@@ -7,7 +7,6 @@ const SPACE_INPUTS = new Set(['checkbox', 'radio', 'button', 'submit', 'reset', 
 const ARROW_ROLES = new Set(['slider', 'spinbutton', 'radiogroup', 'tablist', 'menu', 'listbox']);
 const ARROW_INPUTS = new Set(['range', 'radio']);
 
-// which elements a click focused, as opposed to the keyboard or a script
 const clicked = new WeakSet();
 function followClicks() {
   let pressed = null;
@@ -31,8 +30,6 @@ function typing(el) {
   return el.tagName === 'INPUT' && TYPED.test(el.type || 'text');
 }
 
-// whether the focused control keeps the key: a slider or a list its arrows, however it was
-// focused; a button its Space only when the keyboard reached it
 function keeps(el, key) {
   if (!el || el === document.body || el.tagName === 'VIDEO') return false;
   const role = el.getAttribute('role'), input = el.tagName === 'INPUT' ? el.type : null;
@@ -98,7 +95,7 @@ export function playerKeys(video, { box = video.parentElement, fps = 60, stepped
     if (e.defaultPrevented || e.ctrlKey || e.metaKey || e.altKey || e.isComposing) return;
     const el = document.activeElement;
     if (typing(el) || document.querySelector('dialog[open]')) return;
-    // the page's g chords (g l, g j) are the page's
+    // g and the key after it are the page's chords (g l, g j)
     if (e.key === 'g' && !e.shiftKey) { chordAt = e.timeStamp; return; }
     if (e.timeStamp - chordAt < 900) { chordAt = -1e9; return; }
     const key = e.key.length === 1 && !e.shiftKey ? e.key.toLowerCase() : e.key;

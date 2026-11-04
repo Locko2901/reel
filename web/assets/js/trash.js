@@ -25,7 +25,6 @@ export function trash() {
     if (count) count.textContent = n ? `${n} picked` : 'Pick';
     if (all) { all.checked = n > 0 && n === can; all.indeterminate = n > 0 && n < can; }
   };
-  // the rows acted on leave in one pass; the others stay picked, the toast says why
   const settle = (list, d, words) => {
     const done = new Set(d.done);
     for (const row of list) if (done.has(row.dataset.id)) row.remove();

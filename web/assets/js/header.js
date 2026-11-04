@@ -1,5 +1,3 @@
-// Shared by the server's pages and the app's own. A field that takes text marks the page as
-// typing, so a phone's tab bar steps aside for the keyboard.
 import { $, $$ } from './lib.js';
 
 export function header() {
@@ -16,6 +14,7 @@ export function header() {
   }
   document.addEventListener('click', close);
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
+  // a field that takes text marks the page as typing, so a phone's tab bar steps aside for the keyboard
   const typing = (el) => !!el && (el.isContentEditable || /^(TEXTAREA|SELECT)$/.test(el.tagName) || (el.tagName === 'INPUT' && !['checkbox', 'radio', 'range', 'button', 'submit', 'reset', 'file', 'color'].includes(el.type)));
   const keyboard = () => document.documentElement.classList.toggle('typing', typing(document.activeElement));
   document.addEventListener('focusin', keyboard);

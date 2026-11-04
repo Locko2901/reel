@@ -1,4 +1,3 @@
-// One menu for the page, filled for the card it opens on, through the clip page's own endpoints.
 import { $, $$, api, copyWhenReady, focusOnOpen, settings, toast } from './lib.js';
 import { setStar } from './star.js';
 
@@ -15,7 +14,6 @@ function newLink(id) {
   });
 }
 
-// The clip's newest live link, else a new one with the defaults; on a phone the share sheet takes it.
 async function shareLink(card, title) {
   const id = card.dataset.id;
   const made = { link: null };
@@ -28,7 +26,7 @@ async function shareLink(card, title) {
   if (handheld() && navigator.share) {
     try { await navigator.share({ url: await url, title }); }
     catch (err) {
-      // a wait outlasts the tap's permission to open the share sheet; the next tap has the link at once
+      // a wait outlasts the tap's permission to open the share sheet; the next tap has it
       if (err.name === 'NotAllowedError') toast('The link is ready. Tap Send the link again to send it.', 'ok');
       else if (err.name !== 'AbortError') toast(err.message, 'err');
     }

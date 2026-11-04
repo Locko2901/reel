@@ -250,8 +250,6 @@ label.toggle { display: inline-flex; align-items: center; gap: var(--s2); cursor
 .top .search-toggle { display: none; }
 .top .app-share { display: none; }
 html[data-app="desktop"] .top .app-share { display: inline-flex; }
-/* Save clip and Save and share inside the app: labelled from 1280 px, icons alone below, and in
-   the avatar's menu at 600 px and below. */
 .top .app-save { display: none; }
 html[data-app="desktop"] .top .app-save { display: inline-flex; }
 .menu .menu-save { display: none; }
@@ -415,7 +413,6 @@ body.over::after { content: "Drop to upload"; position: fixed; inset: 12px; z-in
 .srow .sctl .unit { color: var(--text-2); font-size: var(--fs-s); }
 .setbox { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s1) var(--s3); }
 .srow .sctl .setbox { justify-content: flex-end; gap: 2px 14px; }
-/* a setting of several options */
 .sgroup { border-bottom: 1px solid var(--line); }
 .sgroup:last-child { border-bottom: 0; }
 .sgroup .srow { border-bottom: 0; }
@@ -466,7 +463,6 @@ label.check.pick:has(input:checked) { background: var(--raised-2); border-color:
 .srow .sctl .ro { font-family: var(--mono); font-size: var(--fs-s); color: var(--text-2); overflow-wrap: anywhere; text-align: right; }
 .srow .sctl input[type="number"] { width: var(--in-num); }
 .srow .sctl input[type="text"], .srow .sctl input[type="password"] { width: var(--in-text); }
-/* a width class on the input wins over the row's default width */
 .srow .sctl input.in-short { width: var(--in-short); }
 .srow .sctl input[type="range"] { width: var(--in-short); }
 .srow .sctl select { max-width: var(--in-text); }
@@ -675,7 +671,6 @@ html[data-kbd="off"] kbd, html[data-kbd="off"] .keys { display: none; }
 .btn.back span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .player { position: relative; aspect-ratio: 16 / 9; background: #000; border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
 .player video, .player img { width: 100%; height: 100%; display: block; object-fit: contain; }
-/* the cut's window: what a tall or square cut keeps, the rest dimmed */
 .player .reframe-window { position: absolute; border: 2px solid var(--accent); border-radius: 2px; box-shadow: 0 0 0 100vmax rgba(13, 11, 16, 0.6); pointer-events: none; z-index: 1; }
 .picture .reframe-x input { width: 140px; }
 .playing-line { color: var(--text-2); font-size: var(--fs-s); margin-top: 6px; }
@@ -812,7 +807,6 @@ html[data-native-play] .play-overlay, html[data-native-play] .player .cover { di
 }
 ::selection { background: var(--selection); }
 
-/* Under 720 px the tabs move into the avatar's menu, under 600 into a bottom bar (not in the app). */
 @media (max-width: 1023px) {
   .top { gap: 10px; padding: 0 14px; }
   .top .search { flex-basis: 200px; }

@@ -1,5 +1,4 @@
-// Through the history while the page the clip was opened from is reel's own and right before
-// this one; else the link the server made from the same page, or the library.
+// data-history: the server saw reel's own page right before this one, so Back walks the history.
 import { $ } from './lib.js';
 
 export function canWalkBack() {

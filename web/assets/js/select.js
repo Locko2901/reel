@@ -1,11 +1,8 @@
-// The bar acts on every picked card in one request each; the clips it did not act on stay
-// picked, and the bar says how many and why.
 import { $, $$, api, copyWhenReady, focusOnOpen, toast } from './lib.js';
 import { showStar } from './star.js';
 
 const typing = (el) => /^(INPUT|TEXTAREA|SELECT)$/.test(el?.tagName) || el?.isContentEditable;
 
-// "Skipped 2: not yours: ..." for each reason, in the bar's words
 export function skippedWords(skipped) {
   if (!skipped?.length) return '';
   const by = new Map();
@@ -87,7 +84,6 @@ export function selectSeveral() {
     toggle(card, e.shiftKey);
   }, true);
 
-  // by touch: a long press on a card starts picking with it
   grid.addEventListener('touchstart', (e) => {
     const card = e.target.closest('.card');
     if (!card || e.touches.length > 1 || e.target.closest('.card-more, .card-star')) return;
@@ -174,7 +170,6 @@ export function selectSeveral() {
     } catch (err) { toast(err.message, 'err'); }
   });
 
-  // the montage page with the picked clips in the order picked
   montage.addEventListener('click', () => {
     const list = inPickOrder();
     const most = 100;
@@ -196,8 +191,7 @@ export function selectSeveral() {
     } catch (err) { toast(err.message, 'err'); }
   });
 
-  // the zip is a plain download of the pick's token, so the browser's bar or the app's
-  // Downloads take it
+  // a plain download of the pick's token, so the browser's bar or the app's Downloads take it
   const dl = $('#download-dialog');
   $('[data-bulk="download"]', bar).addEventListener('click', async (e) => {
     const list = picked();

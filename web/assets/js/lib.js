@@ -2,7 +2,7 @@ export const $ = (s, r = document) => r.querySelector(s);
 export const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 export const settings = (() => { try { return JSON.parse(document.body.dataset.settings || '{}'); } catch { return {}; } })();
 
-// `link`: the words lead there, as a delete's "In the trash for 7 days" leads to the trash.
+// `link`: where the words lead, as a delete's "In the trash for 7 days" leads to the trash.
 export function toast(text, kind = '', action = null, link = '') {
   const host = $('#toasts');
   if (!host) return;
@@ -72,8 +72,6 @@ export async function api(method, url, body) {
 
 export { precise as fmt, parseTime } from './format.js';
 
-// When the stream fails the page asks reel once why (signed out, out of reach, a drop), and
-// waits longer after each failure, up to a minute; focus on the page asks at once.
 let sse = null, retry = null, wait = 0, missed = false, signedOut = false, before = null;
 const listeners = new Set();
 const FIRST_WAIT = 3000, LONGEST_WAIT = 60000;

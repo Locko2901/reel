@@ -237,7 +237,6 @@ function filterControl(picks, apply) {
   };
 }
 
-// Picks of one kind are any of, the kinds and the search all of.
 function liveSearch(grid) {
   const box = $('#search');
   const picks = $$('#filter input[type="checkbox"]');

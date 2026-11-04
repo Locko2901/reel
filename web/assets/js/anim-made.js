@@ -1,7 +1,6 @@
 import { $, $$, api, arm, onEvent, toast } from './lib.js';
 
-// The list is asked for again every 3 s while a picture is being made, so a missed event never
-// leaves a row making.
+// Asked for every 3 s while a picture is being made, so a missed event never leaves a row making.
 export function animMade(id) {
   const box = $('#anim-made');
   if (!box) return;

@@ -1,4 +1,3 @@
-// Volume and mute kept per browser; a store that is blocked or full is ignored.
 const KEY = 'reel-playback';
 
 function read() {
@@ -35,7 +34,6 @@ export function rememberPlayback(video) {
   });
 }
 
-// A hover loop plays muted unless the user unmuted a player.
 export function hoverPlayback(video) {
   const p = read();
   if (volumeOf(p) !== null) video.volume = volumeOf(p);

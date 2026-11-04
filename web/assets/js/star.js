@@ -1,5 +1,4 @@
-// The star on a card, the clip page's Star and the clip menu's item all go through here; the
-// page hears "reel:star" to sieve its cards again.
+// Every star goes through here; the page hears "reel:star" to sieve its cards again.
 import { $$, api, toast } from './lib.js';
 
 export function showStar(id, on) {
@@ -27,7 +26,6 @@ export function stars() {
     const id = b.dataset.clip || b.closest('.card')?.dataset.id;
     if (id) setStar(id, b.getAttribute('aria-pressed') !== 'true');
   });
-  // the clip page's s, outside a text field
   const page = document.querySelector('#star');
   if (!page) return;
   document.addEventListener('keydown', (e) => {

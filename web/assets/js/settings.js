@@ -4,7 +4,6 @@ import { isOn, setOn } from './switch.js';
 
 const CTL = 'input, select, button[role="switch"]';
 
-// A setting of several options (a set) is a group: a row for each option with its switch.
 const optionsOf = (row) => $$('.sopt', row).map(o => ({ value: o.dataset.opt, sw: $('button[role="switch"]', o) }));
 
 function rawOf(row) {
@@ -27,8 +26,7 @@ function show(row, d) {
   else ctl.value = d.value;
 }
 
-// A row under a switch shows while that switch, and every one above it, is on; its value
-// stays either way. Parents come before their rows, so one pass settles a chain.
+// Parents come before their rows in the page, so one pass settles a chain.
 function dependents() {
   $$('[data-depends]').forEach(r => {
     const p = $(`[data-key="${r.dataset.depends}"]`);
@@ -143,7 +141,6 @@ async function settingsHistory() {
   } catch (err) { $('#history-empty').textContent = err.message; $('#history-empty').hidden = false; }
 }
 
-// What the cap would move to the trash at the size typed, before it is set.
 function capLine() {
   const row = $('.srow[data-key="storage.cap_gb"]');
   const field = row && $('input', row);

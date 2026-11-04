@@ -7,8 +7,7 @@ function bar(row, sent, total, word) {
   $('.mono', row).textContent = word ? `${word} ${p}%` : `${p}%`;
 }
 
-// One file in pieces, its row in `list` showing how far it is; `then(clip)` once the
-// library has it.
+// One file in pieces, its row in `list`; `then(clip)` once the library has it.
 export function send(file, list, then) {
   const row = document.createElement('div');
   row.className = 'notice active';
@@ -58,7 +57,6 @@ export function send(file, list, then) {
   go();
 }
 
-// Files dropped on `target` go up into `list`; a class while files are over it.
 function dropOn(target, list, shown) {
   ['dragenter', 'dragover'].forEach((t) => target.addEventListener(t, (e) => {
     if (![...(e.dataTransfer?.types || [])].includes('Files')) return;
@@ -86,6 +84,5 @@ export function upload() {
     input.onchange = () => { [...input.files].forEach((f) => send(f, list)); input.value = ''; };
     dropOn(drop, list);
   }
-  // The library takes clips dropped anywhere on it.
   if ($('.lib-head')) dropOn(document.body, list, () => { list.hidden = false; });
 }

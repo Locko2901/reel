@@ -24,7 +24,6 @@ export function montage() {
   const overlap = () => (join.value === 'cut' ? 0 : +joinLen.value);
   const total = () => { const u = used(); return Math.max(0, u.reduce((t, p) => t + length(p), 0) - Math.max(0, u.length - 1) * overlap()); };
 
-  // a value the lists do not have (one asked for by hand) is added to them, so it shows as it is
   const choose = (select, value, words) => {
     if (![...select.options].some((o) => o.value === value)) select.add(new Option(words, value));
     select.value = value;
@@ -99,7 +98,6 @@ export function montage() {
   }
 
   const hs = $('#m-hs'), he = $('#m-he'), strip = $('#m-strip'), tStart = $('#m-t-start'), tEnd = $('#m-t-end'), volSel = $('#m-vol');
-  // the keyframes of the part's version, asked for once each, and its ticks under the strip
   const snap = $('#m-snap'), kfHost = $('#m-keyframes'), asked = new Map();
   let kf = [], frame = 1 / 30;
   const nearest = (t) => kf.reduce((a, b) => (Math.abs(b - t) < Math.abs(a - t) ? b : a));

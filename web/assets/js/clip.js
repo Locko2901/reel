@@ -105,10 +105,9 @@ function followLinkWait(id, rid, show) {
   return () => { stopped = true; clearTimeout(timer); };
 }
 
-// The newest link that still plays: the Share panel lists the expired ones too.
 const liveLink = () => $('#shares .linkrow[data-active] .copy');
 
-// Phones and tablets only, never a PC, whatever its browser offers and however narrow its window.
+// Phones and tablets, never a PC, whatever its browser offers or its window's width.
 const handheld = () => matchMedia('(pointer: coarse) and (hover: none)').matches;
 
 function bindShares(id) {
@@ -335,7 +334,6 @@ function audioEditor(id, video, root, toMaster, onChange) {
   update();
   return {
     changed,
-    // The sound of a cut's recipe, or as the original is with none.
     apply: (r = {}) => {
       applying = true;
       setOn(mute, !!r.mute);
@@ -373,13 +371,11 @@ function trimEditor(id, video, duration, fps, titleField) {
   let kf = []; try { kf = JSON.parse($('#kf-json').textContent) || []; } catch {}
   const kfHost = $('#keyframes');
   kf.forEach(t => { const i = document.createElement('i'); i.style.left = `${t / duration * 100}%`; kfHost.append(i); });
-  // With a cut current the editor opens on it, its range on the original and its sound.
   let from = null; try { from = JSON.parse($('#from-json')?.textContent || 'null'); } catch {}
   const st = from ? { start: Math.max(0, from.start), end: Math.min(duration, from.end) } : { start: 0, end: duration };
   const frame = 1 / fps;
   const previewRow = $('#preview-row'), previewBox = $('#preview-cut'), loopBox = $('#preview-loop'), readout = $('#preview-time');
   const root = $('#clip');
-  // the picture: a window of it, tall or square, and fades in and out
   const reframe = $('#reframe'), reframeX = $('#reframe-x'), xBox = $('#reframe-x-box'), fadeIn = $('#fade-in'), fadeOut = $('#fade-out'), win = $('#reframe-window');
   const picture = () => {
     const p = {};
@@ -503,7 +499,7 @@ function trimEditor(id, video, duration, fps, titleField) {
     if (fadeOut) fadeOut.value = String(from.fade_out || 0);
     fromPicture = JSON.stringify(picture());
   }
-  // a frame is chosen on the original, so the player shows it (a version may be framed already)
+  // a frame is chosen on the original: a version may be framed already
   const toOriginal = () => { if (reframe?.value && !onOriginal()) masterPlaying(); };
   [reframe, fadeIn, fadeOut].forEach((el) => el?.addEventListener('change', () => { pristine = false; toOriginal(); showWindow(); render(); }));
   reframeX?.addEventListener('input', () => { pristine = false; toOriginal(); showWindow(); render(); });
@@ -651,7 +647,7 @@ function animPanel() {
       if (d.error) throw new Error(d.error);
       btn.classList.add('busy');
       word().textContent = 'Making it';
-      // asked for as well as heard of: a missed event never leaves the button making it for good
+      // asked for as well as heard of, so a missed event never leaves the button making it
       const step = (j, fail) => {
         if (j.state === 'running') word().textContent = `Making it, ${Math.round(j.progress * 100)}%`;
         const why = jobEnded(j, 'it could not be made');
@@ -687,8 +683,7 @@ function sendPanel(root, id, titleField) {
     const why = await fetch(copyUrl()).then(r => r.json()).then(d => d.error).catch(() => null);
     throw new Error(why || `${head.status}: the copy could not be made`);
   }
-  // the events say how far the copy is, and its own address answers 200 once it is made,
-  // whichever the page hears first
+  // done at whichever comes first: the events, or the copy's own address answering 200
   async function follow(onProgress) {
     const url = copyUrl(), o = chosen(), limit = quality.value;
     const first = await fetch(url, { cache: 'no-store' });

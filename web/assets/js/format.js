@@ -9,9 +9,8 @@ export const size = (bytes) => {
 export const clock = (s) => { s = Math.max(0, Math.round(s)); const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), r = s % 60; return h ? `${h}:${String(m).padStart(2, '0')}:${String(r).padStart(2, '0')}` : `${m}:${String(r).padStart(2, '0')}`; };
 export const precise = (s) => { s = Math.max(0, s); const m = Math.floor(s / 60), r = s - m * 60; return `${m}:${r.toFixed(2).padStart(5, '0')}`; };
 export const seconds = (s) => `${Math.max(0, s).toFixed(1)} s`;
-// A gain with its sign, the decimal only when there is one (`+6 dB`, `-3.5 dB`); a measured level with one (`-16.3 dBTP`).
 export const gain = (db) => { const n = Math.abs(db); const t = Number.isInteger(n) ? String(n) : n.toFixed(1); return db > 0 ? `+${t} dB` : db < 0 ? `-${t} dB` : '0 dB'; };
 export const level = (v, unit) => `${v.toFixed(1)} ${unit}`;
 export const parseTime = (t) => { const m = /^(?:(\d+):)?(\d+(?:\.\d+)?)$/.exec(t.trim()); return m ? (+(m[1] || 0)) * 60 + +m[2] : NaN; };
-// A long value cut for the pages: the head and the tail, the tail whole (six characters).
+// Head and tail of a long value, so the pages cut the head and show the tail whole.
 export const split = (value, keep = 6) => value.length <= keep ? [value, ''] : [value.slice(0, value.length - keep), value.slice(value.length - keep)];

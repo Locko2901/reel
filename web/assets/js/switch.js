@@ -1,5 +1,4 @@
-// A button with role="switch" whose aria-checked is the state; inside a form it keeps a hidden
-// field (data-input) in step, so the form posts it.
+// Inside a form a switch keeps its hidden field (data-input) in step, so the form posts it.
 export const isOn = (el) => el.getAttribute('aria-checked') === 'true';
 
 export function setOn(el, on) {

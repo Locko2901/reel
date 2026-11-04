@@ -1,5 +1,4 @@
-// The app's webview shows no download bar, so the app tells the page as a download starts,
-// goes and ends, and the page says so in a toast. In a browser nothing here runs.
+// The app's webview shows no download bar, so the app reports each download and the page toasts it.
 import { $ } from './lib.js';
 import { size } from './format.js';
 
@@ -8,7 +7,7 @@ export function appDownloads() {
   const call = t && t.core && typeof t.core.invoke === 'function' ? t.core.invoke : null;
   if (!call || !window.__REEL_DESKTOP__) return;
   const timers = new Map();
-  // the app calls this on each change of a download; what the toast says goes to its log
+  // called by the app on each change of a download; the words returned go to its log
   window.__reelDownload = (d) => {
     const host = $('#toasts');
     if (!host || !d) return '';

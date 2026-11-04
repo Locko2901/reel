@@ -1,5 +1,4 @@
-// The device API's upload in pieces, behind the session; after a reload the same file picked
-// again goes on where it stopped.
+// Uploads in pieces through the device API; the same file picked again after a reload goes on.
 import { Sha256 } from './sha256.js';
 
 const READ = 4 << 20;
