@@ -277,6 +277,11 @@ desktop-back: desktop-linux ## The way back in the window: the button, the mouse
 desktop-standalone: desktop-linux ## Standalone in the app under Xvfb, where a new install starts
 	$(DESKTOP_RUN) -w /work -e XVFB_SCREEN=1280x900 -e REEL_SHOTS_OUT $(DESKTOP_IMAGE) /work/desktop/ci/xvfb.sh run sh /work/desktop/ci/check-standalone.sh
 
+.PHONY: desktop-library
+desktop-library: desktop-linux ## The library moved to another drive, copied, cut short and away, in the app under Xvfb
+	mkdir -p "$(DESKTOP_OUT)"
+	$(DESKTOP_RUN) -w /work -e XVFB_SCREEN=1280x1200 -e REEL_SHOTS_OUT $(DESKTOP_IMAGE) /work/desktop/ci/xvfb.sh run sh /work/desktop/ci/check-library.sh
+
 desktop-shots: desktop-linux ## Screenshots of the window at 1280x800 and 720x850 against the demo (REEL_E2E_PASSWORD)
 	$(DESKTOP_RUN) -w /work -e XVFB_SCREEN=1280x900 -e REEL_E2E_SERVER=$(REEL_E2E_SERVER) -e REEL_E2E_USER=$(REEL_E2E_USER) \
 	  -e REEL_E2E_PASSWORD="$(REEL_E2E_PASSWORD)" -e REEL_SHOTS_OUT=/work/$(DESKTOP_SHOTS_OUT) $(DESKTOP_IMAGE) /work/desktop/ci/xvfb.sh run /work/desktop/ci/shots.sh
