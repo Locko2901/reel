@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.11.2](https://github.com/Locko2901/reel/compare/v1.11.1...v1.11.2) (2026-11-04)
+
+
+### Documentation
+
+* MAINTAINING.md, for running the repository ([#5](https://github.com/Locko2901/reel/issues/5)) ([088b51e](https://github.com/Locko2901/reel/commit/088b51e49bd62c12770f3b5c84607f9d0ca561b7))
+* the FAQ is called Questions ([#6](https://github.com/Locko2901/reel/issues/6)) ([8ae1f8e](https://github.com/Locko2901/reel/commit/8ae1f8ebf979e3e6f8dece11f834fe94e3717429))
+
 ## 1.11.1 (2026-11-04)
 
 ### Bug Fixes
