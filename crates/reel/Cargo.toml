@@ -44,6 +44,6 @@ tempfile.workspace = true
 zip.workspace = true
 openidconnect = { version = "4.0.1", features = ["reqwest"] }
 rsa = "0.9"
-rand = "0.8"
+rand = "0.10"
 chrono = "0.4.45"
 axum.workspace = true

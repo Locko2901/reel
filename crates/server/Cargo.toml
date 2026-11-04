@@ -35,7 +35,7 @@ anyhow.workspace = true
 futures.workspace = true
 jiff.workspace = true
 percent-encoding.workspace = true
-tower-sessions = "0.14"
+tower-sessions = "0.15"
 tower-sessions-sqlx-store = { version = "0.15", features = ["sqlite"] }
 axum-login = "0.18.0"
 password-auth = "1.0.0"
