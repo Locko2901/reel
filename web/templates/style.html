@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+{% block title %}Style · reel{% endblock %}
+{% block content %}
+<div class="page-head"><h1>Style</h1><span class="sub">every token and component of reel's pages, rendered; the demo only</span></div>
+<div class="style-page panels">
+
+<div class="panel">
+  <header><h2>Colour</h2><span class="desc">the surfaces, the lines, the text, the one pink, the primary, the three status colours</span></header>
+  <div class="body swatches">
+    {% for (name, var) in swatches %}<div class="swatch"><i style="background: var({{ var }})"></i><span>{{ name }}</span></div>{% endfor %}
+  </div>
+</div>
+
+<div class="panel">
+  <header><h2>Type</h2><span class="desc">Geist for everything read; Geist Mono for ids, paths, URLs, error output and key caps</span></header>
+  <div class="body specimen">
+    <h1>Page title, 22 px</h1>
+    <h2>Panel header, 14 px, sentence case, one line</h2>
+    <p>Body, 14 px: the clip was taken from the incoming folder and published.</p>
+    <p class="small muted">Small, 12 px, text-2: the description of a row.</p>
+    <p class="small faint">Small, 12 px, text-3: a hint, AA on every surface.</p>
+    <p class="mono small">01M4GJGN31P2HR8W0DPTDE92PP, /srv/reel/library, https://clips.example.org/s/abc</p>
+    <p><kbd>i</kbd> <kbd>o</kbd> <kbd>space</kbd> key caps</p>
+  </div>
+</div>
+
+<div class="panel">
+  <header><h2>Spacing, radius and control heights</h2><span class="desc">4, 8, 12, 16, 20, 24, 32; radius 4 and 2; controls 30, 24 and 38 (44 on a coarse pointer)</span></header>
+  <div class="body specimen">
+    <div class="scale"><i style="width: 4px; height: 4px"></i><i style="width: 8px; height: 8px"></i><i style="width: 12px; height: 12px"></i><i style="width: 16px; height: 16px"></i><i style="width: 20px; height: 20px"></i><i style="width: 24px; height: 24px"></i><i style="width: 32px; height: 32px"></i></div>
+    <div class="row"><button class="small">compact, 24</button><span class="small muted">tables, panel headers, rows of small actions</span></div>
+    <div class="row"><button>default, 30</button><span class="small muted">everything that sits beside an input or a select</span></div>
+    <div class="row"><button class="big">large, 38</button><span class="small muted">the sign-in</span></div>
+  </div>
+</div>
+
+<div class="panel">
+  <header><h2>Actions</h2><span class="desc">primary (one per view), secondary, quiet, danger; a toggle holds a pressed state</span></header>
+  <div class="body specimen">
+    <div class="row wrap"><button class="primary">Primary</button><button>Secondary</button><button class="quiet">Quiet</button><button class="danger">Danger</button><button disabled>Disabled</button></div>
+    <div class="row wrap"><button class="primary small">Primary</button><button class="small">Secondary</button><button class="quiet small">Quiet</button><button class="danger small">Danger</button></div>
+    <div class="row wrap"><label class="toggle">Loop <button type="button" class="switch" role="switch" aria-checked="true"><i></i></button></label><label class="toggle">Half speed <button type="button" class="switch" role="switch" aria-checked="false"><i></i></button></label><div class="seg" role="group"><button aria-pressed="true">Now</button><button aria-pressed="false">Failed</button><button aria-pressed="false">History</button></div></div>
+    <div class="row wrap"><a class="btn primary" href="#"><svg class="icon" viewBox="0 0 16 16"><path d="M8 11V3M4.5 6.5 8 3l3.5 3.5M3 13h10"/></svg><span>Upload</span></a><a class="btn" href="/status">A link that looks like a button navigates</a><a href="/status">A text link navigates</a></div>
+    <div class="row wrap"><fieldset class="setbox pick-list"><legend>Picked from a list</legend><label class="check"><input type="checkbox" checked> <span>Valorant</span></label><label class="check"><input type="checkbox"> <span>Overwatch 2</span></label></fieldset><span class="faint small">checkboxes only where several items are picked from a list (the Filter, a clip's collections)</span></div>
+  </div>
+</div>
+
+<div class="panel">
+  <header><h2>Inputs</h2><span class="desc">one height; widths by kind; the unit inside the group; a locked value in the same column; selects show words</span></header>
+  <div class="body flush">
+    <div class="srow"><div class="slabel"><b>A number with its unit</b><span class="shelp">in-num, 92 px, right aligned, the unit inside the group</span></div><div class="sctl"><span class="ctl-group"><input type="number" class="in-num" value="20" aria-label="A number"><span class="unit">GB free</span></span></div></div>
+    <div class="srow"><div class="slabel"><b>A short word</b><span class="shelp">in-short, 140 px</span></div><div class="sctl"><input type="text" class="in-short" value="Europe/Berlin" aria-label="A short word"></div></div>
+    <div class="srow"><div class="slabel"><b>A name or a URL</b><span class="shelp">in-text, 260 px</span></div><div class="sctl"><input type="text" class="in-text" value="https://clips.example.org" aria-label="A URL"></div></div>
+    <div class="srow"><div class="slabel"><b>A path</b><span class="shelp">in-path, the column's width, monospace</span></div><div class="sctl"><input type="text" class="in-path mono" value="/srv/reel/incoming" aria-label="A path"></div></div>
+    <div class="srow locked"><div class="slabel"><b>Set by the environment</b><span class="shelp">a read-only control with a lock; the note as a badge</span><div class="notes"><span class="badge lock">set by the environment (REEL_DATA_DIR)</span><span class="badge warn">after a restart</span></div></div><div class="sctl"><span class="in-locked mono" title="/srv/reel/data"><span>/srv/reel/data</span></span></div></div>
+    <div class="srow"><div class="slabel"><b>A choice</b><span class="shelp">a select shows words, never a stored value</span><div class="notes"><span class="badge accent">changed, was every clip</span></div></div><div class="sctl"><button class="quiet">Reset</button><select aria-label="A choice"><option>re-encoded clips only</option><option>every clip</option><option>none</option></select></div></div>
+    <div class="srow"><div class="slabel"><b>A choice that does not apply</b><span class="shelp">disabled, with the reason under it</span></div><div class="sctl"><select disabled aria-label="A choice that does not apply"><option>same as the stream</option></select><span class="why">the bitrate sits in the encoder's own settings in advanced output mode</span></div></div>
+    <div class="srow"><div class="slabel"><b>On or off</b><span class="shelp">a switch, the label on the left, no word beside it</span></div><div class="sctl"><button type="button" class="switch" role="switch" aria-checked="true" aria-label="On or off"><i></i></button></div></div>
+    <div class="sgroup" role="group" aria-label="Several options">
+      <div class="srow sgroup-head"><div class="slabel"><b>Several options</b><span class="shelp">a setting that takes several: its name and Reset, then a row with a switch for each option, in words; never a checkbox</span><div class="notes"><span class="badge accent">changed from the defaults</span></div></div><div class="sctl"><button class="quiet reset" type="button">Reset</button></div></div>
+      <div class="srow sopt"><div class="slabel"><b>A job failed</b><span class="shelp">the option's short line</span></div><div class="sctl"><button type="button" class="switch" role="switch" aria-checked="true" aria-label="Several options: a job failed"><i></i></button></div></div>
+      <div class="srow sopt"><div class="slabel"><b>The disk is low</b></div><div class="sctl"><button type="button" class="switch" role="switch" aria-checked="false" aria-label="Several options: the disk is low"><i></i></button></div></div>
+    </div>
+    <div class="srow refused"><div class="slabel"><b>A refused value</b><span class="shelp">the error under the control, the row marked</span></div><div class="sctl"><span class="ctl-group"><input type="number" class="in-num" value="900" aria-label="A refused value"><span class="unit">days</span></span><span class="err">at most 365</span></div></div>
+  </div>
+</div>
+
+<div class="panel">
+  <header><h2>Status</h2><span class="desc">a dot, a badge, a coloured value; details in a block that expands</span></header>
+  <div class="body specimen">
+    <div class="row wrap"><span class="row"><i class="dot ok"></i> ok</span><span class="row"><i class="dot warn"></i> warning</span><span class="row"><i class="dot err"></i> error</span><span class="row"><i class="dot"></i> neutral</span><span class="row"><i class="dot active"></i> busy</span></div>
+    <div class="row wrap"><span class="badge ok">done</span><span class="badge warn">after a restart</span><span class="badge err">failed</span><span class="badge">queued</span><span class="badge accent">current</span><span class="badge lock">set by the environment</span></div>
+    <p><span class="st-ok">stream copy</span>, <span class="st-warn">re-encode</span>, <span class="st-err">failed</span>, <span class="st-active">encoding 40%</span>, <span class="st-neutral">waiting</span></p>
+    <details class="errbox"><summary><span class="badge err">failed</span> ffmpeg exited with 1: Conversion failed</summary><pre>ffmpeg -hwaccel qsv -i /srv/reel/incoming/Replay.mkv ...
+[h264_qsv @ 0x5] Error initializing an internal MFX session: unsupported (-3)
+Conversion failed!</pre><div class="actions"><button class="small quiet copy" data-copy="ffmpeg exited with 1">Copy</button></div></details>
+    <div class="notice active"><span class="pulse st-active">processing</span><span class="muted">ingest 40%</span></div>
+  </div>
+</div>
+
+<div class="panel">
+  <header><h2>Long values</h2><span class="desc">cut in the middle, never inside a token, the whole on hover, Copy beside it</span></header>
+  <div class="body specimen">
+    <span class="value"><span class="trunc" title="https://clips.example.org/s/nsrvqZhI1trZUgir0gKlA"><span class="a">https://clips.example.org/s/nsrvqZhI1trZUgi</span><span class="b">r0gKlA</span></span><button class="small quiet copy" data-copy="https://clips.example.org/s/nsrvqZhI1trZUgir0gKlA">Copy</button></span>
+    <span class="value"><span class="trunc" title="01M4GJGN31P2HR8W0DPTDE92PP"><span class="a">01M4GJGN31P2HR8W0DPTD</span><span class="b">E92PP</span></span><button class="small quiet copy" data-copy="01M4GJGN31P2HR8W0DPTDE92PP">Copy</button></span>
+  </div>
+</div>
+
+<div class="panel">
+  <header><h2>A table</h2><span class="desc">compact buttons in the last column, a badge for the state</span><div class="actions"><button class="small">Refresh</button></div></header>
+  <div class="body flush">
+    <table class="cards">
+      <thead><tr><th>Clip</th><th>State</th><th>When</th><th></th></tr></thead>
+      <tbody>
+        <tr><td class="clip">Oct 8, 16:33</td><td class="sub"><span class="badge ok">done</span></td><td class="sub">10 min ago</td><td class="right acts"><button class="small">Retry</button> <button class="quiet small">Dismiss</button></td></tr>
+        <tr><td class="clip">Oct 8, 16:21</td><td class="sub"><span class="badge err">failed</span></td><td class="sub">Oct 7, 21:14</td><td class="right acts"><button class="small">Retry</button> <button class="quiet small">Dismiss</button></td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="panel">
+  <header><h2>Formats</h2><span class="desc">one formatter each</span></header>
+  <div class="body"><dl class="kv"><dt>sizes</dt><dd>512 kB, 1.1 MB, 27.1 GB</dd><dt>durations</dt><dd>0:03, 1:02:03; 0:03.00 in the editor</dd><dt>dates</dt><dd>just now, 10 min ago, 3 h ago, then Oct 7, 21:14 (the ISO stamp on hover)</dd><dt>resolutions</dt><dd>1920 × 1080</dd><dt>meta lines</dt><dd><div class="meta"><span>0:03</span><span>1280 × 720, 30 fps</span><span>1.1 MB</span><span>uploaded by sam</span></div></dd></dl></div>
+</div>
+
+</div>
+{% endblock %}

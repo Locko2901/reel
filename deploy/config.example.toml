@@ -1,0 +1,78 @@
+# Every key has a REEL_* environment override, named on the Settings page. A key set here or
+# in the environment is read only in Settings; the rest is edited there and kept in the database.
+site_name = "reel"
+listen = "0.0.0.0:8080"
+public_url = "https://clips.example.com"
+data_dir = "/data"
+timezone = ""                  # an IANA name; empty follows the host's clock
+
+[auth]
+mode = "proxy"                 # local (the default for a new install): built-in accounts; proxy: trust X-authentik-username from trusted_proxies; oidc: an identity provider; single: no sign-in, only on a loopback address
+dev_user = "you"
+admins = ["sam"]            # users with these names are admins; the first user ever seen is one too; with oidc the name is the provider's claim, trusted at first sight
+session_days = 30              # built-in accounts: a session ends this long after its last use
+session_max_days = 90          # a session ends this long after the sign-in, however active; 0 is no limit
+# auth.mode = "oidc" leaves the sign-in to an identity provider (Authentik, Keycloak, ...):
+# oidc_issuer = "https://auth.example.org/application/o/reel/"
+# oidc_client_id = "reel"      # the secret comes from REEL_OIDC_CLIENT_SECRET or the file REEL_OIDC_CLIENT_SECRET_FILE names
+# oidc_scopes = "openid profile email"
+# oidc_username_claim = "preferred_username"   # the name shown; email only when verified; who the user is comes from the issuer and subject
+# oidc_role_claim = "groups"   # a claim holding oidc_admin_value makes an admin, followed at every sign-in both ways; the admins list and the last admin stay; empty: the admins list alone, at first sight
+# oidc_admin_value = "admin"
+
+[ingest]
+incoming_dir = "/incoming"
+originals_dir = "/originals"
+poll_seconds = 5
+stable_polls = 2
+keep_originals = "reencoded"   # reencoded | all | none
+extensions = ["mkv", "mp4", "mov", "webm", "ts", "avi"]
+
+[media]
+ffmpeg = "/usr/lib/jellyfin-ffmpeg/ffmpeg"
+ffprobe = "/usr/lib/jellyfin-ffmpeg/ffprobe"
+hwaccel = "auto"               # auto | qsv | vaapi | none
+render_device = "/dev/dri/renderD128"
+# A clip is copied untouched when the video is H.264 within copy_max_height and copy_max_mbit and
+# the audio is AAC, else re-encoded. Normalising to loudness_target (LUFS) re-encodes the audio.
+copy_max_height = 1440
+copy_max_mbit = 50
+encode_mbit = 10
+normalize_audio = false
+loudness_target = -16
+audio_kbit = 320
+
+[pipeline]
+workers = 1
+job_timeout_minutes = 60
+nice = 10
+
+[share]
+discord_limit_mb = 20
+discord_limits_mb = [10, 20, 50, 100, 500]
+trash_days = 7
+discord_cache_gb = 5
+download_default = true        # whether a new link offers the full file
+expiry_default = "never"       # never | 1d | 7d | 30d
+embed_mb = 20                  # the preview video size: a version over it gets a smaller copy for the link previews, which give up fetching after a few seconds
+
+[storage]
+disk_warn_gb = 20              # the disk line turns amber under this much free; 0 is off
+
+[import]
+upload_max_gb = 8
+
+[notify]
+kind = "off"                   # off | ntfy | webhook
+ntfy_url = ""
+ntfy_topic = ""
+ntfy_token = ""
+webhook_url = ""               # ntfy_url and webhook_url: https, unless the host is on the private network
+events = ["job_failed", "file_unreadable", "disk_low"]   # also update_available, link_made
+
+[appearance]
+theme = "dark"
+
+[advanced]
+log_level = "info"             # error | warn | info | debug; RUST_LOG wins when set
+update_check = true            # once a day against the repository's releases

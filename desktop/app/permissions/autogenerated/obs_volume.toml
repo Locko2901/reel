@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-obs-volume"
+description = "Enables the obs_volume command without any pre-configured scope."
+commands.allow = ["obs_volume"]
+
+[[permission]]
+identifier = "deny-obs-volume"
+description = "Denies the obs_volume command without any pre-configured scope."
+commands.deny = ["obs_volume"]

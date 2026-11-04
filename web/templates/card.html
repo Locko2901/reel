@@ -1,0 +1,17 @@
+<div class="card" data-id="{{ c.id }}" data-text="{{ c.text }}" data-when="{{ c.when }}" data-dur="{{ c.duration_s }}" data-title="{{ c.title_key }}" data-shared="{{ c.shares }}" data-game="{{ c.game_key }}" data-sets="{{ c.sets }}" data-state="{{ c.state }}"{% if c.can_edit %} data-edit{% endif %}{% if c.starred %} data-star{% endif %} {% if let Some(h) = c.hover %}data-hover="{{ h }}"{% endif %}>
+  <a class="card-link" href="/clips/{{ c.id }}">
+  <div class="poster {% if c.state == "processing" %}processing{% endif %}">
+    {% if let Some(p) = c.poster %}<img src="{{ p }}" alt="" loading="lazy">{% endif %}
+    {% if c.state == "processing" %}<span class="flag st-active">{% if c.progress > 0 %}encoding {{ c.progress }}%{% else %}waiting{% endif %}</span><span class="progress"><i style="width:{{ c.progress }}%"></i></span>
+    {% else if c.state == "failed" %}<span class="flag st-err">failed</span>
+    {% else if !c.duration.is_empty() %}<span class="dur">{{ c.duration }}</span>{% endif %}
+  </div>
+  <div class="card-title ellipsis">{{ c.title }}</div>
+  <div class="card-meta">
+    {% if let Some(e) = c.error %}<span class="st-err">{{ e }}</span>
+    {% else %}{% for m in c.meta %}<span{% if !m.class.is_empty() %} class="{{ m.class }}"{% endif %}>{{ m.text }}</span>{% endfor %}{% if show_owners %}{% if let Some(o) = c.owner %}<span class="by">by {{ o }}</span>{% endif %}{% endif %}{% if !c.shared.is_empty() %}<span class="shared">{{ c.shared }}</span>{% endif %}{% endif %}
+  </div>
+  </a>
+  <button class="card-star" type="button" aria-pressed="{{ c.starred }}" aria-label="Star {{ c.title }}" title="{% if c.starred %}Starred{% else %}Star{% endif %}"><svg class="icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.9l1.85 3.85 4.2.55-3.07 2.9.78 4.17L8 11.33l-3.76 2.04.78-4.17-3.07-2.9 4.2-.55z"/></svg></button>
+  <button class="card-more" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="More for {{ c.title }}"><svg class="icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="3.5" cy="8" r="1.1"/><circle cx="8" cy="8" r="1.1"/><circle cx="12.5" cy="8" r="1.1"/></svg></button>
+</div>

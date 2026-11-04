@@ -1,0 +1,12 @@
+{
+  "name": "ffmpeg 9.0.2 GPL build by BtbN (linux64, static but for glibc)",
+  "version": "9.0.2",
+  "url": "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-09-30-13-08/ffmpeg-n9.0.2-17-g2a571b6068-linux64-gpl-9.0.tar.xz",
+  "sha256": "68ee646831adaae2495618346f3bba94ff207ff83bbd34d643e7004730d66269",
+  "bytes": 151017172,
+  "license": "GPL v3",
+  "license_file": "ffmpeg-LICENSE.txt",
+  "source": "https://ffmpeg.org/download.html#releases",
+  "build_page": "https://github.com/BtbN/FFmpeg-Builds",
+  "note": "A month's last build, which BtbN keeps; the checksum is the one GitHub publishes for the asset. desktop/ci/fetch-ffmpeg.sh refuses a download that does not match it. One build for every distribution: the AppImage and the .deb carry it, as the Windows installers carry gyan.dev's."
+}

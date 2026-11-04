@@ -1,0 +1,17 @@
+<div class="menu card-menu" id="card-menu" role="menu" aria-labelledby="card-menu-title" hidden>
+  <div class="menu-head"><b id="card-menu-title" class="ellipsis"></b></div>
+  <a role="menuitem" tabindex="-1" data-act="open" href="">Open</a>
+  {% if !who.standalone %}<button role="menuitem" tabindex="-1" class="item" type="button" data-act="link"><span>Copy link</span><span class="note"></span></button>{% endif %}
+  <button role="menuitem" tabindex="-1" class="item" type="button" data-act="star">Star</button>
+  <a role="menuitem" tabindex="-1" data-act="download" href="" download>Download</a>
+  <button role="menuitem" tabindex="-1" class="item" type="button" data-act="rename">Rename</button>
+  <button role="menuitem" tabindex="-1" class="item" type="button" data-act="sets">Collections</button>
+  <button role="menuitem" tabindex="-1" class="item danger" type="button" data-act="delete"><span>Delete</span><span class="note"></span></button>
+</div>
+<dialog id="rename-dialog" aria-labelledby="rename-title">
+  <header id="rename-title">Rename</header>
+  <form method="dialog" class="body" id="rename-form">
+    <label class="field"><span>Title</span><input type="text" name="title" maxlength="200" required></label>
+  </form>
+  <footer><button class="quiet" id="rename-cancel" type="button">Cancel</button><button class="primary" id="rename-save" type="button">Save</button></footer>
+</dialog>

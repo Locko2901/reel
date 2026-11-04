@@ -1,0 +1,49 @@
+[package]
+name = "reel"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+publish = false
+
+[lib]
+name = "reel"
+path = "src/lib.rs"
+
+[[bin]]
+name = "reel"
+path = "src/main.rs"
+
+[features]
+style-page = ["reel-server/style-page"]
+
+[dependencies]
+reel-core.workspace = true
+reel-store.workspace = true
+reel-media.workspace = true
+reel-pipeline.workspace = true
+reel-server.workspace = true
+tokio.workspace = true
+tokio-util.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+anyhow.workspace = true
+clap.workspace = true
+serde_json.workspace = true
+jiff.workspace = true
+
+[dev-dependencies]
+sqlx.workspace = true
+reqwest.workspace = true
+futures.workspace = true
+toml.workspace = true
+scraper.workspace = true
+tempfile.workspace = true
+zip.workspace = true
+openidconnect = { version = "4.0.1", features = ["reqwest"] }
+rsa = "0.9"
+rand = "0.8"
+chrono = "0.4.45"
+axum.workspace = true

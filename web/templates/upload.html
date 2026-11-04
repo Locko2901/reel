@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block title %}Upload · reel{% endblock %}
+{% block content %}
+<div class="page-head"><h1>Upload</h1><span class="sub">{% if who.standalone %}into the library on this PC, the same way a clip OBS saves goes{% else %}raw clips go through the same pipeline as the incoming folder{% endif %}</span></div>
+<div class="drop" id="drop">
+  <p class="row wrap">Drop clips here, or <label class="btn">pick files<input type="file" id="file" accept="{{ extensions }}" multiple hidden></label></p>
+  <p class="faint small">{{ extensions }}</p>
+</div>
+<div class="stack uploads" id="uploads"></div>
+{% endblock %}

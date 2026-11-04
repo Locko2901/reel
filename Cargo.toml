@@ -1,0 +1,64 @@
+[workspace]
+resolver = "2"
+members = ["crates/*"]
+exclude = ["desktop"]
+
+[workspace.package]
+version = "1.11.1"
+edition = "2021"
+license = "MIT"
+authors = ["Lockoo"]
+repository = "https://github.com/Locko2901/reel"
+homepage = "https://locko2901.github.io/reel/"
+rust-version = "1.85"
+
+[workspace.dependencies]
+reel-core = { path = "crates/core" }
+reel-store = { path = "crates/store" }
+reel-media = { path = "crates/media" }
+reel-pipeline = { path = "crates/pipeline" }
+reel-server = { path = "crates/server" }
+
+anyhow = "1"
+thiserror = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+jiff = { version = "0.2", features = ["serde", "tzdb-bundle-always"] }
+tokio = { version = "1", features = ["full"] }
+tokio-stream = { version = "0.1", features = ["sync"] }
+tokio-util = "0.7"
+futures = "0.3"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+toml = "0.8"
+sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio", "sqlite", "migrate", "macros", "derive"] }
+axum = { version = "0.8", features = ["macros", "multipart"] }
+tower = "0.5"
+tower-http = { version = "0.6", features = ["fs", "trace", "set-header"] }
+askama = "0.14"
+rust-embed = { version = "8", features = ["include-exclude"] }
+mime_guess = "2"
+ulid = "1"
+getrandom = "0.3"
+base64 = "0.22"
+regex = "1"
+ipnet = "2"
+clap = { version = "4", features = ["derive"] }
+percent-encoding = "2"
+tempfile = "3"
+zip = { version = "9", default-features = false }
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json", "stream", "multipart"] }
+scraper = "0.23"
+mime = "0.3"
+nix = { version = "0.29", features = ["fs", "signal"] }
+arc-swap = "1"
+sha2 = "0.11.0"
+
+# No debug info for dependencies in test builds: the target volume stays a third of the size.
+[profile.dev.package."*"]
+debug = false
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = true

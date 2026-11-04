@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-obs-audio"
+description = "Enables the obs_audio command without any pre-configured scope."
+commands.allow = ["obs_audio"]
+
+[[permission]]
+identifier = "deny-obs-audio"
+description = "Denies the obs_audio command without any pre-configured scope."
+commands.deny = ["obs_audio"]

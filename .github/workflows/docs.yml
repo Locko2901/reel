@@ -1,0 +1,64 @@
+name: Docs
+
+# Built strictly: a broken link or anchor, or a private detail (ci/docs/hooks.py), fails it.
+# Pull requests build it without deploying, and without the private words.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "docs/**"
+      - "mkdocs.yml"
+      - "ci/docs/**"
+      - "deploy/docker-compose.yml"
+      - "web/assets/fonts/**"
+      - "web/assets/icon.svg"
+      - ".github/workflows/docs.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "docs/**"
+      - "mkdocs.yml"
+      - "ci/docs/**"
+      - "deploy/docker-compose.yml"
+      - ".github/workflows/docs.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+# The build runs in a container (make docs), so the runner needs Docker alone.
+jobs:
+  build:
+    name: Build · mkdocs build --strict
+    runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Build
+        env:
+          DOCS_PRIVATE_WORDS: ${{ github.event_name != 'pull_request' && secrets.DOCS_PRIVATE_WORDS || '' }}
+        run: make docs
+
+      - uses: actions/upload-pages-artifact@v5
+        if: ${{ github.event_name != 'pull_request' }}
+        with:
+          path: site
+
+  deploy:
+    name: Deploy · GitHub Pages
+    if: ${{ github.event_name != 'pull_request' }}
+    needs: build
+    runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v5

@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-hotkey-try"
+description = "Enables the hotkey_try command without any pre-configured scope."
+commands.allow = ["hotkey_try"]
+
+[[permission]]
+identifier = "deny-hotkey-try"
+description = "Denies the hotkey_try command without any pre-configured scope."
+commands.deny = ["hotkey_try"]

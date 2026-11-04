@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}{{ name }} · reel{% endblock %}
+{% block content %}
+<p class="crumb"><a href="/collections">Collections</a><span class="sep">/</span><span>{{ name }}</span></p>
+<div class="page-head" id="set" data-id="{{ id }}">
+  {% if editable %}<div class="clip-title"><input type="text" id="set-name" value="{{ name }}" maxlength="80" aria-label="The collection's name"></div>{% else %}<h1>{{ name }}</h1>{% endif %}
+  {% if game %}<span class="badge">automatic</span>{% endif %}
+  <span class="sub">{{ count }}{% if game %}, every clip with the game {{ name }}, kept up to date{% endif %}</span>
+  <div class="tools">{% if !cards.is_empty() %}<button class="btn" id="select-btn" type="button" aria-pressed="false" title="Pick several clips: Shift+click a range, Ctrl+A all shown, Esc to stop"><svg class="icon" viewBox="0 0 16 16" aria-hidden="true"><rect x="2.5" y="2.5" width="11" height="11" rx="2"/><path d="M5.5 8.2l1.8 1.8 3.4-4"/></svg><span>Select</span></button>{% endif %}{% if cards.len() > 1 %}<a class="btn" href="/montage?set={{ id }}" id="set-montage">Make a montage</a>{% endif %}{% if editable %}<button class="danger" type="button" id="set-delete">Delete the collection</button>{% endif %}</div>
+</div>
+{% if !who.standalone %}
+<div class="panel" id="set-link">
+  <header><h2>Link</h2><span class="desc">{% if game %}shows {{ name }}'s clips as they are when it is opened, new ones included; each plays as on its share page; a new link retires the one before{% else %}lists the clips; each plays as on its share page; a new link retires the one before{% endif %}</span></header>
+  <div class="body">
+    {% if let Some(l) = link %}
+    <div class="row wrap"><span class="value"><span class="trunc" title="{{ l }}"><span class="a">{{ l }}</span></span><button class="small copy" type="button" data-copy="{{ l }}">Copy</button></span>{% if can_link %}<button class="danger small" type="button" id="set-revoke">Revoke</button>{% endif %}</div>
+    {% else %}
+    <p class="muted">No link yet.</p>
+    {% endif %}
+    {% if game %}<p class="small muted" id="set-link-words">Anyone with the link sees every clip with the game {{ name }} at the moment they open it, the ones that come later too. A clip whose game changes leaves it.</p>{% endif %}
+    {% if can_link %}<div class="row wrap"><button type="button" id="set-link-make">{% if link.is_some() %}New link{% else %}Make a link{% endif %}</button></div>{% endif %}
+  </div>
+</div>
+{% endif %}
+{% if cards.is_empty() %}
+<div class="empty"><strong>Nothing in it yet.</strong><span>Open a clip and tick this collection under Collections.</span></div>
+{% else %}
+<div class="grid" id="grid">
+  {% for c in cards %}
+  {% include "card.html" %}
+  {% endfor %}
+</div>
+{% include "card-menu.html" %}
+{% if !cards.is_empty() %}{% include "select-bar.html" %}{% endif %}
+{% endif %}
+{% endblock %}

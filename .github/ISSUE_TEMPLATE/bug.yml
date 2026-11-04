@@ -1,0 +1,50 @@
+name: Bug report
+description: Something in reel does not work as it should.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. For a security problem, please report it privately instead (SECURITY.md).
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what you saw instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: How to make it happen again
+      placeholder: |
+        1. Open a clip
+        2. Press Save and share
+        3. ...
+  - type: dropdown
+    id: part
+    attributes:
+      label: Where
+      options:
+        - The server (web pages, links, jobs)
+        - The desktop app on Windows
+        - The desktop app on Linux
+        - Standalone (the app without a server)
+        - The phone
+        - The docs
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Settings, Status shows the server's; the app shows its own under This app, Startup, About.
+      placeholder: "1.9.1"
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: The server's log (docker compose logs reel) or the app's (Settings, Log). Take out anything private first, such as addresses and names.
+      render: text

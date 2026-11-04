@@ -1,0 +1,145 @@
+name: Desktop
+
+# Not on pushes to main: the release job in ci.yml builds the installers for a release.
+# Every job runs in desktop/ci/desktop.Dockerfile, so the runner needs Docker alone.
+on:
+  pull_request:
+    branches: [main]
+    # labeled: the label installers asks for the installers as an artifact
+    types: [opened, synchronize, reopened, labeled]
+    paths:
+      - "desktop/**"
+      - ".github/workflows/desktop.yml"
+      - "Makefile"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# A newer push waits for the run in progress, so a documentation push then finishes in a
+# minute against the run that just passed.
+concurrency:
+  group: desktop-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: false
+
+jobs:
+  # What changed since the newest passed run decides which jobs run: documentation alone runs
+  # nothing; the Windows installers only when affected or labelled installers.
+  changes:
+    name: Desktop · what changed
+    runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      heavy: ${{ steps.what.outputs.heavy }}
+      windows: ${{ steps.what.outputs.windows }}
+      plain: ${{ steps.what.outputs.plain }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: The passed runs of this pull request
+        id: green
+        if: ${{ github.event_name == 'pull_request' }}
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
+        with:
+          result-encoding: string
+          script: |
+            const { data } = await github.rest.actions.listWorkflowRuns({
+              ...context.repo, workflow_id: 'desktop.yml', event: 'pull_request', status: 'success',
+              branch: context.payload.pull_request.head.ref, per_page: 50,
+            });
+            return data.workflow_runs.map((r) => r.head_sha).join(' ');
+      - name: What runs
+        id: what
+        env:
+          EVENT: ${{ github.event_name }}
+          ACTION: ${{ github.event.action }}
+          AFTER: ${{ github.event.pull_request.head.sha }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+          GREEN: ${{ steps.green.outputs.result }}
+          LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
+          NEW_LABEL: ${{ github.event.label.name }}
+        run: |
+          sh desktop/ci/changes.sh
+          sed -n 's/^why=//p' "$GITHUB_OUTPUT" >> "$GITHUB_STEP_SUMMARY"
+
+  check:
+    name: Desktop · make desktop-check
+    needs: [changes]
+    # Not on release-please's pull requests: they only bump the version, and the release job
+    # builds the installers anyway. A failed decision runs everything.
+    if: ${{ !cancelled() && needs.changes.outputs.heavy != 'false' && !startsWith(github.head_ref, 'release-please--') }}
+    runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/free-disk
+      - name: Lint and tests
+        run: make desktop-check
+      # The Windows-only code compiles here on every pull request, the installers or not.
+      - name: Clippy for Windows
+        run: make desktop-check-windows
+
+  # The app's WebSocket and settings code against the pinned OBS's own Linux build, under
+  # Xvfb; no server needed.
+  obs:
+    name: Desktop · the app with the real OBS
+    needs: [changes, check]
+    if: ${{ !cancelled() && needs.check.result == 'success' }}
+    runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/free-disk
+      - name: The app and the pinned OBS under Xvfb
+        run: make desktop-obs-e2e
+
+  # After the check passed or, for a label on a head that passed, without it.
+  windows:
+    name: Desktop · Windows installer
+    needs: [changes, check]
+    if: ${{ !cancelled() && needs.changes.outputs.windows != 'false' && contains(fromJSON('["success", "skipped"]'), needs.check.result) && !startsWith(github.head_ref, 'release-please--') }}
+    runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/free-disk
+      # The installer with OBS, its OBS checked against the pinned SHA-256 and the official zip;
+      # the one without too when its own files changed or with the label.
+      - name: Cross build the installers
+        run: make desktop-windows DESKTOP_OUT="$PWD/desktop-out" DESKTOP_INSTALLERS="${{ needs.changes.outputs.plain != 'false' && 'plain with-obs' || 'with-obs' }}"
+      - name: What each installer holds
+        run: make desktop-installers-check DESKTOP_OUT="$PWD/desktop-out"
+      # The real app starts the real OBS under Wine: fresh, without the copy for games run as
+      # administrator, and as an update over the newest older release.
+      - name: The app starts its OBS, fresh and as an update
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          make desktop-previous DESKTOP_PREVIOUS="$PWD/desktop-previous"
+          make desktop-obs-start-check DESKTOP_OUT="$PWD/desktop-out" DESKTOP_PREVIOUS="$PWD/desktop-previous"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: reel-desktop-windows
+          path: desktop-out/*
+          if-no-files-found: error
+
+  # The AppImage updates itself from the paired server, the .deb does not; both are checked
+  # under Xvfb as on X11 and as on Wayland.
+  linux:
+    name: Desktop · Linux AppImage and .deb
+    needs: [changes, check]
+    if: ${{ !cancelled() && needs.check.result == 'success' }}
+    runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/free-disk
+      - name: Build the AppImage and the .deb
+        run: make desktop-appimage DESKTOP_OUT="$PWD/desktop-out"
+      - name: What each holds, and the app under Xvfb
+        run: make desktop-appimage-check DESKTOP_OUT="$PWD/desktop-out"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: reel-desktop-linux
+          path: desktop-out/*
+          if-no-files-found: error

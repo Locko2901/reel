@@ -1,0 +1,13 @@
+{
+  "bundle": {
+    "resources": {
+      "binaries/ffmpeg-LICENSE.txt": "binaries/ffmpeg-LICENSE.txt",
+      "obs/": "obs/"
+    },
+    "windows": {
+      "nsis": {
+        "installerHooks": "nsis/with-obs.nsh"
+      }
+    }
+  }
+}

@@ -1,0 +1,11 @@
+name: Free disk
+description: On a GitHub-hosted runner, removes preinstalled toolchains reel never uses, for the desktop image and its builds.
+runs:
+  using: composite
+  steps:
+    - if: runner.environment == 'github-hosted'
+      shell: bash
+      run: |
+        sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/.ghcup /opt/hostedtoolcache/CodeQL /usr/local/share/boost /usr/share/swift
+        sudo docker image prune --all --force >/dev/null
+        df -h /

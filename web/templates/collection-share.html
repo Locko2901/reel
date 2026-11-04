@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>{{ name }}</title>
+<meta name="theme-color" content="#f282d8">
+<meta name="robots" content="noindex">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="{{ site_name }}">
+<meta property="og:title" content="{{ name }}">
+<meta property="og:description" content="{{ count }}">
+<meta property="og:url" content="{{ page_url }}">
+{% if let Some(i) = image %}<meta property="og:image" content="{{ i }}">
+<meta property="og:image:type" content="image/jpeg">
+<meta name="twitter:card" content="summary_large_image">{% endif %}
+<link rel="stylesheet" href="/assets/{{ crate::routes::asset_v() }}/reel.css">
+<link rel="icon" href="/assets/icon.svg" type="image/svg+xml">
+</head>
+<body class="share-page" data-page="collection">
+<main class="set-body">
+  <h1>{{ name }}</h1>
+  <div class="meta"><span>{{ count }}</span></div>
+  <div class="grid">
+    {% for t in tiles %}
+    <a class="card" href="{{ t.href }}">
+      <div class="poster"><img src="{{ t.poster }}" alt="" loading="lazy"><span class="dur">{{ t.duration }}</span></div>
+      <div class="card-title ellipsis">{{ t.title }}</div>
+    </a>
+    {% endfor %}
+  </div>
+  <footer class="share-foot"><svg class="mark" viewBox="8.6 3 16.2 26" aria-hidden="true"><path d="M8.6 3L16 10.4V29H8.6Z"/><path class="arm" d="M8.6 3H24.8V10.4H16Z"/></svg>{{ site_name }}</footer>
+</main>
+</body>
+</html>

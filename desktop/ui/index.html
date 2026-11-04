@@ -1,0 +1,265 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>reel</title>
+<link rel="stylesheet" href="assets/reel.css">
+<link rel="stylesheet" href="app.css">
+</head>
+<body data-page="settings">
+<main class="page">
+  <div class="notice active obs-bar" id="obs-bar" role="status" hidden><span class="grow"><b>OBS is open.</b> In its Settings: Output, Replay Buffer for the clip length; Video for the quality; Output, Recording for the encoder, the format and the tracks; Hotkeys. The levels: its Audio Mixer.</span><div class="actions"><button class="small primary" id="obs-bar-hide" type="button">Hide OBS</button></div></div>
+  <div class="page-head">
+    <h1>Settings</h1>
+    <span class="sub">a change saves as you make it; these pages are the app's own, kept on this PC</span>
+    <div class="tools"><input type="search" id="settings-filter" placeholder="Filter settings" aria-label="Filter settings" autocomplete="off"></div>
+  </div>
+  <div class="settings" id="settings" data-section="status">
+    <nav class="sections" aria-label="Sections"></nav>
+    <div id="sections-body">
+
+      <div class="group status" id="g-status" data-app-section="status" hidden>
+        <p class="section-line" data-standalone-text="What the app is doing right now: the clips going into the library on this PC, the last ones, and reel on this PC.">What the app is doing right now: the queue, the last clips, and how it is connected.</p>
+        <div class="panel">
+          <header><h2>Connections</h2></header>
+          <div class="body"><dl class="kv wide" id="conn"></dl></div>
+        </div>
+        <div class="panel">
+          <header><h2>Versions</h2><div class="actions"><button class="small quiet" id="versions-updates" type="button">Updates</button></div></header>
+          <div class="body"><dl class="kv wide" id="versions-kv"></dl></div>
+        </div>
+        <div class="panel" id="local-panel" data-off hidden>
+          <header><h2>Standalone</h2><span class="desc" id="local-line"></span></header>
+          <div class="body"><dl class="kv wide" id="local-kv"></dl><p class="muted small" id="local-ffmpeg"></p></div>
+        </div>
+        <div class="panel">
+          <header><h2>Queue</h2><span class="desc" id="queue-line"></span></header>
+          <div class="body flush"><table class="cards" id="queue"><thead><tr><th>Clip</th><th>State</th><th></th></tr></thead><tbody></tbody></table><p class="muted" id="queue-empty">Nothing waiting.</p></div>
+        </div>
+        <div class="panel">
+          <header><h2>Last clips</h2><span class="desc" data-standalone-text="saved on this PC, in the library here">uploaded from this PC; Copy link asks the server for the link and waits until it embeds</span></header>
+          <div class="body flush"><table class="cards" id="recent"><thead><tr><th>Clip</th><th>When</th><th>State</th><th></th></tr></thead><tbody></tbody></table><p class="muted" id="recent-empty">No clip yet. Save a replay in OBS.</p></div>
+        </div>
+      </div>
+
+      <div class="group" id="g-server" data-app-section="server" hidden>
+        <p class="section-line" data-standalone-text="Standalone: reel runs inside the app and the library is on this PC. A server can be added later, below.">Connected: the clips go to a reel server. Standalone: reel runs inside the app and the library is on this PC; a paired server can still take clips from it.</p>
+        <div class="panel">
+          <header><h2>Mode</h2><span class="desc" id="mode-line"></span></header>
+          <div class="body flush">
+            <div class="srow" data-key="mode" data-kind="select"><div class="slabel"><b>Mode</b><span class="shelp">connected uploads every clip to the server below; standalone keeps the library on this PC and shows it in the window</span></div><div class="sctl"><select aria-label="Mode"><option value="connected">connected</option><option value="standalone">standalone</option></select><span class="err" hidden></span></div></div>
+          </div>
+        </div>
+        <div class="panel" id="standalone-panel" data-off hidden>
+          <header><h2>Standalone</h2><span class="desc">reel on this PC: the encoder, the library cap, the copies</span></header>
+          <div class="body flush">
+            <div class="srow" data-key="standalone.hwaccel" data-kind="select"><div class="slabel"><b>GPU encoder</b><span class="shelp" data-linux-text="probed with a test encode when reel starts; auto tries Quick Sync, then VAAPI; NVENC and AMF are tried only when picked">probed with a test encode when reel starts; auto tries NVENC, AMF, then QSV</span></div><div class="sctl"><select aria-label="GPU encoder"><option value="auto">automatic</option><option value="nvenc">NVIDIA NVENC</option><option value="amf">AMD AMF</option><option value="qsv">Intel Quick Sync</option><option value="vaapi" data-os="linux">VAAPI</option><option value="none">none, the CPU</option></select><span class="err" hidden></span></div></div>
+            <div class="srow" data-key="standalone.cap_gb" data-kind="int" data-min="0" data-max="100000"><div class="slabel"><b>Library cap</b><span class="shelp">the library is kept under this size: the oldest clips go to the trash first; a starred clip or one in a collection never goes; 0 is no cap</span><span class="snote" id="cap-line" aria-live="polite"></span></div><div class="sctl"><span class="ctl-group"><input type="number" class="in-num" min="0" max="100000" aria-label="Library cap"><span class="unit">GB</span></span><span class="err" hidden></span></div></div>
+            <div class="srow" data-key="standalone.cap_keeps_unsent" data-kind="bool"><div class="slabel"><b>The cap spares unsent clips</b><span class="shelp">a clip that is not on a server too is never trimmed</span></div><div class="sctl"><button type="button" class="switch" role="switch" aria-checked="false" aria-label="The cap spares unsent clips"><i></i></button><span class="err" hidden></span></div></div>
+            <div class="srow" data-key="standalone.copies_on_hardware" data-kind="bool"><div class="slabel"><b>Copies on the GPU</b><span class="shelp">copies under a size on the GPU encoder in one pass instead of two-pass x264: faster, a little larger</span></div><div class="sctl"><button type="button" class="switch" role="switch" aria-checked="false" aria-label="Copies on the GPU"><i></i></button><span class="err" hidden></span></div></div>
+          </div>
+        </div>
+        <div class="panel" id="server-panel">
+          <header><h2 data-standalone-text="A server, later">Server</h2><span class="desc" data-standalone="only">to add one: pair the app with it here, send clips to it from Status, then switch Mode to connected</span></header>
+          <div class="body flush">
+            <div class="srow" data-key="server_url" data-kind="text"><div class="slabel"><b>Server URL</b><span class="shelp">https, such as https://clips.example.com; plain http only for localhost</span></div><div class="sctl"><input type="text" class="in-path mono" aria-label="Server URL"><span class="err" hidden></span></div></div>
+            <div class="srow" data-key="device_name" data-kind="text"><div class="slabel"><b>Device name</b><span class="shelp">how this PC shows under Settings, Devices on the server</span></div><div class="sctl"><input type="text" class="in-text" aria-label="Device name"><span class="err" hidden></span></div></div>
+          </div>
+        </div>
+        <div class="panel" id="pair-panel">
+          <header><h2>Pairing</h2><span class="desc" id="pair-line"></span></header>
+          <div class="body flush">
+            <div class="srow" id="pair-row"><div class="slabel"><b>Pairing code</b><span class="shelp">on the server: Settings, Devices, Pair a device; the code works once, for ten minutes</span></div><div class="sctl"><input type="text" class="in-short mono" id="pair-code" placeholder="abcd-2345" aria-label="Pairing code" autocomplete="off"><button class="primary" id="pair-btn" type="button">Pair</button><span class="err" id="pair-err" hidden></span></div></div>
+            <div class="srow" id="unpair-row" data-off hidden><div class="slabel"><b>This device</b><span class="shelp" id="paired-as"></span></div><div class="sctl"><button class="danger" id="unpair-btn" type="button">Unpair</button></div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="group" id="g-obs" data-app-section="obs" hidden>
+        <p class="section-line" id="obs-section-line">OBS tells the app the moment a replay is saved (Tools, WebSocket Server Settings, enable the server). The folder watch below stays on as a safety net.</p>
+        <div class="notice" id="discord-notice" role="note" hidden><span class="grow" id="discord-note"></span></div>
+        <div class="panel" id="save-panel">
+          <header><h2>Save a clip now</h2><span class="desc" data-standalone-text="what the hotkey Save a clip does">what the hotkeys Save a clip and Save and share do</span><div class="actions"><button class="small" id="obs-save" type="button" disabled>Save clip</button><button class="small" id="obs-save-share" type="button" data-standalone="hide" disabled>Save and share</button></div></header>
+          <div class="body"><p class="muted" id="save-state"></p></div>
+        </div>
+        <div class="panel" id="bundled-panel" data-off hidden>
+          <header><h2 id="bundled-title">The OBS that came with reel</h2><span class="desc" id="bundled-line"></span><div class="actions"><button class="small" id="bundled-setup" type="button" hidden>Set it up</button><button class="small" id="bundled-show" type="button" title="OBS's own window: change anything there">Open OBS</button><button class="small" id="bundled-hide" type="button" hidden>Hide OBS</button></div></header>
+          <div class="body flush">
+            <div class="srow" data-key="obs.bundled" data-kind="bool"><div class="slabel"><b id="bundled-use-label">Use the OBS that came with reel</b><span class="shelp" id="bundled-use-help">reel starts it hidden with the app, sets it up and keeps it running; off, the app connects to an OBS of your own as below</span></div><div class="sctl"><button type="button" class="switch" role="switch" aria-checked="false" aria-label="Use the OBS that came with reel"><i></i></button><span class="err" hidden></span></div></div>
+          </div>
+        </div>
+        <div class="panel" id="bundled-setup-panel" data-off hidden>
+          <header><h2>Its setup</h2><span class="desc" id="setup-app-desc">each change is written into OBS's settings and OBS starts again with it, a few seconds</span><div class="actions"><button class="small" id="setup-again" type="button">Run the setup again</button></div></header>
+          <div class="body flush">
+            <div class="srow" data-key="obs.setup.clip_seconds" data-kind="int" data-min="5" data-max="1800"><div class="slabel"><b>Clip length</b><span class="shelp" id="length-app-help">what the replay buffer keeps before a save, up to 30 minutes</span></div><div class="sctl"><span class="ctl-group"><input type="number" class="in-num" min="5" max="1800" aria-label="Clip length"><span class="unit">s</span></span><span class="err" hidden></span></div></div>
+            <div class="srow" data-key="obs.setup.quality" data-kind="select"><div class="slabel"><b>Quality</b><span class="shelp">Smooth suits most games; Sharp keeps small text readable; Native records the screen as it is</span></div><div class="sctl"><select aria-label="Quality"><option value="smooth">Smooth: 1080p60</option><option value="sharp">Sharp: 1440p60</option><option value="native">Native: the screen</option><option value="custom" hidden>As set in OBS</option></select><span class="err" hidden></span></div></div>
+            <div class="srow" data-key="obs.setup.encoder" data-kind="select"><div class="slabel"><b>Encoder</b><span class="shelp">the setup tests which work here; run it again to test again</span></div><div class="sctl"><select aria-label="Encoder"><option value="obs_nvenc_h264_tex">NVIDIA NVENC H.264</option><option value="h264_texture_amf">AMD AMF H.264</option><option value="obs_qsv11_v2">Intel Quick Sync H.264</option><option value="obs_x264">x264 on the CPU</option></select><span class="err" hidden></span></div></div>
+            <div class="srow" data-key="obs.setup.game" data-kind="bool"><div class="slabel"><b>The game in front</b><span class="shelp" id="game-app-help">game capture of any fullscreen application over the screen; off, the screen alone</span></div><div class="sctl"><button type="button" class="switch" role="switch" aria-checked="false" aria-label="The game in front"><i></i></button><span class="err" hidden></span></div></div>
+            <div class="srow" data-key="obs.setup.desktop" data-kind="bool" id="desktop-app-row"><div class="slabel"><b>Desktop audio</b><span class="shelp">everything the PC plays, the game and Discord included</span></div><div class="sctl"><button type="button" class="switch" role="switch" aria-checked="true" aria-label="Desktop audio"><i></i></button><span class="err" hidden></span></div></div>
+            <div class="srow" id="mic-app-row"><div class="slabel"><b>Microphone</b><span class="shelp">your voice, from this device</span></div><div class="sctl"><button type="button" class="switch" role="switch" aria-checked="false" id="mic-app-on" aria-label="Microphone"><i></i></button><select id="mic-app" aria-label="Microphone device" hidden></select><span class="err" id="mic-app-err" hidden></span></div></div>
+            <div class="srow" id="game-app-row" data-off hidden><div class="slabel"><b>The game alone</b><span class="shelp">only the game's sound: the game in front, or a program you pick</span></div><div class="sctl"><button type="button" class="switch" role="switch" aria-checked="false" id="game-app-on" aria-label="The game alone"><i></i></button><select id="game-app" aria-label="Which game" hidden></select><span class="err" id="game-app-err" hidden></span></div></div>
+            <div class="srow" data-key="obs.setup.discord" data-kind="bool" id="discord-app-row" data-off hidden><div class="slabel"><b>Discord alone</b><span class="shelp">only Discord's voices</span></div><div class="sctl"><button type="button" class="switch" role="switch" aria-checked="false" aria-label="Discord alone"><i></i></button><span class="err" hidden></span></div></div>
+            <div class="srow" data-key="obs.setup.own_tracks" data-kind="bool"><div class="slabel"><b>Each source on a track of its own</b><span class="shelp">beside the full mix, which links play: each source chosen above, for the editor to turn each up or down</span></div><div class="sctl"><button type="button" class="switch" role="switch" aria-checked="false" aria-label="Each source on a track of its own"><i></i></button><span class="err" hidden></span></div></div>
+            <div class="srow" data-key="obs.setup.noise" data-kind="select" id="noise-app-row" data-off hidden><div class="slabel"><b>Noise suppression</b><span class="shelp" id="noise-app-help"></span></div><div class="sctl"><select aria-label="Noise suppression"><option value="off">Off</option><option value="speex">Light (Speex)</option><option value="rnnoise">Strong (RNNoise)</option><option value="nvidia">NVIDIA noise removal</option><option value="own">My own OBS's filters</option></select><span class="err" hidden></span></div></div>
+            <div class="srow" id="own-mic-app-row" data-off hidden><div class="slabel"><b>Your own OBS's microphone</b><span class="shelp" id="own-mic-app-help"></span></div><div class="sctl"><button class="small" type="button" id="own-mic-app-use">Use these filters</button></div></div>
+            <div class="srow" data-key="obs.setup.gate" data-kind="bool" id="gate-app-row" data-off hidden><div class="slabel"><b>Noise gate</b><span class="shelp">after the noise suppression, silences the microphone while it stays below a level: opens at -26 dB, closes at -32 dB, OBS's own values</span></div><div class="sctl"><button type="button" class="switch" role="switch" aria-checked="false" aria-label="Noise gate"><i></i></button><span class="err" hidden></span></div></div>
+            <div class="srow" id="route-app-row" data-off hidden><div class="slabel"><b>Where each goes</b><span class="shelp route-words" id="audio-words-app"></span></div></div>
+            <div id="levels-app"></div>
+            <div class="srow" data-key="obs.setup.format" data-kind="select"><div class="slabel"><b>Format</b><span class="shelp">hybrid MP4 plays everywhere and survives a crash; MKV survives one too</span></div><div class="sctl"><select aria-label="Format"><option value="hybrid_mp4">hybrid MP4</option><option value="mkv">MKV</option></select><span class="err" hidden></span></div></div>
+            <div class="srow" data-key="obs.setup.elevated" data-kind="bool" id="elevated-app-row"><div class="slabel"><b>Capture games that run as administrator</b><span class="shelp">a scheduled task starts OBS, never reel, with the highest rights, so its game capture reaches them, from a copy in Program Files that only an administrator can change; Windows asks once when this changes, and once for each change of the setup above while it is on. OBS then takes the Save hotkey itself</span></div><div class="sctl"><button type="button" class="switch" role="switch" aria-checked="false" aria-label="Capture games that run as administrator"><i></i></button><span class="err" hidden></span><span class="why" id="elevated-why" hidden></span></div></div>
+            <div class="srow" id="copy-app-row" data-off hidden><div class="slabel"><b>Its copy in Program Files</b><span class="shelp" id="copy-app-help"></span></div><div class="sctl"><button class="small" id="copy-app-put" type="button" hidden>Put it in place</button><span class="err" id="copy-app-err" hidden></span></div></div>
+          </div>
+        </div>
+        <div class="panel" id="obs-checks-panel" data-off hidden>
+          <header><h2>What reel needs from OBS</h2><span class="desc">checked as long as the app runs</span></header>
+          <div class="body"><dl class="kv wide" id="obs-checks"></dl></div>
+        </div>
+        <div class="panel" id="obs-ws-panel">
+          <header><h2>obs-websocket</h2><span class="desc" id="obs-line"></span></header>
+          <div class="body flush">
+            <div class="srow" data-key="obs.enabled" data-kind="bool"><div class="slabel"><b>Connect to OBS</b><span class="shelp">OBS 28 or later has the WebSocket server built in</span></div><div class="sctl"><button type="button" class="switch" role="switch" aria-checked="false" aria-label="Connect to OBS"><i></i></button><span class="err" hidden></span></div></div>
+            <div class="srow" data-key="obs.host" data-kind="text"><div class="slabel"><b>Host</b><span class="shelp">127.0.0.1 when OBS runs on this PC</span></div><div class="sctl"><input type="text" class="in-path mono" aria-label="Host"><span class="err" hidden></span></div></div>
+            <div class="srow" data-key="obs.port" data-kind="int" data-min="1" data-max="65535"><div class="slabel"><b>Port</b><span class="shelp">4455 by default</span></div><div class="sctl"><input type="number" class="in-num" min="1" max="65535" aria-label="Port"><span class="err" hidden></span></div></div>
+            <div class="srow" data-key="obs.password" data-kind="password"><div class="slabel"><b>Password</b><span class="shelp">from OBS's WebSocket Server Settings, when authentication is on</span></div><div class="sctl"><input type="password" class="in-text" aria-label="Password" autocomplete="off"><span class="err" hidden></span></div></div>
+            <div class="srow"><div class="slabel"><b>Test</b><span class="shelp">connects once with the values above and asks OBS its version</span></div><div class="sctl"><button id="obs-test" type="button">Test</button><span class="why" id="obs-test-line"></span></div></div>
+            <div class="test-result" id="obs-test-result" hidden><p id="obs-test-main"></p><p class="muted small" id="obs-test-detail" hidden></p></div>
+            <div class="srow" data-key="obs.start_replay" data-kind="bool"><div class="slabel"><b>Start the replay buffer</b><span class="shelp">when OBS is open and its replay buffer is off, the app enables it and starts it (not while OBS records)</span></div><div class="sctl"><button type="button" class="switch" role="switch" aria-checked="false" aria-label="Start the replay buffer"><i></i></button><span class="err" hidden></span></div></div>
+          </div>
+        </div>
+        <div class="panel" id="obs-state-panel">
+          <header><h2>What OBS is set to</h2><span class="desc" id="obs-state-line">read over the WebSocket once OBS is connected</span><div class="actions"><button class="small" id="obs-refresh" type="button">Refresh</button></div></header>
+          <div class="body"><dl class="kv wide" id="obs-kv"></dl><p class="muted" id="obs-kv-empty">OBS is not connected.</p></div>
+        </div>
+        <div class="panel" id="obs-change-panel">
+          <header><h2>Change in OBS</h2><span class="desc">written into OBS's profile; refused while OBS records; a running replay buffer is restarted so the change takes</span></header>
+          <div class="body flush">
+            <div class="srow" data-obs="record_dir"><div class="slabel"><b>Recording folder</b><span class="shelp">where OBS writes recordings and replays; the clips folder follows it</span></div><div class="sctl"><span class="ctl-group in-path"><input type="text" class="mono" aria-label="Recording folder"><button class="small" type="button" id="obs-browse-dir">Browse</button></span><span class="err" hidden></span></div></div>
+            <div class="srow" data-obs="replay_seconds"><div class="slabel"><b>Replay length</b><span class="shelp">seconds the replay buffer keeps before a save</span></div><div class="sctl"><span class="ctl-group"><input type="number" class="in-num" min="1" max="3600" aria-label="Replay length"><span class="unit">s</span></span><span class="err" hidden></span></div></div>
+            <div class="srow" data-obs="format"><div class="slabel"><b>Format</b><span class="shelp">mkv survives a crash; hybrid mp4 plays everywhere and survives one too (OBS 30 and later)</span></div><div class="sctl"><select aria-label="Format"><option value="mkv">MKV</option><option value="hybrid_mp4">hybrid MP4</option><option value="mp4">MP4</option><option value="fragmented_mp4">fragmented MP4</option><option value="mov">MOV</option><option value="fragmented_mov">fragmented MOV</option><option value="ts">MPEG-TS</option><option value="flv">FLV</option></select><span class="err" hidden></span></div></div>
+            <div class="srow" data-obs="video_kbit"><div class="slabel"><b>Video bitrate</b><span class="shelp" id="obs-bitrate-help">kbit/s; simple output mode with the recording quality "same as stream"</span></div><div class="sctl"><span class="ctl-group"><input type="number" class="in-num" min="500" max="300000" aria-label="Video bitrate"><span class="unit">kbit/s</span></span><span class="why" id="obs-bitrate-why" hidden></span><span class="err" hidden></span></div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="group" id="g-clips" data-app-section="clips" hidden>
+        <p class="section-line" data-standalone-text="Where OBS writes and what counts as a clip; reel takes each one into the library on this PC.">Where OBS writes, what counts as a clip, and how much stays on this PC after the server has it.</p>
+        <div class="panel">
+          <header><h2>Clips folder</h2><span class="desc" id="watch-line"></span></header>
+          <div class="body flush">
+            <div class="srow" data-key="clips_follow_obs" data-kind="bool"><div class="slabel"><b>Follow OBS</b><span class="shelp">watch OBS's recording folder while OBS is connected; off, the folder below is watched whatever OBS says</span></div><div class="sctl"><button type="button" class="switch" role="switch" aria-checked="false" aria-label="Follow OBS"><i></i></button><span class="err" hidden></span></div></div>
+            <div class="srow" data-key="clips_dir" data-kind="path"><div class="slabel"><b>Folder</b><span class="shelp" id="clips-dir-help">watched while OBS is not connected or Follow OBS is off; a file counts once its size holds still and it can be opened</span></div><div class="sctl"><span class="ctl-group in-path"><input type="text" class="mono" aria-label="Folder"><button class="small" type="button" id="browse-dir">Browse</button></span><span class="err" hidden></span></div></div>
+            <div class="srow" data-key="extensions" data-kind="list"><div class="slabel"><b>Extensions</b><span class="shelp">file endings taken, comma separated; .part files are always skipped</span></div><div class="sctl"><input type="text" class="in-path mono" aria-label="Extensions"><span class="err" hidden></span></div></div>
+            <div class="srow" data-key="stable_seconds" data-kind="int" data-min="1" data-max="120"><div class="slabel"><b>Still for</b><span class="shelp">seconds the size must not change before the file is taken</span></div><div class="sctl"><span class="ctl-group"><input type="number" class="in-num" min="1" max="120" aria-label="Still for"><span class="unit">s</span></span><span class="err" hidden></span></div></div>
+          </div>
+        </div>
+        <div class="panel" data-standalone="hide">
+          <header><h2>Local cache</h2><span class="desc">a clip is deleted here only after the server confirmed it, and only beyond these limits</span></header>
+          <div class="body flush">
+            <div class="srow" data-key="cache.gb" data-kind="int" data-min="0" data-max="10000"><div class="slabel"><b>Keep up to</b><span class="shelp">0 deletes a clip right after the server confirms it, as the relay did</span></div><div class="sctl"><span class="ctl-group"><input type="number" class="in-num" min="0" max="10000" aria-label="Keep up to"><span class="unit">GB</span></span><span class="err" hidden></span></div></div>
+            <div class="srow" data-key="cache.days" data-kind="int" data-min="0" data-max="3650"><div class="slabel"><b>Keep for</b><span class="shelp">confirmed clips older than this go; 0 means no age limit</span></div><div class="sctl"><span class="ctl-group"><input type="number" class="in-num" min="0" max="3650" aria-label="Keep for"><span class="unit">days</span></span><span class="err" hidden></span></div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="group" id="g-upload" data-app-section="upload" hidden>
+        <p class="section-line" data-standalone-text="What a clip gets as it goes into the library on this PC.">Every clip goes up on its own by default. Uploads are chunked, resumed after a drop, checked by hash on both ends.</p>
+        <div class="panel">
+          <header><h2 data-standalone-text="New clips">Upload</h2></header>
+          <div class="body flush">
+            <div class="srow" data-key="upload.mode" data-kind="select" data-standalone="hide"><div class="slabel"><b>Upload</b><span class="shelp">every clip as it is found, the last clip on the hotkey, or by hand from the Status page</span></div><div class="sctl"><select aria-label="Upload"><option value="auto">every clip, automatically</option><option value="hotkey">the last clip, on the hotkey</option><option value="manual">by hand</option></select><span class="err" hidden></span></div></div>
+            <div class="srow" data-key="upload.bandwidth_kbit" data-kind="int" data-min="0" data-max="10000000" data-standalone="paired"><div class="slabel"><b>Bandwidth limit</b><span class="shelp">0 is unlimited</span></div><div class="sctl"><span class="ctl-group"><input type="number" class="in-num" min="0" max="10000000" aria-label="Bandwidth limit"><span class="unit">kbit/s</span></span><span class="err" hidden></span></div></div>
+            <div class="srow" data-key="upload.pause_in_fullscreen" data-kind="bool" data-os="windows"><div class="slabel"><b data-standalone-text="Wait while a game is fullscreen">Pause while a game is fullscreen</b><span class="shelp" data-standalone-text="Windows says when a fullscreen app has the screen; the library's heavy work (a re-encode, the copies, the loop and the strip) waits and goes on after">Windows says when a fullscreen app has the screen; the queue waits and goes on after</span></div><div class="sctl"><button type="button" class="switch" role="switch" aria-checked="false" aria-label="Pause while a game is fullscreen"><i></i></button><span class="err" hidden></span></div></div>
+            <div class="srow" data-key="upload.pause_only_on_wan" data-kind="bool" data-standalone="paired" data-os="windows"><div class="slabel"><b>Only on the internet, not on the LAN</b><span class="shelp">when the server's address is on the local network the upload goes on during a game</span></div><div class="sctl"><button type="button" class="switch" role="switch" aria-checked="false" aria-label="Only on the internet"><i></i></button><span class="err" hidden></span></div></div>
+            <div class="srow" data-key="upload.keep_last" data-kind="int" data-min="0" data-max="600"><div class="slabel"><b>Keep the last</b><span class="shelp" data-standalone-text="each clip goes into the library with its last seconds as its current version, the whole file kept as the original; 0 keeps the whole clip">each clip is published with its last seconds as the version the library and the links show, the whole file kept as the original; 0 keeps the whole clip</span></div><div class="sctl"><span class="ctl-group"><input type="number" class="in-num" min="0" max="600" aria-label="Keep the last"><span class="unit">s</span></span><span class="err" hidden></span></div></div>
+            <div class="srow"><div class="slabel"><b>Normalise new clips</b><span class="shelp" data-standalone-text="a setting of the library, under Settings, Ingest: every new clip gets a version levelled to the loudness target, made current, in the same cut as Keep the last">a setting of the server, under Settings, Ingest: every new clip gets a version levelled to the loudness target, made current, in the same cut as Keep the last</span></div><div class="sctl"><span class="in-locked" id="normalize-state"><span>not asked yet</span></span><button id="normalize-open" type="button" hidden>Open on the server</button><button id="normalize-open-here" type="button" data-standalone="only">Open Ingest</button></div></div>
+            <div class="srow" data-key="upload.chunk_mb" data-kind="int" data-min="0" data-max="90" data-standalone="paired"><div class="slabel"><b>Chunk size</b><span class="shelp">0 takes the server's setting; at most 90 MB</span></div><div class="sctl"><span class="ctl-group"><input type="number" class="in-num" min="0" max="90" aria-label="Chunk size"><span class="unit">MB</span></span><span class="err" hidden></span></div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="group" id="g-hotkeys" data-app-section="hotkeys" hidden>
+        <p class="section-line" id="hotkeys-section-line">Global shortcuts: click one and press the keys. They work while a game has the focus; see Startup for games that run elevated.</p>
+        <div class="panel">
+          <header><h2>Hotkeys</h2><span class="desc" id="hotkey-line"></span></header>
+          <div class="body flush">
+            <div class="srow" data-key="hotkeys.share_last" data-kind="hotkey" data-standalone="hide"><div class="slabel"><b>Share the last clip</b><span class="shelp">asks the server for the link, waits until it embeds, copies it, plays the cue</span></div><div class="sctl"><button type="button" class="hotkey" aria-label="Hotkey: Share the last clip"></button><span class="why" aria-live="polite" hidden></span><span class="err" hidden></span></div></div>
+            <div class="srow" data-key="hotkeys.save_share" data-kind="hotkey" data-standalone="hide"><div class="slabel"><b>Save and share</b><span class="shelp">OBS saves the replay, the app uploads it (with Keep the last, when set), waits until it embeds, copies the link and plays the cue</span></div><div class="sctl"><button type="button" class="hotkey" aria-label="Hotkey: Save and share"></button><span class="why" aria-live="polite" hidden></span><span class="err" hidden></span></div></div>
+            <div class="srow" data-key="hotkeys.save" data-kind="hotkey"><div class="slabel"><b>Save a clip</b><span class="shelp" data-standalone-text="OBS saves the replay, and it goes into the library on this PC; the OBS that came with reel has no hotkeys of its own to reach">OBS saves the replay and it goes up as any clip does; the OBS that came with reel has no hotkeys of its own to reach</span></div><div class="sctl"><button type="button" class="hotkey" aria-label="Hotkey: Save a clip"></button><span class="why" aria-live="polite" hidden></span><span class="err" hidden></span></div></div>
+            <div class="srow" data-key="hotkeys.upload_last" data-kind="hotkey" data-standalone="hide"><div class="slabel"><b>Upload the last clip</b><span class="shelp">for the hotkey upload mode; harmless otherwise</span></div><div class="sctl"><button type="button" class="hotkey" aria-label="Hotkey: Upload the last clip"></button><span class="why" aria-live="polite" hidden></span><span class="err" hidden></span></div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="group" id="g-sounds" data-app-section="sounds" hidden>
+        <p class="section-line" data-standalone-text="Two cues: a clip was captured, a clip is in the library. WAV files only.">Three cues: a clip was captured, a clip is safe on the server, a link was copied. WAV files only.</p>
+        <div class="panel" data-cue="captured">
+          <header><h2>Clip captured</h2><div class="actions"><button class="small" type="button" data-preview="captured">Preview</button></div></header>
+          <div class="body flush">
+            <div class="srow" data-key="sounds.captured.enabled" data-kind="bool"><div class="slabel"><b>Play</b><span class="shelp">when a clip is found in the folder or OBS says it saved one</span></div><div class="sctl"><button type="button" class="switch" role="switch" aria-checked="false" aria-label="Play captured"><i></i></button><span class="err" hidden></span></div></div>
+            <div class="srow" data-key="sounds.captured.volume" data-kind="volume"><div class="slabel"><b>Volume</b></div><div class="sctl"><input type="range" class="in-short" min="0" max="100" aria-label="Volume captured"><span class="unit vol">100</span><span class="err" hidden></span></div></div>
+            <div class="srow" data-key="sounds.captured.file" data-kind="file"><div class="slabel"><b>Sound</b><span class="shelp">empty plays the bundled save.wav</span></div><div class="sctl"><span class="ctl-group in-path"><input type="text" class="mono" aria-label="Sound captured" placeholder="save.wav (bundled)"><button class="small" type="button" data-browse="sounds.captured.file">Browse</button></span><span class="err" hidden></span></div></div>
+          </div>
+        </div>
+        <div class="panel" data-cue="uploaded">
+          <header><h2 data-standalone-text="Clip in the library">Clip uploaded</h2><div class="actions"><button class="small" type="button" data-preview="uploaded">Preview</button></div></header>
+          <div class="body flush">
+            <div class="srow" data-key="sounds.uploaded.enabled" data-kind="bool"><div class="slabel"><b>Play</b><span class="shelp" data-standalone-text="when the clip is ready in the library on this PC">when the server confirms the clip is in the library</span></div><div class="sctl"><button type="button" class="switch" role="switch" aria-checked="false" aria-label="Play uploaded"><i></i></button><span class="err" hidden></span></div></div>
+            <div class="srow" data-key="sounds.uploaded.volume" data-kind="volume"><div class="slabel"><b>Volume</b></div><div class="sctl"><input type="range" class="in-short" min="0" max="100" aria-label="Volume uploaded"><span class="unit vol">100</span><span class="err" hidden></span></div></div>
+            <div class="srow" data-key="sounds.uploaded.file" data-kind="file"><div class="slabel"><b>Sound</b><span class="shelp">empty plays the bundled uploaded.wav</span></div><div class="sctl"><span class="ctl-group in-path"><input type="text" class="mono" aria-label="Sound uploaded" placeholder="uploaded.wav (bundled)"><button class="small" type="button" data-browse="sounds.uploaded.file">Browse</button></span><span class="err" hidden></span></div></div>
+          </div>
+        </div>
+        <div class="panel" data-cue="link_copied" data-standalone="hide">
+          <header><h2>Link copied</h2><div class="actions"><button class="small" type="button" data-preview="link_copied">Preview</button></div></header>
+          <div class="body flush">
+            <div class="srow" data-key="sounds.link_copied.enabled" data-kind="bool"><div class="slabel"><b>Play</b><span class="shelp">when the hotkey put a link on the clipboard</span></div><div class="sctl"><button type="button" class="switch" role="switch" aria-checked="false" aria-label="Play link copied"><i></i></button><span class="err" hidden></span></div></div>
+            <div class="srow" data-key="sounds.link_copied.volume" data-kind="volume"><div class="slabel"><b>Volume</b></div><div class="sctl"><input type="range" class="in-short" min="0" max="100" aria-label="Volume link copied"><span class="unit vol">50</span><span class="err" hidden></span></div></div>
+            <div class="srow" data-key="sounds.link_copied.file" data-kind="file"><div class="slabel"><b>Sound</b><span class="shelp">empty plays the bundled uploaded.wav, quieter</span></div><div class="sctl"><span class="ctl-group in-path"><input type="text" class="mono" aria-label="Sound link copied" placeholder="uploaded.wav (bundled)"><button class="small" type="button" data-browse="sounds.link_copied.file">Browse</button></span><span class="err" hidden></span></div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="group" id="g-startup" data-app-section="startup" hidden>
+        <p class="section-line">The app lives in the tray. Start it at logon so a clip is never missed.</p>
+        <div class="panel">
+          <header><h2>Startup</h2></header>
+          <div class="body flush">
+            <div class="srow" data-key="startup.autostart" data-kind="bool"><div class="slabel"><b>Start at logon</b><span class="shelp">starts with your session, hidden in the tray</span></div><div class="sctl"><button type="button" class="switch" role="switch" aria-checked="false" aria-label="Start at logon"><i></i></button><span class="err" hidden></span></div></div>
+            <div class="srow" data-key="tray_icon" data-kind="select"><div class="slabel"><b>Tray icon</b><span class="shelp">reel's mark in colour on its dark square, or the mark alone in one colour, for a tray whose icons are all white or all black</span></div><div class="sctl"><select aria-label="Tray icon"><option value="colour">in colour</option><option value="white">white</option><option value="black">black</option></select><span class="err" hidden></span></div></div>
+            <div class="srow" data-key="startup.elevated" data-kind="bool" id="elevated-start-row" data-off hidden><div class="slabel"><b>Start elevated at logon</b><span class="shelp">retired: the app runs the server's pages and should not have the highest rights; turn this off, and Capture games that run as administrator, for the OBS that came with reel, gives them to OBS alone</span></div><div class="sctl"><button type="button" class="switch" role="switch" aria-checked="false" aria-label="Start elevated at logon"><i></i></button><span class="err" hidden></span></div></div>
+          </div>
+        </div>
+        <div class="panel">
+          <header><h2>Updates</h2><span class="desc" data-standalone-text="new versions are on the releases page; Check now reads the newest, nothing asks by itself">the paired server offers the app of its own version, signed with the release key</span></header>
+          <div class="body flush">
+            <div class="srow" data-key="updates" data-kind="select" data-standalone="hide"><div class="slabel"><b>New versions</b><span class="shelp">the installer shows its progress; after Install reel opens again by itself, after a quit it stays closed; standalone has no server to ask</span></div><div class="sctl"><select aria-label="New versions"><option value="ask">ask, then install</option><option value="on_quit">install when the app quits</option><option value="off">off</option></select><span class="err" hidden></span></div></div>
+            <div class="srow"><div class="slabel"><b>This version</b><span class="shelp" id="update-help"></span><span class="snote" id="update-before" hidden></span></div><div class="sctl"><button class="small" id="update-check" type="button">Check now</button><button class="small" id="update-install" type="button" hidden>Install</button><button class="small" id="update-releases" type="button" hidden>Open the releases</button></div></div>
+            <div class="srow"><div class="slabel"><b>Versions</b><span class="shelp" id="versions-help"></span></div></div>
+          </div>
+          <div class="body" id="update-notes-body" hidden><p class="muted small">What reel <span id="update-notes-version"></span> brings</p><div class="update-notes" id="update-notes"></div></div>
+        </div>
+        <div class="panel">
+          <header><h2>About</h2><div class="actions"><button class="small quiet" id="uninstall" type="button" title="Starts reel's uninstaller, where you choose what goes with it, and quits; Windows' Apps &amp; features does the same" hidden>Uninstall reel...</button></div></header>
+          <div class="body"><dl class="kv wide" id="about"></dl><p class="muted small">reel is open source under the MIT licence, copyright (c) 2026 Lockoo.</p><p class="muted small" id="about-obs" hidden>OBS Studio <span id="about-obs-version"></span> comes with this app as its makers publish it, unmodified, under the GPL 2.0; its licence text is in the app's obs folder and its source is <a href="#" id="about-obs-source">on the release</a>.</p></div>
+        </div>
+      </div>
+
+      <div class="group" id="g-log" data-app-section="log" hidden>
+        <p class="section-line">What the app did, newest at the bottom. Tokens never appear here.</p>
+        <div class="panel">
+          <header><h2>Log</h2><div class="actions"><button class="small" id="log-folder" type="button">Open the log folder</button><button class="small quiet" id="log-refresh" type="button">Refresh</button></div></header>
+          <div class="body flush">
+            <div class="srow" data-key="log_level" data-kind="select"><div class="slabel"><b>Log level</b><span class="shelp">debug says every chunk</span></div><div class="sctl"><select aria-label="Log level"><option value="error">errors only</option><option value="warn">warnings</option><option value="info">info</option><option value="debug">debug, everything</option></select><span class="err" hidden></span></div></div>
+          </div>
+          <div class="body"><pre class="logbox" id="log-lines">nothing yet</pre></div>
+        </div>
+      </div>
+
+      <p class="faint small no-match" id="no-match" hidden>No setting matches.</p>
+    </div>
+  </div>
+</main>
+<div id="toasts"></div>
+<script type="module" src="app.js"></script>
+</body>
+</html>

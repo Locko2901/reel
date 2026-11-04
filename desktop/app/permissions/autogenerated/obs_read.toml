@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-obs-read"
+description = "Enables the obs_read command without any pre-configured scope."
+commands.allow = ["obs_read"]
+
+[[permission]]
+identifier = "deny-obs-read"
+description = "Denies the obs_read command without any pre-configured scope."
+commands.deny = ["obs_read"]

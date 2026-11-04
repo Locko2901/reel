@@ -1,0 +1,30 @@
+# reel: one container and three folders. A reverse proxy with TLS goes in front, as share pages
+# must be reachable from the internet for link previews; the setup guide says what it needs.
+services:
+  reel:
+    image: ghcr.io/locko2901/reel:latest
+    container_name: reel
+    restart: unless-stopped
+    ports:
+      - "8746:8080"
+    environment:
+      # your time zone, an IANA name such as America/New_York, for the dates on the pages
+      TZ: UTC
+      # the address share links carry; it has to be reachable from the internet
+      REEL_PUBLIC_URL: https://clips.example.com
+      # local (the default): reel's own accounts, the first admin from the setup code in the log.
+      # Behind a forward-auth proxy instead: proxy, and the proxy's exact address.
+      REEL_AUTH_MODE: local
+      # REEL_AUTH_MODE: proxy
+      # REEL_TRUSTED_PROXIES: 10.0.0.2/32
+      REEL_HWACCEL: auto
+    volumes:
+      # the database, the library and the caches
+      - ./data:/data
+      # where raw clips arrive; a recorder or a sync tool drops them here
+      - ./incoming:/incoming
+      # the raw file of every re-encoded clip is kept here
+      - ./originals:/originals
+    # an Intel or AMD GPU for the encodes; remove the two lines on a host without one
+    devices:
+      - /dev/dri:/dev/dri

@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-audio-programs"
+description = "Enables the audio_programs command without any pre-configured scope."
+commands.allow = ["audio_programs"]
+
+[[permission]]
+identifier = "deny-audio-programs"
+description = "Denies the audio_programs command without any pre-configured scope."
+commands.deny = ["audio_programs"]

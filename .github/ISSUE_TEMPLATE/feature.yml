@@ -1,0 +1,20 @@
+name: Feature request
+description: An idea for something reel could do.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What you want to do
+      description: The situation and what gets in the way today.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: How reel could help
+      description: What you picture, in your own words. Screenshots or sketches welcome.
+  - type: textarea
+    id: else
+    attributes:
+      label: Anything else

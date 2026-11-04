@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}Trash · reel{% endblock %}
+{% block content %}
+<p class="crumb"><a href="/">Library</a><span class="sep">/</span><span>Trash</span></p>
+<div class="page-head">
+  <h1>Trash</h1>
+  <span class="sub" id="trash-sum">{{ summary }}{% if !disk.is_empty() %}; {{ disk }}{% endif %}</span>
+  <div class="tools">
+    {% if admin && !rows.is_empty() %}<button class="danger" id="trash-empty" type="button">Empty the trash</button>{% endif %}
+  </div>
+</div>
+<p class="section-line">A deleted clip waits here {{ trash_days }} day{% if trash_days != 1 %}s{% endif %}{% if !who.standalone %}, its links stopped{% endif %}, then it is deleted for good; the soonest first. Restore brings it back{% if !who.standalone %} with its links{% endif %}. The days are the Trash setting under <a href="/settings/storage">Settings, Library and storage</a>.</p>
+
+<dialog id="trash-confirm" aria-labelledby="trash-confirm-title">
+  <header id="trash-confirm-title">Delete for good</header>
+  <div class="body"><p id="trash-confirm-line"></p><p class="st-err small">This cannot be undone: the files{% if !who.standalone %} and the clip's links{% endif %} go.</p></div>
+  <footer><button class="quiet" id="trash-confirm-cancel" type="button">Cancel</button><button class="danger" id="trash-confirm-go" type="button">Delete for good</button></footer>
+</dialog>
+
+{% if rows.is_empty() %}
+<div class="empty"><strong>The trash is empty.</strong><span>A clip you delete waits here {{ trash_days }} day{% if trash_days != 1 %}s{% endif %} before it goes for good.</span><a class="btn" href="/">Back to the library</a></div>
+{% else %}
+<div class="panel trash">
+  <header>
+    {% if editable %}<label class="check" id="trash-all-label"><input type="checkbox" id="trash-all" aria-label="Pick every clip"> <span id="trash-picked">Pick</span></label>{% else %}<h2>Deleted clips</h2>{% endif %}
+    <div class="actions" id="trash-bulk" hidden><button class="small" id="trash-restore-picked" type="button">Restore</button><button class="danger small" id="trash-delete-picked" type="button">Delete now</button></div>
+  </header>
+  <div class="body flush">
+    <table class="cards trash-table">
+      <thead><tr>{% if editable %}<th class="pick"><span class="sr">Pick</span></th>{% endif %}<th>Clip</th><th>Deleted</th><th class="num">On disk</th><th>Deleted for good</th><th></th></tr></thead>
+      <tbody>
+        {% for r in rows %}
+        <tr data-id="{{ r.id }}" data-title="{{ r.title }}">
+          {% if editable %}<td class="pick">{% if r.can_edit %}<input type="checkbox" class="trash-pick" aria-label="Pick {{ r.title }}">{% endif %}</td>{% endif %}
+          <td class="clip"><span class="row">{% if let Some(p) = r.poster %}<img class="thumb" src="{{ p }}" alt="" loading="lazy">{% else %}<span class="thumb"></span>{% endif %}<span class="ellipsis">{{ r.title }}</span></span></td>
+          <td class="sub" data-l="deleted">{{ r.deleted }}{% if !r.by.is_empty() %} <span class="muted">by {{ r.by }}</span>{% endif %}</td>
+          <td class="num sub" data-l="on disk">{{ r.size }}</td>
+          <td class="sub{% if r.soon %} st-warn{% endif %}" data-l="for good"><span>{{ r.left }}</span>{% if !r.until.is_empty() %} <span class="muted">{{ r.until }}</span>{% endif %}</td>
+          <td class="right acts">{% if r.can_edit %}<button class="small trash-restore" type="button">Restore</button><button class="danger small trash-delete" type="button">Delete now</button>{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+{% endblock %}

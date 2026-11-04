@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-page-shape-get"
+description = "Enables the page_shape_get command without any pre-configured scope."
+commands.allow = ["page_shape_get"]
+
+[[permission]]
+identifier = "deny-page-shape-get"
+description = "Denies the page_shape_get command without any pre-configured scope."
+commands.deny = ["page_shape_get"]

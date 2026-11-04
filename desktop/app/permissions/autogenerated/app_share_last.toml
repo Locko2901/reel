@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-app-share-last"
+description = "Enables the app_share_last command without any pre-configured scope."
+commands.allow = ["app_share_last"]
+
+[[permission]]
+identifier = "deny-app-share-last"
+description = "Denies the app_share_last command without any pre-configured scope."
+commands.deny = ["app_share_last"]
