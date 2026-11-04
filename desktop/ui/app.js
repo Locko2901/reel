@@ -6,6 +6,7 @@ import { noiseHelp, noiseOptions, ownMicWords } from './noise.js';
 import { ensureOption, syncCustom, takenWords } from './inobs.js';
 import { bindObsBar, renderObsBar } from './obsbar.js';
 import { audioPlan, meterIn, renderLevelRows, wordsInto } from './sources.js';
+import { bindLibrary, refreshLibrary, renderLibrary } from './library.js';
 
 const CTL = 'input, select, button[role="switch"]';
 
@@ -315,6 +316,8 @@ function renderLocal() {
   const standalone = status.mode === 'standalone';
   off($('#local-panel'), !standalone);
   off($('#standalone-panel'), !standalone);
+  off($('#library-panel'), !standalone);
+  renderLibrary(status);
   $('#mode-line').textContent = standalone ? (status.local ? 'reel runs on this PC' : status.local_line || 'standalone') : 'connected to a server';
   if (!standalone) return;
   $('#local-line').textContent = status.local_line || '';
@@ -815,6 +818,7 @@ async function main() {
   bindRows();
   bindHotkeys();
   bindObs();
+  bindLibrary();
   try {
     settings = await invoke('settings_get');
     ownMicApp = await invoke('obs_own_mic').catch(() => null);
@@ -824,6 +828,7 @@ async function main() {
     status = await invoke('status_get');
     shapeKey = `${status.mode}|${status.server_url}|${status.paired}|${!!status.offline}`;
     renderStatus();
+    if (status.mode === 'standalone') refreshLibrary();
   } catch (e) {
     toast(`no shell: ${String(e.message || e)}`, 'err');
   }

@@ -8,6 +8,8 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 const INSTANCE_KEY: &str = "instance_id";
+/// The database's file in the data folder, and in a copy of the library.
+pub const DB: &str = "reel.db";
 const EVERY: Duration = Duration::from_secs(10);
 const ANSWER_WITHIN: Duration = Duration::from_secs(10);
 const FIRST_LINE: &str = "reel's library: clips are written here only while this file is here.";
@@ -336,6 +338,33 @@ pub async fn move_old_trash(ctx: &Ctx) -> anyhow::Result<usize> {
     Ok(moved)
 }
 
+/// Whether a folder holds a library: its database, and its library with a marker. The id the
+/// marker names, when it does.
+pub fn holds_library(dir: &Path) -> Option<String> {
+    if !dir.join(DB).is_file() {
+        return None;
+    }
+    let text = std::fs::read_to_string(dir.join("library").join(MARKER)).ok()?;
+    Some(marker_id(&text).to_string())
+}
+
+/// Rewrites each kept original's absolute path under the data folder as one relative to it, so
+/// the folder can move or be copied with them. How many changed.
+pub async fn relative_originals(
+    store: &reel_store::Store,
+    cfg: &reel_core::Config,
+) -> anyhow::Result<usize> {
+    let mut n = 0;
+    for (id, path) in store.originals().await? {
+        let stored = cfg.stored(Path::new(&path));
+        if stored != path {
+            store.set_original_path(&id, Some(&stored)).await?;
+            n += 1;
+        }
+    }
+    Ok(n)
+}
+
 /// Where a trashed clip's folder is: the library's trash, else the data folder's, not moved yet.
 pub fn trashed_dir(cfg: &reel_core::Config, clip_id: &str) -> PathBuf {
     let new = cfg.trash_dir().join(clip_id);
@@ -456,5 +485,46 @@ mod tests {
         assert_eq!(read_marker(&lib).unwrap(), None);
         write_marker(&lib, ME).unwrap();
         assert_eq!(read_marker(&lib).unwrap().as_deref(), Some(ME));
+    }
+
+    #[test]
+    fn a_folder_holds_a_library_with_its_database_and_marker() {
+        let tmp = tempfile::tempdir().unwrap();
+        assert_eq!(holds_library(tmp.path()), None);
+        std::fs::write(tmp.path().join(DB), b"").unwrap();
+        assert_eq!(
+            holds_library(tmp.path()),
+            None,
+            "a database alone is not one"
+        );
+        std::fs::create_dir_all(tmp.path().join("library")).unwrap();
+        std::fs::write(tmp.path().join("library").join(MARKER), marker_text("01ID")).unwrap();
+        assert_eq!(holds_library(tmp.path()).as_deref(), Some("01ID"));
+    }
+
+    #[test]
+    fn an_original_in_the_data_folder_is_kept_by_a_relative_path() {
+        let cfg = reel_core::Config {
+            data_dir: PathBuf::from("/data/reel"),
+            ..Default::default()
+        };
+        assert_eq!(
+            cfg.stored(Path::new("/data/reel/originals/C1.mkv")),
+            "originals/C1.mkv"
+        );
+        assert_eq!(
+            cfg.stored(Path::new("/originals/C1.mkv")),
+            "/originals/C1.mkv",
+            "a server's originals folder of its own keeps absolute paths"
+        );
+        assert_eq!(
+            cfg.abs("originals/C1.mkv"),
+            Path::new("/data/reel/originals/C1.mkv")
+        );
+        assert_eq!(
+            cfg.abs("/originals/C1.mkv"),
+            Path::new("/originals/C1.mkv"),
+            "an absolute path reads as it is"
+        );
     }
 }

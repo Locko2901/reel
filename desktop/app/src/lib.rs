@@ -2,6 +2,7 @@
 mod commands;
 mod downloads;
 mod hotkey;
+mod library;
 #[cfg(target_os = "linux")]
 mod linux;
 #[cfg(target_os = "linux")]
@@ -123,6 +124,10 @@ pub fn run() {
             commands::status_get,
             commands::settings_get,
             commands::standalone_cap,
+            commands::library_get,
+            commands::library_plan,
+            commands::library_move,
+            commands::library_stop,
             commands::settings_save,
             commands::hotkey_try,
             commands::hotkeys_listen,

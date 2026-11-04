@@ -1,6 +1,7 @@
 pub mod anim;
 pub mod app_update;
 pub mod cap;
+pub mod copier;
 pub mod cut;
 pub mod derive;
 pub mod derived;

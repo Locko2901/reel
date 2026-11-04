@@ -624,6 +624,19 @@ impl Config {
         }
     }
 
+    /// How the database keeps a file's path: relative to the data folder when it is in it, so the
+    /// folder can move, else as it is.
+    pub fn stored(&self, path: &Path) -> String {
+        match path.strip_prefix(&self.data_dir) {
+            Ok(rel) if !self.data_dir.as_os_str().is_empty() => rel
+                .components()
+                .map(|c| c.as_os_str().to_string_lossy())
+                .collect::<Vec<_>>()
+                .join("/"),
+            _ => path.to_string_lossy().into_owned(),
+        }
+    }
+
     /// The data folder's own directories; the library is made by its check, never here, so a
     /// share that is not mounted does not get one on its bare mount point.
     pub fn ensure_dirs(&self) -> std::io::Result<()> {

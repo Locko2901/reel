@@ -588,13 +588,17 @@ pub async fn clip(
         ));
     }
     let mut original_download = None;
-    match &clip.original_path {
+    match clip
+        .original_path
+        .as_deref()
+        .map(|p| st.ctx.config().abs(p))
+    {
         Some(p) => {
-            let size = std::fs::metadata(p)
+            let size = std::fs::metadata(&p)
                 .map(|m| format::size(m.len()))
                 .unwrap_or_else(|_| "file missing".into());
             details.push(("original".into(), format!("kept, {size}")));
-            if std::path::Path::new(p).is_file() {
+            if p.is_file() {
                 original_download = Some((format!("/media/clips/{}/original", clip.id), size));
             }
         }

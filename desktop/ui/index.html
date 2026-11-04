@@ -60,6 +60,13 @@
             <div class="srow" data-key="standalone.copies_on_hardware" data-kind="bool"><div class="slabel"><b>Copies on the GPU</b><span class="shelp">copies under a size on the GPU encoder in one pass instead of two-pass x264: faster, a little larger</span></div><div class="sctl"><button type="button" class="switch" role="switch" aria-checked="false" aria-label="Copies on the GPU"><i></i></button><span class="err" hidden></span></div></div>
           </div>
         </div>
+        <div class="panel" id="library-panel" data-off hidden>
+          <header><h2>Library</h2><span class="desc">where reel keeps it on this PC</span></header>
+          <div class="body flush">
+            <div class="srow" id="library-row"><div class="slabel"><b>Library folder</b><span class="shelp">the clips with every version, their database and the kept originals; Move puts them on another drive, and a folder that holds a reel library, such as a copy, is taken up as it is</span><span class="snote" id="library-line" aria-live="polite"></span></div><div class="sctl"><button class="small quiet" type="button" id="library-open">Open folder</button><button class="small" type="button" id="library-move">Move</button></div></div>
+          </div>
+          <div class="body" id="library-job" hidden></div>
+        </div>
         <div class="panel" id="server-panel">
           <header><h2 data-standalone-text="A server, later">Server</h2><span class="desc" data-standalone="only">to add one: pair the app with it here, send clips to it from Status, then switch Mode to connected</span></header>
           <div class="body flush">

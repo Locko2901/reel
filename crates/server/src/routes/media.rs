@@ -68,20 +68,20 @@ pub async fn original(
     req: Request,
 ) -> AppResult<Response> {
     let clip = st.ctx.store.clip(&id).await?.ok_or(AppError::NotFound)?;
-    let path = clip.original_path.as_deref().ok_or(AppError::NotFound)?;
-    let ext = std::path::Path::new(path)
-        .extension()
-        .and_then(|e| e.to_str())
-        .unwrap_or("mkv");
+    let path = st
+        .ctx
+        .config()
+        .abs(clip.original_path.as_deref().ok_or(AppError::NotFound)?);
+    let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("mkv");
     let stem = clip
         .source_name
         .rsplit_once('.')
         .map(|(s, _)| s)
         .unwrap_or(&clip.source_name);
-    let mime = mime_guess::from_path(path).first_or_octet_stream();
+    let mime = mime_guess::from_path(&path).first_or_octet_stream();
     Ok(serve(
         req,
-        std::path::Path::new(path),
+        &path,
         mime,
         Some(attachment_name(&format!("{stem} raw"), ext)),
     )

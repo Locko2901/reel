@@ -120,6 +120,9 @@ pub struct StandaloneSettings {
     pub cap_keeps_unsent: bool,
     /// Size-limited copies on the GPU encoder instead of two-pass x264.
     pub copies_on_hardware: bool,
+    /// reel on this PC's whole folder when the app moved it; empty is `library` in the data
+    /// folder. Only a move or the use of another library sets it.
+    pub library_dir: PathBuf,
 }
 
 impl Default for StandaloneSettings {
@@ -129,6 +132,18 @@ impl Default for StandaloneSettings {
             cap_gb: 100,
             cap_keeps_unsent: true,
             copies_on_hardware: true,
+            library_dir: PathBuf::new(),
+        }
+    }
+}
+
+impl Settings {
+    /// The folder reel on this PC runs from: the one the app moved it to, else its origin.
+    pub fn library_dir(&self, paths: &Paths) -> PathBuf {
+        if self.standalone.library_dir.as_os_str().is_empty() {
+            paths.library_dir()
+        } else {
+            self.standalone.library_dir.clone()
         }
     }
 }
@@ -399,7 +414,8 @@ impl Paths {
     pub fn ledger_file(&self) -> PathBuf {
         self.data_dir.join("ledger.json")
     }
-    /// Standalone: reel's data folder (its library, cache, trash and database).
+    /// Standalone: reel's data folder (its library, cache, trash and database) where it starts
+    /// out; `Settings::library_dir` says where it is.
     pub fn library_dir(&self) -> PathBuf {
         self.data_dir.join("library")
     }
