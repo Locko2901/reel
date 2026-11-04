@@ -1,0 +1,15 @@
+/target
+/data
+__pycache__/
+/desktop/target
+/desktop/app/gen
+/desktop/ui/assets
+/desktop/app/binaries
+/.ffmpeg-cache
+/desktop/app/obs
+/.obs-cache
+/desktop/app/nsis/reel-stop.exe
+/desktop/app/nsis/reel-elevate.exe
+/desktop/.wine-standins
+/site/
+/shots/

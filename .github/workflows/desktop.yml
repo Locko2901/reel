@@ -1,0 +1,131 @@
+name: Desktop
+
+# Not on pushes to main: the release job in ci.yml builds the installers for a release.
+on:
+  pull_request:
+    branches: [main]
+    # labeled: the label installers asks for the installers as an artifact
+    types: [opened, synchronize, reopened, labeled]
+    paths:
+      - "desktop/**"
+      - ".github/workflows/desktop.yml"
+      - "Makefile"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Not cancelled: a documentation push then finishes against the run that just passed.
+concurrency:
+  group: desktop-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: false
+
+jobs:
+  changes:
+    name: Desktop · what changed
+    runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      heavy: ${{ steps.what.outputs.heavy }}
+      windows: ${{ steps.what.outputs.windows }}
+      plain: ${{ steps.what.outputs.plain }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: The passed runs of this pull request
+        id: green
+        if: ${{ github.event_name == 'pull_request' }}
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          result-encoding: string
+          script: |
+            const { data } = await github.rest.actions.listWorkflowRuns({
+              ...context.repo, workflow_id: 'desktop.yml', event: 'pull_request', status: 'success',
+              branch: context.payload.pull_request.head.ref, per_page: 50,
+            });
+            return data.workflow_runs.map((r) => r.head_sha).join(' ');
+      - name: What runs
+        id: what
+        env:
+          EVENT: ${{ github.event_name }}
+          ACTION: ${{ github.event.action }}
+          AFTER: ${{ github.event.pull_request.head.sha }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+          GREEN: ${{ steps.green.outputs.result }}
+          LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
+          NEW_LABEL: ${{ github.event.label.name }}
+        run: |
+          sh desktop/ci/changes.sh
+          sed -n 's/^why=//p' "$GITHUB_OUTPUT" >> "$GITHUB_STEP_SUMMARY"
+
+  check:
+    name: Desktop · make desktop-check
+    needs: [changes]
+    # Not on release-please's pull requests, which only bump the version. A failed decision runs it.
+    if: ${{ !cancelled() && needs.changes.outputs.heavy != 'false' && !startsWith(github.head_ref, 'release-please--') }}
+    runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/free-disk
+      - name: Lint and tests
+        run: make desktop-check
+      - name: Clippy for Windows
+        run: make desktop-check-windows
+
+  obs:
+    name: Desktop · the app with the real OBS
+    needs: [changes, check]
+    if: ${{ !cancelled() && needs.check.result == 'success' }}
+    runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/free-disk
+      - name: The app and the pinned OBS under Xvfb
+        run: make desktop-obs-e2e
+
+  # After check, or without it when the label comes on a head that passed (check is skipped).
+  windows:
+    name: Desktop · Windows installer
+    needs: [changes, check]
+    if: ${{ !cancelled() && needs.changes.outputs.windows != 'false' && contains(fromJSON('["success", "skipped"]'), needs.check.result) && !startsWith(github.head_ref, 'release-please--') }}
+    runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/free-disk
+      - name: Cross build the installers
+        run: make desktop-windows DESKTOP_OUT="$PWD/desktop-out" DESKTOP_INSTALLERS="${{ needs.changes.outputs.plain != 'false' && 'plain with-obs' || 'with-obs' }}"
+      - name: What each installer holds
+        run: make desktop-installers-check DESKTOP_OUT="$PWD/desktop-out"
+      - name: The app starts its OBS, fresh and as an update
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          make desktop-previous DESKTOP_PREVIOUS="$PWD/desktop-previous"
+          make desktop-obs-start-check DESKTOP_OUT="$PWD/desktop-out" DESKTOP_PREVIOUS="$PWD/desktop-previous"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: reel-desktop-windows
+          path: desktop-out/*
+          if-no-files-found: error
+
+  linux:
+    name: Desktop · Linux AppImage and .deb
+    needs: [changes, check]
+    if: ${{ !cancelled() && needs.check.result == 'success' }}
+    runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/free-disk
+      - name: Build the AppImage and the .deb
+        run: make desktop-appimage DESKTOP_OUT="$PWD/desktop-out"
+      - name: What each holds, and the app under Xvfb
+        run: make desktop-appimage-check DESKTOP_OUT="$PWD/desktop-out"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: reel-desktop-linux
+          path: desktop-out/*
+          if-no-files-found: error

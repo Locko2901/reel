@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block title %}Sending to reel · reel{% endblock %}
+{% block content %}
+<div class="page-head"><h1>Sending to reel</h1><span class="sub" id="st-line">the clip shared from this phone goes up as an upload does</span></div>
+<div class="stack uploads" id="uploads" data-limit="{{ limit_bytes }}" data-limit-gb="{{ limit_gb }}">{% if let Some(line) = refused %}<div class="notice err"><span class="grow">{{ line }}</span></div>{% endif %}</div>
+<div class="drop" id="st-pick" hidden>
+  <p class="row wrap"><span id="st-why">Nothing came with the share.</span> <label class="btn">pick a clip<input type="file" id="st-file" accept="{{ extensions }}" hidden></label></p>
+  <p class="faint small">{{ extensions }}</p>
+</div>
+{% endblock %}

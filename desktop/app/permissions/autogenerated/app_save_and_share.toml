@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-app-save-and-share"
+description = "Enables the app_save_and_share command without any pre-configured scope."
+commands.allow = ["app_save_and_share"]
+
+[[permission]]
+identifier = "deny-app-save-and-share"
+description = "Denies the app_save_and_share command without any pre-configured scope."
+commands.deny = ["app_save_and_share"]

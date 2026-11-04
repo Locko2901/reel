@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>First run · {{ site }}</title>
+<link rel="stylesheet" href="/assets/{{ crate::routes::asset_v() }}/reel.css">
+<link rel="icon" href="/assets/icon.svg" type="image/svg+xml">
+</head>
+<body data-page="setup">
+<header class="top">
+  <a class="wordmark" href="/"><svg class="mark" viewBox="8.6 3 16.2 26" aria-hidden="true"><path d="M8.6 3L16 10.4V29H8.6Z"/><path class="arm" d="M8.6 3H24.8V10.4H16Z"/></svg>{{ site }}</a>
+  <span class="muted">first run{% if done %}, again{% endif %}</span>
+</header>
+<main class="page">
+  <div class="wizard" data-step="{{ step }}">
+    <div class="steps">
+      {% for s in steps %}<a href="/setup?step={{ s.n }}" class="{% if s.done %}done{% else if s.now %}now{% endif %}"><i>{{ s.n }}</i><span>{{ s.name }}</span></a>
+      {% endfor %}
+    </div>
+    <div class="panels">
+      {% if step == 1 %}
+      <h1>Welcome</h1>
+      <p class="intro">Six short steps, each saved as you go; skip any of them, every value is under Settings later. First the name on the pages and the address the share links carry: it has to be reachable from the internet, or link previews cannot play it.</p>
+      {% else if step == 2 %}
+      <h1>Folders</h1>
+      <p class="intro">The data folder holds the library, the database and the caches. The incoming folder is where raw clips arrive; the originals folder keeps the raw file of re-encoded clips.</p>
+      <div class="panel">
+        <header><h2>What is there</h2><div class="actions"><button class="small" id="folders-again" type="button">Check again</button></div></header>
+        <div class="body flush">
+          {% for f in folders %}
+          <div class="srow" data-folder="{{ f.key }}">
+            <div class="slabel"><b>{{ f.label }}</b><span class="shelp mono">{{ f.path }}</span></div>
+            <div class="sctl"><span class="{{ f.class }}">{{ f.state }}</span>{% if f.can_create %}<button class="small" type="button" data-mkdir="{{ f.key }}">Create it</button>{% endif %}</div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+      {% else if step == 3 %}
+      <h1>Hardware</h1>
+      <p class="intro">reel doctor ran at start. Re-encodes go through the GPU where a route works; a codec marked failed takes the software route for its clips. Nothing here is a blocker: with no GPU at all every clip is encoded on the CPU.</p>
+      <div class="panel">
+        <header><h2>What doctor found</h2><div class="actions"><button class="small" id="doctor-btn" type="button">Run again</button></div></header>
+        <div class="body">
+          <dl class="kv wide">{% for c in checks %}<dt>{{ c.name }}</dt><dd>{% if !c.class.is_empty() %}<i class="dot {{ c.dot() }}"></i> {% endif %}<span{% if !c.class.is_empty() %} class="{{ c.class }}"{% endif %}>{{ c.value }}</span></dd>{% endfor %}</dl>
+        </div>
+      </div>
+      {% else if step == 4 %}
+      <h1>Access</h1>
+      <p class="intro">{{ access_line }}</p>
+      {% if !users.is_empty() %}<p class="small muted">Users so far: {{ users.join(", ") }}.</p>{% endif %}
+      {% else if step == 5 %}
+      <h1>Sharing</h1>
+      <p class="intro">What a new link starts with, the limit the copies under a size aim for, and whether the raw files are kept.</p>
+      {% else %}
+      <h1>Done</h1>
+      <p class="intro">That is the setup. The incoming folder is being watched; drop a clip there or upload one, and every value here is under Settings from now on.</p>
+      <div class="panel">
+        <header><h2>Summary</h2></header>
+        <div class="body"><dl class="kv wide">{% for (k, v) in summary %}<dt>{{ k }}</dt><dd>{{ v }}</dd>{% endfor %}</dl></div>
+      </div>
+      <div class="panel">
+        <header><h2>The app</h2><span class="desc">for the PC games are played on: it uploads what OBS saves, and Save and share copies a link with one key</span></header>
+        <div class="body flush">
+          {% for a in apps %}<div class="srow"><div class="slabel"><b>{{ a.name }}</b><span class="shelp">{{ a.who }}</span></div><div class="sctl">{% if let Some(u) = a.url %}<a class="btn" href="{{ u }}" download>Download, {{ a.size }}</a>{% else %}<span class="muted small">not on this server yet: it fetches its version's installers from the release, at start and once a day</span>{% endif %}</div></div>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+      {% if !rows.is_empty() %}
+      <div class="panel">
+        <header><h2>Choices</h2>{% if step == 1 %}<div class="actions"><button class="small" id="url-check" type="button">Check the public URL</button></div>{% endif %}</header>
+        <div class="body flush" id="setup-rows">
+          {% for r in rows %}{% include "setting-row.html" %}{% endfor %}
+        </div>
+      </div>
+      <p class="small muted" id="url-result" hidden></p>
+      {% endif %}
+      <footer>
+        {% if step > 1 %}<a class="btn quiet" href="/setup?step={{ step - 1 }}">Back</a>{% endif %}
+        {% if step < 6 %}<a class="btn primary" href="/setup?step={{ step + 1 }}">Next: {{ steps[step].name }}</a>{% else %}<button class="primary" id="setup-done" type="button">Open the library</button>{% endif %}
+        {% if step < 6 %}<button class="quiet skip" id="setup-skip" type="button">Skip the rest, use the defaults</button>{% endif %}
+      </footer>
+    </div>
+  </div>
+</main>
+<div id="toasts"></div>
+<script type="module" src="/assets/{{ crate::routes::asset_v() }}/reel.js"></script>
+</body>
+</html>

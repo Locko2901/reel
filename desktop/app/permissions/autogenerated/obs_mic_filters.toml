@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-obs-mic-filters"
+description = "Enables the obs_mic_filters command without any pre-configured scope."
+commands.allow = ["obs_mic_filters"]
+
+[[permission]]
+identifier = "deny-obs-mic-filters"
+description = "Denies the obs_mic_filters command without any pre-configured scope."
+commands.deny = ["obs_mic_filters"]

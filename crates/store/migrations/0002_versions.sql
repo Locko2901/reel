@@ -1,0 +1,2 @@
+ALTER TABLE share ADD COLUMN rendition_id TEXT REFERENCES rendition(id) ON DELETE SET NULL;
+ALTER TABLE clip ADD COLUMN source_clip_id TEXT REFERENCES clip(id);

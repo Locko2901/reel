@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-screens-get"
+description = "Enables the screens_get command without any pre-configured scope."
+commands.allow = ["screens_get"]
+
+[[permission]]
+identifier = "deny-screens-get"
+description = "Denies the screens_get command without any pre-configured scope."
+commands.deny = ["screens_get"]

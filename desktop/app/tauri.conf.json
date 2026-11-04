@@ -1,0 +1,76 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "reel",
+  "version": "1.11.1",
+  "identifier": "dev.lockoo.reel",
+  "build": {
+    "frontendDist": "../ui"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "publisher": "Lockoo",
+    "copyright": "Copyright (c) 2026 Lockoo",
+    "targets": [
+      "appimage",
+      "deb"
+    ],
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "windows": {
+      "webviewInstallMode": {
+        "type": "embedBootstrapper"
+      },
+      "nsis": {
+        "installMode": "currentUser",
+        "installerHooks": "nsis/plain.nsh",
+        "template": "nsis/installer.nsi",
+        "customLanguageFiles": {
+          "English": "nsis/English.nsh"
+        },
+        "installerIcon": "icons/icon.ico",
+        "uninstallerIcon": "icons/icon.ico"
+      }
+    },
+    "externalBin": [
+      "binaries/ffmpeg",
+      "binaries/ffprobe"
+    ],
+    "resources": [
+      "binaries/ffmpeg-LICENSE.txt"
+    ],
+    "linux": {
+      "appimage": {
+        "bundleMediaFramework": true
+      },
+      "deb": {
+        "depends": [
+          "gstreamer1.0-plugins-base",
+          "gstreamer1.0-plugins-good",
+          "gstreamer1.0-libav",
+          "gstreamer1.0-gl"
+        ]
+      }
+    }
+  },
+  "plugins": {
+    "updater": {
+      "dangerousInsecureTransportProtocol": true,
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEQ4RjhCQzhENkQ3RDc2QzAKUldUQWRuMXRqYno0Mk90MlJnVFJ3SnlONHBPMTR5S3YwaU15cXZoaGU3UVBjMlFKZ01xdGhhTHUK",
+      "windows": {
+        "installMode": "passive"
+      }
+    }
+  }
+}

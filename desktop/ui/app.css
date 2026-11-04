@@ -1,0 +1,36 @@
+header.top [data-page].disabled, nav.sections [data-page].disabled { opacity: 0.5; pointer-events: none; }
+.group { scroll-margin-top: 66px; }
+.srow .err .again { margin-left: 8px; }
+.srow .sctl input[type="range"] { width: 160px; }
+.test-result { padding: 4px 12px 12px; border-bottom: 1px solid var(--line); }
+.test-result:last-child { border-bottom: 0; }
+.test-result p { margin: 0; overflow-wrap: anywhere; }
+.test-result p + p { margin-top: 4px; }
+table .bar { display: inline-block; width: 120px; height: 4px; background: var(--raised-2); vertical-align: middle; margin-right: 8px; border-radius: 2px; overflow: hidden; }
+table .bar i { display: block; height: 100%; background: var(--accent); }
+td.acts { white-space: nowrap; }
+td.acts button { margin-left: 4px; }
+.offline-page { display: flex; justify-content: center; padding-top: 48px; }
+.panel.offline { width: min(640px, 100%); }
+.offline-words { font-size: var(--fs-l); margin: 0 0 8px; }
+.offline-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+button.hotkey { min-width: 220px; justify-content: flex-start; gap: 4px; }
+button.hotkey.listening { border-color: var(--accent); }
+button.hotkey .unset { color: var(--text-3); }
+.meter { display: block; width: 160px; height: 4px; margin-top: 6px; background: var(--raised-2); border-radius: 2px; overflow: hidden; }
+.meter i { display: block; height: 100%; width: 0; background: var(--ok); }
+.wizard[data-step="choose"] { grid-template-columns: minmax(0, 1fr); max-width: 760px; }
+.wizard[data-step="choose"] .steps { display: none; }
+.srow.wide { grid-template-columns: minmax(0, 1fr); }
+#where-notice { margin-bottom: var(--s2); }
+.srow.wide .sctl { justify-content: flex-start; }
+.srow.wide .seg { flex: none; }
+details.advanced { margin-top: var(--gap-in); }
+details.advanced > summary { cursor: pointer; color: var(--text-2); font-size: var(--fs-s); padding: 6px 0; width: max-content; }
+details.advanced > summary:hover { color: var(--text); }
+details.advanced[open] > summary { margin-bottom: var(--s2); }
+.srow .sctl .switch + select { max-width: calc(100% - 34px - var(--s2)); }
+.srow .sctl .vol { display: inline-flex; align-items: center; gap: var(--s2); }
+.obs-bar { position: sticky; top: 48px; z-index: 4; margin-bottom: var(--s3); }
+.route-words span { display: block; color: var(--text-2); }
+.update-notes { white-space: pre-wrap; font-size: var(--fs-s); color: var(--text-2); max-height: 320px; overflow: auto; }

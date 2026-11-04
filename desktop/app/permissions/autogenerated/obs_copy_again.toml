@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-obs-copy-again"
+description = "Enables the obs_copy_again command without any pre-configured scope."
+commands.allow = ["obs_copy_again"]
+
+[[permission]]
+identifier = "deny-obs-copy-again"
+description = "Denies the obs_copy_again command without any pre-configured scope."
+commands.deny = ["obs_copy_again"]

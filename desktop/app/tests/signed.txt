@@ -1,0 +1,1 @@
+reel: a file signed with the release key, so a test can check that the key built into the app is its public half.

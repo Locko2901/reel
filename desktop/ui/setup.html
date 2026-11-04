@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Set up reel</title>
+<link rel="stylesheet" href="assets/reel.css">
+<link rel="stylesheet" href="app.css">
+</head>
+<body data-page="setup">
+<header class="top">
+  <a class="wordmark" href="index.html"><svg class="mark" viewBox="8.6 3 16.2 26" aria-hidden="true"><path d="M8.6 3L16 10.4V29H8.6Z"/><path class="arm" d="M8.6 3H24.8V10.4H16Z"/></svg>reel</a>
+  <span class="muted" id="setup-of">setup of the OBS that came with it</span>
+</header>
+<main class="page">
+  <div class="notice active obs-bar" id="obs-bar" role="status" hidden><span class="grow"><b>OBS is open.</b> In its Settings: Output, Replay Buffer for the clip length; Video for the quality; Output, Recording for the encoder, the format and the tracks; Hotkeys. The levels: its Audio Mixer.</span><div class="actions"><button class="small primary" id="obs-bar-hide" type="button">Hide OBS</button></div></div>
+  <div class="wizard" id="wizard">
+    <nav class="steps" id="steps" aria-label="Steps"></nav>
+    <div class="panels">
+      <div class="notice warn" id="obs-notice" role="status" hidden><span class="grow" id="obs-notice-line"></span><div class="actions"><button class="small" id="obs-notice-log" type="button">Show the log</button></div></div>
+
+
+      <section data-step="choose">
+        <h1 id="choose-title">reel's own OBS</h1>
+        <p class="intro" id="choose-intro">OBS came with this app, as its makers publish it, to keep the replay buffer reel saves clips from. reel can run it for you, hidden, and set it up in seven short steps, each with a default: Next, Next, Done gives a working setup, and everything stays changeable under This app, OBS.</p>
+        <div class="panel">
+          <div class="body flush">
+            <div class="srow"><div class="slabel"><b>Set it up for me</b><span class="shelp" id="choose-bundled-help">recommended: reel starts the OBS that came with it, hidden, with the app, and writes its settings from these steps; anything can be changed in OBS itself later</span></div><div class="sctl"><button class="primary" id="choose-bundled" type="button">Set it up</button></div></div>
+            <div class="srow"><div class="slabel"><b>Use my own OBS</b><span class="shelp" id="choose-own-help">for an OBS set up already: reel connects to it over its WebSocket, as reel light does. Discord turns on its Streamer Mode while it sees your OBS running; its Streamer Mode settings, Automatically Enable/Disable, turn that off</span></div><div class="sctl"><button id="choose-own" type="button">Use my own</button></div></div>
+            <div class="srow"><div class="slabel"><b>Later</b><span class="shelp">the app opens on its own pages; This app, OBS has this setup whenever you want it</span></div><div class="sctl"><button class="quiet" id="choose-later" type="button">Skip for now</button></div></div>
+          </div>
+        </div>
+      </section>
+
+      <section data-step="length" hidden>
+        <h1>Clip length</h1>
+        <p class="intro">How much a clip keeps from before the moment you save it. The replay buffer holds this much in memory, so its size follows from the length and the quality.</p>
+        <div class="panel">
+          <div class="body flush">
+            <div class="srow wide"><div class="slabel"><b>Clip length</b><span class="shelp" id="length-help"></span></div><div class="sctl"><div class="seg" role="group" aria-label="Clip length" id="length-seg"><button type="button" data-seconds="30">30 s</button><button type="button" data-seconds="60">1 min</button><button type="button" data-seconds="120">2 min</button><button type="button" data-seconds="180">3 min</button><button type="button" data-seconds="300">5 min</button><button type="button" data-seconds="600">10 min</button></div><span class="ctl-group"><input type="number" class="in-num" id="length-n" min="5" max="1800" aria-label="Clip length in seconds"><span class="unit">s</span></span></div></div>
+          </div>
+        </div>
+        <p class="small st-warn" id="length-warn" hidden></p>
+      </section>
+
+      <section data-step="quality" hidden>
+        <h1>Quality</h1>
+        <p class="intro">What the clips are recorded at. Smooth suits most games and links; Sharp keeps small text readable; Native records the screen as it is.</p>
+        <div class="panel">
+          <div class="body flush">
+            <div class="srow"><div class="slabel"><b>Quality</b><span class="shelp" id="quality-help"></span></div><div class="sctl"><select id="quality" aria-label="Quality"><option value="smooth">Smooth: 1080p60</option><option value="sharp">Sharp: 1440p60</option><option value="native">Native: your screen</option><option value="custom" hidden>As set in OBS</option></select></div></div>
+          </div>
+        </div>
+        <div class="panel">
+          <header><h2>What that comes to</h2></header>
+          <div class="body"><dl class="kv wide" id="quality-kv"></dl></div>
+        </div>
+        <p class="small st-warn" id="quality-warn" hidden></p>
+        <details class="advanced" id="quality-advanced">
+          <summary>Advanced</summary>
+          <div class="panel">
+            <div class="body flush">
+              <div class="srow"><div class="slabel"><b>Rate control</b><span class="shelp">a bitrate keeps the size and the memory known; a quality level spends less on still scenes and more on busy ones</span></div><div class="sctl"><select id="rate" aria-label="Rate control"><option value="bitrate">a bitrate</option><option value="quality">a quality level</option></select></div></div>
+              <div class="srow" id="kbit-row"><div class="slabel"><b>Bitrate</b><span class="shelp">0 is the preset's</span></div><div class="sctl"><span class="ctl-group"><input type="number" class="in-num" id="kbit" min="0" max="200000" aria-label="Bitrate"><span class="unit">kbit/s</span></span></div></div>
+              <div class="srow" id="level-row" hidden><div class="slabel"><b>Quality level</b><span class="shelp">lower is better and larger; 18 to 23 is the usual range</span></div><div class="sctl"><input type="number" class="in-num" id="level" min="1" max="51" aria-label="Quality level"></div></div>
+              <div class="srow"><div class="slabel"><b>Format</b><span class="shelp">hybrid MP4 plays everywhere and survives a crash; MKV survives one too</span></div><div class="sctl"><select id="format" aria-label="Format"><option value="hybrid_mp4">hybrid MP4</option><option value="mkv">MKV</option></select></div></div>
+            </div>
+          </div>
+        </details>
+      </section>
+
+      <section data-step="encoder" hidden>
+        <h1>Encoder</h1>
+        <p class="intro">reel tried each encoder OBS could use here with a short test encode, the graphics card's first: they leave the game more room than the CPU. All of them write H.264, so reel keeps the clips as they are.</p>
+        <div class="panel">
+          <header><h2>What the test found</h2><div class="actions"><button class="small" id="encoders-again" type="button">Test again</button></div></header>
+          <div class="body flush">
+            <table class="cards" id="encoders"><thead><tr><th>Encoder</th><th>Test</th></tr></thead><tbody></tbody></table>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="body flush">
+            <div class="srow"><div class="slabel"><b>Encoder</b><span class="shelp">the first that worked, unless you pick another</span></div><div class="sctl"><select id="encoder" aria-label="Encoder"></select></div></div>
+          </div>
+        </div>
+      </section>
+
+      <section data-step="capture" hidden>
+        <h1>What to capture</h1>
+        <p class="intro" id="capture-intro">The game in front, captured straight from the game, with the whole screen behind it: while no game runs fullscreen, a clip shows the screen.</p>
+        <div class="panel">
+          <div class="body flush">
+            <div class="srow"><div class="slabel"><b>The game in front</b><span class="shelp" id="game-help">OBS's game capture of any fullscreen application; off, the screen alone</span></div><div class="sctl"><button type="button" class="switch" role="switch" aria-checked="true" id="game" aria-label="The game in front"><i></i></button></div></div>
+            <div class="srow"><div class="slabel"><b>Screen</b><span class="shelp">the one to capture, and the size and frame rate Native records at</span></div><div class="sctl"><select id="screen" aria-label="Screen"></select></div></div>
+            <div class="srow" id="elevated-row"><div class="slabel"><b>Capture games that run as administrator</b><span class="shelp">some games run as administrator, and OBS can only capture them when it does too. A scheduled task then starts OBS, never reel, with the highest rights, from a copy in Program Files that only an administrator can change; Windows asks once, at Finish, not at every start. OBS then takes the Save hotkey itself</span></div><div class="sctl"><button type="button" class="switch" role="switch" aria-checked="false" id="elevated" aria-label="Capture games that run as administrator"><i></i></button><span class="why" id="elevated-doing" aria-live="polite" hidden></span></div></div>
+          </div>
+        </div>
+      </section>
+
+      <section data-step="audio" hidden>
+        <h1>Audio</h1>
+        <p class="intro">What should a clip hear? Desktop audio and your microphone are on; the game alone and Discord alone can be added, each on a track of its own, or in place of desktop audio for clips without the PC's other sounds.</p>
+        <div class="panel">
+          <header><h2>Sources</h2><span class="desc" id="audio-line"></span></header>
+          <div class="body flush">
+            <div class="srow" id="src-desktop"><div class="slabel"><b>Desktop audio</b><span class="shelp">everything the PC plays on this output, the game and Discord included</span></div><div class="sctl"><button type="button" class="switch" role="switch" aria-checked="true" id="desktop-on" aria-label="Desktop audio"><i></i></button><select id="desktop-audio" aria-label="Desktop audio device"></select></div></div>
+            <div class="srow" id="src-mic"><div class="slabel"><b>Microphone</b><span class="shelp">your voice, from this device</span></div><div class="sctl"><button type="button" class="switch" role="switch" aria-checked="true" id="mic-on" aria-label="Microphone"><i></i></button><select id="mic" aria-label="Microphone device"></select></div></div>
+            <div class="srow" id="noise-row" hidden><div class="slabel"><b>Noise suppression</b><span class="shelp" id="noise-help"></span></div><div class="sctl"><select id="noise" aria-label="Noise suppression"><option value="off">Off</option><option value="speex">Light (Speex)</option><option value="rnnoise">Strong (RNNoise)</option><option value="nvidia">NVIDIA noise removal</option><option value="own">My own OBS's filters</option></select></div></div>
+            <div class="srow" id="own-mic-row" hidden><div class="slabel"><b>Your own OBS's microphone</b><span class="shelp" id="own-mic-help"></span></div><div class="sctl"><button type="button" id="own-mic-use">Use these filters</button></div></div>
+            <div class="srow" id="src-game" hidden><div class="slabel"><b>The game alone</b><span class="shelp" id="game-audio-help">only the game's sound: the game in front, or a program you pick</span></div><div class="sctl"><button type="button" class="switch" role="switch" aria-checked="false" id="game-on" aria-label="The game alone"><i></i></button><select id="game-audio" aria-label="Which game" hidden></select></div></div>
+            <div class="srow" id="src-apart-missing" hidden><div class="slabel"><b>The game alone, Discord alone</b><span class="shelp" id="apart-missing-help"></span></div></div>
+            <div class="srow" id="src-discord" hidden><div class="slabel"><b>Discord alone</b><span class="shelp">only Discord's voices</span></div><div class="sctl"><button type="button" class="switch" role="switch" aria-checked="false" id="discord-on" aria-label="Discord alone"><i></i></button></div></div>
+            <div class="srow"><div class="slabel"><b>Each source on a track of its own</b><span class="shelp">beside the full mix: the editor can turn each up or down later; each track costs a little in the file and in memory</span></div><div class="sctl"><button type="button" class="switch" role="switch" aria-checked="false" id="own-tracks" aria-label="Each source on a track of its own"><i></i></button></div></div>
+          </div>
+        </div>
+        <p class="small route-words" id="audio-words" hidden></p>
+        <div class="panel" id="levels-panel">
+          <header><h2>Levels</h2><span class="desc">set the mix before you record; the meters move once OBS answers</span><div class="actions"></div></header>
+          <div class="body flush" id="levels"></div>
+        </div>
+        <details class="advanced" id="audio-advanced" hidden>
+          <summary>Advanced</summary>
+          <div class="panel">
+            <div class="body flush">
+              <div class="srow"><div class="slabel"><b>Noise gate</b><span class="shelp">after the noise suppression, silences the microphone while it stays below a level: opens at -26 dB, closes at -32 dB, OBS's own values</span></div><div class="sctl"><button type="button" class="switch" role="switch" aria-checked="false" id="gate" aria-label="Noise gate"><i></i></button></div></div>
+            </div>
+          </div>
+        </details>
+      </section>
+
+      <section data-step="hotkeys" hidden>
+        <h1>Hotkeys</h1>
+        <p class="intro">Keys that work while a game has the screen. Click a field and press the combination.</p>
+        <div class="panel">
+          <div class="body flush">
+            <div class="srow" data-key="hotkeys.save_share" data-kind="hotkey" id="hotkey-save-share"><div class="slabel"><b>Save and share</b><span class="shelp">OBS saves the replay, reel uploads it, waits until its link embeds and copies the link</span></div><div class="sctl"><button type="button" class="hotkey" aria-label="Hotkey: Save and share"></button><span class="why" aria-live="polite" hidden></span><span class="err" hidden></span></div></div>
+            <div class="srow" data-key="hotkeys.save" data-kind="hotkey"><div class="slabel"><b>Save a clip</b><span class="shelp" id="hotkey-save-help">OBS saves the replay, and it goes up as any clip does</span></div><div class="sctl"><button type="button" class="hotkey" aria-label="Hotkey: Save a clip"></button><span class="why" aria-live="polite" hidden></span><span class="err" hidden></span></div></div>
+          </div>
+        </div>
+      </section>
+
+      <section data-step="where" hidden>
+        <h1>Where clips go</h1>
+        <p class="intro">On this PC, where reel keeps the library itself and nothing goes anywhere; or to a reel server, which makes the links to share.</p>
+        <div class="panel">
+          <div class="body flush">
+            <div class="srow"><div class="slabel"><b>Clips go to</b><span class="shelp" id="where-help"></span></div><div class="sctl"><div class="seg" role="group" aria-label="Clips go to" id="where-seg"><button type="button" data-where="local">This PC only</button><button type="button" data-where="server">A reel server</button></div></div></div>
+            <div class="srow" id="server-row"><div class="slabel"><b>Server URL</b><span class="shelp">such as https://clips.example.com</span></div><div class="sctl"><input type="text" class="in-path mono" id="server-url" aria-label="Server URL"></div></div>
+            <div class="srow" id="pair-row"><div class="slabel"><b>Pairing code</b><span class="shelp">on the server: Settings, Devices, Pair a device</span></div><div class="sctl"><input type="text" class="in-short mono" id="pair-code" placeholder="abcd-2345" aria-label="Pairing code" autocomplete="off"><button class="primary" id="pair-btn" type="button">Pair</button><span class="err" id="pair-err" hidden></span></div></div>
+            <div class="srow"><div class="slabel"><b>Clips folder</b><span class="shelp" id="clips-dir-help">where OBS writes the clips; reel takes each one into the library on this PC</span></div><div class="sctl"><span class="ctl-group in-path"><input type="text" class="mono" id="clips-dir" aria-label="Clips folder"><button type="button" id="clips-browse">Browse</button></span></div></div>
+          </div>
+        </div>
+      </section>
+
+      <section data-step="done" hidden>
+        <h1>Done</h1>
+        <p class="intro">That is the setup. Finish starts OBS with it, hidden; the hotkeys work from then on.</p>
+        <div class="notice warn" id="finish-note" role="status" hidden><span class="grow" id="finish-note-line"></span></div>
+        <div class="panel">
+          <header><h2>Summary</h2></header>
+          <div class="body"><dl class="kv wide" id="summary"></dl></div>
+        </div>
+      </section>
+
+      <footer id="footer" hidden><button class="quiet" id="back" type="button">Back</button><button class="primary" id="next" type="button">Next</button><span class="err" id="finish-err" hidden></span><button class="quiet" id="log-link" type="button" hidden>Show the log</button><span class="muted small skip" id="step-line"></span><button class="quiet" id="later" type="button">Skip for now</button></footer>
+    </div>
+  </div>
+</main>
+<dialog id="log-dialog">
+  <header>The log</header>
+  <div class="body"><pre class="logbox" id="log-lines">nothing yet</pre></div>
+  <footer><button class="quiet" id="log-folder" type="button">Open the log folder</button><button class="primary" id="log-close" type="button">Close</button></footer>
+</dialog>
+<div id="toasts"></div>
+<script type="module" src="setup.js"></script>
+</body>
+</html>

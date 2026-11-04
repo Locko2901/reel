@@ -1,0 +1,76 @@
+[package]
+name = "reel-desktop"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+publish = false
+description = "reel desktop: finds OBS clips, uploads them to reel, shares the last one with a hotkey"
+build = "build.rs"
+
+[lib]
+name = "reel_desktop_lib"
+crate-type = ["rlib"]
+
+[[bin]]
+name = "reel-desktop"
+path = "src/main.rs"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+reel-desktop-core.workspace = true
+reel-core.workspace = true
+reel-store.workspace = true
+reel-media.workspace = true
+reel-pipeline.workspace = true
+reel-server.workspace = true
+tauri = { version = "2", features = ["tray-icon", "image-png", "unstable"] }
+tauri-plugin-global-shortcut = "2"
+tauri-plugin-autostart = "2"
+tauri-plugin-notification = "2"
+tauri-plugin-clipboard-manager = "2"
+tauri-plugin-dialog = "2"
+tauri-plugin-opener = "2"
+tauri-plugin-single-instance = "2"
+tauri-plugin-updater = "2"
+serde.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+tokio-util.workspace = true
+jiff.workspace = true
+anyhow.workspace = true
+url = "2"
+reqwest.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+tracing-appender = "0.2"
+
+[dev-dependencies]
+minisign-verify = "0.2"
+base64.workspace = true
+tempfile.workspace = true
+
+[target.'cfg(target_os = "linux")'.dependencies]
+gtk = "0.18"
+ashpd = { version = "0.13.13", default-features = false, features = ["tokio", "global_shortcuts"] }
+x11-dl = "2.21"
+notify-rust = "4.18"
+webkit2gtk = { version = "=2.0.2", features = ["v2_38"] }
+futures-util.workspace = true
+
+[target.'cfg(windows)'.dependencies]
+webview2-com = "0.39"
+windows = { version = "0.62", features = [
+    "Win32_Foundation",
+    "Win32_UI_Shell",
+    "Win32_UI_WindowsAndMessaging",
+    "Win32_System_Threading",
+    "Win32_Security",
+    "Win32_Media_Audio",
+    "Data_Xml_Dom",
+    "UI_Notifications",
+] }

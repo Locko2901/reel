@@ -1,0 +1,6 @@
+{% if !anims.is_empty() %}<p class="made-head">Made <span class="muted">kept with the copies under a size, the oldest going first at their limit</span></p>
+{% for a in anims %}<div class="made" data-rid="{{ a.id }}"{% if !a.making.is_empty() %} data-making{% endif %}>
+  <span class="name"><b>{{ a.format }}</b> <span class="muted">{{ a.words }}</span></span>
+  {% if a.making.is_empty() %}<span class="acts"><a class="btn small" href="{{ a.download }}" download>Download</a>{% if can_edit %}<button class="danger small anim-delete" type="button" data-rid="{{ a.id }}">Delete</button>{% endif %}</span>{% else %}<span class="badge accent pulse made-state">{{ a.making }}</span>{% endif %}
+</div>
+{% endfor %}{% endif %}

@@ -1,0 +1,13 @@
+{
+  "name": "ffmpeg 9.0.2 essentials build by gyan.dev (static, 64-bit)",
+  "version": "9.0.2",
+  "url": "https://www.gyan.dev/ffmpeg/builds/packages/ffmpeg-9.0.2-essentials_build.zip",
+  "sha256": "60f467265b1e312373dbcd92200c2618a74850f98d3d078e94296bb3fa2047ba",
+  "bytes": 114768076,
+  "license": "GPL v3",
+  "license_file": "ffmpeg-LICENSE.txt",
+  "source": "https://ffmpeg.org/download.html#releases",
+  "build_page": "https://www.gyan.dev/ffmpeg/builds/",
+  "encoders": "libx264, h264_nvenc, h264_amf, h264_qsv (libvpl)",
+  "note": "The checksum is the one gyan.dev publishes next to the archive; desktop/ci/fetch-ffmpeg.sh refuses a download that does not match it."
+}

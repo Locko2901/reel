@@ -1,0 +1,356 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "The release tag to upload the installer to (v1.0.0)"
+        required: true
+        type: string
+      commit:
+        description: "The commit to build; the tag's own commit when empty"
+        required: false
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  changes:
+    name: Check · what changed
+    runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      heavy: ${{ steps.what.outputs.heavy }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: The passed runs of this pull request
+        id: green
+        if: ${{ github.event_name == 'pull_request' }}
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          result-encoding: string
+          script: |
+            const { data } = await github.rest.actions.listWorkflowRuns({
+              ...context.repo, workflow_id: 'ci.yml', event: 'pull_request', status: 'success',
+              branch: context.payload.pull_request.head.ref, per_page: 50,
+            });
+            return data.workflow_runs.map((r) => r.head_sha).join(' ');
+      - name: What runs
+        id: what
+        env:
+          EVENT: ${{ github.event_name }}
+          ACTION: ${{ github.event.action }}
+          AFTER: ${{ github.event.pull_request.head.sha }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+          GREEN: ${{ steps.green.outputs.result }}
+        run: |
+          sh desktop/ci/changes.sh
+          sed -n 's/^why=//p' "$GITHUB_OUTPUT" >> "$GITHUB_STEP_SUMMARY"
+
+  check:
+    name: Check · make check
+    needs: [changes]
+    # a failed decision runs it
+    if: ${{ !cancelled() && github.event_name != 'workflow_dispatch' && needs.changes.outputs.heavy != 'false' }}
+    runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/free-disk
+
+      - name: Lint and tests
+        run: make check
+
+  text:
+    name: Check · plain text
+    if: ${{ github.event_name != 'workflow_dispatch' }}
+    runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: No dashes, special spaces, typographic quotes or pictographs
+        run: sh ci/check-text.sh
+
+  licences:
+    name: Check · licences
+    needs: [changes]
+    if: ${{ !cancelled() && github.event_name != 'workflow_dispatch' && needs.changes.outputs.heavy != 'false' }}
+    runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Every crate under a licence deny.toml allows
+        run: make licences
+
+  secrets:
+    name: Secrets · gitleaks (full history)
+    if: ${{ github.event_name != 'workflow_dispatch' }}
+    runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: gitleaks
+        run: docker run --rm -v "$PWD:/repo" ghcr.io/gitleaks/gitleaks:latest git --redact -v /repo
+
+  docker-publish:
+    name: Docker publish (GHCR - dev)
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+    needs: [check, text, secrets]
+    runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      - uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
+        id: meta
+        with:
+          images: ghcr.io/locko2901/reel
+          tags: |
+            type=sha,format=short
+            type=raw,value=dev
+          labels: |
+            org.opencontainers.image.title=reel
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+
+      - name: The commit's date, for the Status page
+        id: commit
+        run: echo "date=$(git log -1 --format=%cs)" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          platforms: linux/amd64
+          push: true
+          build-args: |
+            REEL_GIT_SHA=${{ github.sha }}
+            REEL_BUILD_DATE=${{ steps.commit.outputs.date }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          provenance: false
+
+  release-please:
+    name: release-please
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+    needs: [docker-publish]
+    runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}
+    permissions:
+      contents: write
+      pull-requests: write
+    outputs:
+      release_created: ${{ steps.release.outputs.release_created }}
+      tag_name: ${{ steps.release.outputs.tag_name }}
+      major: ${{ steps.release.outputs.major }}
+      minor: ${{ steps.release.outputs.minor }}
+      patch: ${{ steps.release.outputs.patch }}
+    steps:
+      - name: The repository's bot, when it has one
+        id: bot
+        if: ${{ vars.REEL_BOT_APP_ID != '' }}
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          # GitHub takes an app's ID where its client ID is asked for
+          client-id: ${{ vars.REEL_BOT_APP_ID }}
+          private-key: ${{ secrets.REEL_BOT_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: ${{ github.event.repository.name }}
+          permission-contents: write
+          permission-pull-requests: write
+
+      # The lock files' push below needs the bot's token: a push with GITHUB_TOKEN starts no checks.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          token: ${{ steps.bot.outputs.token || github.token }}
+
+      - id: release
+        uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
+        with:
+          config-file: .release-please-config.json
+          manifest-file: .release-please-manifest.json
+
+      # A version bump without the lock files fails the --locked build of the merge commit.
+      - name: Update the lock files on the release PR
+        if: ${{ steps.release.outputs.prs_created == 'true' }}
+        env:
+          PR: ${{ steps.release.outputs.pr }}
+        run: |
+          set -euo pipefail
+          branch=$(printf '%s' "$PR" | sed -n 's/.*"headBranchName":"\([^"]*\)".*/\1/p')
+          test -n "$branch"
+          git fetch --depth=1 origin "$branch"
+          git checkout -B "$branch" FETCH_HEAD
+          make check-image
+          docker run --rm \
+            -v reel-cargo-registry:/usr/local/cargo/registry \
+            -v reel-cargo-git:/usr/local/cargo/git \
+            -v "$PWD":/work -w /work \
+            reel-check:local sh -c 'cargo update --workspace && cd desktop && cargo update --workspace && chown "$(stat -c %u:%g /work/Cargo.toml)" /work/Cargo.lock /work/desktop/Cargo.lock'
+          git add Cargo.lock desktop/Cargo.lock
+          if git diff --cached --quiet; then
+            echo "the lock files are current"
+            exit 0
+          fi
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+            commit -m 'chore(release): update the lock files for the version bump'
+          git push origin "HEAD:$branch"
+
+  docker-publish-release:
+    name: Docker publish (GHCR - release)
+    needs: [release-please]
+    if: ${{ needs.release-please.outputs.release_created == 'true' }}
+    runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      - uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Retag the image
+        env:
+          REF: ghcr.io/locko2901/reel
+          SHA: ${{ github.sha }}
+          MAJOR: ${{ needs.release-please.outputs.major }}
+          MINOR: ${{ needs.release-please.outputs.minor }}
+          PATCH: ${{ needs.release-please.outputs.patch }}
+        run: |
+          set -euo pipefail
+          docker buildx imagetools create \
+            --tag "${REF}:${MAJOR}.${MINOR}.${PATCH}" \
+            --tag "${REF}:${MAJOR}.${MINOR}" \
+            --tag "${REF}:${MAJOR}" \
+            --tag "${REF}:latest" \
+            "${REF}:sha-${SHA:0:7}"
+
+  desktop-release:
+    name: Desktop · installers on the release
+    needs: [release-please]
+    if: ${{ always() && (needs.release-please.outputs.release_created == 'true' || (github.event_name == 'workflow_dispatch' && inputs.tag != '')) }}
+    runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && (inputs.commit || inputs.tag) || github.sha }}
+      - uses: ./.github/actions/free-disk
+
+      - name: Cross build both installers
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: make desktop-windows DESKTOP_OUT="$PWD/desktop-out"
+
+      # A cap of 0 wipes the build volume: both builds do not fit on the runner's disk.
+      - name: Room on the disk for the Linux build
+        run: |
+          ci/cap-volume.sh reel-desktop-target 0 reel-desktop:local
+          df -h / && docker system df
+
+      - name: Build the AppImage and the .deb
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: make desktop-appimage DESKTOP_OUT="$PWD/desktop-out"
+
+      - name: Room on the disk for the checks
+        run: |
+          ci/cap-volume.sh reel-desktop-target 0 reel-desktop:local
+          df -h / && docker system df
+
+      - name: What each installer holds, and OBS's source
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          make desktop-installers-check DESKTOP_OUT="$PWD/desktop-out"
+          make desktop-previous DESKTOP_PREVIOUS="$PWD/desktop-previous"
+          make desktop-obs-start-check DESKTOP_OUT="$PWD/desktop-out" DESKTOP_PREVIOUS="$PWD/desktop-previous"
+          make desktop-appimage-check DESKTOP_OUT="$PWD/desktop-out"
+          make desktop-obs-sources DESKTOP_OUT="$PWD/desktop-out"
+
+      - name: Upload the installers and OBS's source to the release
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || needs.release-please.outputs.tag_name }}
+        with:
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+            const tag = process.env.TAG;
+            const dir = 'desktop-out';
+            const files = fs.readdirSync(dir);
+            const exes = files.filter((f) => f.endsWith('-setup.exe')).sort();
+            const linux = files.filter((f) => /_amd64\.(AppImage|deb)$/.test(f)).sort();
+            const sources = files.filter((f) => /^OBS-Studio-.*-Sources\.tar\.gz$/.test(f));
+            const missing = [...exes, ...linux].flatMap((e) => [`${e}.sha256`, `${e}.sig`]).filter((f) => !files.includes(f));
+            if (!tag || exes.length !== 2 || linux.length !== 2 || sources.length !== 1 || missing.length) {
+              core.setFailed(`nothing to upload: tag "${tag}", installers ${[...exes, ...linux].join(', ') || 'none'}, OBS source ${sources.join(', ') || 'none'}, missing ${missing.join(', ') || 'nothing'} (the signing secrets)`);
+              return;
+            }
+            const { owner, repo } = context.repo;
+            const { data: release } = await github.rest.repos.getReleaseByTag({ owner, repo, tag });
+            const assets = await github.paginate(github.rest.repos.listReleaseAssets, { owner, repo, release_id: release.id, per_page: 100 });
+            const type = (name) => name.endsWith('.exe') ? 'application/vnd.microsoft.portable-executable'
+              : name.endsWith('.tar.gz') ? 'application/gzip'
+              : name.endsWith('.deb') ? 'application/vnd.debian.binary-package'
+              : name.endsWith('.AppImage') ? 'application/octet-stream' : 'text/plain';
+            for (const name of [...[...exes, ...linux].flatMap((e) => [e, `${e}.sha256`, `${e}.sig`]), ...sources]) {
+              for (const old of assets.filter((a) => a.name === name)) {
+                await github.rest.repos.deleteReleaseAsset({ owner, repo, asset_id: old.id });
+                core.info(`replaced ${name}`);
+              }
+              const data = fs.readFileSync(path.join(dir, name));
+              await github.rest.repos.uploadReleaseAsset({
+                owner, repo, release_id: release.id, name, data,
+                headers: { 'content-type': type(name), 'content-length': data.length },
+              });
+              core.info(`uploaded ${name} to ${tag}`);
+            }
+            const body = release.body || '';
+            const names = JSON.parse(fs.readFileSync('desktop/packages.json', 'utf8'));
+            const withObs = exes.find((e) => e.startsWith(`${names.with_obs_file}_`));
+            const plain = exes.find((e) => e.startsWith(`${names.plain_file}_`));
+            const appimage = linux.find((e) => e.endsWith('.AppImage'));
+            const deb = linux.find((e) => e.endsWith('.deb'));
+            let notes = body.trimEnd();
+            if (!body.includes(withObs)) {
+              notes += `\n\nThe Windows app, two installers, each with its SHA-256 in the .sha256 next to it: ${names.with_obs_name}, ${withObs}, with OBS included, and ${names.plain_name}, ${plain}, for a PC with OBS already. The OBS in ${names.with_obs_name} is unmodified; its source, the same version, is ${sources[0]}.`;
+            }
+            if (!body.includes(appimage)) {
+              notes += `\n\nThe Linux app, with the OBS of your distribution or Flathub: ${appimage} for any distribution, which updates itself from your server; ${deb} for Debian and Ubuntu, which does not update itself (install each new version's .deb the same way).`;
+            }
+            if (notes !== body.trimEnd()) {
+              await github.rest.repos.updateRelease({ owner, repo, release_id: release.id, body: `${notes}\n` });
+            }
+
+      - name: Remove the build volume and the image
+        if: always()
+        run: |
+          docker volume rm -f reel-desktop-target || true
+          docker image rm -f reel-desktop:local || true

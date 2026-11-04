@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-obs-show"
+description = "Enables the obs_show command without any pre-configured scope."
+commands.allow = ["obs_show"]
+
+[[permission]]
+identifier = "deny-obs-show"
+description = "Denies the obs_show command without any pre-configured scope."
+commands.deny = ["obs_show"]

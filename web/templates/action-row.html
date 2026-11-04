@@ -1,0 +1,8 @@
+<div class="srow action" data-label="{{ r.title }}"{% if !r.depends.is_empty() %} data-depends="{{ r.depends }}"{% endif %}{% if r.dep_off %} data-dep-off{% endif %}>
+  <div class="slabel"><b>{{ r.title }}</b><span class="shelp">{{ r.help }}</span></div>
+  <div class="sctl">
+    {% if let Some(f) = r.field %}<input type="text" class="in-path mono" data-field="{{ f.name }}" placeholder="{{ f.placeholder }}" aria-label="{{ f.label }}">{% endif %}
+    {% for b in r.buttons %}{% if b.link %}<a class="btn" href="{{ b.path }}">{{ b.label }}</a>{% else %}<button class="{% if !b.confirm.is_empty() %}danger{% endif %}" type="button" id="{{ b.id }}" data-action="{{ b.path }}" data-confirm="{{ b.confirm }}" data-label="{{ b.label }}"{% if !b.extra.is_empty() %} data-extra="{{ b.extra }}"{% endif %}>{{ b.label }}</button>{% endif %}{% endfor %}
+    <span class="note why" hidden></span>
+  </div>
+</div>

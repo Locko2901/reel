@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-obs-items"
+description = "Enables the obs_items command without any pre-configured scope."
+commands.allow = ["obs_items"]
+
+[[permission]]
+identifier = "deny-obs-items"
+description = "Denies the obs_items command without any pre-configured scope."
+commands.deny = ["obs_items"]

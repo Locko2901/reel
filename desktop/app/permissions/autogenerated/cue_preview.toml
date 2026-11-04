@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-cue-preview"
+description = "Enables the cue_preview command without any pre-configured scope."
+commands.allow = ["cue_preview"]
+
+[[permission]]
+identifier = "deny-cue-preview"
+description = "Denies the cue_preview command without any pre-configured scope."
+commands.deny = ["cue_preview"]

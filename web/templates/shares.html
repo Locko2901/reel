@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}Shares · reel{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>Shares</h1>
+  <span class="sub">{{ summary }}</span>
+  <div class="tools">
+    <div class="seg" role="group" aria-label="Filter">
+      <a class="btn" href="/shares?state=active" aria-pressed="{{ filter == "active" }}">Active</a><a class="btn" href="/shares?state=expired" aria-pressed="{{ filter == "expired" }}">Expired</a><a class="btn" href="/shares?state=revoked" aria-pressed="{{ filter == "revoked" }}">Revoked</a><a class="btn" href="/shares?state=all" aria-pressed="{{ filter == "all" }}">All</a>
+    </div>
+  </div>
+</div>
+
+{% if rows.is_empty() %}
+<div class="empty"><strong>No {% if filter != "all" %}{{ filter }} {% endif %}links.</strong><span>Open a clip and press New link.</span></div>
+{% else %}
+<div class="panel">
+  <div class="body flush">
+    <table class="shares-table cards">
+      <thead><tr><th>Clip</th><th>Link</th><th>Serves</th>{% if previews %}<th>Preview</th>{% endif %}<th>Created</th><th>Expires</th><th>Posted</th><th class="num">Opened</th><th>Download</th><th>State</th><th></th></tr></thead>
+      <tbody>
+        {% for r in rows %}
+        <tr data-sid="{{ r.share.id }}">
+          <td class="clip"><a class="row" href="/clips/{{ r.clip_id }}">{% if let Some(t) = r.thumb %}<img class="thumb" src="{{ t }}" alt="">{% else %}<span class="thumb"></span>{% endif %}<span class="ellipsis">{{ r.title }}</span>{% if !r.share.label.is_empty() %} <span class="muted">{{ r.share.label }}</span>{% endif %}</a></td>
+          <td class="link"><span class="value"><span class="trunc" title="{{ r.share.url }}"><span class="a">/s/{{ r.link_head }}</span><span class="b">{{ r.link_tail }}</span></span><button class="small copy" type="button" data-copy="{{ r.share.url }}">Copy</button></span></td>
+          <td class="sub" data-l="serves" title="{{ r.share.serves }}"><span class="short"><span{% if r.share.pinned %} class="st-active"{% endif %}>{{ r.version }}</span> <span class="mark">{% if r.share.pinned %}pinned{% else %}follows{% endif %}</span></span><span class="long"><span{% if r.share.pinned %} class="st-active"{% endif %}>{{ r.share.serves }}</span></span></td>
+          {% if previews %}<td class="sub" data-l="preview" title="{{ r.share.preview }}"><span class="short{% if r.preview_warn %} st-warn{% endif %}">{{ r.preview_word }}</span><span class="long">{{ r.share.preview.trim_start_matches("preview ") }}</span></td>{% endif %}
+          <td class="sub" data-l="created" title="{{ r.created }}"><span class="short">{{ r.created_day }}</span><span class="long">{{ r.created }}</span></td>
+          <td class="sub" title="{{ r.share.expiry }}"><span class="short {{ r.expires_class }}">{{ r.expires }}</span><span class="long {{ r.share.expiry_class }}">{{ r.share.expiry }}</span></td>
+          <td class="sub"{% if let Some(p) = r.share.posted %} title="posted {{ p }}"{% endif %}>{% if let (Some(p), Some(d)) = (r.share.posted.as_ref(), r.posted_day.as_ref()) %}<span class="word">posted </span><span class="short">{{ d }}</span><span class="long">{{ p }}</span>{% else %}never<span class="word"> posted</span>{% endif %}</td>
+          <td class="num sub"><span class="word">opened </span>{{ r.share.views }}<span class="word"> time{% if r.share.views != 1 %}s{% endif %}</span></td>
+          <td class="sub" data-l="download">{% if r.share.download %}on{% else %}off{% endif %}</td>
+          <td class="sub state">{% if r.share.state == "active" %}<span class="badge ok">active</span>{% else %}<span class="badge">{{ r.share.state }}</span>{% endif %}</td>
+          <td class="right acts">{% if r.share.state == "active" %}<button class="danger small revoke" type="button" data-sid="{{ r.share.id }}">Revoke</button>{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

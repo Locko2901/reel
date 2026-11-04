@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Status · reel{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>Status</h1>
+  <span class="sub">what runs, what doctor sees, and what changed</span>
+</div>
+<div class="clip-layout status">
+  <section class="panels">
+    <div class="panel">
+      <header><h2>reel {{ version }}</h2><div class="actions"><button class="small" id="update-btn" type="button"{% if !update_on %} hidden{% endif %}>Check now</button></div></header>
+      <div class="body">
+        <dl class="kv wide">
+          <dt>built</dt><dd>{{ built }}</dd>
+          <dt>newest release</dt><dd>{{ newest }}</dd>
+          <dt class="app-part" hidden>this app</dt><dd class="app-part" id="status-app" hidden></dd>
+          <dt>update</dt><dd><span class="{{ update_class }}">{{ update_line }}</span>{% if let Some(u) = update_url %} <a href="{{ u }}" rel="noopener">release notes</a>{% endif %}; releases of {{ repo }}</dd>
+          <dt>running</dt><dd>{{ running }}</dd>
+          <dt>licences</dt><dd>reel MIT; ffmpeg GPL (<a href="https://github.com/jellyfin/jellyfin-ffmpeg" rel="noopener">jellyfin-ffmpeg, source</a>); OBS Studio {{ obs_version }} in the app's Windows installer {{ obs_package }}, unmodified, GPL 2.0 (<a href="{{ obs_source }}" rel="noopener">its source</a>); Geist OFL; <a href="https://github.com/Locko2901/reel/blob/main/THIRD_PARTY.md" rel="noopener">every one, with its source</a></dd>
+        </dl>
+      </div>
+    </div>
+    <div class="panel changelog">
+      <header><h2>Changelog</h2><span class="desc">written by release-please from the commits; the newest five</span></header>
+      <div class="body">
+        {% if releases.is_empty() %}<p class="muted">No release yet. The first one appears here once release-please has made it.</p>{% endif %}
+        {% for r in releases %}
+        <h3>{{ r.title }}</h3>
+        <ul>
+        {% for l in r.lines %}<li{% if l.heading %} class="head"{% endif %}>{% for p in l.pieces %}{% if p.code %}<code>{{ p.text }}</code>{% else if p.bold %}<b>{{ p.text }}</b>{% else %}{{ p.text }}{% endif %}{% endfor %}</li>{% endfor %}
+        </ul>
+        {% endfor %}
+      </div>
+    </div>
+  </section>
+  <aside class="panels">
+    <div class="panel">
+      <header><h2>Doctor</h2><div class="actions"><button class="small" id="doctor-btn" type="button">Run again</button></div></header>
+      <div class="body">
+        <dl class="kv wide checks">
+          {% for c in checks %}<dt>{{ c.name }}</dt><dd>{% if !c.class.is_empty() %}<i class="dot {{ c.dot() }}"></i> {% endif %}<span{% if !c.class.is_empty() %} class="{{ c.class }}"{% endif %}>{{ c.value }}</span></dd>{% endfor %}
+        </dl>
+      </div>
+    </div>
+    <div class="panel">
+      <header><h2>Logs</h2></header>
+      <div class="body"><p class="muted small">{% if who.standalone %}The app's log carries everything, without secrets: Settings, This app, Log.{% else %}The container's log carries everything, without secrets; the level is under <a href="/settings/advanced">Settings, Advanced</a>.{% endif %}</p></div>
+    </div>
+  </aside>
+</div>
+{% endblock %}

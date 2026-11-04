@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Sign in · {{ site }}</title>
+<meta name="robots" content="noindex">
+<link rel="stylesheet" href="/assets/{{ crate::routes::asset_v() }}/reel.css">
+<link rel="icon" href="/assets/icon.svg" type="image/svg+xml">
+</head>
+<body data-page="signin">
+<header class="top">
+  <a class="wordmark" href="/"><svg class="mark" viewBox="8.6 3 16.2 26" aria-hidden="true"><path d="M8.6 3L16 10.4V29H8.6Z"/><path class="arm" d="M8.6 3H24.8V10.4H16Z"/></svg>{{ site }}</a>
+</header>
+<main class="signin">
+  {% if let Some(host) = oidc %}
+  <div class="stack">
+    <h1>Sign in</h1>
+    {% if !error.is_empty() %}<p class="st-err small">{{ error }}</p>{% endif %}
+    {% if !mode_line.is_empty() %}<p class="muted">{{ mode_line }}</p>{% else %}
+    <p class="muted small">{{ site }} leaves the sign-in to {{ host }}; you come back here signed in.</p>
+    <a class="btn primary big" href="/oidc/start?next={{ next }}">Sign in with {{ host }}</a>{% endif %}
+    <p class="faint small">Share links need no sign-in.</p>
+  </div>
+  {% else if !local %}
+  <div class="stack">
+    <h1>Sign in</h1>
+    <p class="muted">{{ mode_line }}</p>
+    <a class="btn primary" href="/">Open the library</a>
+  </div>
+  {% else if first %}
+  <form method="post" action="/signin/first">
+    <h1>The first admin</h1>
+    <p class="muted small">Nobody has an account yet. Make the admin's: this name signs in, makes the other users and changes the settings. The setup code is in reel's log from its first start, and in reel doctor.</p>
+    {% if !error.is_empty() %}<p class="st-err small">{{ error }}</p>{% endif %}
+    <label class="field"><span>Setup code</span><input type="text" name="code" autocomplete="off" class="mono" placeholder="xxxxx-xxxxx" required autofocus></label>
+    <label class="field"><span>Name</span><input type="text" name="name" autocomplete="username" maxlength="40" required></label>
+    <label class="field"><span>Password, at least 12 characters</span><input type="password" name="password" autocomplete="new-password" minlength="12" required></label>
+    <button class="primary big" type="submit">Make the admin and sign in</button>
+  </form>
+  {% else %}
+  <form method="post" action="/signin">
+    <h1>Sign in</h1>
+    {% if !error.is_empty() %}<p class="st-err small">{{ error }}</p>{% endif %}
+    <input type="hidden" name="next" value="{{ next }}">
+    <label class="field"><span>Name</span><input type="text" name="name" autocomplete="username" required autofocus></label>
+    <label class="field"><span>Password</span><input type="password" name="password" autocomplete="current-password" required></label>
+    <label class="toggle">stay signed in on this device <button type="button" class="switch" role="switch" aria-checked="true" data-input="remember"><i></i></button></label>
+    <input type="hidden" name="remember" value="1" id="remember">
+    <button class="primary big" type="submit">Sign in</button>
+    <p class="faint small">Forgot it? An admin sets a new one under Settings, Access. Share links need no sign-in.</p>
+  </form>
+  {% endif %}
+</main>
+<footer class="share-foot"><svg class="mark" viewBox="8.6 3 16.2 26" aria-hidden="true"><path d="M8.6 3L16 10.4V29H8.6Z"/><path class="arm" d="M8.6 3H24.8V10.4H16Z"/></svg>{{ site }}</footer>
+<script type="module">import { appShell } from '/assets/js/app-shell.js'; import { switches } from '/assets/js/switch.js'; switches(); appShell();</script>
+</body>
+</html>

@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-standalone-cap"
+description = "Enables the standalone_cap command without any pre-configured scope."
+commands.allow = ["standalone_cap"]
+
+[[permission]]
+identifier = "deny-standalone-cap"
+description = "Denies the standalone_cap command without any pre-configured scope."
+commands.deny = ["standalone_cap"]

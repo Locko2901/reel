@@ -1,0 +1,36 @@
+<div class="select-bar" id="select-bar" role="region" aria-label="Picked clips" hidden>
+  <span class="select-count" id="select-count" aria-live="polite">Pick clips</span>
+  <span class="select-acts">
+    <button class="small" type="button" data-bulk="collect" disabled>Add to a collection</button>
+    {% if !who.standalone %}<button class="small" type="button" data-bulk="links" disabled>Copy links</button>{% endif %}
+    <button class="small" type="button" data-bulk="download" disabled>Download</button>
+    <button class="small" type="button" data-bulk="montage" disabled title="Two clips or more, in the order picked">Make a montage</button>
+    <button class="small" type="button" data-bulk="star" disabled>Star</button>
+    <button class="small danger" type="button" data-bulk="delete" disabled>Delete</button>
+  </span>
+  <button class="small quiet" type="button" id="select-done">Done</button>
+  <p class="select-note small" id="select-note" hidden></p>
+</div>
+<dialog id="collect-dialog" aria-labelledby="collect-title">
+  <header id="collect-title">Add to a collection</header>
+  <div class="body">
+    <p class="small muted" id="collect-what"></p>
+    <div class="pick-list collect-list" id="collect-list" role="group" aria-label="Collections"></div>
+    <div class="row"><input type="text" class="in-text grow" id="collect-new" placeholder="a new collection" maxlength="80" aria-label="A new collection with the picked clips"><button type="button" id="collect-make">Add</button></div>
+  </div>
+  <footer><button class="quiet" id="collect-cancel" type="button">Cancel</button></footer>
+</dialog>
+<dialog id="download-dialog" aria-labelledby="download-title">
+  <header id="download-title">Download</header>
+  <div class="body">
+    <p class="small muted" id="download-what"></p>
+    <fieldset class="pick-list download-list" id="download-list">
+      <legend>Which files</legend>
+      <label class="check pick"><input type="radio" name="download-which" value="current" checked> <span>The current version of each</span> <span class="count" data-size="current"></span></label>
+      <label class="check pick"><input type="radio" name="download-which" value="original"> <span>The original of each</span> <span class="count" data-size="original"></span></label>
+      <label class="check pick"><input type="radio" name="download-which" value="every"> <span>Every version</span> <span class="count" data-size="every"></span></label>
+    </fieldset>
+    <p class="small" id="download-note" hidden></p>
+  </div>
+  <footer><button class="quiet" id="download-cancel" type="button">Cancel</button><button class="primary" id="download-go" type="button">Download</button></footer>
+</dialog>

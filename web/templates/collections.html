@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Collections · reel{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>Collections</h1>
+  <span class="sub">every game is one by itself; your own hold the clips you put in</span>
+  <div class="tools"><button class="btn primary" type="button" id="new-set-open">New collection</button></div>
+</div>
+{% if sets.is_empty() %}
+<div class="empty"><strong>No collection yet.</strong><span>A game's collection comes with its first clip; make your own with New collection, or from a clip's page.</span></div>
+{% else %}
+<div class="set-grid" id="sets">
+  {% for s in sets %}
+  <a class="set-card" href="/collections/{{ s.id }}" data-set="{{ s.id }}">
+    <span class="mosaic" data-n="{{ s.posters.len() }}" aria-hidden="true">{% for p in s.posters %}<img src="{{ p }}" alt="" loading="lazy">{% endfor %}</span>
+    <span class="set-name"><b>{{ s.name }}</b>{% if s.game %}<span class="badge">automatic</span>{% endif %}</span>
+    <span class="meta"><span>{{ s.clips }}</span>{% if !s.newest.is_empty() %}<span>newest {{ s.newest }}</span>{% endif %}{% if s.link.is_some() %}<span>a link is out</span>{% endif %}</span>
+  </a>
+  {% endfor %}
+</div>
+{% endif %}
+<dialog id="new-set-dialog" aria-labelledby="new-set-title">
+  <header id="new-set-title">New collection</header>
+  <div class="body"><input type="text" class="in-text" id="new-set" placeholder="Best of" maxlength="80" aria-label="The new collection's name"></div>
+  <footer><button type="button" id="new-set-cancel">Cancel</button><button type="button" id="make-set">Make it</button></footer>
+</dialog>
+{% endblock %}

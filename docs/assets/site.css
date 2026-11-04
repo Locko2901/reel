@@ -1,0 +1,60 @@
+@font-face { font-family: "Geist"; font-weight: 400; font-style: normal; font-display: swap; src: url(fonts/geist-latin-400-normal.woff2) format("woff2"); }
+@font-face { font-family: "Geist"; font-weight: 500; font-style: normal; font-display: swap; src: url(fonts/geist-latin-500-normal.woff2) format("woff2"); }
+@font-face { font-family: "Geist"; font-weight: 600; font-style: normal; font-display: swap; src: url(fonts/geist-latin-600-normal.woff2) format("woff2"); }
+@font-face { font-family: "Geist Mono"; font-weight: 400; font-style: normal; font-display: swap; src: url(fonts/geist-mono-latin-400-normal.woff2) format("woff2"); }
+
+:root {
+  --md-text-font: "Geist";
+  --md-code-font: "Geist Mono";
+}
+
+[data-md-color-scheme="reel"] {
+  color-scheme: dark;
+  --md-hue: 280;
+  --md-default-bg-color: #0d0b10;
+  --md-default-bg-color--light: #15121a;
+  --md-default-bg-color--lighter: #1c1822;
+  --md-default-bg-color--lightest: #241f2b;
+  --md-default-fg-color: #ededf0;
+  --md-default-fg-color--light: #a7a2ae;
+  --md-default-fg-color--lighter: #908a98;
+  --md-default-fg-color--lightest: #3b3446;
+  --md-primary-fg-color: #0d0b10;
+  --md-primary-fg-color--light: #15121a;
+  --md-primary-fg-color--dark: #0d0b10;
+  --md-primary-bg-color: #ededf0;
+  --md-primary-bg-color--light: #a7a2ae;
+  --md-accent-fg-color: #f282d8;
+  --md-accent-fg-color--transparent: rgba(242, 130, 216, 0.1);
+  --md-accent-bg-color: #0d0b10;
+  --md-typeset-color: #ededf0;
+  --md-typeset-a-color: #f282d8;
+  --md-typeset-mark-color: rgba(242, 130, 216, 0.3);
+  --md-typeset-table-color: #2a2533;
+  --md-typeset-table-color--light: #15121a;
+  --md-code-bg-color: #15121a;
+  --md-code-fg-color: #ededf0;
+  --md-code-hl-color: rgba(242, 130, 216, 0.15);
+  --md-admonition-bg-color: #15121a;
+  --md-admonition-fg-color: #ededf0;
+  --md-footer-bg-color: #0d0b10;
+  --md-footer-bg-color--dark: #0d0b10;
+  --md-footer-fg-color: #a7a2ae;
+  --md-shadow-z1: none;
+}
+
+[data-md-color-scheme="reel"] ::selection { background: rgba(242, 130, 216, 0.3); }
+[data-md-color-scheme="reel"] .md-header,
+[data-md-color-scheme="reel"] .md-tabs { border-bottom: 1px solid #2a2533; }
+[data-md-color-scheme="reel"] .md-search__form { background: #1c1822; }
+
+/* The mark at three quarters of the word's size, the gap as reel's own wordmark has it. */
+.md-header__button.md-logo { padding-right: 0; }
+.md-header__button.md-logo img { height: 0.68rem; width: auto; }
+.md-header__title { font-weight: 600; letter-spacing: -0.02em; }
+[dir=ltr] .md-header__title { margin-left: 0.35rem; }
+
+.md-typeset img { border: 1px solid #2a2533; border-radius: 6px; }
+.md-typeset video { display: block; max-width: 100%; height: auto; border: 1px solid #2a2533; border-radius: 6px; }
+.md-typeset h1, .md-typeset h2, .md-typeset h3 { font-weight: 600; letter-spacing: -0.01em; color: #ededf0; }
+.md-typeset .admonition, .md-typeset details { border-width: 1px; }

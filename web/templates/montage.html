@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block title %}Montage · reel{% endblock %}
+{% block content %}
+<p class="crumb"><a href="{{ from_href }}">{{ from }}</a><span class="sep">/</span><span>{% if from_href.starts_with("/clips/") %}Edit the montage{% else %}Montage{% endif %}</span></p>
+<div class="page-head">
+  <h1>{% if from_href.starts_with("/clips/") %}Edit the montage{% else %}Make a montage{% endif %}</h1>
+  <span class="sub" id="montage-sum"></span>
+</div>
+<p class="section-line">The clips play one after the other, each as the part of its current version you set here. Clips of another shape are fitted into the montage's frame, and the montage is a new clip in the library: the clips it is made of stay as they are.</p>
+{% for n in notes %}<p class="notice"><span class="muted">{{ n }}</span></p>{% endfor %}
+{% if parts.len() < 2 %}
+<div class="empty"><strong>A montage needs two clips or more.</strong><span>{{ from }} has {{ parts.len() }} ready.</span><a class="btn" href="{{ from_href }}">Back</a></div>
+{% else %}
+<div class="montage-editor" id="montage" data-most="{{ most }}" data-longest="{{ longest }}" data-join="{{ join }}" data-join-seconds="{{ join_seconds }}" data-shape="{{ shape }}" data-fill="{{ fill }}" data-even="{{ even_loudness }}">
+  <div class="m-top">
+  <div class="m-stage">
+    <div class="player m-player" id="m-player"><video id="m-video" controls playsinline preload="metadata"></video></div>
+    <div class="m-transport">
+      <button class="primary small" id="m-play" type="button">Play the montage</button>
+      <button class="small quiet" id="m-prev" type="button" aria-label="The clip before"><svg class="icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M10 4l-4 4 4 4"/></svg></button>
+      <button class="small quiet" id="m-next" type="button" aria-label="The next clip"><svg class="icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg></button>
+      <span class="small" id="m-now">0:00 of 0:00</span>
+      <span class="small muted m-which" id="m-which"></span>
+    </div>
+    <div class="m-timeline" id="m-timeline" role="group" aria-label="The montage, clip by clip"><div class="m-blocks" id="m-blocks"></div><div class="m-head" id="m-head"></div></div>
+    <p class="small muted m-hint">The preview plays every part in order at its volume. The joins between clips, the frame and the loudness show in the render.</p>
+    <div class="trim m-trim" id="m-trim">
+      <div class="m-trim-head"><strong id="m-trim-title"></strong><span class="small muted" id="m-trim-len"></span></div>
+      <div class="filmstrip m-strip" id="m-strip">
+        <img id="m-strip-img" alt="" hidden>
+        <div class="shade" id="m-shade-l"></div><div class="shade" id="m-shade-r"></div><div class="range" id="m-range"></div>
+        <div class="handle start" id="m-hs" tabindex="0" role="slider" aria-label="Where this clip starts"></div>
+        <div class="handle end" id="m-he" tabindex="0" role="slider" aria-label="Where this clip ends"></div>
+        <div class="head" id="m-phead"></div>
+      </div>
+      <div class="keyframes" id="m-keyframes" aria-hidden="true"></div>
+      <div class="times">
+        <label>Start <input class="in-text" id="m-t-start" inputmode="decimal" aria-label="Start, minutes and seconds"></label>
+        <label>End <input class="in-text" id="m-t-end" inputmode="decimal" aria-label="End, minutes and seconds"></label>
+        <button class="small" id="m-set-start" type="button">Start here <kbd>i</kbd></button>
+        <button class="small" id="m-set-end" type="button">End here <kbd>o</kbd></button>
+        <button class="small quiet" id="m-whole" type="button">The whole clip</button>
+        <label>Volume <select id="m-vol"><option value="0">Silent</option><option value="0.5">50%</option><option value="0.75">75%</option><option value="1">100%</option><option value="1.5">150%</option><option value="2">200%</option></select></label>
+        <label class="toggle end">snap start to keyframes <button type="button" class="switch" role="switch" aria-checked="true" id="m-snap"><i></i></button></label>
+      </div>
+    </div>
+  </div>
+  <div class="panel m-clips">
+    <header><h2>Clips</h2><span class="desc">pick one to set its part; drag it, or move it with its arrows; untick it to leave it out</span></header>
+    <ol class="montage-list" id="montage-list">
+      {% for p in parts %}
+      <li class="montage-part" draggable="true" data-id="{{ p.id }}" data-rid="{{ p.rid }}" data-seconds="{{ p.seconds }}" data-src="{{ p.src }}" data-poster="{{ p.poster }}" data-start="{{ p.start }}" data-end="{{ p.end }}" data-volume="{{ p.volume }}" data-title="{{ p.title }}">
+        <svg class="icon grip" viewBox="0 0 16 16" aria-hidden="true"><circle cx="6" cy="4" r="1"/><circle cx="10" cy="4" r="1"/><circle cx="6" cy="8" r="1"/><circle cx="10" cy="8" r="1"/><circle cx="6" cy="12" r="1"/><circle cx="10" cy="12" r="1"/></svg>
+        <label class="check"><input type="checkbox"{% if p.used %} checked{% endif %} aria-label="Use {{ p.title }}"></label>
+        <img class="thumb" src="{{ p.poster }}" alt="">
+        <button class="part-words" type="button" aria-label="Set the part of {{ p.title }}"><span class="part-title">{{ p.title }}</span><span class="small muted part-line">{{ p.length }}{% if !p.size.is_empty() %}, {{ p.size }}{% endif %}</span></button>
+        <span class="part-acts"><button class="small quiet up" type="button" aria-label="Move {{ p.title }} up"><svg class="icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 10l4-4 4 4"/></svg></button><button class="small quiet down" type="button" aria-label="Move {{ p.title }} down"><svg class="icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6l4 4 4-4"/></svg></button></span>
+      </li>
+      {% endfor %}
+    </ol>
+  </div>
+  </div>
+  <div class="panel">
+    <header><h2>The montage</h2><span class="desc">how one clip gives way to the next, its frame and its sound</span></header>
+    <div class="m-options">
+      <label>Between clips <select id="m-join"><option value="cut">A hard cut</option><option value="fade">A crossfade</option><option value="black">A fade through black</option></select></label>
+      <label id="m-join-len-box">lasting <select id="m-join-len"><option value="0.25">0.25 s</option><option value="0.5">0.5 s</option><option value="0.75">0.75 s</option><option value="1">1 s</option><option value="1.5">1.5 s</option><option value="2">2 s</option></select></label>
+      <label>Frame <select id="m-shape"><option value="wide">Wide, 16:9</option><option value="tall">Tall, 9:16 (a phone's short)</option><option value="square">Square, 1:1</option></select></label>
+      <label class="check"><input type="checkbox" id="m-fill"> Fill the frame, cutting off what is over (no bars)</label>
+      <label class="check"><input type="checkbox" id="m-even"> Every clip at one loudness</label>
+    </div>
+  </div>
+  <div class="row wrap montage-go">
+    <input type="text" class="in-text grow" id="montage-title" value="{{ title }}" maxlength="200" aria-label="The montage's title">
+    <button class="primary" id="montage-render" type="button">Render the montage</button>
+  </div>
+  {% if !replace_id.is_empty() %}<label class="check m-replace"><input type="checkbox" id="m-replace" data-id="{{ replace_id }}"> Replace {{ replace_title }} once the new one is made: it goes to the trash, where Restore brings it back{% if !who.standalone %}, and its links stop{% endif %}</label>{% endif %}
+</div>
+{% endif %}
+{% endblock %}

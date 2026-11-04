@@ -1,0 +1,54 @@
+{% if r.kind == "set" %}
+<div class="sgroup{% if r.locked.is_some() %} locked{% endif %}" data-key="{{ r.key }}" data-label="{{ r.label }}" data-kind="set"{% if !r.depends.is_empty() %} data-depends="{{ r.depends }}"{% endif %}{% if r.dep_off %} data-dep-off{% endif %} role="group" aria-label="{{ r.label }}">
+  <div class="srow sgroup-head">
+    <div class="slabel">
+      <b>{{ r.label }}</b><span class="shelp">{{ r.help }}</span>
+      <div class="notes">
+        {% if let Some(l) = r.locked %}<span class="badge lock">{{ l }}</span>{% endif %}
+        {% if r.restart %}<span class="badge warn">after a restart</span>{% endif %}
+        <span class="badge accent changed"{% if !r.changed %} hidden{% endif %}>changed from the defaults</span>
+      </div>
+    </div>
+    <div class="sctl">
+      {% if r.locked.is_none() %}<button class="quiet reset" type="button"{% if !r.changed %} hidden{% endif %}>Reset</button>{% endif %}
+      <span class="err" hidden></span>
+    </div>
+  </div>
+  {% for o in r.options %}
+  <div class="srow sopt" data-opt="{{ o.value }}">
+    <div class="slabel"><b>{{ o.title }}</b>{% if !o.line.is_empty() %}<span class="shelp">{{ o.line }}</span>{% endif %}</div>
+    <div class="sctl"><button type="button" class="switch" role="switch" aria-checked="{% if o.chosen %}true{% else %}false{% endif %}" aria-label="{{ r.label }}: {{ o.label }}"{% if r.locked.is_some() %} disabled{% endif %}><i></i></button></div>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="srow{% if r.locked.is_some() %} locked{% endif %}" data-key="{{ r.key }}" data-label="{{ r.label }}" data-kind="{{ r.kind }}"{% if r.kind == "bool" %} data-on="{{ r.is_on }}"{% endif %}{% if !r.depends.is_empty() %} data-depends="{{ r.depends }}"{% endif %}{% if r.dep_off %} data-dep-off{% endif %}>
+  <div class="slabel">
+    <b>{{ r.label }}</b><span class="shelp">{{ r.help }}</span>{% if !r.note.is_empty() %}<span class="snote {{ r.note_class }}">{{ r.note }}</span>{% endif %}
+    <div class="notes">
+      {% if let Some(l) = r.locked %}<span class="badge lock">{{ l }}</span>{% endif %}
+      {% if r.restart %}<span class="badge warn">after a restart</span>{% endif %}
+      <span class="badge accent changed"{% if !r.changed %} hidden{% endif %}>changed, was {{ r.default_text }}</span>
+    </div>
+  </div>
+  <div class="sctl">
+    {% if r.locked.is_none() %}<button class="quiet reset" type="button"{% if !r.changed %} hidden{% endif %}>Reset</button>{% endif %}
+    {% if r.locked.is_some() %}
+    <span class="in-locked{% if r.kind == "path" || r.kind == "url" %} mono{% endif %}" title="{{ r.value }}"><span>{% if r.kind == "secret" %}{% if r.secret_set %}set{% else %}not set{% endif %}{% else if r.value.is_empty() %}empty{% else %}{{ r.value }}{% endif %}</span></span>
+    {% else if r.kind == "int" %}
+    <span class="ctl-group"><input type="number" class="in-num" value="{{ r.value }}" min="{{ r.min }}" max="{{ r.max }}" aria-label="{{ r.label }}">{% if !r.unit.is_empty() %}<span class="unit">{{ r.unit }}</span>{% endif %}</span>
+    {% else if r.kind == "bool" %}
+    <button type="button" class="switch" role="switch" aria-checked="{% if r.is_on %}true{% else %}false{% endif %}" aria-label="{{ r.label }}"><i></i></button>
+    {% else if r.kind == "select" %}
+    <select aria-label="{{ r.label }}">{% for o in r.options %}<option value="{{ o.value }}"{% if o.value == r.value %} selected{% endif %}>{{ o.label }}</option>{% endfor %}</select>
+    {% else if r.kind == "secret" %}
+    <input type="password" class="in-text" value="" placeholder="{% if r.secret_set %}set, type to replace{% else %}not set{% endif %}" aria-label="{{ r.label }}" autocomplete="off">
+    {% else if r.kind == "path" || r.kind == "url" %}
+    <input type="text" class="in-path mono" value="{{ r.value }}" aria-label="{{ r.label }}">
+    {% else %}
+    <input type="text" class="in-text" value="{{ r.value }}" aria-label="{{ r.label }}">
+    {% endif %}
+    <span class="err" hidden></span>
+  </div>
+</div>
+{% endif %}

@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-system-memory"
+description = "Enables the system_memory command without any pre-configured scope."
+commands.allow = ["system_memory"]
+
+[[permission]]
+identifier = "deny-system-memory"
+description = "Denies the system_memory command without any pre-configured scope."
+commands.deny = ["system_memory"]

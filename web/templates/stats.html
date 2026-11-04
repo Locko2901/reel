@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}Stats · reel{% endblock %}
+{% block content %}
+<p class="crumb"><a href="/">Library</a><span class="sep">/</span><span>Stats</span></p>
+<div class="page-head">
+  <h1>Stats</h1>
+  <span class="sub" id="stats-sum">{{ figures.clips }} clip{% if figures.clips != 1 %}s{% endif %}, {{ figures.length }}, {{ figures.size }} on disk</span>
+</div>
+<p class="section-line">Every clip in the library, as the library shows it; on disk is each clip's versions{% if !who.standalone %} and preview video{% endif %}. A month is when the clips were recorded.</p>
+{% if figures.clips == 0 %}
+<div class="empty"><strong>Nothing to count yet.</strong><span>The figures come with the first clip.</span><a class="btn" href="/">Back to the library</a></div>
+{% else %}
+<div class="stats">
+  <div class="panel">
+    <header><h2>Games</h2><span class="desc">a game opens the library on its clips</span></header>
+    <div class="body flush">
+      <table class="cards stats-table">
+        <thead><tr><th>Game</th><th class="num">Clips</th><th class="num">Length</th><th class="num">On disk</th><th class="barcol"><span class="sr">Share of the clips</span></th></tr></thead>
+        <tbody>
+          {% for g in figures.games %}
+          <tr><td class="clip"><a href="{{ g.href() }}">{{ g.name }}</a></td><td class="num sub" data-l="clips">{{ g.clips }}</td><td class="num sub" data-l="length">{{ g.length }}</td><td class="num sub" data-l="on disk">{{ g.size }}</td><td class="barcol"><span class="bar" aria-hidden="true"><i style="width:{{ g.bar }}%"></i></span></td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <div class="panel">
+    <header><h2>Clips per month</h2><span class="desc">newest first</span></header>
+    <div class="body flush">
+      <table class="cards stats-table">
+        <thead><tr><th>Month</th><th class="num">Clips</th><th class="barcol"><span class="sr">Against the busiest month</span></th></tr></thead>
+        <tbody>
+          {% for m in figures.months %}
+          <tr><td class="clip">{{ m.label }}</td><td class="num sub" data-l="clips">{{ m.clips }}</td><td class="barcol"><span class="bar" aria-hidden="true"><i style="width:{{ m.bar }}%"></i></span></td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% if !who.standalone %}
+  <div class="panel">
+    <header><h2>Most watched links</h2><span class="desc">how often each link's page was opened</span></header>
+    <div class="body flush">
+      {% if links.is_empty() %}<p class="muted pad">No link has been watched yet.</p>{% else %}
+      <table class="cards stats-table">
+        <thead><tr><th>Clip</th><th>Link</th><th class="num">Views</th><th>Last watched</th></tr></thead>
+        <tbody>
+          {% for l in links %}
+          <tr><td class="clip"><a href="/clips/{{ l.clip_id }}">{{ l.title }}</a></td><td class="sub" data-l="link">{{ l.label }}{% if !l.live %} <span class="muted">(stopped)</span>{% endif %}</td><td class="num sub" data-l="views">{{ l.views }}</td><td class="sub" data-l="last">{{ l.last }}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+</div>
+{% endif %}
+{% endblock %}

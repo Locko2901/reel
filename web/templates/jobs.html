@@ -1,0 +1,134 @@
+{% extends "base.html" %}
+{% block title %}Jobs · reel{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>Jobs</h1>
+  <span class="sub">{{ summary }}</span>
+  <div class="tools">
+    <div class="seg" role="group" aria-label="Show"><a class="btn" href="/jobs?show=now" aria-pressed="{{ show == "now" }}">Now</a><a class="btn" href="/jobs?show=failed" aria-pressed="{{ show == "failed" }}">Failed</a><a class="btn" href="/jobs?show=history" aria-pressed="{{ show == "history" }}">History</a></div>
+  </div>
+</div>
+<div class="panels">
+{% if show == "now" %}
+{% if running.is_empty() && queued.is_empty() && failed.is_empty() %}
+{% if just.is_empty() %}<div class="empty"><strong>Nothing running, nothing waiting.</strong><span>{% if who.standalone %}Save a clip in a game, or upload one.{% else %}Drop a clip in the incoming folder or upload one.{% endif %}</span></div>
+{% else %}<p class="muted">Nothing running, nothing waiting.</p>{% endif %}
+{% endif %}
+{% if !running.is_empty() %}
+<div class="panel">
+  <header><h2>Running</h2></header>
+  <div class="body flush">
+    <table class="jobs-table cards">
+      <thead><tr><th>Kind</th><th>Clip</th><th>What</th><th>Progress</th><th>Started</th><th></th></tr></thead>
+      <tbody>
+        {% for j in running %}
+        <tr data-job="{{ j.id }}">
+          <td class="state"><span class="badge accent">{{ j.kind }}</span></td>
+          <td class="clip">{% if let Some(c) = j.clip_id %}<a class="row" href="/clips/{{ c }}">{% if let Some(t) = j.thumb %}<img class="thumb" src="{{ t }}" alt="">{% else %}<span class="thumb"></span>{% endif %}<span class="ellipsis">{{ j.title }}</span></a>{% else %}{{ j.title }}{% endif %}</td>
+          <td class="sub">{{ j.what }}{% if !j.route.is_empty() %}<span class="route">, {{ j.route }}</span>{% endif %}</td>
+          <td class="sub"><span class="bar"><i style="width:{{ j.progress }}%"></i></span><span class="pct">{{ j.progress }}%</span> <span class="faint eta">{{ j.eta }}</span></td>
+          <td class="sub">{{ j.started }}</td>
+          <td class="acts right">{% if j.can_act %}<button class="quiet small" type="button" data-act="cancel" data-id="{{ j.id }}">Cancel</button>{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+{% if !queued.is_empty() %}
+<div class="panel">
+  <header><h2>Queued</h2><span class="desc">in the order the worker will take them</span></header>
+  <div class="body flush">
+    <table class="jobs-table cards">
+      <thead><tr><th>Kind</th><th>Clip</th><th>What</th><th>Waiting</th><th></th></tr></thead>
+      <tbody>
+        {% for j in queued %}
+        <tr data-job="{{ j.id }}">
+          <td class="state"><span class="badge">{{ j.kind }}</span></td>
+          <td class="clip">{% if let Some(c) = j.clip_id %}<a class="row" href="/clips/{{ c }}">{% if let Some(t) = j.thumb %}<img class="thumb" src="{{ t }}" alt="">{% else %}<span class="thumb"></span>{% endif %}<span class="ellipsis">{{ j.title }}</span></a>{% else %}{{ j.title }}{% endif %}</td>
+          <td class="sub">{{ j.what }}</td>
+          <td class="sub">{{ j.waiting }}{% if j.next %}, next{% endif %}</td>
+          <td class="acts right">{% if j.can_act %}<button class="quiet small" type="button" data-act="cancel" data-id="{{ j.id }}">Cancel</button>{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+{% endif %}
+
+{% if !just.is_empty() %}
+<div class="panel">
+  <header><h2>Just finished</h2><span class="desc">the last half hour; the rest is in the <a href="/jobs?show=history">history</a></span></header>
+  <div class="body flush">
+    <table class="jobs-table cards">
+      <thead><tr><th>Kind</th><th>Clip</th><th>What</th><th>Took</th><th>Finished</th></tr></thead>
+      <tbody>
+        {% for j in just %}
+        <tr data-job="{{ j.id }}">
+          <td class="state">{% if j.result == "done" %}<span class="badge ok">{{ j.kind }}</span>{% else %}<span class="badge">{{ j.kind }}, {{ j.result }}</span>{% endif %}</td>
+          <td class="clip">{% if let Some(c) = j.clip_id %}<a class="row" href="/clips/{{ c }}">{% if let Some(t) = j.thumb %}<img class="thumb" src="{{ t }}" alt="">{% else %}<span class="thumb"></span>{% endif %}<span class="ellipsis">{{ j.title }}</span></a>{% else %}{{ j.title }}{% endif %}</td>
+          <td class="sub">{{ j.what }}{% if !j.route.is_empty() %}<span class="route">, {{ j.route }}</span>{% endif %}</td>
+          <td class="sub" data-l="took">{{ j.took }}</td>
+          <td class="sub">{{ j.finished_ago }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+{% if show != "history" && !failed.is_empty() %}
+<div class="panel">
+  <header><h2>Failed</h2><span class="desc">a retry runs the job again from the start; discard throws the parked file and the failed clip away; dismiss hides it here, the clip keeps its failed mark</span></header>
+  <div class="body flush">
+    <table class="jobs-table cards">
+      <thead><tr><th>Kind</th><th>Clip</th><th>Reason</th><th>Attempts</th><th>Failed</th><th></th></tr></thead>
+      <tbody>
+        {% for j in failed %}
+        <tr data-job="{{ j.id }}">
+          <td class="state"><span class="badge err">{{ j.kind }}</span></td>
+          <td class="clip">{% if let Some(c) = j.clip_id %}<a class="row" href="/clips/{{ c }}">{% if let Some(t) = j.thumb %}<img class="thumb" src="{{ t }}" alt="">{% else %}<span class="thumb"></span>{% endif %}<span class="ellipsis">{{ j.title }}</span></a>{% else %}{{ j.title }}{% endif %}</td>
+          <td class="sub reason"><details class="errbox"><summary><span class="ellipsis">{{ j.reason_short() }}</span></summary><pre>{{ j.reason }}</pre><div class="actions"><button class="small quiet copy" type="button" data-copy="{{ j.reason }}">Copy</button></div></details></td>
+          <td class="sub" data-l="attempts">{{ j.attempts }}</td>
+          <td class="sub">{{ j.finished }}</td>
+          <td class="acts right">{% if j.can_act %}<button class="small" type="button" data-act="retry" data-id="{{ j.id }}">Retry</button> {% if j.kind == "ingest" %}<button class="danger small" type="button" data-act="discard" data-id="{{ j.id }}">Discard</button> {% endif %}<button class="quiet small" type="button" data-act="dismiss" data-id="{{ j.id }}">Dismiss</button>{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+{% if show == "failed" && failed.is_empty() %}
+<div class="empty"><strong>No failed jobs.</strong><span>The ones dismissed are in the history.</span></div>
+{% endif %}
+
+{% if show == "history" %}
+<div class="panel">
+  <header><h2>Recent</h2><span class="desc">the last 100 finished jobs; older ones are dropped by housekeeping</span></header>
+  <div class="body flush">
+    {% if recent.is_empty() %}<p class="muted">Nothing has finished yet.</p>{% else %}
+    <table class="jobs-table cards">
+      <thead><tr><th>Kind</th><th>Clip</th><th>What</th><th>Result</th><th>Took</th><th>When</th></tr></thead>
+      <tbody>
+        {% for j in recent %}
+        <tr data-job="{{ j.id }}">
+          <td class="state">{{ j.kind }}</td>
+          <td class="clip">{% if let Some(c) = j.clip_id %}<a href="/clips/{{ c }}">{{ j.title }}</a>{% else %}{{ j.title }}{% endif %}</td>
+          <td class="sub">{{ j.what }}{% if !j.route.is_empty() %}<span class="route">, {{ j.route }}</span>{% endif %}{% if j.result == "failed" %}<details class="errbox"><summary><span class="ellipsis">{{ j.reason_short() }}</span></summary><pre>{{ j.reason }}</pre></details>{% endif %}</td>
+          <td class="sub">{% if j.result == "done" %}<span class="badge ok">done</span>{% else if j.result == "failed" %}<span class="badge err">failed</span>{% else %}<span class="badge">{{ j.result }}</span>{% endif %}</td>
+          <td class="sub">{{ j.took }}</td>
+          <td class="sub">{{ j.finished }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+</div>
+{% endblock %}

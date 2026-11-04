@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+{% block title %}Library · reel{% endblock %}
+{% block content %}
+<div class="page-head lib-head">
+  <h1>Library</h1>
+  <span class="lib-sum">
+    <button class="quiet summary" id="summary" type="button" aria-expanded="false" aria-controls="disk-pop" aria-describedby="disk-pop-line">{{ summary }}</button>
+    <span class="popover disk-pop" id="disk-pop" role="dialog" aria-label="Disk" hidden>
+      <span id="disk-pop-sum">{{ summary }}</span>
+      <b id="disk-pop-line">{{ disk_line }}</b>
+      <span class="small muted" id="disk-pop-detail">{{ disk_detail }}</span>
+      <span class="pop-actions"><a class="btn small quiet" href="/stats">Stats</a><button class="btn small" id="disk-pop-refresh" type="button">Refresh</button></span>
+    </span>
+  </span>
+  <div class="tools">
+    <span class="disk small muted" id="disk"><button class="quiet" id="disk-line" type="button" title="{{ disk_detail }}" aria-expanded="false">{{ disk_line }}</button><button id="disk-refresh" type="button" title="Recompute now">Refresh</button></span>
+    {% if card_count > 0 %}<button class="btn starred-btn" id="starred-btn" type="button" aria-pressed="false" title="Only the clips you starred"><svg class="icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.9l1.85 3.85 4.2.55-3.07 2.9.78 4.17L8 11.33l-3.76 2.04.78-4.17-3.07-2.9 4.2-.55z"/></svg><span>Starred</span></button>{% endif %}
+    {% if card_count > 0 %}<button class="btn" id="select-btn" type="button" aria-pressed="false" title="Pick several clips: Shift+click a range, Ctrl+A all shown, Esc to stop"><svg class="icon" viewBox="0 0 16 16" aria-hidden="true"><rect x="2.5" y="2.5" width="11" height="11" rx="2"/><path d="M5.5 8.2l1.8 1.8 3.4-4"/></svg><span>Select</span></button>{% endif %}
+    {% if !games.is_empty() || !sets.is_empty() %}
+    <span class="filter-wrap">
+      <button class="btn filter-btn" id="filter-btn" type="button" aria-haspopup="dialog" aria-expanded="false" aria-controls="filter"><svg class="icon" viewBox="0 0 16 16"><path d="M2.5 3.5h11L9 9.2v3.6l-2 1V9.2z"/></svg><span id="filter-label">Filter</span></button>
+      <dialog class="filter" id="filter" aria-labelledby="filter-title">
+        <header><span id="filter-title">Filter</span><button class="btn small" id="filter-done" type="button">Done</button></header>
+        <div class="body">
+          {% if !games.is_empty() %}<fieldset class="setbox pick-list"><legend>Games</legend>{% for g in games %}<label class="check pick"><input type="checkbox" data-game="{{ g.key }}"> <span>{{ g.name }}</span> <span class="count">{{ g.count }}</span></label>{% endfor %}</fieldset>{% endif %}
+          {% if !sets.is_empty() %}<fieldset class="setbox pick-list"><legend>Collections</legend>{% for s in sets %}<label class="check pick"><input type="checkbox" data-set="{{ s.key }}"> <span>{{ s.name }}</span> <span class="count">{{ s.count }}</span></label>{% endfor %}</fieldset>{% endif %}
+          <span class="row small filter-links"><a href="/collections">Manage collections</a><a href="/stats">Stats per game</a></span>
+        </div>
+      </dialog>
+    </span>
+    {% endif %}
+    <form method="get" action="/" class="row small muted">
+      <input type="hidden" name="q" value="{{ q }}" id="sort-q">
+      <label class="row">Sort
+        <select name="sort" aria-label="Sort" onchange="this.form.submit()">
+          <option value="newest" {% if sort == "newest" %}selected{% endif %}>Newest</option>
+          <option value="oldest" {% if sort == "oldest" %}selected{% endif %}>Oldest</option>
+          <option value="longest" {% if sort == "longest" %}selected{% endif %}>Longest</option>
+          <option value="title" {% if sort == "title" %}selected{% endif %}>Title</option>
+          {% if !who.standalone %}<option value="shared" {% if sort == "shared" %}selected{% endif %}>Shared first</option>{% endif %}
+        </select>
+      </label>
+    </form>
+  </div>
+</div>
+<p class="faint small disk-detail" id="disk-detail" hidden>{{ disk_detail }}</p>
+{% if let Some(why) = library_away %}<div class="notice err library-away" role="status"><span class="badge err">library away</span><span>{{ why }}. Nothing new is taken in and nothing moves to or from the trash until it is back; reel goes on by itself then.</span><a class="actions small" href="/settings/storage">Folders</a></div>{% endif %}
+<div class="stack uploads" id="uploads" hidden></div>
+<div class="picked" id="picked" role="group" aria-label="Picked" hidden></div>
+
+{% if !activity.is_empty() || waiting > 0 %}
+<div class="activity" id="activity">
+  {% for a in activity %}
+  <span><span class="{{ a.class }}">{{ a.text }}</span></span>
+  <span class="bar" aria-hidden="true"><i style="width:{{ a.progress }}%"></i></span>
+  <span>{{ a.progress }}%</span>
+  {% endfor %}
+  {% if waiting > 0 %}<span class="faint">{{ waiting }} waiting</span>{% endif %}
+  <a href="/jobs" class="faint">jobs</a>
+</div>
+{% endif %}
+
+{% if card_count == 0 %}
+<div class="empty" id="library-empty">
+  {% if q.is_empty() %}
+  <strong>Nothing here yet.</strong>
+  <span>{% if who.standalone %}Save a clip in a game, or upload one.{% else %}The incoming folder is waiting, or upload something.{% endif %}</span>
+  <a class="btn primary" href="/upload">Upload a clip</a>
+  {% else %}
+  <strong>No clip matches "{{ q }}".</strong>
+  <a class="btn" href="/">Show everything</a>
+  {% endif %}
+</div>
+{% else %}
+<div class="grid" id="grid" data-q="{{ q }}">
+  {% for g in groups %}
+  {% if !g.label.is_empty() %}<div class="day" data-key="{{ g.key }}"><span>{{ g.label }}</span></div>{% endif %}
+  {% for c in g.cards %}
+  {% include "card.html" %}
+  {% endfor %}
+  {% endfor %}
+</div>
+<div class="empty" id="no-match" hidden>
+  <strong></strong>
+  <button class="btn" id="clear-search" type="button">Clear</button>
+</div>
+{% endif %}
+
+{% include "card-menu.html" %}
+{% if card_count > 0 %}{% include "select-bar.html" %}{% endif %}
+<dialog id="sets-dialog" aria-labelledby="sets-title">
+  <header id="sets-title">Collections</header>
+  <div class="body">
+    <p class="small muted ellipsis" id="sets-clip"></p>
+    {% if !sets.is_empty() %}<fieldset class="setbox pick-list" id="sets-list" aria-label="Collections">{% for s in sets %}<label class="check pick"><input type="checkbox" data-set="{{ s.key }}"> <span>{{ s.name }}</span></label>{% endfor %}</fieldset>{% endif %}
+    <div class="row"><input type="text" class="in-text grow" id="sets-new" placeholder="a new collection" maxlength="80" aria-label="A new collection with this clip"><button type="button" id="sets-make">Add</button></div>
+  </div>
+  <footer><button class="primary" id="sets-done" type="button">Done</button></footer>
+</dialog>
+<p class="keys mt"><span><kbd>/</kbd> search</span><span><kbd>j</kbd> <kbd>k</kbd> move</span><span><kbd>enter</kbd> open</span><span><kbd>u</kbd> upload</span>{% if !who.standalone %}<span><kbd>g</kbd> <kbd>s</kbd> shares</span>{% endif %}</p>
+{% endblock %}
