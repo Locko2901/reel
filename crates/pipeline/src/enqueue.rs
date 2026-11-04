@@ -101,8 +101,7 @@ pub async fn create_clip_for_file(ctx: &Ctx, new: NewClip<'_>) -> anyhow::Result
     clip.game = new.game.filter(|g| !g.trim().is_empty()).or(parsed.game);
     ctx.store.insert_clip(&clip).await.context("insert clip")?;
     let payload = json!({ "input": new.input.to_string_lossy(), "source": new.source, "relative": new.relative, "recipe": new.recipe, "keep_last": new.keep_last, "audio_names": new.audio_names });
-    // an upload's clip is about to be shared, so its ingest runs in the lane; a folder's or an
-    // import's waits its turn
+    // an upload's clip is about to be shared: its ingest runs in the lane, others wait their turn
     let priority = if matches!(new.source, "device" | "upload") {
         PRIORITY_EMBED
     } else {
@@ -741,7 +740,6 @@ pub async fn embed_grade(ctx: &Ctx, current: &Rendition) -> anyhow::Result<Optio
     }
 }
 
-/// Where a version starts in the original's seconds.
 fn start_in_original(version: &Rendition) -> f64 {
     if version.kind == "master" {
         return 0.0;
@@ -963,7 +961,6 @@ mod tests {
         );
         tree(&from);
         std::fs::create_dir_all(to.parent().unwrap()).unwrap();
-        // a part a crash left behind is cleared first
         std::fs::create_dir_all(reel_media::ffmpeg::part_path(&to).join("stale")).unwrap();
         copy_dir_then_swap(&from, &to).await.unwrap();
         assert!(!from.exists());

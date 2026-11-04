@@ -12,7 +12,6 @@ use tokio_util::sync::CancellationToken;
 pub trait Pauser: Send + Sync {
     fn started(&self, pid: u32);
     fn ended(&self, pid: u32);
-    /// How long the process has been paused so far.
     fn paused(&self, pid: u32) -> Duration;
 }
 

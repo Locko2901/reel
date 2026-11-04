@@ -9,7 +9,7 @@ homepage.workspace = true
 publish = false
 
 [features]
-# The demo's /style page and /__shot/ routes for the screenshot checks; never in a release.
+# The demo's /style page and /__shot/ routes for the screenshots; never in a release.
 style-page = []
 
 [dependencies]

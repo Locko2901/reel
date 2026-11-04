@@ -54,12 +54,10 @@ fn half() -> f64 {
 pub enum ReframeShape {
     /// 9:16, a phone's short.
     Tall,
-    /// 1:1.
     Square,
 }
 
 impl ReframeShape {
-    /// Width to height.
     pub fn aspect(self) -> (u32, u32) {
         match self {
             Self::Tall => (9, 16),
@@ -124,7 +122,6 @@ impl CutRecipe {
         !self.trimmed() && !self.mute && !self.audio_changed() && !self.pictured()
     }
 
-    /// The cut fades in or out: its sound, if it has any, is made again too.
     pub fn fades(&self) -> bool {
         self.fade_in > 0.0 || self.fade_out > 0.0
     }
@@ -286,7 +283,6 @@ impl DiscordRecipe {
     }
 }
 
-/// An animated picture of a version: a GIF or a WebP, its width and frame rate.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct AnimRecipe {
     pub format: AnimFormat,
@@ -327,8 +323,7 @@ impl AnimFormat {
             AnimFormat::Webp => "WebP",
         }
     }
-    /// The bytes a pixel of a frame takes, from a calm clip to a busy one, measured with the
-    /// encoders' settings here (`args::anim`).
+    /// Bytes per pixel of a frame, calm clip to busy, measured with `args::anim`'s settings.
     fn bytes_per_pixel(self) -> (f64, f64) {
         match self {
             AnimFormat::Gif => (0.12, 0.55),
@@ -352,7 +347,6 @@ impl AnimRecipe {
     pub fn json(&self) -> String {
         serde_json::to_string(self).expect("a recipe serialises")
     }
-    /// The picture's size for a version this wide and high.
     pub fn size(&self, width: u32, height: u32) -> (u32, u32) {
         let w = self.width.min(width.max(2));
         let h = if width == 0 {
@@ -371,8 +365,6 @@ impl AnimRecipe {
     }
 }
 
-/// A montage: its versions in order, each with the part used, the frame they share and how
-/// one gives way to the next.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct MontageRecipe {
     pub parts: Vec<MontagePart>,
@@ -495,7 +487,7 @@ impl MontageJoin {
 
 /// The shortest and longest join, in seconds.
 pub const JOIN_SECONDS: (f64, f64) = (0.2, 2.0);
-/// The shortest part of a clip a montage takes.
+/// Seconds.
 pub const PART_SHORTEST: f64 = 0.5;
 
 /// How a clip of another shape fills the montage's frame.
@@ -529,7 +521,6 @@ impl MontageShape {
         }
     }
 
-    /// What a frame this wide and high is.
     pub fn of(width: u32, height: u32) -> Self {
         match width.cmp(&height) {
             std::cmp::Ordering::Greater => Self::Wide,

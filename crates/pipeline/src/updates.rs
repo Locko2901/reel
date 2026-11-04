@@ -19,7 +19,6 @@ pub struct Release {
 }
 
 impl UpdateState {
-    /// The newer release, when the one running is older.
     pub fn newer(&self) -> Option<&Release> {
         self.latest
             .as_ref()

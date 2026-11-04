@@ -7,7 +7,7 @@ pub enum Visitor {
     Person,
 }
 
-/// The apps that fetch a page to build a link's preview, by a lowercase word of their User-Agent.
+/// Apps that fetch a page for a link's preview, by a lowercase word of their User-Agent.
 /// Signal asks as WhatsApp, iMessage as facebookexternalhit; Viber's fetcher looks like its browser.
 pub const PREVIEWERS: &[&str] = &[
     "discordbot",

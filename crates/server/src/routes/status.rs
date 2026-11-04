@@ -18,7 +18,6 @@ pub struct Check {
 }
 
 impl Check {
-    /// The dot that goes with the value's colour.
     pub fn dot(&self) -> &'static str {
         match self.class {
             "st-ok" => "ok",
@@ -109,7 +108,6 @@ pub struct StatusPage {
     pub update_line: String,
     pub update_class: &'static str,
     pub update_url: Option<String>,
-    /// The newest release this server knows of.
     pub newest: String,
     pub update_on: bool,
     pub checks: Vec<Check>,

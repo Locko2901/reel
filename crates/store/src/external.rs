@@ -76,7 +76,6 @@ impl Store {
         Ok(())
     }
 
-    /// Why a version's links are served from this server while the storage is on.
     pub async fn set_external_fallback(
         &self,
         version_id: &str,

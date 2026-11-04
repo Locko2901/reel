@@ -48,7 +48,6 @@ fn tag(event: &str) -> &'static str {
     }
 }
 
-/// The free and the total bytes of the file system under a path, on both platforms.
 pub fn free_and_total(path: &std::path::Path) -> (u64, u64) {
     #[cfg(unix)]
     {

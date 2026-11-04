@@ -4,7 +4,6 @@ use crate::{Result, Sort, Store};
 use reel_core::format::now;
 use sqlx::Row;
 
-/// The query as a LIKE pattern that means the text itself: the wildcards are escaped.
 fn like_literal(q: &str) -> String {
     q.replace('\\', "\\\\")
         .replace('%', "\\%")
@@ -250,8 +249,7 @@ impl Store {
         Ok(())
     }
 
-    /// Every live, ready clip with the bytes of its ready versions, oldest first: what the
-    /// library cap walks.
+    /// Every live, ready clip with its ready versions' bytes, for the library cap's walk.
     pub async fn clip_sizes_oldest_first(&self) -> Result<Vec<ClipSize>> {
         sqlx::query_as::<_, ClipSize>(
             "SELECT c.id, c.created_at, c.uploaded_at, COALESCE(SUM(r.size), 0) AS bytes FROM clip c LEFT JOIN rendition r ON r.clip_id = c.id AND r.state = 'ready' WHERE c.deleted_at IS NULL AND c.state = 'ready' GROUP BY c.id ORDER BY c.created_at ASC",
@@ -260,8 +258,7 @@ impl Store {
         .await
     }
 
-    /// Every clip the library cap weighs, the oldest first as the library's Oldest sort orders
-    /// them: the ones in the library, ready, with what each takes and what may spare it.
+    /// Every clip the library cap weighs, oldest first as the library's Oldest sort orders them.
     pub async fn cap_rows(&self) -> Result<Vec<CapRow>> {
         sqlx::query_as::<_, CapRow>(
             "SELECT c.id, c.title, COALESCE(c.recorded_at, c.created_at) AS at, c.uploaded_at, \
@@ -321,8 +318,8 @@ impl Store {
         Ok(true)
     }
 
-    /// Clips that have a folder in the library, those not in the trash first, the newest
-    /// first, each with whether it is in the trash. The library's check looks for their folders.
+    /// Clips that have a folder in the library, with whether each is in the trash: those not
+    /// in the trash first, then the newest first.
     pub async fn clips_with_files(&self, limit: i64) -> Result<Vec<(String, bool)>> {
         sqlx::query_as(
             "SELECT id, deleted_at IS NOT NULL FROM clip WHERE master_id IS NOT NULL ORDER BY deleted_at IS NOT NULL, created_at DESC LIMIT ?",

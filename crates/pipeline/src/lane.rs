@@ -94,7 +94,6 @@ impl Lane {
         }
     }
 
-    /// How many times a background ffmpeg was paused.
     pub fn pauses(&self) -> u64 {
         self.pauses.load(Ordering::Relaxed)
     }
@@ -143,8 +142,6 @@ mod tests {
     use std::os::unix::fs::PermissionsExt;
     use std::path::Path;
 
-    /// A stand-in for ffmpeg that works for `tenths` tenths of a second, and only while it
-    /// is not stopped.
     fn worker(dir: &Path, tenths: u32) -> Ffmpeg {
         let path = dir.join(format!("ffmpeg-{tenths}"));
         std::fs::write(
@@ -161,7 +158,6 @@ mod tests {
         }
     }
 
-    /// Runs `ff` as a background job's ffmpeg while the lane runs a job for `held`.
     async fn paused_for(ff: Ffmpeg, held: Duration) -> (Result<(), MediaError>, Arc<Lane>) {
         let lane = Arc::new(Lane::default());
         let told: OnSpawn = lane.clone();

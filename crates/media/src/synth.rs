@@ -63,7 +63,8 @@ impl Synth {
     pub fn small(seconds: f64, label: &str) -> Self {
         Self::base(640, 360, 30, seconds, "libx264", 800, label)
     }
-    /// A common OBS recording profile: H.264 High 1080p60, VBR 16 Mbit/s up to 25, 2 s keyframes, 2 B-frames, AAC 320 kbit/s.
+    /// A common OBS recording profile: H.264 High 1080p60, VBR 16 Mbit/s up to 25, 2 s
+    /// keyframes, 2 B-frames, AAC 320 kbit/s.
     pub fn obs(seconds: f64, label: &str) -> Self {
         Self {
             maxrate_kbit: Some(25000),

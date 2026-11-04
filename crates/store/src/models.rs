@@ -580,8 +580,7 @@ pub struct ClipSize {
     pub bytes: i64,
 }
 
-/// A clip as the library cap weighs it: when it was recorded, the room its
-/// versions and its preview video take in the library, and what may spare it.
+/// A clip as the library cap weighs it: its age, its room in the library, what may spare it.
 #[derive(Debug, Clone, FromRow, PartialEq)]
 pub struct CapRow {
     pub id: String,

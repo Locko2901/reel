@@ -87,7 +87,6 @@ impl AppState {
     }
 }
 
-/// Drops expired sessions from the store every ten minutes.
 pub async fn expire_sessions(
     store: accounts::HashedIdStore<tower_sessions_sqlx_store::SqliteStore>,
 ) {

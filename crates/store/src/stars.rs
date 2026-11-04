@@ -38,7 +38,6 @@ impl Store {
         )
     }
 
-    /// The clips a person starred, for the cards of a page.
     pub async fn starred_ids(&self, user_id: &str) -> Result<HashSet<String>> {
         Ok(sqlx::query("SELECT clip_id FROM star WHERE user_id = ?")
             .bind(user_id)

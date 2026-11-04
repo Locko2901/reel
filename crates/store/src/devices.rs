@@ -96,7 +96,6 @@ impl Store {
             .await
     }
 
-    /// This device's unfinished upload of a file with that hash, if any.
     pub async fn open_upload_by_hash(
         &self,
         device_id: &str,

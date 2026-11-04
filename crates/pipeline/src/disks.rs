@@ -126,7 +126,7 @@ pub fn network_kind(magic: u64) -> Option<&'static str> {
     }
 }
 
-/// The statfs magic number of the file system under a path (Linux only).
+/// The statfs magic number of the file system under a path; None off Linux.
 pub fn fs_magic(path: &Path) -> Option<u64> {
     #[cfg(target_os = "linux")]
     {
@@ -141,7 +141,6 @@ pub fn fs_magic(path: &Path) -> Option<u64> {
     }
 }
 
-/// The network share a folder is on, if it is on one.
 pub fn network_share(path: &Path) -> Option<&'static str> {
     fs_magic(path).and_then(network_kind)
 }

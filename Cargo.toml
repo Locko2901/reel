@@ -54,7 +54,7 @@ nix = { version = "0.29", features = ["fs", "signal"] }
 arc-swap = "1"
 sha2 = "0.11.0"
 
-# No debug info for dependencies in test builds: the target volume stays a third of the size.
+# Keeps the target directory a third of the size.
 [profile.dev.package."*"]
 debug = false
 

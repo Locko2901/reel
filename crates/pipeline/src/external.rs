@@ -1,5 +1,4 @@
-//! Link previews from an S3-compatible bucket behind its public address. One task keeps the
-//! storage as the links want it; the routes kick it and wait on it.
+//! Link previews from an S3-compatible bucket; one task keeps it as the links want it.
 
 use crate::enqueue::{
     ensure_embed, ensure_embed_ext, ext_file, ext_file_made, needs_embed, ExtFile,
@@ -14,7 +13,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::{watch, Notify};
 
-/// Everything reel writes goes under this prefix, and it never touches anything else.
+/// Everything reel writes goes under this prefix; nothing outside it is touched.
 pub const PREFIX: &str = "reel/";
 
 pub fn bucket_of(cfg: &Config) -> Bucket {
@@ -31,21 +30,18 @@ pub fn bucket_of(cfg: &Config) -> Bucket {
     }
 }
 
-/// Where an object is served from, for anyone.
 pub fn public_url(cfg: &Config, key: &str) -> String {
     format!("{}/{key}", cfg.external.public_url.trim_end_matches('/'))
 }
 
-/// What the storage task shares with the routes: a kick, the passes it finished, and what
-/// the last one found.
+/// What the storage task shares with the routes.
 pub struct State {
     kick: Notify,
     passes: watch::Sender<u64>,
     pub report: std::sync::Mutex<Option<Report>>,
     listed_at: std::sync::Mutex<Option<std::time::Instant>>,
     alarm: std::sync::Mutex<Alarm>,
-    /// When the next live link expires, for its preview to go then rather than at the next
-    /// ten minutes.
+    /// When the next live link expires: its preview goes then, not at the ten minute pass.
     next_expiry: std::sync::Mutex<Option<jiff::Timestamp>>,
     /// The uploads under way, by version: the bytes sent and the size.
     going_up: std::sync::Mutex<HashMap<String, (Arc<AtomicU64>, u64)>>,
@@ -66,7 +62,7 @@ impl Default for State {
 }
 
 impl State {
-    /// How far the upload of a version's preview is, from 0 to 1, while it goes up.
+    /// How far a version's preview is uploaded, 0 to 1, while it goes up.
     pub fn going_up(&self, version_id: &str) -> Option<f64> {
         let up = self.going_up.lock().unwrap();
         let (sent, size) = up.get(version_id)?;
@@ -74,7 +70,7 @@ impl State {
     }
 }
 
-/// What the last pass found, for Status, the setting and the alarms.
+/// What the last pass found.
 #[derive(Debug, Clone, Default)]
 pub struct Report {
     pub at: String,
@@ -86,18 +82,15 @@ pub struct Report {
     pub from_here: Vec<(String, usize)>,
     /// Linked versions on their way up.
     pub pending: usize,
-    /// Uploads and deletes that failed in the pass.
     pub failures: Vec<String>,
     /// Why the storage could not be used at all.
     pub error: Option<String>,
-    /// Records whose object the last listing lacked, and objects under reel's prefix without
-    /// a record, left alone.
+    /// Records whose object the listing lacked, and objects under the prefix without a record.
     pub missing: usize,
     pub unknown: usize,
 }
 
-/// Where the alarms stand: the share of the limit last told about, and whether the last pass
-/// failed somewhere.
+/// Where the alarms stand: the share of the limit last told about, and whether a pass failed.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct Alarm {
     pub level: u8,
@@ -342,8 +335,7 @@ pub fn where_words(w: &Where) -> String {
     }
 }
 
-/// The sentence a new link's maker reads when its preview is not in the storage, or not
-/// ready yet.
+/// What a new link's maker reads when its preview is not in the storage, or not ready yet.
 pub fn where_note(w: &Where, ready: bool) -> String {
     match (w, ready) {
         (Where::Server { why, .. }, true) => {
@@ -409,8 +401,7 @@ impl Overview {
         where_words(&place)
     }
 
-    /// The same in a word for a table's cell, and whether it is a link the storage left out
-    /// while it is on.
+    /// The same in a word for a table's cell, and whether the storage left this link out.
     pub fn word(&self, version_id: &str) -> (&'static str, bool) {
         match (self.on, self.stored.contains(version_id)) {
             (false, false) => ("", false),

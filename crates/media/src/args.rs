@@ -74,7 +74,6 @@ impl Encoder {
     }
 }
 
-/// The hardware decoder for a source codec, or None when the backend has none for it.
 pub fn hw_decoder(backend: HwBackend, vcodec: Option<&str>) -> Option<String> {
     let codec = vcodec?;
     match backend {
@@ -487,8 +486,8 @@ pub fn cut_with(
     a
 }
 
-/// What follows the mix of the tracks; None when the audio is copied. A boost, a raised track or
-/// summed tracks are limited at `aim` four times oversampled, so the limit holds for the true peak.
+/// What follows the mix of the tracks; None when the audio is copied. A boost, a raised track
+/// or summed tracks are limited at `aim`, four times oversampled for the true peak.
 pub fn audio_filter(recipe: &CutRecipe, measured: Option<&Loudnorm>, aim: f64) -> Option<String> {
     if !recipe.audio_changed() {
         return None;
@@ -836,7 +835,6 @@ pub struct MontageInput<'a> {
     pub volume: f64,
 }
 
-/// How a montage looks and sounds as a whole.
 pub struct MontageStyle {
     pub join: reel_core::recipe::MontageJoin,
     pub fit: reel_core::recipe::MontageFit,
@@ -894,7 +892,7 @@ pub fn montage(
                 chain.push_str(&format!("volume={:.2},", i.volume.clamp(0.0, 2.0)));
             }
             if i.volume > 1.0 + 1e-6 {
-                // raised over what it was: held under a true peak of about -1 dB, as a cut's boost is
+                // 0.89 is a true peak of about -1 dB, the ceiling a cut's boost has too
                 chain.push_str("alimiter=limit=0.89:attack=5:release=50:level=0,");
             }
             // the sound exactly as long as the picture: a version's sound runs some milliseconds

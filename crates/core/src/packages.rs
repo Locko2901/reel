@@ -1,6 +1,5 @@
-//! The two Windows downloads as `desktop/packages.json` names them, read by the server, the
-//! app, the installers and the release alike. Linux keeps `reel_<version>_amd64.AppImage` and
-//! `.deb`.
+//! The two Windows downloads as `desktop/packages.json` names them, for the server, the app,
+//! the installers and the release; Linux keeps `reel_<version>_amd64.AppImage` and `.deb`.
 use serde::Deserialize;
 use std::sync::LazyLock;
 

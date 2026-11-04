@@ -141,10 +141,10 @@ pub struct ShareConfig {
     pub embed_mb: u64,
     /// Preview videos for the links; off in standalone mode, where no link embeds anywhere.
     pub previews: bool,
-    /// The web copy a link's page plays: its bitrate, video and audio together, and its tallest height.
+    /// The bitrate of the web copy a link's page plays, video and audio together.
     pub web_mbit: u64,
     pub web_max_height: u32,
-    /// Revoke the links never shared (never posted nor opened), this many days after they were made.
+    /// Revoke the links never posted nor opened, `cleanup_days` after they were made.
     pub cleanup: bool,
     pub cleanup_days: u64,
 }
@@ -175,7 +175,7 @@ pub struct ExternalConfig {
 #[serde(default)]
 pub struct StorageConfig {
     pub disk_warn_gb: u64,
-    /// The library is kept under this size, the oldest clips going to the trash first; 0 is no cap.
+    /// The oldest clips go to the trash first to keep the library under this; 0 is no cap.
     pub cap_gb: u64,
     /// The cap never trims a clip that is not on a server too.
     pub cap_keeps_unsent: bool,

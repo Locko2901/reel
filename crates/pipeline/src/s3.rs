@@ -195,7 +195,6 @@ impl S3 {
         refused(r, "the delete").await.map(|_| ())
     }
 
-    /// Every object under a prefix, page after page.
     pub async fn list(&self, prefix: &str) -> anyhow::Result<Vec<Listed>> {
         let mut out = Vec::new();
         let mut token: Option<String> = None;
@@ -520,8 +519,6 @@ mod tests {
         assert!(elements("<a>", "a").is_empty());
     }
 
-    /// Against a real storage when the environment names one (REEL_TEST_S3_ENDPOINT, _REGION,
-    /// _BUCKET, _KEY, _SECRET and _PUBLIC, the bucket's public address); skipped otherwise.
     #[tokio::test]
     async fn a_real_storage_takes_lists_serves_and_deletes() {
         let var = |n: &str| std::env::var(format!("REEL_TEST_S3_{n}")).unwrap_or_default();

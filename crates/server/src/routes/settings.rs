@@ -58,7 +58,6 @@ pub struct PanelView {
     pub section: &'static str,
     pub name: &'static str,
     pub rows: Vec<RowView>,
-    /// Buttons that belong with these settings, under them.
     pub actions: Vec<ActionRow>,
 }
 
@@ -140,15 +139,13 @@ fn action_row(title: &'static str, help: &str, buttons: Vec<ActionView>) -> Acti
     }
 }
 
-/// An action row that shows under a switch, as a setting under it does.
 fn under_switch(parent: &'static str, cfg: &Config, mut r: ActionRow) -> ActionRow {
     r.depends = parent;
     r.dep_off = catalog::get(cfg, parent) != "true" || !catalog::shown(cfg, parent);
     r
 }
 
-/// The actions of a server's the app's standalone library leaves out; a restart would stop the
-/// app's reel for good.
+/// Server actions the app's standalone library leaves out: a restart would stop its reel for good.
 const SERVER_ACTIONS: &[&str] = &[
     "external-check",
     "external-test",
@@ -249,7 +246,7 @@ fn action_panels(
     ]
 }
 
-/// The trash's row: its clips and their size on disk, the same figure as the Disk row's.
+/// The trash's size on disk is the same figure as the Disk row's.
 fn trash_line(clips: usize, bytes: u64) -> String {
     let held = match clips {
         0 => "empty".to_string(),
@@ -818,7 +815,6 @@ pub async fn notify_test(
     Ok(Json(json!({ "ok": true, "line": went })))
 }
 
-/// A stored value as the page says it: a switch on or off, a choice by its words.
 fn value_words(d: &Def, v: &str) -> String {
     match d.kind {
         Kind::Bool => if v == "true" { "on" } else { "off" }.into(),

@@ -94,7 +94,6 @@ impl Zip {
         }
     }
 
-    /// The archive's length in bytes, as `write` will send it.
     pub fn length(&self) -> u64 {
         let mut offset = 0u64;
         let mut central = 0u64;

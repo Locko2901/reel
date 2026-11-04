@@ -1,4 +1,3 @@
-# cargo deny check licenses: every crate reel builds on may ship inside an MIT program.
 [graph]
 targets = ["x86_64-unknown-linux-gnu", "x86_64-pc-windows-msvc"]
 all-features = true

@@ -148,7 +148,6 @@ pub fn game_word(raw: &str) -> String {
     out
 }
 
-/// The year the pages count as the current one.
 pub fn this_year() -> i16 {
     Timestamp::now()
         .to_zoned(jiff::tz::TimeZone::system())

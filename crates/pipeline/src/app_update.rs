@@ -91,7 +91,6 @@ pub fn notes_between(from: &str, to: &str) -> String {
     }
 }
 
-/// The repository's latest releases, for `keep_releases`.
 pub async fn read_releases(api: &str, repo: &str, token: &str) -> Result<Vec<Release>, String> {
     let client = reqwest::Client::builder()
         .timeout(Duration::from_secs(60))
@@ -111,9 +110,8 @@ pub async fn read_releases(api: &str, repo: &str, token: &str) -> Result<Vec<Rel
     resp.json().await.map_err(|e| e.to_string())
 }
 
-/// Which installer an app came from; each install is offered its own kind. The .deb does not
-/// update itself. On Windows, `WithObs` is the package called reel and `Plain` reel light
-/// (`reel_core::packages`).
+/// Which installer an app came from, each offered its own kind; the .deb does not update
+/// itself. On Windows `WithObs` is the package called reel, `Plain` reel light.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Flavour {
     Plain,
@@ -130,8 +128,7 @@ impl Flavour {
         Flavour::Deb,
     ];
 
-    /// As the app names itself in its update request, which every app since the two installers
-    /// sends the same way: `with-obs` from the app with OBS, none from the one without.
+    /// As the app names itself in its update request: `with-obs` with OBS, none without.
     pub fn parse(s: Option<&str>) -> Flavour {
         match s {
             Some("with-obs") | Some("reel-with-obs") => Flavour::WithObs,

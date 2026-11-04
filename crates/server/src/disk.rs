@@ -27,7 +27,6 @@ pub struct DiskInfo {
     /// Settings' four folders by key, each with its disk (device, free, total) if it is there.
     pub folders: Vec<(&'static str, Option<reel_pipeline::disks::DiskAt>)>,
     pub computed: Instant,
-    /// The app's standalone library, for the words.
     pub standalone: bool,
 }
 

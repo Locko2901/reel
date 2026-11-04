@@ -196,7 +196,6 @@ pub async fn download(
     // without the library every video would be "missing": a zip of clip.json files alone
     crate::error::library_ready(&st.ctx).await?;
     let (picked, skipped) = gather(&st, &ids).await?;
-    // as the dialog weighed it, before a file is looked at; then the zip itself, below
     let (_, bytes) = weight(&picked, which);
     let over = |bytes: u64| {
         AppError::BadRequest(format!(
@@ -213,7 +212,6 @@ pub async fn download(
     let clips = picked.len();
     let zip = Zip::new(entries, now.datetime());
     let length = zip.length();
-    // the zip as it will be sent, from the files' sizes on disk
     if length > MOST_BYTES {
         return Err(over(length));
     }
@@ -254,7 +252,6 @@ pub async fn download(
     Ok(r)
 }
 
-/// The note at the top of the zip.
 const README: &str = "README.txt";
 
 /// A clip's folder: its title, made safe for every system's files, numbered when two are alike.
@@ -483,7 +480,6 @@ mod tests {
         assert_eq!(folder("Überhang", &mut taken), "Überhang");
         let long = "x".repeat(200);
         assert_eq!(folder(&long, &mut taken).chars().count(), 80);
-        // a dot at the cut goes as well
         assert_eq!(
             folder(&format!("{}.y", "x".repeat(79)), &mut taken),
             "x".repeat(79)

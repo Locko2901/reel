@@ -3,17 +3,14 @@
 use std::ffi::OsStr;
 use std::process::Command;
 
-/// The child gets no console window (Windows).
 pub const CREATE_NO_WINDOW: u32 = 0x0800_0000;
-/// The child runs in the idle priority class (Windows), for ffmpeg while a game plays.
 pub const IDLE_PRIORITY_CLASS: u32 = 0x0000_0040;
 
-/// A process without a console window.
 pub fn command(program: impl AsRef<OsStr>) -> Command {
     command_with(program, 0)
 }
 
-/// The same, with more creation flags (Windows); CREATE_NO_WINDOW is always among them.
+/// `command` with more creation flags (Windows); CREATE_NO_WINDOW is always among them.
 pub fn command_with(program: impl AsRef<OsStr>, flags: u32) -> Command {
     #[allow(unused_mut)]
     let mut c = Command::new(program);

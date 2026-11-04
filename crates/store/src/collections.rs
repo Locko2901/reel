@@ -53,8 +53,8 @@ impl Store {
         Ok(())
     }
 
-    /// Every collection with its clips not in the trash, its live link and newest clip: the own ones
-    /// by name, then the games' by clip count; a game with no clip left is not listed.
+    /// Every collection with its live clips, live link and newest clip: the own ones by name,
+    /// then the games' by clip count; a game with no clip left is not listed.
     pub async fn collections(&self) -> Result<Vec<CollectionRow>> {
         self.sync_game_collections().await?;
         let rows = sqlx::query_as::<_, CollectionRow>(
@@ -139,7 +139,6 @@ impl Store {
         Ok(rows.iter().map(|r| r.get::<String, _>("id")).collect())
     }
 
-    /// For the library: the collections each clip is in.
     pub async fn collection_ids_by_clip(&self) -> Result<HashMap<String, Vec<String>>> {
         let rows = sqlx::query("SELECT clip_id, collection_id FROM collection_clip")
             .fetch_all(&self.pool)

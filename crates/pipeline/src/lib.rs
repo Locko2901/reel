@@ -38,7 +38,7 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 use tokio_util::sync::CancellationToken;
 
-/// The layers under the database: the base config, config.toml, and whether the process environment counts.
+/// The layers under the database: the base config, config.toml, and whether the environment counts.
 pub struct Layers {
     pub base: Config,
     pub file: Option<toml::Value>,
@@ -72,9 +72,7 @@ pub struct Ctx {
     /// Set by the desktop app while a game has the screen: the heavy jobs (re-encodes, the
     /// loop and the strip, the copies) wait for it to clear; the light ones go on.
     pub hold_heavy: Arc<std::sync::atomic::AtomicBool>,
-    /// The external storage's task, kicked by the routes.
     pub external: Arc<external::State>,
-    /// The jobs someone waits for, and the background ffmpeg they pause.
     pub lane: Arc<lane::Lane>,
     /// Whether the Library folder is there to be written to.
     pub library: Arc<library::State>,

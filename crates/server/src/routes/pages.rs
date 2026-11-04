@@ -211,7 +211,6 @@ pub async fn library(
     }))
 }
 
-/// The page head's line: the count, the size of the current versions, the sort.
 fn summary_line(count: i64, bytes: i64, sort: Sort) -> String {
     format!(
         "{count} clip{}, {}, {}",
@@ -341,7 +340,6 @@ fn anim_json(current: Option<&reel_store::models::Rendition>) -> String {
     json!({ "max": ANIM_MAX_SECONDS, "long": d > ANIM_MAX_SECONDS + 0.05, "length": format::duration(d), "sizes": sizes }).to_string()
 }
 
-/// What a montage's master was made of, each clip by its title as it is now.
 async fn montage_parts(
     st: &AppState,
     master: Option<&reel_store::models::Rendition>,
@@ -434,7 +432,6 @@ pub struct ClipPage {
     /// The animated pictures the Send panel offers: formats, weights, and whether it is too long.
     pub anim_json: String,
     pub anim_webp: bool,
-    /// The animated pictures made of its versions, and being made.
     pub anims: Vec<crate::routes::anims::AnimView>,
     /// Whether the poster is an uploaded image, and the shape the poster takes.
     pub poster_image: bool,
@@ -495,8 +492,7 @@ pub async fn clip(
                 }
             }
             crate::views::cleanup_note(&mut v, s, &st.ctx.config());
-            // posted, then edited: Discord keeps the preview the link was posted with, so a
-            // new address for this version gets a fresh one
+            // Discord keeps the preview a link was posted with: a newer version needs a new address
             if let (true, None, Some(posted), Some(cur)) =
                 (s.is_active(), &s.rendition_id, &s.last_posted_at, &current)
             {
@@ -712,7 +708,6 @@ pub async fn clip(
             });
         }
     }
-    // with a cut current the editor opens on its range, so nudging it is one small drag
     let edit_from = current
         .as_ref()
         .filter(|c| c.kind == "cut")

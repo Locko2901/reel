@@ -110,7 +110,7 @@ impl Store {
         Ok(())
     }
 
-    /// What the clips take: every ready master, cut and embed copy of every clip in the library.
+    /// The bytes of every ready master, cut and embed copy of every clip in the library.
     pub async fn library_bytes(&self) -> Result<i64> {
         let row = sqlx::query("SELECT COALESCE(SUM(r.size), 0) AS bytes FROM rendition r JOIN clip c ON c.id = r.clip_id WHERE r.state = 'ready' AND r.kind IN ('master', 'cut', 'embed') AND c.deleted_at IS NULL")
             .fetch_one(&self.pool).await?;

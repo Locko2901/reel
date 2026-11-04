@@ -18,7 +18,6 @@ pub struct PartView {
     pub rid: String,
     pub title: String,
     pub poster: String,
-    /// The version's video, for the editor's player.
     pub src: String,
     /// The whole version's length.
     pub seconds: f64,
@@ -105,7 +104,6 @@ fn shape_name(shape: MontageShape) -> &'static str {
     }
 }
 
-/// A montage's master recipe, if the clip is a montage.
 async fn recipe_of(
     st: &AppState,
     clip: &reel_store::models::Clip,

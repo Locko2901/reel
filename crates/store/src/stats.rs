@@ -15,7 +15,6 @@ pub struct StatRow {
     pub bytes: i64,
 }
 
-/// A link and how often it was watched.
 #[derive(Debug, Clone, FromRow, PartialEq)]
 pub struct WatchedLink {
     pub id: String,
@@ -29,8 +28,7 @@ pub struct WatchedLink {
 }
 
 impl Store {
-    /// One query for the whole library, whatever its size: the clips in the library and ready,
-    /// grouped by game and month.
+    /// The library's ready clips by game and month, in one query whatever the library's size.
     pub async fn stat_rows(&self) -> Result<Vec<StatRow>> {
         sqlx::query_as::<_, StatRow>(
             "SELECT COALESCE(NULLIF(TRIM(c.game), ''), '') AS game, \

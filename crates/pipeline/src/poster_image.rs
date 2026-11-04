@@ -11,13 +11,11 @@ use std::sync::{LazyLock, Mutex};
 pub const MAX_BYTES: usize = 25 * 1024 * 1024;
 /// The most pixels it may have, so a small file that unpacks huge never gets decoded.
 pub const MAX_PIXELS: u64 = 50_000_000;
-/// The longest side it may have.
 pub const MAX_SIDE: u32 = 16_384;
 /// The kept copy's widest, and a poster's width, as a frame's is (`args::poster`).
 const SOURCE_WIDTH: u32 = 2560;
 const POSTER_WIDTH: u32 = 1280;
 
-/// What the bytes are, by their first bytes alone.
 pub fn sniff(bytes: &[u8]) -> Option<&'static str> {
     match bytes {
         [0xFF, 0xD8, 0xFF, ..] => Some("jpeg"),
@@ -75,8 +73,7 @@ fn le32(b: &[u8], at: usize) -> Option<u32> {
     Some(u32::from_le_bytes(b.get(at..at + 4)?.try_into().ok()?))
 }
 
-/// The signature, then IHDR, which a PNG must start with: its length, its name, the width and
-/// the height.
+/// IHDR follows the 8 byte signature: its length, its name, the width and the height.
 fn png_size(b: &[u8]) -> Option<(u32, u32)> {
     (b.get(12..16)? == b"IHDR").then_some(())?;
     Some((be32(b, 16)?, be32(b, 20)?))

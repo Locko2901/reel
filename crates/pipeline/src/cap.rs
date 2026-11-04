@@ -4,7 +4,7 @@ use crate::Ctx;
 use reel_core::format;
 use reel_store::models::CapRow;
 
-/// What the library cap's run moves to the trash.
+/// What the trash page names as having deleted a clip the cap sent there.
 pub const CAP: &str = "the library cap";
 
 #[derive(Debug, Default, Clone, Copy, PartialEq)]
@@ -164,7 +164,6 @@ pub fn note_words(p: &Plan, trash_days: u64) -> (String, String) {
     )
 }
 
-/// The plan for a cap of `cap` bytes over the library as it is now.
 pub async fn preview(ctx: &Ctx, cap: u64) -> anyhow::Result<Plan> {
     let cfg = ctx.config();
     let keeps = cfg.storage.cap_keeps_unsent && cfg.storage.standalone;

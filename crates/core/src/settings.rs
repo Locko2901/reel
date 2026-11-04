@@ -1,5 +1,4 @@
-//! Every setting reel has, and the config built in layers: the defaults, the `setting` table,
-//! `config.toml`, then the environment, which always wins and shows read only in the UI.
+//! Every setting reel has, and the config built from its layers; the environment always wins.
 use crate::config::{AuthMode, Config, ConfigError, Hwaccel, KeepOriginals};
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -84,8 +83,7 @@ impl Section {
         }
     }
 
-    /// The line under the section's title: a server's, or with `library`, the folder of the
-    /// app's standalone library, that library's where it says something else.
+    /// The line under the section's title; with `library`, the standalone library's own.
     pub fn line_in(&self, library: Option<&std::path::Path>) -> String {
         let Some(library) = library else {
             return self.line().into();
@@ -191,7 +189,6 @@ const fn def(
     }
 }
 
-/// A setting that shows under the switch `parent`, only while it is on.
 const fn under(parent: &'static str, d: Def) -> Def {
     Def {
         depends: Some(parent),
@@ -449,8 +446,6 @@ pub fn help_in(d: &Def, standalone: bool) -> &'static str {
     }
 }
 
-/// Whether the app's standalone library offers a setting: on its Settings page, to a change,
-/// and from a value saved before.
 pub fn in_standalone(key: &str) -> bool {
     find(key).is_some_and(|d| d.section.in_standalone())
         && !key.starts_with("external.")
@@ -681,7 +676,6 @@ pub fn set(cfg: &mut Config, key: &str, raw: &str) -> Result<(), String> {
     Ok(())
 }
 
-/// One key in its string form.
 pub fn get(cfg: &Config, key: &str) -> String {
     let join = |v: &[String]| v.join(", ");
     match key {
@@ -1000,7 +994,6 @@ fn tracing_skip(key: &str, value: &str, why: &str) {
     );
 }
 
-/// The config with every secret blank, for an export.
 pub fn without_secrets(cfg: &Config) -> Config {
     let mut out = cfg.clone();
     for d in DEFS.iter().filter(|d| matches!(d.kind, Kind::Secret)) {
@@ -1009,7 +1002,6 @@ pub fn without_secrets(cfg: &Config) -> Config {
     out
 }
 
-/// The keys whose values are secrets.
 pub fn secret_keys() -> impl Iterator<Item = &'static str> {
     DEFS.iter()
         .filter(|d| matches!(d.kind, Kind::Secret))

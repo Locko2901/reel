@@ -280,7 +280,6 @@ pub async fn links(
         links.push(json!({ "id": clip.id, "title": clip.title, "url": format!("{base}/s/{}", share.token) }));
     }
     if made > 0 {
-        // the new links' previews on the external storage
         st.ctx.external.kick();
         tracing::info!(links = made, by = %me.name, "links made for picked clips");
         reel_pipeline::notify::send_later(

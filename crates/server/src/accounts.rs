@@ -121,7 +121,6 @@ impl Backend {
     }
 }
 
-/// The row for a name, made on first sight.
 pub async fn user_on_sight(
     store: &Store,
     cfg: &Config,
