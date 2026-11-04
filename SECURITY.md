@@ -5,11 +5,11 @@
 Please report it privately, not in a public issue: open the repository's **Security** tab
 and choose **Report a vulnerability**
 ([direct link](https://github.com/Locko2901/reel/security/advisories/new)). GitHub keeps the
-report between you and the maintainer until a fix is out.
+report between you and me until a fix is out.
 
 Say what you found, how to reproduce it, and which version you ran (Settings, Status shows
-the server's; the desktop app shows its own under This app, Startup, About). Reports are
-answered as soon as possible. Once a fix is released, the advisory is published with credit
+the server's; the desktop app shows its own under This app, Startup, About). I answer
+reports as soon as I can. Once a fix is released, the advisory is published with credit
 to you, unless you would rather stay unnamed.
 
 ## What is supported

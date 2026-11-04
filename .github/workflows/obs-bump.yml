@@ -90,9 +90,9 @@ jobs:
               message: `chore(desktop): ${notice} names OBS ${version}`,
               content: Buffer.from(credited).toString('base64'),
             });
-            const checks = process.env.BOT === 'true' ? 'they started by themselves, as the repository\'s bot opened it' : 'close and reopen this pull request to start them; once the repository\'s bot is set up, as CONTRIBUTING.md says, they start by themselves';
+            const checks = process.env.BOT === 'true' ? 'they started by themselves, as the repository\'s bot opened it' : 'close and reopen this pull request to start them; once the repository\'s bot is set up, as MAINTAINING.md says, they start by themselves';
             const byHand = [
-              'What the owner checks by hand on Windows, with reel from that artifact (what no runner has: a GPU, a game, a microphone; `desktop/OBS.md`):',
+              'What to check by hand on Windows, with reel from that artifact (what no runner has: a GPU, a game, a microphone; `desktop/OBS.md`):',
               '- a game in fullscreen: Save clip with its hotkey, the clip of the game with its name, its audio on Game and Discord on its own track',
               '- the screen when no game runs, the desktop audio and the microphone from the setup\'s lists, heard at their volumes',
               '- the microphone\'s noise suppression (RNNoise, Speex, and NVIDIA\'s on an RTX card) and the gate',

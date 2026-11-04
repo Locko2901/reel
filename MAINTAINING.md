@@ -1,7 +1,7 @@
 # Maintaining reel
 
-What only the repository's owner needs, or someone who runs a fork of it: the settings the
-workflows read, how a release goes, and the weekly OBS bump. Contributing is in
+What it takes to run this repository, or a fork of it: the settings the workflows read, how a
+release goes, and the weekly OBS bump. Contributing is in
 [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Secrets and variables
