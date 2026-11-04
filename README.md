@@ -120,7 +120,7 @@ The image is `ghcr.io/locko2901/reel`; `latest` follows the releases.
   [configuration](https://locko2901.github.io/reel/configuration/) (every setting and
   `REEL_` variable)
 - [Troubleshooting](https://locko2901.github.io/reel/troubleshooting/) and the
-  [FAQ](https://locko2901.github.io/reel/faq/)
+  [short answers to common questions](https://locko2901.github.io/reel/faq/)
 
 ## Contributing
 
