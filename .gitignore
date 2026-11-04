@@ -1,15 +1,8 @@
 /target
 /data
-.env
-*.env
-!.env.example
-*.part
 __pycache__/
-node_modules/
 /desktop/target
 /desktop/app/gen
-/desktop/app/target
-/desktop/core/target
 /desktop/ui/assets
 /desktop/app/binaries
 /.ffmpeg-cache
