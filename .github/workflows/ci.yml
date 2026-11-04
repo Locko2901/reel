@@ -39,7 +39,7 @@ jobs:
       - name: The passed runs of this pull request
         id: green
         if: ${{ github.event_name == 'pull_request' }}
-        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           result-encoding: string
           script: |
@@ -313,7 +313,7 @@ jobs:
       # Through the API, so the runner needs no gh. A rerun replaces assets of the same name;
       # the notes get each line about the installers once.
       - name: Upload the installers and OBS's source to the release
-        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || needs.release-please.outputs.tag_name }}
         with:
