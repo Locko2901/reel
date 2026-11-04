@@ -151,7 +151,7 @@ standalone library included, in another:
 |---|---|---|
 | The settings (`settings.json`) | `%APPDATA%\reel` | `~/.config/reel` |
 | The pairing with your server | the Windows Credential Manager | `~/.config/reel/token` |
-| A standalone library: its clips, its database, its copies | `%LOCALAPPDATA%\reel\library` | `~/.local/share/reel/library` |
+| A standalone library: its clips, its database, its copies | `%LOCALAPPDATA%\reel\library`, or the folder you moved it to | `~/.local/share/reel/library`, or the folder you moved it to |
 | The logs | `%LOCALAPPDATA%\reel\logs` | `~/.local/share/reel/logs` |
 | The settings of reel's own OBS | `%LOCALAPPDATA%\reel\obs\config` | `~/.local/share/reel/obs` (OBS from Flathub: `~/.var/app/com.obsproject.Studio/reel`) |
 
@@ -169,17 +169,22 @@ The standalone library is a whole reel inside the app, with its own
 database, so the same rule holds: copy it with the app stopped, or take
 a consistent copy of the database while it runs.
 
+The app does it for you: Settings, This app, **Server**, **Library**,
+**Make a copy** puts a complete copy, every file checked, into a new
+folder on the drive you pick, while reel runs. See
+[A copy of the library](setup/standalone.md#a-copy-of-the-library).
+
+By hand:
+
 1. Quit reel from its tray icon.
-2. Copy the library folder (`%LOCALAPPDATA%\reel\library` on Windows,
-   `~/.local/share/reel/library` on Linux) to your backup drive, and the
-   settings folder with it.
+2. Copy the library folder to your backup drive, and the settings folder
+   with it. This app, **Server**, **Library folder** says where the
+   library is: `%LOCALAPPDATA%\reel\library` on Windows and
+   `~/.local/share/reel/library` on Linux, unless you moved it.
 3. Start reel again.
 
-While the app runs, Settings, **Advanced**, **Export**, **Download**
-beside **The database** gives you a consistent copy of the library's
-database. The rest of the library folder is plain files you can copy as
-they are.
-
-To restore, quit reel, put the folders back, and start it. On a new
-Windows PC the pairing is not in those folders: pair the app again under
-This app, **Server**.
+To use a copy the app made, on this PC or a new one: Settings, This app,
+**Server**, **Library folder**, **Move**, and pick the copy's folder. To
+restore a copy made by hand, quit reel, put the folders back, and start
+it. On a new Windows PC the pairing is not in those folders: pair the
+app again under This app, **Server**.

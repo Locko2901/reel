@@ -407,6 +407,17 @@ meanwhile. [Fast and bulk
 storage](bulk-storage.md#when-the-library-is-not-there) says how to give
 reel a folder that really is new.
 
+## "Is not there: is its drive plugged in?"
+
+In standalone, with the library moved to another drive (Settings, This
+app, **Server**, **Library folder**), reel on this PC waits for that
+drive: it is unplugged, off, or has another letter now. **Save clip**
+still saves, and the clips wait in the clips folder. Plug the drive in:
+within ten seconds reel on this PC starts by itself, and the waiting
+clips go in. If Windows gave the drive another letter, press **Move**
+and pick the library's folder at its new place; reel takes it up as it
+is.
+
 ## The server does not start
 
 The log says why in a sentence. The most common:

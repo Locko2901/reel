@@ -72,7 +72,8 @@ footer below it, never on the video.
 On your own machines, never in a cloud of reel's (there is none). Out of
 the box they stay on your gaming PC, in the app's library:
 `%LOCALAPPDATA%\reel\library` on Windows, `~/.local/share/reel/library`
-on Linux. With a server, they live on the machine that runs it: a folder
+on Linux, or another drive you
+[moved it to](setup/standalone.md#the-library-on-another-drive). With a server, they live on the machine that runs it: a folder
 of video files plus a SQLite database. See
 [Privacy and security](privacy.md) and [Backing up](backup.md).
 
@@ -253,7 +254,8 @@ new version is on the
 On a server, keep the data folder (the database and the library) and the
 originals folder; copy the database with reel stopped, or with a
 consistent copy while it runs. The app keeps its settings and a
-standalone library in two folders of your user. See
+standalone library in two folders of your user, and This app, **Server**,
+**Library**, **Make a copy** copies the whole library while it runs. See
 [Backing up](backup.md).
 
 ### How do I uninstall it?
