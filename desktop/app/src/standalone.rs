@@ -95,6 +95,13 @@ impl Local {
         store
             .set_setting("setup_done", "by the desktop app")
             .await?;
+        let n = reel_pipeline::library::relative_originals(&store, &cfg).await?;
+        if n > 0 {
+            tracing::info!(
+                n,
+                "standalone: kept originals now by a path relative to the library"
+            );
+        }
         let ff = Arc::new(reel_media::Ffmpeg::new(
             &cfg.media.ffmpeg,
             &cfg.media.ffprobe,
@@ -184,6 +191,15 @@ impl Local {
             h.abort();
         }
         tracing::info!("standalone: reel stopped");
+    }
+
+    /// Stops it and closes its database, so its folder can move.
+    pub async fn close(&self) {
+        self.stop();
+        self.ctx.store.close().await;
+        // an ffmpeg ended with its job lets go of its files a moment later on Windows
+        tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+        tracing::info!("standalone: reel's database is closed");
     }
 }
 

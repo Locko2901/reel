@@ -25,6 +25,31 @@ pub async fn standalone_cap(rt: State<'_, Runtime>, gb: u64) -> R<Value> {
     Ok(json!({ "line": rt.cap_line(gb).await }))
 }
 
+/// The library folder: where it is, its size, its drive's room.
+#[tauri::command]
+pub async fn library_get(rt: State<'_, Runtime>) -> R<Value> {
+    Ok(rt.library_info().await)
+}
+
+/// What a picked folder would be for the library: a move into it, or the use of the library in
+/// it; or why not.
+#[tauri::command]
+pub async fn library_plan(rt: State<'_, Runtime>, picked: String) -> R<crate::library::Target> {
+    rt.library_plan(picked.into()).await
+}
+
+/// Moves the library into the picked folder, or uses the library in it; the status follows it.
+#[tauri::command]
+pub fn library_move(rt: State<'_, Runtime>, picked: String) -> R<()> {
+    rt.library_move(picked.into())
+}
+
+/// Stops a move before it switched; it rolls back.
+#[tauri::command]
+pub fn library_stop(rt: State<'_, Runtime>) {
+    rt.library_stop()
+}
+
 /// Saves the settings; a changed server URL is refused when nothing answers there, unless
 /// `force` (the page's "Save anyway").
 #[tauri::command]
@@ -314,7 +339,11 @@ pub fn view_get(app: AppHandle) -> R<String> {
 #[tauri::command]
 pub fn open_folder(app: AppHandle, path: String) -> R<()> {
     let p = std::path::PathBuf::from(&path);
-    if p.is_file() {
+    if p.is_dir() {
+        app.opener()
+            .open_path(p.display().to_string(), None::<&str>)
+            .map_err(|e| e.to_string())
+    } else if p.is_file() {
         app.opener()
             .reveal_item_in_dir(&p)
             .map_err(|e| e.to_string())

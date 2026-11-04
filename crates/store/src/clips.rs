@@ -329,6 +329,24 @@ impl Store {
         .await
     }
 
+    /// The clips with a kept original, and its path as stored.
+    pub async fn originals(&self) -> Result<Vec<(String, String)>> {
+        sqlx::query_as(
+            "SELECT id, original_path FROM clip WHERE original_path IS NOT NULL ORDER BY id",
+        )
+        .fetch_all(&self.pool)
+        .await
+    }
+
+    pub async fn set_original_path(&self, id: &str, path: Option<&str>) -> Result<()> {
+        sqlx::query("UPDATE clip SET original_path = ? WHERE id = ?")
+            .bind(path)
+            .bind(id)
+            .execute(&self.pool)
+            .await?;
+        Ok(())
+    }
+
     /// Who or what sent a clip to the trash, for the trash page.
     pub async fn set_deleted_by(&self, id: &str, by: &str) -> Result<()> {
         sqlx::query("UPDATE clip SET deleted_by = ? WHERE id = ? AND deleted_at IS NOT NULL")

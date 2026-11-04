@@ -120,6 +120,11 @@ impl Store {
     pub fn pool(&self) -> &SqlitePool {
         &self.pool
     }
+
+    /// Closes every connection, so the file can be moved or removed.
+    pub async fn close(&self) {
+        self.pool.close().await
+    }
 }
 
 #[cfg(test)]

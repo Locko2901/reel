@@ -34,3 +34,6 @@ details.advanced[open] > summary { margin-bottom: var(--s2); }
 .obs-bar { position: sticky; top: 48px; z-index: 4; margin-bottom: var(--s3); }
 .route-words span { display: block; color: var(--text-2); }
 .update-notes { white-space: pre-wrap; font-size: var(--fs-s); color: var(--text-2); max-height: 320px; overflow: auto; }
+#library-job .notice .bar { flex-basis: 100%; width: 100%; }
+#library-job .notice .grow { flex: 1 1 320px; overflow-wrap: anywhere; }
+#library-line .mono { overflow-wrap: anywhere; }

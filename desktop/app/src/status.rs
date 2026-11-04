@@ -152,6 +152,7 @@ pub struct Status {
     pub version: String,
     pub config_dir: String,
     pub data_dir: String,
+    pub library: crate::library::LibraryLine,
     pub panel: Panel,
 }
 
@@ -187,7 +188,10 @@ pub fn panel(st: &Status) -> Panel {
             } else {
                 st.local_line.clone()
             };
-            let dot = if line.contains("did not start") || st.local_line.is_empty() {
+            let dot = if line.contains("did not start")
+                || st.local_line.is_empty()
+                || st.library.away.is_some()
+            {
                 "err"
             } else {
                 "active"
@@ -504,6 +508,16 @@ mod tests {
         );
         here.local_line = "reel did not start: the library is not there".into();
         assert_eq!(panel(&here).place_state.unwrap().0, "err");
+        here.local_line = r"D:\reel library is not there: is its drive plugged in?".into();
+        here.library.away = Some(here.local_line.clone());
+        assert_eq!(
+            panel(&here).place_state.unwrap().0,
+            "err",
+            "a library whose drive is away"
+        );
+        here.library.away = None;
+        here.local_line = "the library is moving; reel on this PC waits".into();
+        assert_eq!(panel(&here).place_state.unwrap().0, "active");
         here.local_line = String::new();
         assert_eq!(
             panel(&here).place_state.unwrap(),

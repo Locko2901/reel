@@ -106,6 +106,13 @@ pub struct Inner {
     /// Standalone mode: reel in this process, once it is up.
     pub local: Option<Arc<Local>>,
     pub local_line: String,
+    /// A move, a use or a copy of the library, under way or just ended.
+    pub library_job: Option<crate::library::Job>,
+    pub library_stop: Arc<std::sync::atomic::AtomicBool>,
+    /// The library is moving: reel on this PC does not start until it is in its new place.
+    pub moving: bool,
+    /// The library's folder is elsewhere and not there: why reel on this PC waits.
+    pub library_away: Option<String>,
     /// The server cannot be reached: the app shows its own page instead.
     pub offline: Option<Offline>,
     /// Counts the navigations of the library webview; a watchdog belongs to one of them.
@@ -407,6 +414,10 @@ impl Runtime {
             updated_from: None,
             local: None,
             local_line: String::new(),
+            library_job: None,
+            library_stop: Default::default(),
+            moving: false,
+            library_away: None,
             offline: None,
             nav_nonce: 0,
             page_alive: false,
@@ -452,6 +463,7 @@ impl Runtime {
         rt.spawn_whoami();
         rt.requeue_pending();
         rt.sweep_cache();
+        rt.recover_library();
         if rt.is_standalone() {
             rt.start_local();
         }
@@ -468,6 +480,10 @@ impl Runtime {
         if self.lock().copy.is_some() {
             self.lane.post(reel_desktop_core::lane::Ask::Check);
         }
+    }
+
+    pub(crate) fn lane(&self) -> Arc<reel_desktop_core::lane::Lane> {
+        self.lane.clone()
     }
 
     pub fn lock(&self) -> std::sync::MutexGuard<'_, Inner> {
@@ -561,6 +577,20 @@ impl Runtime {
                     .clone()
                     .unwrap_or_else(|| "enter the server and a pairing code under Server".into()),
             )
+        } else if let Some(j) = g.library_job.as_ref().filter(|j| j.running) {
+            let pct = (j.done * 100).checked_div(j.total).unwrap_or(0);
+            (
+                "working",
+                if j.kind == "copy" {
+                    "copying the library"
+                } else {
+                    "moving the library"
+                }
+                .to_string(),
+                format!("{}, {pct}%", j.phase),
+            )
+        } else if let Some(why) = g.library_away.as_ref().filter(|_| standalone) {
+            ("error", "library away".to_string(), why.clone())
         } else if let Some((_, name, sent, total)) = &g.uploading {
             let pct = if *total > 0 { sent * 100 / total } else { 0 };
             (
@@ -698,7 +728,7 @@ impl Runtime {
             .into(),
             local: g.local.as_ref().map(|l| LocalLine {
                 url: l.url.clone(),
-                library_dir: g.paths.library_dir().display().to_string(),
+                library_dir: g.settings.library_dir(&g.paths).display().to_string(),
                 backend: l.backend.clone(),
                 ffmpeg_version: l.ffmpeg_version.clone(),
                 notes: l.notes.clone(),
@@ -834,8 +864,11 @@ impl Runtime {
             version: reel_desktop_core::version_line(),
             config_dir: g.paths.config_dir.display().to_string(),
             data_dir: g.paths.data_dir.display().to_string(),
+            library: Default::default(),
             panel: Default::default(),
         };
+        drop(g);
+        st.library = self.library_line();
         st.panel = crate::status::panel(&st);
         st
     }
@@ -1010,6 +1043,8 @@ impl Runtime {
         };
         // only what this request changed from its own base, applied over the requests before
         let base = base.unwrap_or_else(|| self.settings());
+        // the library folder changes by a move alone
+        new.standalone.library_dir = base.standalone.library_dir.clone();
         let changes = reel_desktop_core::lane::Changes::between(&base, &new);
         let lane = self.lane.clone();
         tokio::task::block_in_place(|| lane.ask(reel_desktop_core::lane::Ask::Save(changes)))
@@ -2847,7 +2882,7 @@ impl Runtime {
     fn local_settings(&self) -> LocalSettings {
         let g = self.lock();
         LocalSettings {
-            data_dir: g.paths.library_dir(),
+            data_dir: g.settings.library_dir(&g.paths),
             hwaccel: g.settings.standalone.hwaccel.clone(),
             cap_gb: g.settings.standalone.cap_gb,
             cap_keeps_unsent: g.settings.standalone.cap_keeps_unsent,
@@ -2858,6 +2893,21 @@ impl Runtime {
     /// Standalone: reel in this process; the library webview goes to it once it is up.
     pub fn start_local(&self) {
         if self.lock().local.is_some() {
+            return;
+        }
+        if self.lock().moving {
+            self.lock().local_line = "the library is moving; reel on this PC waits".into();
+            self.push_status();
+            return;
+        }
+        if let Some(why) = self.library_away_now() {
+            let waiting = self.lock().library_away.replace(why.clone()).is_some();
+            self.lock().local_line = why.clone();
+            tracing::warn!(why, "standalone: reel on this PC waits for its library");
+            self.push_status();
+            if !waiting {
+                self.wait_for_library();
+            }
             return;
         }
         let s = self.local_settings();
@@ -2873,8 +2923,9 @@ impl Runtime {
                         let mut g = rt.lock();
                         g.local_line = format!("reel on {} with {}", local.addr, local.backend);
                         local.hold(g.paused_fullscreen);
-                        g.local = Some(local);
+                        g.local = Some(local.clone());
                     }
+                    rt.watch_library(local);
                     let _ = url;
                     if rt.is_standalone() {
                         if std::mem::take(&mut rt.lock().library_wanted) {
@@ -2954,8 +3005,14 @@ impl Runtime {
     /// is published there.
     fn ingest_locally(&self, path: &Path) {
         let Some(local) = self.local() else {
-            self.lock().last_error =
-                Some("standalone: reel is not running yet; the clip waits in the folder".into());
+            let mut g = self.lock();
+            if g.moving || g.library_away.is_some() {
+                tracing::info!(path = %path.display(), "standalone: the clip waits in the clips folder until reel on this PC is back");
+            } else {
+                g.last_error = Some(
+                    "standalone: reel is not running yet; the clip waits in the folder".into(),
+                );
+            }
             return;
         };
         let (title, recorded, game, keep_last, names) = {

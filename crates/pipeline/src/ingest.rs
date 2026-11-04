@@ -377,7 +377,7 @@ async fn place_original(
         move_or_copy(input, &target)
             .await
             .context("keep original")?;
-        Ok(Some(target.to_string_lossy().into_owned()))
+        Ok(Some(ctx.config().stored(&target)))
     } else {
         tokio::fs::remove_file(input)
             .await

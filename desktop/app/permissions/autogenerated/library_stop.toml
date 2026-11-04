@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-library-stop"
+description = "Enables the library_stop command without any pre-configured scope."
+commands.allow = ["library_stop"]
+
+[[permission]]
+identifier = "deny-library-stop"
+description = "Denies the library_stop command without any pre-configured scope."
+commands.deny = ["library_stop"]
