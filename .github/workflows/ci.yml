@@ -32,7 +32,7 @@ jobs:
     outputs:
       heavy: ${{ steps.what.outputs.heavy }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
@@ -67,7 +67,7 @@ jobs:
     if: ${{ !cancelled() && github.event_name != 'workflow_dispatch' && needs.changes.outputs.heavy != 'false' }}
     runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/free-disk
 
       # make check runs in a container: the runner needs Docker and nothing else.
@@ -79,7 +79,7 @@ jobs:
     if: ${{ github.event_name != 'workflow_dispatch' }}
     runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: No dashes, special spaces, typographic quotes or pictographs
         run: sh ci/check-text.sh
 
@@ -89,7 +89,7 @@ jobs:
     if: ${{ !cancelled() && github.event_name != 'workflow_dispatch' && needs.changes.outputs.heavy != 'false' }}
     runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Every crate under a licence deny.toml allows
         run: make licences
 
@@ -98,7 +98,7 @@ jobs:
     if: ${{ github.event_name != 'workflow_dispatch' }}
     runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
 
@@ -116,17 +116,17 @@ jobs:
       contents: read
       packages: write
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: docker/setup-buildx-action@v4
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
 
-      - uses: docker/login-action@v4
+      - uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - uses: docker/metadata-action@v6
+      - uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
         id: meta
         with:
           images: ghcr.io/locko2901/reel
@@ -141,7 +141,7 @@ jobs:
         id: commit
         run: echo "date=$(git log -1 --format=%cs)" >> "$GITHUB_OUTPUT"
 
-      - uses: docker/build-push-action@v7
+      - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: .
           platforms: linux/amd64
@@ -186,12 +186,12 @@ jobs:
       # The lock files' push below is the release pull request's last commit: pushed by the
       # bot, it starts the checks of a head that builds. release-please keeps GITHUB_TOKEN, so
       # its own commit, which does not build without them, starts nothing.
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           token: ${{ steps.bot.outputs.token || github.token }}
 
       - id: release
-        uses: googleapis/release-please-action@v5
+        uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
         with:
           config-file: .release-please-config.json
           manifest-file: .release-please-manifest.json
@@ -232,9 +232,9 @@ jobs:
       contents: read
       packages: write
     steps:
-      - uses: docker/setup-buildx-action@v4
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
 
-      - uses: docker/login-action@v4
+      - uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -266,7 +266,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event_name == 'workflow_dispatch' && (inputs.commit || inputs.tag) || github.sha }}
       - uses: ./.github/actions/free-disk

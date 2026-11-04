@@ -36,7 +36,7 @@ jobs:
       windows: ${{ steps.what.outputs.windows }}
       plain: ${{ steps.what.outputs.plain }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
@@ -74,7 +74,7 @@ jobs:
     if: ${{ !cancelled() && needs.changes.outputs.heavy != 'false' && !startsWith(github.head_ref, 'release-please--') }}
     runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/free-disk
       - name: Lint and tests
         run: make desktop-check
@@ -90,7 +90,7 @@ jobs:
     if: ${{ !cancelled() && needs.check.result == 'success' }}
     runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/free-disk
       - name: The app and the pinned OBS under Xvfb
         run: make desktop-obs-e2e
@@ -102,7 +102,7 @@ jobs:
     if: ${{ !cancelled() && needs.changes.outputs.windows != 'false' && contains(fromJSON('["success", "skipped"]'), needs.check.result) && !startsWith(github.head_ref, 'release-please--') }}
     runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/free-disk
       # The installer with OBS, its OBS checked against the pinned SHA-256 and the official zip;
       # the one without too when its own files changed or with the label.
@@ -118,7 +118,7 @@ jobs:
         run: |
           make desktop-previous DESKTOP_PREVIOUS="$PWD/desktop-previous"
           make desktop-obs-start-check DESKTOP_OUT="$PWD/desktop-out" DESKTOP_PREVIOUS="$PWD/desktop-previous"
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: reel-desktop-windows
           path: desktop-out/*
@@ -132,13 +132,13 @@ jobs:
     if: ${{ !cancelled() && needs.check.result == 'success' }}
     runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/free-disk
       - name: Build the AppImage and the .deb
         run: make desktop-appimage DESKTOP_OUT="$PWD/desktop-out"
       - name: What each holds, and the app under Xvfb
         run: make desktop-appimage-check DESKTOP_OUT="$PWD/desktop-out"
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: reel-desktop-linux
           path: desktop-out/*
