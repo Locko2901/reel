@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
-# The OBS pinned in desktop/obs/pinned.json, checked against its SHA-256: the Windows zip unpacked
-# (obs64.exe as reel-capture.exe), its sources, its Ubuntu package, or the cached zip's path.
+# Usage: fetch-obs.sh windows|sources|linux|zip <folder>; zip prints the cached zip's path.
 set -euo pipefail
 WHAT="${1:?windows, sources, linux or zip}"
 INTO="${2:?a folder}"

@@ -1,6 +1,5 @@
 #!/bin/sh
-# The obs-websocket requests reel's code sends, one a line, read from the code: the literal
-# each request or obs_request call names, and the microphone filters' requests.
+# The obs-websocket requests reel's code sends, one a line.
 # With --check: fails when a call names its request another way, which this would not read.
 set -eu
 D=$(cd "$(dirname "$0")/.." && pwd)

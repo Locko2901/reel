@@ -1,10 +1,9 @@
 #!/bin/sh
-# The AppImage and the .deb from one release build, run in desktop/app, into /out. The bundler's
-# AppImage tools are cached first, checked against these SHA-256, so it downloads nothing.
 set -eu
 VERSION="${DESKTOP_VERSION:-$(sed -n 's/^  "version": "\(.*\)",/\1/p' tauri.conf.json)}"
 TOOLS="${XDG_CACHE_HOME:-$HOME/.cache}/tauri"
 mkdir -p "$TOOLS"
+# The bundler's AppImage tools, cached and checked first so it downloads nothing.
 tool() { # tool <name in the cache> <url> <sha256>
   if [ -f "$TOOLS/$1" ] && echo "$3  $TOOLS/$1" | sha256sum -c - >/dev/null 2>&1; then
     return 0

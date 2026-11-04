@@ -1,6 +1,4 @@
 #!/bin/sh
-# Before an installer touches the install folder, the stop helper ends the running app, then its
-# OBS, and waits until OBS's library can be written; the uninstaller does the same.
 set -eu
 S=/work/desktop/.wine-standins
 W=$(mktemp -d)

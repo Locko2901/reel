@@ -5,7 +5,6 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
-  # Redoes the installer job by hand: builds at a commit and uploads to an existing release.
   workflow_dispatch:
     inputs:
       tag:
@@ -22,7 +21,6 @@ permissions:
   contents: read
 
 jobs:
-  # On a pull request, documentation alone since the newest passed run skips make check.
   changes:
     name: Check · what changed
     runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}
@@ -70,7 +68,6 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/free-disk
 
-      # make check runs in a container: the runner needs Docker and nothing else.
       - name: Lint and tests
         run: make check
 
@@ -105,8 +102,6 @@ jobs:
       - name: gitleaks
         run: docker run --rm -v "$PWD:/repo" ghcr.io/gitleaks/gitleaks:latest git --redact -v /repo
 
-  # Every commit on main is built once, as :dev and :sha-<short>; a release retags the
-  # image of the push that created it (github.sha), nothing is rebuilt.
   docker-publish:
     name: Docker publish (GHCR - dev)
     if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
@@ -183,9 +178,7 @@ jobs:
           permission-contents: write
           permission-pull-requests: write
 
-      # The lock files' push below is the release pull request's last commit: pushed by the
-      # bot, it starts the checks of a head that builds. release-please keeps GITHUB_TOKEN, so
-      # its own commit, which does not build without them, starts nothing.
+      # The lock files' push below needs the bot's token: a push with GITHUB_TOKEN starts no checks.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           token: ${{ steps.bot.outputs.token || github.token }}
@@ -197,7 +190,6 @@ jobs:
           manifest-file: .release-please-manifest.json
 
       # A version bump without the lock files fails the --locked build of the merge commit.
-      # The update runs in the check container, so the runner needs no toolchain.
       - name: Update the lock files on the release PR
         if: ${{ steps.release.outputs.prs_created == 'true' }}
         env:
@@ -256,8 +248,6 @@ jobs:
             --tag "${REF}:latest" \
             "${REF}:sha-${SHA:0:7}"
 
-  # Built from the same push as the image, or by hand at the commit given (or the tag's own)
-  # for that tag's release. The runner needs Docker, make and git, nothing else.
   desktop-release:
     name: Desktop · installers on the release
     needs: [release-please]
@@ -271,30 +261,24 @@ jobs:
           ref: ${{ github.event_name == 'workflow_dispatch' && (inputs.commit || inputs.tag) || github.sha }}
       - uses: ./.github/actions/free-disk
 
-      # Both installers, with OBS and without (desktop/packages.json names them), each signed
-      # for the app's updater; the release that ships OBS carries OBS's upstream source archive
-      # too.
       - name: Cross build both installers
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: make desktop-windows DESKTOP_OUT="$PWD/desktop-out"
 
-      # The Windows and Linux builds do not fit on the runner's disk side by side: the build
-      # volume is wiped (a cap of 0), and the log says what the disk holds.
+      # A cap of 0 wipes the build volume: both builds do not fit on the runner's disk.
       - name: Room on the disk for the Linux build
         run: |
           ci/cap-volume.sh reel-desktop-target 0 reel-desktop:local
           df -h / && docker system df
 
-      # Signed the same way: the AppImage the paired servers offer as an update, and the .deb.
       - name: Build the AppImage and the .deb
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: make desktop-appimage DESKTOP_OUT="$PWD/desktop-out"
 
-      # The checks build only small helpers, so the build volume is wiped again.
       - name: Room on the disk for the checks
         run: |
           ci/cap-volume.sh reel-desktop-target 0 reel-desktop:local
@@ -310,8 +294,6 @@ jobs:
           make desktop-appimage-check DESKTOP_OUT="$PWD/desktop-out"
           make desktop-obs-sources DESKTOP_OUT="$PWD/desktop-out"
 
-      # Through the API, so the runner needs no gh. A rerun replaces assets of the same name;
-      # the notes get each line about the installers once.
       - name: Upload the installers and OBS's source to the release
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:

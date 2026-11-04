@@ -1,5 +1,4 @@
 #!/bin/sh
-# Every crate of both workspaces under a licence deny.toml allows; runs in the check container.
 set -eu
 V=0.20.2
 SUM=9f12ed4c49936e09b48bf862b595cde2fe64fcbd9d74dfacac6131ca824c8d5f

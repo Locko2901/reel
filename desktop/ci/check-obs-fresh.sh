@@ -1,6 +1,4 @@
 #!/bin/sh
-# An update that brings another OBS leaves none of the old OBS's files in obs\, its obs64.exe
-# among them, and keeps obs\config. Two small installers from the real hook files, under Wine.
 set -eu
 W=$(mktemp -d)
 export HOME="$W/home" WINEPREFIX="$W/wine" WINEDEBUG=-all WINEDLLOVERRIDES="mscoree,mshtml="

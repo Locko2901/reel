@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# A virtual display with a tray host, a D-Bus session and a null audio sink: run <command...>
-# runs a command under it, shot <file.png> takes a screenshot from another shell.
 set -euo pipefail
 export DISPLAY="${DISPLAY:-:99}"
 export HOME="${HOME:-/tmp/home}"

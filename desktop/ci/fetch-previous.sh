@@ -1,7 +1,5 @@
 #!/bin/sh
-# The installer with OBS of the newest older release, for check-obs-start.sh's update, checked
-# against its .sha256 asset, as with-obs_<version>_x64-setup.exe; nothing when no older release
-# has one.
+# The newest older release's installer with OBS, for check-obs-start.sh's update.
 set -eu
 INTO="$1" VERSION="${2:-}"
 [ -n "$VERSION" ] || VERSION=$(sed -n 's/^ *"version": *"\([^"]*\)".*/\1/p' /work/desktop/app/tauri.conf.json | head -1)

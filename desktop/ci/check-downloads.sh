@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-# A download in the window says so in the page as it starts, once saved, and when it fails.
 # Under xvfb.sh against a demo; REEL_SHOTS_OUT for screenshots.
 set -euo pipefail
 APP="${1:-/target/debug/reel-desktop}"

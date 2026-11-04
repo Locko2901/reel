@@ -1,5 +1,4 @@
 #!/bin/sh
-# changes.sh on small git histories: what runs for which push.
 set -eu
 HERE=$(cd "$(dirname "$0")" && pwd)
 R=$(mktemp -d)

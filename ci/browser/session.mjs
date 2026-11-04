@@ -1,10 +1,9 @@
-// Signs in once as the demo's admin and hands each browser context the session cookie, kept in
-// a file outside the repository so a second run does not spend the sign-in limit.
 import { readFileSync, writeFileSync } from 'node:fs';
 
 const user = process.env.REEL_DEMO_USER || 'sam';
 // scripts/demo.sh sets the admin's password to "reel demo <port>" unless told otherwise.
 const passwordFor = (base) => process.env.REEL_DEMO_PASSWORD || `reel demo ${new URL(base).port || '8746'}`;
+// The session cookie is kept so a second run does not spend the sign-in limit.
 const cache = process.env.REEL_DEMO_SESSION_FILE || '/tmp/reel-demo-session.json';
 
 async function works(base, cookie) {

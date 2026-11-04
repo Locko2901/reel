@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Wipes a cargo target volume over a cap before a build adds to it: a full disk takes down
-# every job on the runner. Usage: ci/cap-volume.sh <volume> <cap in MB> <image with du and rm>
+# Wipes a cargo target volume over a cap: a full disk takes down every job on the runner.
+# Usage: ci/cap-volume.sh <volume> <cap in MB> <image with du and rm>
 set -euo pipefail
 VOLUME="${1:?volume name}"
 CAP_MB="${2:?cap in MB}"

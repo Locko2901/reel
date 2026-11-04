@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-# Save and share's path on the server timed against the demo, idle and busy, over loopback.
 #   ci/share-speed.sh [the demo, http://127.0.0.1:8746] [MinIO's port, 9103]
 set -euo pipefail
 DEMO="${1:-http://127.0.0.1:8746}"
@@ -69,7 +68,7 @@ TOKEN=$(curl -fsS -X POST -H 'content-type: application/json' -d "{\"code\":\"$c
 dev() { curl -sS -H "authorization: Bearer $TOKEN" -H 'content-type: application/json' -X "$1" "$DEMO$2" ${3:+-d "$3"}; }
 idle() { web GET /api/jobs | python3 -c 'import json,sys
 sys.exit(1 if any(j["state"] in ("queued", "running") for j in json.load(sys.stdin)["jobs"]) else 0)'; }
-stop_web() { # the busy run's web copy, once the link is out
+stop_web() {
   web GET /api/jobs | python3 -c 'import json,sys
 for j in json.load(sys.stdin)["jobs"]:
     if j["kind"] == "web" and j["state"] in ("queued", "running"): print(j["id"])' | while read -r j; do
@@ -78,7 +77,6 @@ for j in json.load(sys.stdin)["jobs"]:
 }
 wait_idle() { for _ in $(seq 1 600); do idle && return 0; sleep 1; done; fail "the demo's jobs did not end"; }
 
-# the busy run's long job: a web copy of the master, for a link pinned to it
 busy() {
   local master share
   master=$(web GET "/api/clips/$1" | python3 -c 'import json,sys

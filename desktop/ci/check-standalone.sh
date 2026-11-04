@@ -1,6 +1,5 @@
 #!/bin/sh
-# Standalone in the real Linux app: a new install, an app set up standalone with no server, and
-# a paired settings file without a mode. Under xvfb.sh with XVFB_SCREEN=1280x900.
+# Under xvfb.sh with XVFB_SCREEN=1280x900.
 set -eu
 APP="${1:-/target/debug/reel-desktop}"
 SHOTS="${REEL_SHOTS_OUT:-}"
@@ -187,7 +186,6 @@ xdotool key Escape 2>/dev/null || true
 stop
 ok "the tray's menu drawn (shot)"
 
-# A settings file without a mode, paired to a server, stays connected.
 D="$W/old"
 L="$D/data/logs"
 mkdir -p "$D/config"

@@ -1,7 +1,5 @@
 #!/bin/sh
-# Every page of an installer and its uninstaller under Wine, as PNGs, at Windows' dots per inch
-# (96 is 100 %). Selawik (OFL, beside this script) stands in for Segoe UI. NAME is the
-# installer's file before its version, as desktop/packages.json names it.
+# Usage: installer-shots.sh <installer> <out folder> <its file before the version> [dpi, 96 is 100 %]
 set -eu
 EXE="$1" OUT="$2" NAME="$3" DPI="${4:-96}"
 . /work/desktop/ci/packages.sh
@@ -35,7 +33,7 @@ window() { # window <title> [not this id]: the id of the visible window of that 
 }
 # Waits on the installer's process, not its X window: X hands a closed window's id to the next
 # program. This script's own shells name the installer too, and are left out.
-ended() { # ended: the installer's process gone, waited for
+ended() {
   for _ in $(seq 1 300); do
     pgrep -af "$(basename "$EXE")" 2>/dev/null | grep -vq '^[0-9]* sh ' || return 0
     sleep 1
@@ -54,7 +52,6 @@ key() {
   for k in $(echo "$2" | tr '+' ' '); do xdotool keydown "$k"; done
   for k in $(echo "$2" | tr '+' ' ' | awk '{for (i = NF; i > 0; i--) printf "%s ", $i}'); do xdotool keyup "$k"; done
 }
-# The window answers while the installer waits: minimized and restored, it paints itself again.
 answers() { # answers <id> <shot before>
   xdotool windowminimize "$1"
   sleep 1
@@ -68,8 +65,7 @@ answers() { # answers <id> <shot before>
 running() { pgrep -fi "$1" >/dev/null 2>&1; }
 local_app() { find "$WINEPREFIX/drive_c/users" -maxdepth 4 -type d -path '*AppData/Local/reel' | head -1; }
 installed() { for _ in $(seq 1 600); do d=$(local_app); [ -n "$d" ] && [ -f "$d/reel-elevate.exe" ] && return 0; sleep 1; done; return 1; }
-# A stand-in reel that keeps its OBS running and never quits when asked; for the update of the
-# package without OBS, with no OBS of its own in obs\
+# A stand-in reel that never quits when asked; without-obs: no OBS of its own in obs\
 standin() {
   d=$(local_app)
   cp "$S/standin_app.exe" "$d/reel-desktop.exe"
@@ -121,7 +117,6 @@ standin
 run over
 ok "the install over a running reel: Closing reel, then the install and the end"
 
-# an update as the app runs it: the small window over a reel that does not quit, then reel again
 if [ "$TITLE" = "$PLAIN_NAME" ]; then standin without-obs; else standin; fi
 d=$(local_app)
 rm -f "$d/reel-elevate.exe" "$d/logs/installer.log"

@@ -1,12 +1,11 @@
 #!/usr/bin/env bash
-# The Select bar's Download in the window: every clip's zip through the app's download hook, whole
-# in the Downloads folder. The buttons are clicked where Chromium draws them at 1280 by 820.
 set -euo pipefail
 APP="${1:-/target/debug/reel-desktop}"
 SERVER="${REEL_E2E_SERVER:-http://127.0.0.1:8746}"
 USER_NAME="${REEL_E2E_USER:-sam}"
 PASSWORD="${REEL_E2E_PASSWORD:?the password of the demo admin}"
 SHOTS="${REEL_SHOTS_OUT:-}"
+# Where Chromium draws the buttons at 1280 by 820.
 BAR_DOWNLOAD="${REEL_ZIP_BAR:-637 779}"
 DIALOG_DOWNLOAD="${REEL_ZIP_GO:-874 523}"
 W=$(mktemp -d)

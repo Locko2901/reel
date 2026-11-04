@@ -1,6 +1,4 @@
 #!/bin/sh
-# Every request reel's code sends is one the OBS listening on <port> has: its GetVersion's
-# availableRequests against the list obs-requests.sh reads from the code.
 # Usage: check-obs-requests.sh <port> <password>
 set -eu
 HERE=$(cd "$(dirname "$0")" && pwd)

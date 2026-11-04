@@ -1,6 +1,4 @@
 #!/bin/sh
-# The uninstaller's clips folder under Wine, reel-stop.exe on real folders, links and junctions:
-# the page's answer for each, and a removal that never touches a folder the answer keeps.
 set -eu
 H=/work/desktop/app/nsis/reel-stop.exe
 W=$(mktemp -d)

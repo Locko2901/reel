@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
-# The end to end run of the Linux build under xvfb.sh against a reel demo: uploads, hotkeys,
-# Save and share with a fake OBS, This app's pages, standalone and the server out of reach.
+# Under xvfb.sh against a demo.
 set -euo pipefail
 SERVER="${REEL_E2E_SERVER:-http://127.0.0.1:8746}"
 USER_NAME="${REEL_E2E_USER:-sam}"

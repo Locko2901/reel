@@ -1,6 +1,4 @@
 #!/bin/sh
-# The package with OBS starts its OBS under Wine: fresh, with Capture games as administrator,
-# and as an app of the previous release updates to it.
 # The stand-in icuuc.dll goes in system32, where an update leaves it (see check-obs-window.sh).
 set -eu
 IN="$1" VERSION="${2:-}" PREVIOUS="${3:-}"

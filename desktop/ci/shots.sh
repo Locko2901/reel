@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-# Screenshots of the desktop window at 1280x800 and 720x850 against a demo, offline page too.
 #   XVFB_SCREEN=1280x900 desktop/ci/xvfb.sh run desktop/ci/shots.sh
 set -euo pipefail
 SERVER="${REEL_E2E_SERVER:-http://127.0.0.1:8746}"

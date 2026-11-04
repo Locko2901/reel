@@ -1,5 +1,4 @@
-/* For check-obs-window.sh only: a stand-in for the icuuc.dll of Windows 10 and later, which
-   OBS's Qt6Core imports for text codecs and Wine does not have. No converter is ever made. */
+/* Windows' icuuc.dll, which OBS's Qt6Core imports and Wine lacks; no converter is ever made. */
 typedef int UErrorCode;
 #define X __declspec(dllexport)
 X void *ucnv_open(const char *n, UErrorCode *e) { if (e) *e = 4; return 0; }

@@ -1,6 +1,5 @@
 #!/bin/sh
-# The tray's Quit with a stand-in OBS slow to close: the window and tray item go at once, OBS
-# behind them; a start during the quit is not lost. $1 may be an extracted AppImage's AppRun.
+# $1 may be an extracted AppImage's AppRun.
 set -eu
 APP="${1:-/target/debug/reel-desktop}"
 W=$(mktemp -d)
@@ -29,7 +28,7 @@ up() { # up <n>: the app's nth start up, its tray registered, its window on the 
   [ "$(grep -c '^item ' "$W/sni.txt")" -ge "$1" ] || fail "the app's tray did not register with the StatusNotifier host"
   sleep 2
 }
-status() { # the tray item's Status, as the host reads it
+status() {
   item=$(grep '^item ' "$W/sni.txt" | tail -1)
   dbus-send --session --print-reply --dest="$(echo "$item" | cut -d' ' -f2)" "$(echo "$item" | cut -d' ' -f3)" \
     org.freedesktop.DBus.Properties.Get string:org.kde.StatusNotifierItem string:Status 2>/dev/null \

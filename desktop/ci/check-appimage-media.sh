@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-# The AppImage's video and sound on an Arch without GStreamer, then with its audio sink broken.
 #   check-appimage-media.sh <the AppImage> <server> <user> <password> <folder for the screenshots>
 set -u
 IMG="$1" SERVER="$2" USER_NAME="$3" PASSWORD="$4" SHOTS="$5"

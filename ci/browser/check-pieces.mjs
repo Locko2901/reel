@@ -1,5 +1,3 @@
-// Uploads in pieces through a proxy refusing requests over 100 MB: a reload half way, a failed
-// piece, the phone's share target and a drop on the library (run by ci/pieces-proof.sh).
 // Usage: node ci/browser/check-pieces.mjs <proxy URL> <500 MB clip> <clip over 100 MB> <small clip> [--log sizes.log] [--shots dir]
 import { launch } from './browsers.mjs';
 import { signInContext } from './session.mjs';
@@ -22,7 +20,6 @@ await signInContext(ctx, base);
 const page = await ctx.newPage();
 page.on('pageerror', (e) => check(false, `page error: ${e.message}`));
 
-// The upload page: 500 MB in pieces, a reload half way, a failed piece.
 await page.goto(`${base}/upload`);
 await page.setInputFiles('#file', big);
 await page.waitForFunction(() => /(\d+)%/.test(document.querySelector('#uploads .mono')?.textContent || '') && +/(\d+)%/.exec(document.querySelector('#uploads .mono').textContent)[1] >= 40, null, LONG);
@@ -42,7 +39,6 @@ check(/uploaded, now encoding|already in the library/.test(line) && aborted >= 2
 if (shots) await page.screenshot({ path: join(shots, 'upload-done.png') });
 await page.unroute(/\/api\/uploads\/[^/?]+\?offset=/);
 
-// The share target: the service worker hands the shared file to the page, which sends it in pieces.
 await page.goto(`${base}/`);
 await page.evaluate(async () => { await navigator.serviceWorker.ready; });
 if (!(await page.evaluate(() => !!navigator.serviceWorker.controller))) await page.reload();
@@ -58,7 +54,6 @@ await Promise.all([page.waitForURL(/\/share-target$|\/clips\//, LONG), page.eval
 await page.waitForURL(/\/clips\/[0-9A-Z]+/, LONG);
 check(true, `a clip of ${Math.round(readFileSync(shared).length / 1e6)} MB shared to reel goes up from the service worker's handed file, and its page opens (${new URL(page.url()).pathname})`);
 
-// Dropped on the library.
 await page.goto(`${base}/`);
 const bytes = readFileSync(small).toString('base64');
 const dt = await page.evaluateHandle((b64) => {

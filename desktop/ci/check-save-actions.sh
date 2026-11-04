@@ -1,6 +1,5 @@
 #!/bin/sh
-# Save clip and Save and share from every way in (tray, header, X11 hotkey, command line) with
-# stand-in OBS, notifications and tray host. $1 may be an extracted AppImage's AppRun.
+# $1 may be an extracted AppImage's AppRun.
 set -eu
 APP="${1:-/target/debug/reel-desktop}"
 W=$(mktemp -d)
@@ -30,8 +29,7 @@ saved() { # saved <before> <what>: one more save reached OBS
   fail "$2 did not reach OBS"
 }
 
-# The save's sound comes as OBS takes the save, not once the replay is written (3 s here, the
-# stand-in's write-ms); a press while one runs saves another clip with its own sound.
+# The stand-in writes the replay in 3 s: the save's sound must come before it.
 echo 3000 > "$W/rec/write-ms"
 cues() { grep -c "cue captured played" "$L"/reel-desktop.log* | tail -1; }
 written() { grep -c "obs saved a replay" "$L"/reel-desktop.log* | tail -1; }

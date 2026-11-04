@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
-# The buttons of a clip's notification under a stand-in notification server, the app's
-# reel-desktop:// links, then standalone with Open alone. Under xvfb.sh against a demo.
+# Under xvfb.sh against a demo.
 set -euo pipefail
 APP="${1:-/target/debug/reel-desktop}"
 SERVER="${REEL_E2E_SERVER:-http://127.0.0.1:8746}"
@@ -42,7 +41,7 @@ start() { # start <args...>: the app, its own log folder
   "$APP" "$@" > "$W/app$(date +%s%N).out" 2>&1 &
   APP_PID=$!
 }
-stop() { # as the tray's Quit, then gone
+stop() {
   kill "$APP_PID" 2>/dev/null || true
   for _ in $(seq 1 40); do kill -0 "$APP_PID" 2>/dev/null || break; sleep 0.25; done
   APP_PID=""

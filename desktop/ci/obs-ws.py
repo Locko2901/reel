@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# Sends obs-websocket requests to the OBS on this machine; fails on the first refused request.
 # Usage: python3 desktop/ci/obs-ws.py <port> <password> <RequestType> '<json data>' [...]
 import base64
 import hashlib

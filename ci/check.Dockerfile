@@ -1,4 +1,4 @@
-# The container `make check` runs in; the font is for the synthetic clips' drawtext.
+# The font is for the synthetic clips' drawtext.
 FROM rust:1-bookworm
 RUN apt-get update \
     && apt-get install -y --no-install-recommends ffmpeg fonts-dejavu-core make \

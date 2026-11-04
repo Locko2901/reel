@@ -1,5 +1,4 @@
 #!/bin/sh
-# Fails on dashes, special spaces, typographic quotes and pictographs in tracked text files.
 set -eu
 cd "$(dirname "$0")/.."
 export LC_ALL=C.UTF-8

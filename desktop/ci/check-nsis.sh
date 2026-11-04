@@ -1,5 +1,4 @@
 #!/bin/sh
-# The real NSIS installers under Wine, silently as the updater and a switch run them.
 #   check-nsis.sh <folder with the installers> [version, the app's own when empty]
 set -eu
 IN="$1" VERSION="${2:-}"
@@ -49,14 +48,13 @@ uninstall() { # the uninstaller, silently, in place, waited for to its end
   wineserver -w
 }
 SCHEME='HKCU\Software\Classes\reel-desktop'
-scheme() { # the app's links go to this install's reel-desktop.exe
+scheme() {
   wine reg query "$SCHEME" /v "URL Protocol" >/dev/null 2>&1 || return 1
   cmd=$(wine reg query "$SCHEME\\shell\\open\\command" /ve 2>/dev/null | tr -d '\r' | sed -n 's/.*REG_SZ *//p')
   [ "$cmd" = "\"$WI\\reel-desktop.exe\" \"%1\"" ]
 }
 app_files() { for f in reel-desktop.exe ffmpeg.exe ffprobe.exe binaries/ffmpeg-LICENSE.txt reel-elevate.exe uninstall.exe; do [ -f "$I/$f" ] || return 1; done; }
-# update <installer> <title> <what> <flags...>: as an app runs its update, over the running
-# stand-in: the small window of that title shown, reel started again, the flags in the log
+# update <installer> <window title> <what> <flags...>
 update() {
   exe=$1 title=$2 what=$3
   shift 3
@@ -83,8 +81,7 @@ key "$UNINST\\reel" && app_files && [ -f "$MENU" ] && [ ! -e "$I/obs" ] && [ "$(
 scheme || fail "$P did not register its links: $(wine reg query "$SCHEME" /s 2>/dev/null | tr -d '\r' | head -8)"
 ok "$P: the app, ffmpeg and ffprobe with ffmpeg's licence, reel-elevate.exe, the uninstaller, the Start menu's shortcut reel, one reel in Apps, its links (reel-desktop://) to its reel-desktop.exe; no OBS; reel not started"
 
-# Wine's HKCR leaves out the user's own classes, so ShellExecute finds no handler: the check
-# runs the registered command as Windows does, %1 the link.
+# Wine's HKCR leaves out the user's own classes: the registered command is run as Windows would.
 WD="$W/app-dir"
 mkdir -p "$WD/config"
 printf '{"server_url":"http://127.0.0.1:9","obs":{"enabled":false},"startup":{"autostart":false},"log_level":"info"}' > "$WD/config/settings.json"
@@ -108,8 +105,6 @@ wineserver -k 2>/dev/null || true
 sleep 1
 unset REEL_DESKTOP_DIR
 
-# an app of 1.10 without OBS updating, with the flags it passes: the window of the package
-# without OBS, reel started again
 cp "$S/standin_app.exe" "$I/reel-desktop.exe"
 (cd "$I" && wine "$I/reel-desktop.exe" >/dev/null 2>&1 &)
 for _ in $(seq 1 60); do running 'reel-desktop.exe' && break; sleep 0.5; done
@@ -160,7 +155,6 @@ grep -q 'stays as it is' "$I/logs/installer.log" || fail "logs\\installer.log do
 scheme || fail "the update did not register the links"
 ok "an update over a running reel without links (as 1.6.0 and before), run as the updater runs it (/S /UPDATE), with the OBS obs\\reel-obs.txt names: the app and its OBS ended first, the app replaced, OBS's files left as they are, the mark gone, the links registered"
 
-# the same update over an OBS of another version, as reel-obs.txt says: obs\ fresh
 printf 'OBS Studio 32.0.0 0000' > "$I/obs/reel-obs.txt"
 cp "$S/standin_app.exe" "$I/reel-desktop.exe"
 start_reel
@@ -172,15 +166,12 @@ sleep 2
 grep -q '^OBS Studio' "$I/obs/reel-obs.txt" && ! grep -q '32.0.0' "$I/obs/reel-obs.txt" || fail "obs\\reel-obs.txt was not written again"
 ok "the same update over another OBS: both replaced, the older OBS's plugin gone, obs\\config kept, reel-obs.txt naming the new OBS"
 
-# an app of 1.9 updating, with the flags Tauri's updater passed in quiet mode: the small
-# window all the same, and reel started again with its arguments
 cp "$S/standin_app.exe" "$I/reel-desktop.exe"
 cp "$S/standin_obs.exe" "$I/obs/bin/64bit/reel-capture.exe"
 start_reel
 update "$WITH" "$F" "an update as an app of 1.9 runs it" /S /UPDATE /R /ARGS --hidden
 ok "an update as an app of 1.9 with OBS runs it (/S /UPDATE /R /ARGS --hidden): its small window \"$F\" shown, reel started again with --hidden, every step in logs\\installer.log"
 
-# an app of 1.10 with OBS, with the flags it passes
 cp "$S/standin_app.exe" "$I/reel-desktop.exe"
 cp "$S/standin_obs.exe" "$I/obs/bin/64bit/reel-capture.exe"
 start_reel

@@ -8,8 +8,7 @@ ENV REEL_GIT_SHA=$REEL_GIT_SHA REEL_BUILD_DATE=$REEL_BUILD_DATE
 COPY Cargo.toml Cargo.lock CHANGELOG.md ./
 COPY crates ./crates
 COPY web ./web
-# The OBS the app's installer carries, named on the Status page next to ffmpeg, and the names
-# of the app's Windows downloads.
+# Status names the installer's OBS and the app's Windows downloads.
 COPY desktop/obs/pinned.json ./desktop/obs/pinned.json
 COPY desktop/packages.json ./desktop/packages.json
 RUN --mount=type=cache,target=/usr/local/cargo/registry \

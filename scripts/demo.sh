@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# A local demo: built-in accounts, CPU encoding, synthetic clips.
-# Usage: scripts/demo.sh [serve|seed|doctor|stop|status]
 set -euo pipefail
 cd "$(dirname "$0")/.."
 export REEL_LISTEN="${REEL_LISTEN:-127.0.0.1:8746}"

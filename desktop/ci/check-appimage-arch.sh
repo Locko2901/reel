@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-# The AppImage on Arch Linux under X11, with Arch's OBS beside the user's, and under Wayland.
 #   check-appimage-arch.sh <the AppImage> <folder for the screenshot>
 set -eu
 IMG="$1" SHOTS="$2"

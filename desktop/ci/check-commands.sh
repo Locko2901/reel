@@ -1,6 +1,5 @@
 #!/bin/sh
-# Every process starts through reel_core::proc, which hides its console window on Windows.
-# Tests and build scripts run on the build machine only and are not looked at.
+# Tests and build scripts run on the build machine only.
 set -eu
 cd "$(dirname "$0")/../.."
 found=$(grep -rnE 'Command::new|\.creation_flags\(' --include='*.rs' crates/*/src desktop/*/src | grep -v '^crates/core/src/proc\.rs:' || true)

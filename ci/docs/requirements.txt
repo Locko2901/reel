@@ -1,4 +1,3 @@
-# The user site's build: MkDocs Material and what it pulls in, at exact versions.
 babel==2.18.0
 backrefs==8.1
 certifi==2026.10.23

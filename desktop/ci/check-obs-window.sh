@@ -1,6 +1,6 @@
 #!/bin/sh
-# Open OBS and Hide OBS on the real OBS in Wine's virtual desktop. For Wine only: a stand-in
-# icuuc.dll, wine_get_version renamed to skip OBS's Wine warning, OpenGL as Direct3D 11 stops it.
+# For Wine only: a stand-in icuuc.dll, wine_get_version renamed to skip OBS's Wine warning, and
+# OpenGL, as Direct3D 11 stops OBS.
 set -eu
 S=/work/desktop/.wine-standins
 W=$(mktemp -d)

@@ -1,6 +1,5 @@
 #!/bin/sh
-# reel-elevate.exe under Wine, as far as Wine goes: the OBS copy in Program Files, its settings,
-# rights and task, the copy's OBS started and shown, then removed. What Wine cannot do is said.
+# reel-elevate.exe under Wine, as far as Wine goes; what Wine cannot do is said.
 set -eu
 S=/work/desktop/.wine-standins
 W=$(mktemp -d)

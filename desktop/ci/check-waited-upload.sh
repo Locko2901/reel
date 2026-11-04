@@ -1,6 +1,5 @@
 #!/bin/sh
-# An upload someone waits for goes at once: with uploads paused, Save and share's upload passes
-# the pause and a held one, and its link is copied. Under xvfb.sh against a demo.
+# Under xvfb.sh against a demo.
 set -eu
 APP="${1:-/target/debug/reel-desktop}"
 SERVER="${REEL_E2E_SERVER:-http://127.0.0.1:8746}"
@@ -10,7 +9,7 @@ W=$(mktemp -d)
 [ -x /target/debug/examples/fake_obs ] || { echo "FAIL no stand-in OBS: make desktop-linux builds it"; exit 1; }
 L="$W/d/data/logs"
 fail() { echo "FAIL $*"; grep -m1 -A1 "panicked" "$W/app.out" || tail -20 "$W/app.out"; tail -15 "$L"/reel-desktop.log* 2>/dev/null; exit 1; }
-cleanup() { # the check's clips leave the demo, however it ended
+cleanup() {
   for c in $(grep -h "upload confirmed" "$L"/reel-desktop.log* 2>/dev/null | sed -n 's/.* clip=\([0-9A-Z]*\).*/\1/p'); do
     curl -fsS -b "$JAR" -H 'Sec-Fetch-Site: same-origin' -X DELETE "$SERVER/api/clips/$c" > /dev/null 2>&1 || true
   done

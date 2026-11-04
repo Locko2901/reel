@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-# The .deb's contents, and the AppImage on X11 and, with a stand-in portal, as on Wayland.
 #   check-appimage.sh <folder> <version>
 set -euo pipefail
 IN="$1" VERSION="$2"

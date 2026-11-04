@@ -1,6 +1,5 @@
 # check=skip=InvalidDefaultArgInFrom
-# The app with the real OBS under Xvfb. OBS packages only its newest Ubuntu, named in the pin as
-# linux_ubuntu and passed as UBUNTU with no default here, hence the check skipped above.
+# UBUNTU has no default: OBS packages only its newest Ubuntu, the pin's linux_ubuntu.
 ARG UBUNTU
 FROM ubuntu:${UBUNTU}
 ARG OBS_URL

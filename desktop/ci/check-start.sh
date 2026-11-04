@@ -1,6 +1,5 @@
 #!/bin/sh
-# The app of the package with OBS under Wine with Capture games as administrator on and a copy
-# without a second task. Wine has no WebView2, so the start is checked up to the window being made.
+# Wine has no WebView2, so the start is checked up to the window being made.
 set -eu
 . /work/desktop/ci/packages.sh
 INST="$1/${WITH_OBS_FILE}_$2_x64-setup.exe"

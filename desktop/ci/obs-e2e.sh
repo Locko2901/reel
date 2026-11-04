@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
-# The app with the real OBS under xvfb.sh, beside the user's own OBS, whose settings stay the
-# same. With REEL_E2E_PASSWORD the clip goes to REEL_E2E_SERVER; without, it is checked here.
+# With REEL_E2E_PASSWORD the clip goes to REEL_E2E_SERVER; without, it is checked here.
 set -euo pipefail
 SERVER="${REEL_E2E_SERVER:-http://127.0.0.1:8746}"
 USER_NAME="${REEL_E2E_USER:-sam}"
@@ -48,8 +47,7 @@ visible_obs_windows() {
   done
   echo "$n"
 }
-# The cursor is in the capture: moved somewhere of this run's own, or a still screen would give
-# a replay the bytes of an earlier run's, which the server takes for that clip.
+# A still screen would give a replay of an earlier run's bytes, which the server takes for that clip.
 own_frames() { xdotool mousemove $((RANDOM % 1200 + 20)) $((RANDOM % 700 + 20)); sleep 2; }
 shot() { [ -n "$SHOTS" ] && import -display "$DISPLAY" -window root "$SHOTS/$1.png" || true; }
 obs_window_names() { local p; p=$(obs_pid); for w in $(xdotool search --all --onlyvisible --pid "$p" --name "" 2>/dev/null | grep -vx "$ROOT_WINDOW"); do printf '  window %s "%s" %s\n' "$w" "$(xdotool getwindowname "$w" 2>/dev/null)" "$(xdotool getwindowgeometry "$w" 2>/dev/null | sed -n 's/.*Geometry: //p')"; done; }
@@ -91,8 +89,7 @@ cat > "$ROOT/config/settings.json" <<JSON
 }
 JSON
 
-# The microphone a silent source of its own: the null sink's monitor, which desktop audio
-# records, would bring every sound into the full mix twice.
+# A silent microphone of its own: the null sink's monitor would bring every sound in twice.
 pactl load-module module-null-sink sink_name=micsink >/dev/null
 pactl set-default-sink null
 

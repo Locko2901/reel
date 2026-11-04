@@ -1,7 +1,5 @@
 name: Docs
 
-# Built strictly: a broken link or anchor, or a private detail (ci/docs/hooks.py), fails it.
-# Pull requests build it without deploying, and without the private words.
 on:
   push:
     branches: [main]
@@ -30,7 +28,6 @@ concurrency:
   group: pages
   cancel-in-progress: false
 
-# The build runs in a container (make docs), so the runner needs Docker alone.
 jobs:
   build:
     name: Build · mkdocs build --strict

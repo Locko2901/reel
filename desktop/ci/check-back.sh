@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
-# The way back in the app's window: the clip's Library button, mouse buttons 8 and 9, Alt+Left
-# and Alt+Right. Under xvfb.sh against a demo with a ready clip; REEL_SHOTS_OUT for screenshots.
+# Under xvfb.sh against a demo with a ready clip; REEL_SHOTS_OUT for screenshots.
 set -euo pipefail
 APP="${1:-/target/debug/reel-desktop}"
 SERVER="${REEL_E2E_SERVER:-http://127.0.0.1:8746}"

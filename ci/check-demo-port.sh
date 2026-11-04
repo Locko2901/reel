@@ -1,5 +1,4 @@
 #!/bin/sh
-# The proofs and the app's checks that talk to a demo default to the one scripts/demo.sh serves.
 set -eu
 cd "$(dirname "$0")/.."
 port=$(sed -n 's/^export REEL_LISTEN="${REEL_LISTEN:-127\.0\.0\.1:\([0-9]*\)}"$/\1/p' scripts/demo.sh)

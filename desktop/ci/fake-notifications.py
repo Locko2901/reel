@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-# A stand-in notification server on the session bus. With FAKE_NOTIFY_ACTIONS=1 it has actions
-# and presses one when "<number> <action>" lands in the file FAKE_NOTIFY_PRESS names.
+# With FAKE_NOTIFY_ACTIONS=1 it has actions, and presses one when "<number> <action>" lands in
+# the file FAKE_NOTIFY_PRESS names.
 import os
 
 import dbus

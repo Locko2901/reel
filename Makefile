@@ -1,10 +1,7 @@
-# `make check` is what CI runs. It needs Docker alone; named volumes keep the cargo
-# registry and the build directory, so a rerun compiles only what changed.
 .DEFAULT_GOAL := help
 .PHONY: help check check-image check-host check-text licences third-party image demo pieces-proof external-proof share-speed
 
 CHECK_IMAGE ?= reel-check:local
-# The cargo target volumes are wiped before a build when they are over these caps.
 TARGET_CAP_MB ?= 8000
 DESKTOP_TARGET_CAP_MB ?= 8000
 
@@ -67,7 +64,6 @@ image: ## Build the product image locally
 demo: ## Run the demo (scripts/demo.sh serve)
 	scripts/demo.sh serve
 
-# The user site (MkDocs Material) builds in an image of its own, pinned by ci/docs/requirements.txt.
 .PHONY: docs docs-image docs-config
 DOCS_IMAGE ?= reel-docs:local
 
@@ -90,21 +86,18 @@ docs-config: check-image ## Write docs/configuration.md again from the settings 
 	  -w /work \
 	  $(CHECK_IMAGE) sh -c 'cargo test -p reel-core --test configuration_page && chown $(shell id -u):$(shell id -g) docs/configuration.md'
 
-# The desktop workspace builds in its own container, which runs as the host user: its caches
-# live in volumes of their own, as the server's are root-owned.
+# The desktop container runs as the host user, so its caches have volumes of their own: the
+# server's are root-owned.
 .PHONY: desktop-image desktop-cap desktop-sidecars-linux desktop-sidecars-windows desktop-check desktop-check-windows desktop-stop-helper desktop-obs-fresh desktop-elevate-check desktop-windows desktop-appimage desktop-appimage-check desktop-appimage-arch desktop-installers-check desktop-start-check desktop-obs-start-check desktop-previous desktop-obs-window-check desktop-installer-shots desktop-installer-audit desktop-obs-sources desktop-obs-image desktop-obs-e2e desktop-dev desktop-linux desktop-shell desktop-e2e desktop-shots desktop-save-actions desktop-quit desktop-waited-upload desktop-presses desktop-downloads desktop-zip-download desktop-back
 
 DESKTOP_IMAGE ?= reel-desktop:local
 DESKTOP_OUT ?= $(HOME)/reel-desktop-out
 DESKTOP_PREVIOUS ?= $(HOME)/reel-desktop-previous
-# The Windows installers desktop-windows builds, by kind: with-obs and plain, named in
-# desktop/packages.json; a pull request builds the one with OBS alone.
 DESKTOP_INSTALLERS ?= plain with-obs
 DESKTOP_PACKAGES = $(shell sed -n 's/^ *"[a-z_]*_file": *"\([^"]*\)".*/\1/p' desktop/packages.json)
 DESKTOP_VERSION ?=
 DESKTOP_BUILD ?=
-# A short hash of digits alone would be a numeric prerelease part with a leading zero, which
-# semver and so Tauri refuse; it gets a g in front, as git describe writes it.
+# An all-digit hash would be a numeric prerelease with a leading zero, which semver refuses.
 DESKTOP_HASH = $(shell git rev-parse --short HEAD | sed 's/^[0-9][0-9]*$$/g&/')
 DESKTOP_BASE = $(shell sed -n 's/^version = "\(.*\)"/\1/p' desktop/Cargo.toml | head -1)
 REEL_E2E_SERVER ?= http://127.0.0.1:8746
@@ -131,21 +124,17 @@ DESKTOP_RUN = docker run --rm --network host --user $(shell id -u):$(shell id -g
 desktop-image: ## Build the desktop container (Tauri deps, cargo-xwin, NSIS, Wine, Xvfb)
 	docker build -t $(DESKTOP_IMAGE) -f desktop/ci/desktop.Dockerfile desktop/ci
 
-# The out directory exists before the first container run mounts it: Docker would make a
-# missing bind mount as root, and the container's user could not write the installer.
+# Docker would make a missing bind mount as root, which the container's user cannot write.
 desktop-cap: desktop-image
 	mkdir -p "$(DESKTOP_OUT)"
 	ci/cap-volume.sh reel-desktop-target $(DESKTOP_TARGET_CAP_MB) $(DESKTOP_IMAGE)
 
-# The ffmpeg sidecars: the pinned builds (desktop/ffmpeg), cached in the cargo volume.
 desktop-sidecars-linux: desktop-cap
 	$(DESKTOP_RUN) -w /work -e FFMPEG_CACHE=/cargo-home/ffmpeg-cache $(DESKTOP_IMAGE) desktop/ci/fetch-ffmpeg.sh linux
 
 desktop-sidecars-windows: desktop-cap
 	$(DESKTOP_RUN) -w /work -e FFMPEG_CACHE=/cargo-home/ffmpeg-cache $(DESKTOP_IMAGE) desktop/ci/fetch-ffmpeg.sh windows
 
-# Windows-only code compiles only for Windows: clippy for that target catches it before an
-# installer build.
 desktop-check-windows: desktop-sidecars-windows ## Clippy of the desktop workspace for Windows, cross compiled
 	$(DESKTOP_RUN) -w /work/desktop $(DESKTOP_IMAGE) sh -c 'cargo xwin clippy --target x86_64-pc-windows-msvc --all-targets -- -D warnings'
 
@@ -166,15 +155,13 @@ desktop-check: desktop-sidecars-linux ## Lint and tests of the desktop workspace
 	$(DESKTOP_RUN) -w /work/desktop $(DESKTOP_IMAGE) sh -c \
 	  'sh ci/check-commands.sh && sh ci/changes-test.sh && sh ci/obs-requests.sh --check && cargo fmt --all -- --check && cargo clippy --all-targets -- -D warnings && cargo test'
 
-# With TAURI_SIGNING_PRIVATE_KEY (and its _PASSWORD) set, each installer is signed for the
-# app's updater, its .sig beside it.
 desktop-windows: desktop-sidecars-windows ## The Windows installers (NSIS), cross compiled; land in $(DESKTOP_OUT)
 	mkdir -p "$(DESKTOP_OUT)"
 	$(DESKTOP_RUN) -w /work/desktop/app -e REEL_DESKTOP_BUILD="$(DESKTOP_BUILD)" -e DESKTOP_VERSION="$(DESKTOP_VERSION)" \
 	  -e REEL_INSTALLERS="$(DESKTOP_INSTALLERS)" -e OBS_CACHE=/cargo-home/obs-cache -e TAURI_SIGNING_PRIVATE_KEY \
 	  -e TAURI_SIGNING_PRIVATE_KEY_PASSWORD $(DESKTOP_IMAGE) ../ci/build-windows.sh
 
-# The pinned OBS's upstream source archive, for the release that ships it (the GPL).
+# The GPL: a release that ships OBS carries its source.
 desktop-obs-sources: desktop-image ## OBS's source archive of the pinned version into $(DESKTOP_OUT)
 	mkdir -p "$(DESKTOP_OUT)"
 	$(DESKTOP_RUN) -w /work -e OBS_CACHE=/cargo-home/obs-cache $(DESKTOP_IMAGE) desktop/ci/fetch-obs.sh sources /out
@@ -215,7 +202,6 @@ desktop-dev: ## Both Windows installers, the AppImage and the .deb, as <version>
 	$(MAKE) desktop-windows DESKTOP_VERSION=$(DESKTOP_BASE)-dev.$(DESKTOP_HASH) DESKTOP_BUILD=dev.$(DESKTOP_HASH)
 	$(MAKE) desktop-appimage DESKTOP_VERSION=$(DESKTOP_BASE)-dev.$(DESKTOP_HASH) DESKTOP_BUILD=dev.$(DESKTOP_HASH)
 
-# One release build with the pinned static ffmpeg, signed for the updater as desktop-windows is.
 desktop-appimage: desktop-sidecars-linux ## The Linux AppImage and .deb; land in $(DESKTOP_OUT)
 	mkdir -p "$(DESKTOP_OUT)"
 	$(DESKTOP_RUN) -w /work/desktop/app -e REEL_DESKTOP_BUILD="$(DESKTOP_BUILD)" -e DESKTOP_VERSION="$(DESKTOP_VERSION)" \
@@ -287,8 +273,6 @@ desktop-shots: desktop-linux ## Screenshots of the window at 1280x800 and 720x85
 	$(DESKTOP_RUN) -w /work -e XVFB_SCREEN=1280x900 -e REEL_E2E_SERVER=$(REEL_E2E_SERVER) -e REEL_E2E_USER=$(REEL_E2E_USER) \
 	  -e REEL_E2E_PASSWORD="$(REEL_E2E_PASSWORD)" -e REEL_SHOTS_OUT=/work/$(DESKTOP_SHOTS_OUT) $(DESKTOP_IMAGE) /work/desktop/ci/xvfb.sh run /work/desktop/ci/shots.sh
 
-# The pinned OBS's own Ubuntu package, in an image of the Ubuntu it is built for; against the
-# demo when REEL_E2E_OBS_PASSWORD is set, else on its own.
 OBS_E2E_IMAGE ?= reel-obs-e2e:local
 OBS_LINUX_URL = $(shell sed -n 's/.*"linux_url": *"\([^"]*\)".*/\1/p' desktop/obs/pinned.json)
 OBS_LINUX_SHA = $(shell sed -n 's/.*"linux_sha256": *"\([^"]*\)".*/\1/p' desktop/obs/pinned.json)

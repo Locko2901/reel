@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
-# The ffmpeg sidecars Tauri bundles next to the app, from the build pinned in desktop/ffmpeg and
-# checked against its SHA-256, named with the target triple as Tauri expects.
+# Named with the target triple, as Tauri expects of a sidecar.
 set -euo pipefail
 TARGET="${1:?linux or windows}"
 HERE=$(cd "$(dirname "$0")/.." && pwd)

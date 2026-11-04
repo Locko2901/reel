@@ -1,7 +1,4 @@
 #!/usr/bin/env bash
-# What each installer holds: the one with OBS the pinned OBS file for file, the one without no
-# OBS, both the app, ffmpeg and the stop helper. The second's checks are skipped when it was not
-# built.
 set -euo pipefail
 OUT="${1:?the folder with the installers}"
 HERE=$(cd "$(dirname "$0")/.." && pwd)

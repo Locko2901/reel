@@ -1,5 +1,4 @@
 #!/bin/sh
-# THIRD_PARTY.md names the OBS that reel, the package with OBS, ships: the version desktop/obs/pinned.json pins.
 set -eu
 cd "$(dirname "$0")/.."
 pin=$(sed -n 's/^ *"version": *"\([0-9.]*\)".*/\1/p' desktop/obs/pinned.json | head -1)
