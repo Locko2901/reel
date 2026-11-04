@@ -44,7 +44,21 @@ pub fn library_move(rt: State<'_, Runtime>, picked: String) -> R<()> {
     rt.library_move(picked.into())
 }
 
-/// Stops a move before it switched; it rolls back.
+#[tauri::command]
+pub async fn library_copy_plan(
+    rt: State<'_, Runtime>,
+    into: String,
+) -> R<crate::library::CopyPlan> {
+    rt.library_copy_plan(into.into()).await
+}
+
+/// Makes a copy of the library in a new folder in the picked one; the status follows it.
+#[tauri::command]
+pub fn library_copy(rt: State<'_, Runtime>, into: String) -> R<()> {
+    rt.library_copy(into.into())
+}
+
+/// Stops a copy, or a move before it switched; both roll back.
 #[tauri::command]
 pub fn library_stop(rt: State<'_, Runtime>) {
     rt.library_stop()

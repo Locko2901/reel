@@ -1,4 +1,4 @@
-// This app, Server, Library: where the library is, and a move to another drive.
+// This app, Server, Library: where the library is, a move to another drive, a copy to keep.
 import { $, invoke, toast } from './shell.js';
 
 let info = null;
@@ -33,9 +33,15 @@ const PHASES = {
     removing: () => 'removing the old folder',
   },
   use: { starting: () => 'switching' },
+  copy: {
+    starting: () => 'starting',
+    database: () => 'copying the database',
+    copying: (j) => `copying the clips, ${size(j.done)} of ${size(j.total)}`,
+    checking: (j) => `checking the copy, ${size(j.done)} of ${size(j.total)}`,
+  },
 };
 
-const TITLE = { move: 'Moving the library to', use: 'Taking up the library in' };
+const TITLE = { move: 'Moving the library to', use: 'Taking up the library in', copy: 'Copying the library to' };
 
 function el(tag, cls, text) {
   const e = document.createElement(tag);
@@ -76,6 +82,13 @@ const path = (p) => el('span', 'mono', p);
 
 function planWords(p) {
   const t = p.p;
+  if (p.kind === 'copy') {
+    return [
+      `Make a copy of the library, ${size(t.bytes)}, in `, path(t.dir), `. There is ${size(t.free)} free there. `,
+      'reel goes on while it copies, and the copy is checked file by file before it gets its name.',
+      ...(t.removable ? [' The drive can be unplugged: wait until the copy says it is done.'] : []),
+    ];
+  }
   if (t.kind === 'use') {
     return [
       path(t.dir), ` holds a reel library with ${t.clips} ${t.clips === 1 ? 'clip' : 'clips'}. Use it? `,
@@ -97,7 +110,8 @@ async function start() {
   const p = plan;
   plan = null;
   try {
-    await invoke('library_move', { picked: p.picked });
+    if (p.kind === 'copy') await invoke('library_copy', { into: p.picked });
+    else await invoke('library_move', { picked: p.picked });
   } catch (e) {
     plan = { ...p, error: String(e.message || e) };
   }
@@ -116,6 +130,8 @@ function render(status) {
   const job = lib.job;
   const running = !!(job && job.running);
   $('#library-move').disabled = running;
+  $('#library-copy').disabled = running || !status.local;
+  $('#library-copy').title = status.local ? '' : 'the copy is made through reel on this PC, which is not running';
   const line = $('#library-line');
   line.textContent = '';
   line.classList.toggle('st-err', !!lib.away);
@@ -130,7 +146,7 @@ function render(status) {
   if (running) {
     const words = (PHASES[job.kind] || {})[job.phase];
     const t = left(job);
-    const stoppable = ['starting', 'copying', 'checking'].includes(job.phase);
+    const stoppable = job.kind === 'copy' || ['starting', 'copying', 'checking'].includes(job.phase);
     n = notice('active', [
       `${TITLE[job.kind] || 'Working on'} `, path(job.to), `: ${words ? words(job) : job.phase}${t ? `, ${t}` : ''}`,
     ], stoppable ? [button('Stop', 'small quiet', () => invoke('library_stop'))] : [],
@@ -139,13 +155,14 @@ function render(status) {
     n = notice('err', [plan.error.replace(/^./, (c) => c.toUpperCase()) + (/[.!?]$/.test(plan.error) ? '' : '.')],
       [button('Dismiss', 'small quiet', () => { plan = null; render(lastStatus); })]);
   } else if (plan) {
-    const go = plan.p.kind === 'use' ? 'Use it' : 'Move';
+    const go = plan.kind === 'copy' ? 'Make the copy' : plan.p.kind === 'use' ? 'Use it' : 'Move';
     n = notice('active', planWords(plan), [
       button(go, 'small primary', start),
       button('Cancel', 'small quiet', () => { plan = null; render(lastStatus); }),
     ]);
   } else if (job && job.line && jobKey(job) !== dismissed) {
     const acts = [];
+    if (job.ok && job.kind === 'copy') acts.push(button('Show in folder', 'small', () => invoke('open_folder', { path: job.to }).catch((e) => toast(String(e.message || e), 'err'))));
     acts.push(button('Dismiss', 'small quiet', () => { dismissed = jobKey(job); render(lastStatus); }));
     n = notice(job.ok ? 'ok' : 'err', [job.line], acts);
   }
@@ -171,7 +188,9 @@ async function pick(kind) {
   }
   if (!picked) return;
   try {
-    const p = await invoke('library_plan', { picked });
+    const p = kind === 'copy'
+      ? await invoke('library_copy_plan', { into: picked })
+      : await invoke('library_plan', { picked });
     plan = { kind, picked, p };
   } catch (e) {
     plan = { kind, picked, error: String(e.message || e) };
@@ -190,6 +209,7 @@ export async function refreshLibrary() {
 
 export function bindLibrary() {
   $('#library-move')?.addEventListener('click', () => pick('move'));
+  $('#library-copy')?.addEventListener('click', () => pick('copy'));
   $('#library-open')?.addEventListener('click', () => {
     const dir = info ? info.dir : lastStatus && lastStatus.library && lastStatus.library.dir;
     if (dir) invoke('open_folder', { path: dir }).catch((e) => toast(String(e.message || e), 'err'));

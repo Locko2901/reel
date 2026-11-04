@@ -229,7 +229,7 @@ fn action_panels(
             name: "Export",
             line: String::new(),
             rows: vec![
-                action_row("The database", "a consistent copy taken while reel runs, the secrets blank", vec![link("export-database", "Download", "/api/export/database")]),
+                action_row("The database", if cfg.standalone() { "a consistent copy taken while reel runs, the secrets blank; a copy of the clips' files with it is This app, Server, Library, Make a copy" } else { "a consistent copy taken while reel runs, the secrets blank" }, vec![link("export-database", "Download", "/api/export/database")]),
                 action_row("The settings as config.toml", "the settings in force, the secrets blank", vec![link("export-config", "Download", "/api/export/config")]),
             ],
         },

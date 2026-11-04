@@ -696,6 +696,68 @@ fn now_ms() -> u64 {
         .unwrap_or(0)
 }
 
+/// What a copy of the library would be: its folder, its size, the drive's room.
+#[derive(Debug, Clone, Serialize)]
+pub struct CopyPlan {
+    pub dir: PathBuf,
+    pub bytes: u64,
+    pub free: u64,
+    pub removable: bool,
+}
+
+/// A copy being made: the folder to remove when the app stopped halfway.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct CopyJournal {
+    part: PathBuf,
+}
+
+pub fn copy_plan(
+    into: &Path,
+    places: &Places,
+    bytes: u64,
+    at: &jiff::Zoned,
+    disks: &dyn Disks,
+) -> Result<CopyPlan, String> {
+    if !into.is_dir() {
+        return Err(format!("{} is not a folder", into.display()));
+    }
+    let into = real(into);
+    let current = real(&places.current);
+    if inside(&into, &current) {
+        return Err(format!(
+            "{} is inside the library; pick a folder outside it",
+            into.display()
+        ));
+    }
+    if let Some(clips) = places.clips.as_deref().map(real) {
+        if inside(&into, &clips) {
+            return Err(format!(
+                "{} is in the clips folder, where OBS saves: reel would take the copy's files for new clips",
+                into.display()
+            ));
+        }
+    }
+    let (dir, part) = reel_pipeline::library_copy::names(&into, at);
+    if dir.exists() || part.exists() {
+        return Err(format!("{} is there already", dir.display()));
+    }
+    let (free, _) = disks.space(&into);
+    if free < bytes.saturating_add(SPARE) {
+        return Err(format!(
+            "{} has {} free, and the copy needs {} with 1 GB to spare",
+            drive_name(&into),
+            reel_core::format::size(free),
+            reel_core::format::size(bytes)
+        ));
+    }
+    Ok(CopyPlan {
+        dir,
+        bytes,
+        free,
+        removable: disks.kind(&into) == Kind::Removable,
+    })
+}
+
 fn peek_real(p: &Path) -> Option<(String, u64)> {
     let id = reel_pipeline::library::holds_library(p)?;
     let clips = std::fs::read_dir(p.join("library"))
@@ -750,6 +812,10 @@ impl Runtime {
         self.lock().paths.data_dir.join("library-move.json")
     }
 
+    fn copy_journal(&self) -> PathBuf {
+        self.lock().paths.data_dir.join("library-copy.json")
+    }
+
     pub fn library_line(&self) -> LibraryLine {
         let g = self.lock();
         let dir = g.settings.library_dir(&g.paths);
@@ -787,6 +853,22 @@ impl Runtime {
         tauri::async_runtime::spawn_blocking(move || {
             let bytes = size_of(&places.current);
             plan(&picked, &places, bytes, &RealDisks, &peek_real)
+        })
+        .await
+        .map_err(|e| e.to_string())?
+    }
+
+    pub async fn library_copy_plan(&self, into: PathBuf) -> Result<CopyPlan, String> {
+        let places = self.places();
+        let cfg = self
+            .lock()
+            .local
+            .as_ref()
+            .map(|l| l.ctx.config())
+            .ok_or("reel on this PC is not running; the copy is made through it")?;
+        tauri::async_runtime::spawn_blocking(move || {
+            let bytes = reel_pipeline::library_copy::measure(&cfg);
+            copy_plan(&into, &places, bytes, &jiff::Zoned::now(), &RealDisks)
         })
         .await
         .map_err(|e| e.to_string())?
@@ -1059,8 +1141,113 @@ impl Runtime {
         }
     }
 
-    /// Settles a move the app did not see to its end, before reel on this PC starts.
+    pub fn library_copy(&self, into: PathBuf) -> Result<(), String> {
+        self.busy()?;
+        let rt = self.clone();
+        tauri::async_runtime::spawn(async move { rt.do_copy(into).await });
+        Ok(())
+    }
+
+    async fn do_copy(&self, into: PathBuf) {
+        let from = self.library_dir();
+        let plan = match self.library_copy_plan(into.clone()).await {
+            Ok(p) => p,
+            Err(e) => {
+                self.begin("copy", &from, &into, 0);
+                return self.end(false, format!("No copy was made: {e}."));
+            }
+        };
+        let Some(local) = self.lock().local.clone() else {
+            self.begin("copy", &from, &plan.dir, 0);
+            return self.end(
+                false,
+                "No copy was made: reel on this PC is not running.".into(),
+            );
+        };
+        self.begin("copy", &from, &plan.dir, plan.bytes);
+        let at = jiff::Zoned::now();
+        let (_, part) = reel_pipeline::library_copy::names(&real(&into), &at);
+        let journal = self.copy_journal();
+        let _ = std::fs::write(
+            &journal,
+            serde_json::to_vec(&CopyJournal { part }).unwrap_or_default(),
+        );
+        let stop = self.lock().library_stop.clone();
+        let rt = self.clone();
+        let last = std::sync::Mutex::new(std::time::Instant::now());
+        let progress = Arc::new(
+            move |phase: reel_pipeline::library_copy::Phase, done: u64, total: u64| {
+                rt.progress(phase.word(), done, total);
+                let mut l = last.lock().unwrap_or_else(|e| e.into_inner());
+                if l.elapsed() >= std::time::Duration::from_millis(250) {
+                    *l = std::time::Instant::now();
+                    rt.push_status();
+                }
+            },
+        );
+        let made =
+            reel_pipeline::library_copy::make(&local.ctx, &real(&into), &at, stop, progress).await;
+        let _ = std::fs::remove_file(&journal);
+        match made {
+            Ok(done) => {
+                let mut line = format!(
+                    "The copy is in {}: {} {}, {}.",
+                    done.dir.display(),
+                    done.clips,
+                    if done.clips == 1 { "clip" } else { "clips" },
+                    reel_core::format::size(done.bytes)
+                );
+                if done.gone > 0 {
+                    line.push_str(&format!(
+                        " {} deleted for good while it ran {} not in it.",
+                        done.gone,
+                        if done.gone == 1 { "is" } else { "are" }
+                    ));
+                }
+                if let Some(j) = self.lock().library_job.as_mut() {
+                    j.to = done.dir.display().to_string();
+                }
+                self.end(true, line)
+            }
+            Err(e) => {
+                let stopped = e
+                    .downcast_ref::<std::io::Error>()
+                    .is_some_and(copier::is_stopped);
+                self.end(
+                    false,
+                    if stopped {
+                        "The copy was stopped, and its unfinished folder removed.".into()
+                    } else {
+                        format!("No copy was made: {e:#}.")
+                    },
+                )
+            }
+        }
+    }
+
+    /// Settles a move or a copy the app did not see to its end, before reel on this PC starts.
     pub fn recover_library(&self) {
+        let file = self.copy_journal();
+        if let Some(j) = std::fs::read(&file)
+            .ok()
+            .and_then(|b| serde_json::from_slice::<CopyJournal>(&b).ok())
+        {
+            if j.part.to_string_lossy().ends_with("(unfinished)") {
+                let _ = std::fs::remove_dir_all(&j.part);
+            }
+            let _ = std::fs::remove_file(&file);
+            tracing::info!(part = %j.part.display(), "library: an unfinished copy was removed");
+            self.lock().library_job = Some(Job {
+                kind: "copy".into(),
+                phase: "ended".into(),
+                to: j.part.display().to_string(),
+                line: format!(
+                    "A copy cut short when the app stopped was removed: {}.",
+                    j.part.display()
+                ),
+                ..Default::default()
+            });
+        }
         let file = self.move_journal();
         let Some(mut j) = Journal::load(&file) else {
             return;

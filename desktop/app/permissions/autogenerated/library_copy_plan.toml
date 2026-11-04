@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-library-copy-plan"
+description = "Enables the library_copy_plan command without any pre-configured scope."
+commands.allow = ["library_copy_plan"]
+
+[[permission]]
+identifier = "deny-library-copy-plan"
+description = "Denies the library_copy_plan command without any pre-configured scope."
+commands.deny = ["library_copy_plan"]
