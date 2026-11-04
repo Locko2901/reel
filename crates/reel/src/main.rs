@@ -67,7 +67,6 @@ fn layers() -> anyhow::Result<Layers> {
     let l = settings::load_layers().context("config")?;
     #[allow(unused_mut)]
     let mut base = l.base;
-    // The app's standalone library pages against a demo, in the dev build alone.
     #[cfg(feature = "style-page")]
     if std::env::var_os("REEL_DEMO_STANDALONE").is_some_and(|v| v == "1") {
         base.make_standalone();

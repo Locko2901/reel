@@ -1,5 +1,3 @@
-//! End to end: a real server on a loopback port, real ffmpeg, synthetic clips.
-//! Needs ffmpeg and ffprobe: REEL_FFMPEG and REEL_FFPROBE, or ~/.local/ffmpeg/.
 use reel_core::config::{AuthMode, Config};
 use reel_core::events::new_bus;
 use reel_media::synth::Synth;
@@ -1232,7 +1230,6 @@ async fn discord_copy_lands_under_the_limit() {
         .await
         .unwrap();
     assert_eq!(bad.status(), 400);
-    // the copy ran in the lane, beside the clip's own loop and filmstrip
     env.wait_no_jobs(Duration::from_secs(120)).await;
     let s: serde_json::Value = env
         .client
@@ -1354,8 +1351,8 @@ async fn upload_goes_through_the_pipeline() {
     );
 }
 
-/// Keeps no idle connection: a piece answered before its body is read may close a connection a
-/// pooled client has put back, and the next request on it fails with hyper's IncompleteMessage.
+/// No idle connections: a piece answered before its body is read may close a pooled
+/// connection, and the next request on it fails with hyper's IncompleteMessage.
 fn pieces_client() -> &'static reqwest::Client {
     static CLIENT: std::sync::OnceLock<reqwest::Client> = std::sync::OnceLock::new();
     CLIENT.get_or_init(|| {
@@ -2882,7 +2879,6 @@ async fn a_montage_part_snaps_to_its_own_versions_keyframes() {
     );
 }
 
-/// What a request in the app's standalone library got: its status and its body as text.
 async fn ask(
     env: &Env,
     method: &str,
@@ -3901,7 +3897,6 @@ async fn a_game_is_a_collection_by_itself_and_its_link_follows_the_game() {
     assert_eq!(game_set("vrchat").await.unwrap().collection.id, vr_id);
 }
 
-/// The relative imports of a module: `from './x.js'`, `import './x.js'` and `import('./x.js')`.
 fn relative_imports(js: &str) -> Vec<String> {
     let mut out = Vec::new();
     for lead in ["from '", "import '", "import('", "from \"", "import \""] {
@@ -5232,7 +5227,6 @@ async fn first_admin(env: &Env, name: &str, code: &str) -> reqwest::Response {
         .unwrap()
 }
 
-/// A JPEG of one colour, with an EXIF segment carrying a marker a poster must not keep.
 fn jpeg_with_exif(env: &Env, colour: &str, marker: &str) -> Vec<u8> {
     let out = env.ctx.config().data_dir.join(format!("{colour}.jpg"));
     let ok = std::process::Command::new(&env.ctx.config().media.ffmpeg)
@@ -5403,8 +5397,7 @@ async fn an_uploaded_image_becomes_the_poster_without_its_metadata() {
         words.contains("pixels") || words.contains("could not be read"),
         "{words}"
     );
-    // two bytes over the limit trip the route on the body's last bytes, with nothing left unsent;
-    // a larger body still sending could see the connection close before the answer
+    // two bytes over: a larger body still sending could see the connection close first
     let mut over = vec![0xFFu8, 0xD8, 0xFF, 0xE0];
     over.resize(25 * 1024 * 1024 + 2, 0);
     assert_eq!(
@@ -6596,7 +6589,6 @@ async fn the_first_admin_needs_the_setup_code_and_is_made_once() {
     );
 }
 
-/// The mock issuer's signing key, made when the tests run and never written anywhere.
 fn throwaway_signing_pem() -> &'static str {
     static PEM: std::sync::OnceLock<String> = std::sync::OnceLock::new();
     PEM.get_or_init(|| {
@@ -6608,7 +6600,6 @@ fn throwaway_signing_pem() -> &'static str {
     })
 }
 
-/// Who the mock provider vouches for; a test changes it between sign-ins.
 #[derive(Clone)]
 struct Persona {
     sub: String,
@@ -6894,8 +6885,8 @@ async fn an_identity_provider_signs_in_and_its_claim_makes_the_admin() {
     );
 }
 
-/// The callback's status and the session cookie. Each call comes from its own forwarded address,
-/// so the sign-in limit does not count a test's many visitors together.
+/// Each call comes from its own forwarded address, so the sign-in limit does not count a
+/// test's many visitors together.
 async fn oidc_sign_in(env: &Env) -> (u16, String) {
     static VISITOR: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(1);
     let n = VISITOR.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
@@ -7289,7 +7280,6 @@ async fn first_run_gates_admins_until_it_is_done() {
 
 type Notes = Arc<tokio::sync::Mutex<Vec<(String, String, serde_json::Value)>>>;
 
-/// A place notes land: `/hook` for the webhook, `/` for ntfy's JSON form; each with its
 /// Authorization header.
 async fn mock_receiver() -> (String, Notes) {
     use axum::extract::State;
@@ -8037,7 +8027,7 @@ async fn storage_actions_purge_clear_rebuild_and_refresh() {
 async fn advanced_has_the_logs_the_history_the_exports_and_a_restart() {
     use tracing_subscriber::layer::SubscriberExt;
     use tracing_subscriber::util::SubscriberInitExt;
-    // the server's own filter: without it every crate's trace lines go into the ring
+    // without the server's own filter every crate's trace lines fill the ring
     let _ = tracing_subscriber::registry()
         .with(tracing_subscriber::EnvFilter::new(
             "info,sqlx=warn,tower_http=info,hyper=warn",
@@ -8440,7 +8430,6 @@ async fn put_chunk(
     (status, v)
 }
 
-/// Uploads the whole file in chunks of the given size and finishes it; the clip id.
 async fn upload_whole(
     env: &Env,
     token: &str,
@@ -10825,8 +10814,6 @@ async fn a_replay_that_asks_for_its_last_seconds_is_published_with_them_current(
     );
 }
 
-/// GitHub's API for two repositories with a release of `version`: `o/r`, private, which
-/// answers only the token `t0ken`, and `o/pub`, public, which answers anyone.
 async fn mock_github_release(version: &'static str) -> String {
     use axum::extract::Path;
     use axum::http::{HeaderMap, StatusCode};
@@ -11189,7 +11176,6 @@ async fn normalise_new_clips_publishes_a_levelled_version_and_keeps_the_original
         clip.current_id, clip.master_id,
         "published with the levelled version current"
     );
-    // the original's level comes with the clip's derive job, after the publish
     env.wait_no_jobs(Duration::from_secs(120)).await;
     let master = env
         .store()
@@ -11847,13 +11833,10 @@ async fn the_storage_secret_shows_nowhere() {
     }
 }
 
-/// Answers what reel asks of S3 and serves its objects to anyone, as a public bucket does;
-/// `down` makes it refuse everything.
 struct FakeS3 {
     base: String,
     objects: Arc<std::sync::Mutex<std::collections::BTreeMap<String, Vec<u8>>>>,
     down: Arc<std::sync::atomic::AtomicBool>,
-    /// How long a put takes, as at a home upload.
     put_ms: Arc<std::sync::atomic::AtomicU64>,
 }
 
@@ -11956,8 +11939,6 @@ async fn fake_s3() -> FakeS3 {
     }
 }
 
-/// What a link's og:video answers without following a redirect: its status, and the
-/// object's address when reel sends the chat app to the storage.
 async fn object_behind(og: &str) -> (u16, Option<String>) {
     let r = reqwest::Client::builder()
         .redirect(reqwest::redirect::Policy::none())
@@ -12490,7 +12471,6 @@ async fn a_link_waiting_for_its_preview_from_here_raises_its_copy_and_gets_it() 
     let copy_job = loop {
         let jobs = env.store().active_jobs().await.unwrap();
         let web = jobs.iter().find(|j| j.kind == "web" && j.state == "queued");
-        // queued, or taken by the lane and waiting there while the heavy work is held
         let copy = jobs
             .iter()
             .find(|j| j.kind == "embed" && matches!(j.state.as_str(), "queued" | "running"));
@@ -12618,7 +12598,6 @@ async fn the_storage_makes_no_copy_for_a_link_it_has_no_room_for() {
     assert!(s3.keys().is_empty());
 }
 
-/// What a test waits to see of reel's objects in the storage.
 type ObjectsAre = Box<dyn Fn(&[reel_store::models::ExternalObject]) -> bool + Send>;
 
 #[tokio::test(flavor = "multi_thread")]
@@ -13012,7 +12991,6 @@ async fn a_revoked_or_expired_links_preview_leaves_the_storage_even_when_made_ah
     )
     .await;
     assert_eq!(code, 200, "{link}");
-    // the chat app fetches the link's og:video and so learns the object's address
     let page = env
         .client
         .get(format!(
@@ -13138,7 +13116,6 @@ async fn a_job_someone_waits_for_runs_at_once_and_pauses_the_background_one() {
         .await;
     let clip = env.wait_ready(Duration::from_secs(120)).await;
     env.wait_no_jobs(Duration::from_secs(180)).await;
-    // a link's page plays a web copy, which the link queues: the background job
     let (s, v) = post_json_body(
         &env,
         &format!("/api/clips/{}/shares", clip.id),

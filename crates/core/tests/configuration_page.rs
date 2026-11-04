@@ -1,5 +1,3 @@
-//! docs/configuration.md is made from the settings catalogue: this test fails when they differ
-//! or a REEL_ variable is missing from the page; `make docs-config` writes the page again.
 use reel_core::config::Config;
 use reel_core::settings::{self, Def, Kind, Section, DEFS};
 use std::collections::BTreeSet;
@@ -35,7 +33,6 @@ const OTHER: &[(&str, &str, &str)] = &[
     ),
 ];
 
-/// Read only by the build or by tests, never by a running server or app.
 const NOT_FOR_USERS: &[&str] = &[
     "REEL_GIT_SHA",
     "REEL_BUILD_DATE",
@@ -127,7 +124,6 @@ fn toml_place(key: &str) -> String {
     }
 }
 
-/// The REEL_ variables the image sets, from the Dockerfile's ENV.
 fn image_env() -> Vec<(String, String)> {
     let text = std::fs::read_to_string(root().join("Dockerfile")).unwrap_or_default();
     let re = regex::Regex::new(r"(REEL_[A-Z0-9_]+)=(\S+)").unwrap();

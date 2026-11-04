@@ -1,4 +1,3 @@
-//! The date the build script stamps: the one given first, as an image's build has no `.git`.
 #[allow(dead_code)]
 #[path = "../build.rs"]
 mod build_script;
