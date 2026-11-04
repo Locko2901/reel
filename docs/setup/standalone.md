@@ -30,8 +30,9 @@ When it worked, **Mode** says "reel runs on this PC", and the window shows the l
 ![The library in standalone mode](img/app-standalone-library.png)
 
 The library lives in `%LOCALAPPDATA%\reel\library` on Windows and `~/.local/share/reel/library` on
-Linux. The status chip at the top of the window has a **Library** row: on this PC, where it lives,
-and whether reel on this PC runs.
+Linux, until you [move it to another drive](#the-library-on-another-drive). The status chip at the
+top of the window has a **Library** row: on this PC, where it lives, and whether reel on this PC
+runs.
 
 ## 3. The first clip
 
@@ -66,6 +67,53 @@ Save and share, Share the last clip and Copy link make links, and links need a s
   ([The library cap](../sharing.md#the-library-cap)). A starred clip or one in a collection never
   goes, and neither does a clip that is on no server, unless you turn **The cap spares unsent
   clips** off. The line under the cap says what it would move at the size you type.
+
+## The library on another drive
+
+The library holds every clip with its versions, their database and the raw files reel kept, and it
+grows with your clips. To put it on a bigger drive:
+
+1. Open Settings, This app, **Server**. Under **Library**, **Library folder** says where the library
+   is, how much it takes, and how much is free on its drive.
+2. Press **Move** and pick a folder on the other drive. An empty folder takes the library itself; a
+   folder with other things in it, such as `D:\`, gets a new folder `reel library` inside it.
+3. The panel says how much moves and how much is free there. Press **Move**.
+
+While it moves, reel on this PC stops and the panel shows how far it is. Every file is copied, then
+read back and checked; only then does reel start again from the new folder, and the old one is
+removed. Clips you save meanwhile wait in the clips folder and go into the library once it is back.
+**Stop** leaves the library where it was. On the same drive the folder is just renamed, at once.
+
+If the app or the PC stops halfway, the next start rolls the move back, or finishes it once every
+file was checked. The library is always whole in one of the two places, and the panel says which.
+
+A drive you unplug, such as a USB drive, works too. While it is away, reel on this PC waits: **Save
+clip** still saves, the clips wait in the clips folder, and reel starts again by itself within ten
+seconds of the drive coming back. If Windows gives the drive another letter, press **Move** and pick
+the library's folder at its new letter: a folder that holds a reel library is taken up as it is.
+
+A folder on the network is refused, because reel's database needs a drive of this PC. For a library
+on a NAS, [run reel as a server](server.md).
+
+## A copy of the library
+
+Settings, This app, **Server**, **Library**, **Make a copy** puts the whole library (the database,
+every clip with its versions, the trash and the raw files reel kept) into a new folder named like
+`reel copy 2026-11-04 2130`, in a folder you pick: a backup drive, or a USB drive to take to another
+PC. reel goes on while it copies, and every file is read back and checked before the folder gets
+its name. The copies under a size are left out; reel makes them again when they are asked for.
+
+A copy is good for two things:
+
+- **Keeping it.** If the drive with the library dies, the copy has every clip as it was when you
+  made it. Each copy is a folder of its own; delete the old ones you no longer need.
+- **Another PC.** Take the copy along, install reel there, and use it.
+
+To use a copy, on this PC or another one: Settings, This app, **Server**, **Library folder**,
+**Move**, and pick the copy's folder. reel takes up the library in it as it is and works in that
+folder from then on; the library it used before stays where it was, and picking that folder again
+goes back. To keep the copy itself as it is, copy its folder to where the library should live
+first, and pick that one. The copy's `README.txt` says the same.
 
 ## New versions
 

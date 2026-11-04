@@ -52,8 +52,9 @@ Desktop and the like), or a folder that holds one of them or reel
 itself. The page then says the folder is kept, and why.
 
 A standalone library stays in any case, in
-`%LOCALAPPDATA%\reel\library`. To remove it too, delete
-`%LOCALAPPDATA%\reel` after the uninstall.
+`%LOCALAPPDATA%\reel\library` or in the folder you moved it to (This
+app, **Server**, **Library folder** says which). To remove it too,
+delete `%LOCALAPPDATA%\reel` after the uninstall, and that folder.
 
 An uninstall without its page (`uninstall.exe /S`) keeps your settings
 and the clips folder.
