@@ -63,6 +63,7 @@ impl Env {
         self.wait_clip(|c| c.state == "ready", timeout).await
     }
     async fn wait_clip(&self, pred: impl Fn(&Clip) -> bool, timeout: Duration) -> Clip {
+        let timeout = timeout * SLOW;
         let start = Instant::now();
         loop {
             for row in self
@@ -80,6 +81,7 @@ impl Env {
         }
     }
     async fn wait_job_done(&self, job_id: &str, timeout: Duration) -> reel_store::models::Job {
+        let timeout = timeout * SLOW;
         let start = Instant::now();
         loop {
             let j = self.store().job(job_id).await.unwrap().expect("job row");
@@ -94,6 +96,7 @@ impl Env {
         }
     }
     async fn wait_no_jobs(&self, timeout: Duration) {
+        let timeout = timeout * SLOW;
         let start = Instant::now();
         loop {
             let (q, r) = self.store().job_counts().await.unwrap();
@@ -105,6 +108,10 @@ impl Env {
         }
     }
 }
+
+/// A wait's limit is stretched by this: on GitHub's four core runners the suite takes twenty
+/// minutes, and a clip's wait of 90 s ran out under that load.
+const SLOW: u32 = 3;
 
 async fn start(mode: AuthMode, trusted: Vec<&str>) -> Option<Env> {
     start_with(mode, trusted, |_| {}).await
