@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.11.2 (2026-11-04)
+
+### Bug Fixes
+
+* the app's updater opens downloaded updates with zip 9.3.0, past three security advisories in zip 4 (one of them critical)
+* the server and the app use rustls 0.23.46, past five security advisories
+
 ## 1.11.1 (2026-11-04)
 
 ### Bug Fixes
