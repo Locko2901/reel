@@ -121,6 +121,13 @@ impl Store {
         &self.pool
     }
 
+    /// SQLite's quick check of the whole file: "ok", or what is wrong.
+    pub async fn quick_check(&self) -> Result<String> {
+        sqlx::query_scalar("PRAGMA quick_check")
+            .fetch_one(&self.pool)
+            .await
+    }
+
     /// Closes every connection, so the file can be moved or removed.
     pub async fn close(&self) {
         self.pool.close().await

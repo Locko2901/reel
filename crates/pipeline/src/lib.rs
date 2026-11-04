@@ -18,6 +18,7 @@ pub mod jobs;
 pub mod lane;
 pub mod level;
 pub mod library;
+pub mod library_copy;
 pub mod logging;
 pub mod montage;
 pub mod notify;

@@ -14289,3 +14289,180 @@ async fn text_of(env: &Env, path: &str) -> (u16, String) {
         .unwrap();
     (r.status().as_u16(), r.text().await.unwrap())
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_copy_of_the_library_made_while_reel_works_opens_in_a_fresh_reel() {
+    use reel_pipeline::library_copy::{self, Phase};
+    use std::sync::atomic::AtomicBool;
+    let Some(env) = start_with(AuthMode::Single, vec![], |c| {
+        c.ingest.originals_dir = c.data_dir.join("originals");
+    })
+    .await
+    else {
+        return;
+    };
+    env.synth("2026-10-06 21-14-03.mkv", Synth::hevc_1440p(3.0, "kept"))
+        .await;
+    let kept = env
+        .wait_clip(
+            |c| c.state == "ready" && c.original_path.is_some(),
+            Duration::from_secs(180),
+        )
+        .await;
+    assert_eq!(
+        kept.original_path.as_deref(),
+        Some(format!("originals/{}.mkv", kept.id).as_str()),
+        "an original in the data folder is kept by a path relative to it"
+    );
+    env.synth("bin.mp4", Synth::small(2.0, "bin")).await;
+    let bin = env
+        .wait_clip(
+            |c| c.title == "bin" && c.state == "ready",
+            Duration::from_secs(90),
+        )
+        .await;
+    env.wait_no_jobs(Duration::from_secs(120)).await;
+    let r = env
+        .client
+        .delete(format!("{}/api/clips/{}", env.base, bin.id))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(r.status(), 200);
+
+    // reel at work while the copy runs: a clip that is encoded again comes in
+    env.synth("busy.mkv", Synth::hevc_1440p(4.0, "busy")).await;
+    let start = Instant::now();
+    while env.store().job_counts().await.unwrap().1 == 0 {
+        assert!(
+            start.elapsed() < Duration::from_secs(60) * SLOW,
+            "no job ran"
+        );
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    }
+    let into = env._dir.path().join("backup");
+    std::fs::create_dir_all(&into).unwrap();
+    let at = jiff::Zoned::now();
+    let seen = Arc::new(std::sync::Mutex::new(Vec::new()));
+    let s = seen.clone();
+    let done = library_copy::make(
+        &env.ctx,
+        &into,
+        &at,
+        Arc::new(AtomicBool::new(false)),
+        Arc::new(move |p: Phase, d: u64, t: u64| s.lock().unwrap().push((p, d, t))),
+    )
+    .await
+    .unwrap();
+    let (dir, part) = library_copy::names(&into, &at);
+    assert_eq!(done.dir, dir);
+    assert!(
+        !part.exists(),
+        "the unfinished folder has its name once checked"
+    );
+    assert!(done.clips >= 2 && done.bytes > 0, "{done:?}");
+    for f in ["reel.db", "README.txt", "library/.reel-library"] {
+        assert!(dir.join(f).is_file(), "{f} is in the copy");
+    }
+    assert!(dir.join("library/.trash").join(&bin.id).is_dir());
+    assert!(dir
+        .join("originals")
+        .join(format!("{}.mkv", kept.id))
+        .is_file());
+    assert!(
+        !dir.join("cache").exists(),
+        "the copies reel makes again stay out"
+    );
+    let phases: Vec<Phase> = seen.lock().unwrap().iter().map(|p| p.0).collect();
+    assert_eq!(phases.first(), Some(&Phase::Database));
+    assert_eq!(phases.last(), Some(&Phase::Checking));
+    env.wait_no_jobs(Duration::from_secs(180)).await;
+    let busy = env
+        .wait_clip(
+            |c| c.title == "busy" && c.state == "ready",
+            Duration::from_secs(10),
+        )
+        .await;
+    assert!(
+        env.ctx.config().clip_dir(&busy.id).is_dir(),
+        "reel went on with its work"
+    );
+
+    let copy = dir.clone();
+    let fresh = start_with(AuthMode::Single, vec![], move |c| {
+        c.data_dir = copy.clone();
+        c.ingest.originals_dir = copy.join("originals");
+    })
+    .await
+    .unwrap();
+    let start = Instant::now();
+    while !fresh.ctx.library.ready() {
+        assert!(
+            start.elapsed() < Duration::from_secs(20) * SLOW,
+            "the copy's library is not taken up: {:?}",
+            fresh.ctx.library.status()
+        );
+        tokio::time::sleep(Duration::from_millis(200)).await;
+    }
+    let again = fresh.store().clip(&kept.id).await.unwrap().unwrap();
+    assert_eq!(again.state, "ready");
+    assert_eq!(again.original_path, kept.original_path);
+    let gone = fresh.store().clip(&bin.id).await.unwrap().unwrap();
+    assert!(gone.deleted_at.is_some(), "the trash came with it");
+    let live = env.ctx.config().abs(
+        env.store()
+            .rendition(kept.current_id.as_deref().unwrap())
+            .await
+            .unwrap()
+            .unwrap()
+            .path
+            .as_deref()
+            .unwrap(),
+    );
+    let r = fresh
+        .client
+        .get(format!(
+            "{}/media/clips/{}/current.mp4",
+            fresh.base, kept.id
+        ))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(r.status(), 200);
+    assert_eq!(
+        r.bytes().await.unwrap().as_ref(),
+        std::fs::read(&live).unwrap().as_slice(),
+        "the clip plays from the copy, byte for byte"
+    );
+    let r = fresh
+        .client
+        .get(format!(
+            "{}/media/clips/{}/current.mp4",
+            fresh.base, kept.id
+        ))
+        .header("range", "bytes=0-99")
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(r.status(), 206, "a player can seek in it");
+    let r = fresh
+        .client
+        .get(format!("{}/media/clips/{}/original", fresh.base, kept.id))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(r.status(), 200, "the kept original is found in the copy");
+    let page = fresh
+        .client
+        .get(format!("{}/clips/{}", fresh.base, kept.id))
+        .send()
+        .await
+        .unwrap()
+        .text()
+        .await
+        .unwrap();
+    assert!(
+        !page.contains("file missing"),
+        "the clip's page finds every file"
+    );
+}

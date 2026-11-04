@@ -28,6 +28,8 @@
     "allow-library-get",
     "allow-library-plan",
     "allow-library-move",
+    "allow-library-copy-plan",
+    "allow-library-copy",
     "allow-library-stop",
     "allow-settings-get",
     "allow-settings-save",

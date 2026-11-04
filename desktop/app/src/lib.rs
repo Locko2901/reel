@@ -127,6 +127,8 @@ pub fn run() {
             commands::library_get,
             commands::library_plan,
             commands::library_move,
+            commands::library_copy_plan,
+            commands::library_copy,
             commands::library_stop,
             commands::settings_save,
             commands::hotkey_try,

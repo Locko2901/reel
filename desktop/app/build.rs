@@ -32,6 +32,8 @@ const COMMANDS: &[&str] = &[
     "library_get",
     "library_plan",
     "library_move",
+    "library_copy_plan",
+    "library_copy",
     "library_stop",
     "settings_save",
     "hotkey_try",

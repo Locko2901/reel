@@ -329,6 +329,13 @@ impl Store {
         .await
     }
 
+    /// Every clip, and whether it is in the trash: what a copy of the library carries.
+    pub async fn clip_places(&self) -> Result<Vec<(String, bool)>> {
+        sqlx::query_as("SELECT id, deleted_at IS NOT NULL FROM clip ORDER BY created_at")
+            .fetch_all(&self.pool)
+            .await
+    }
+
     /// The clips with a kept original, and its path as stored.
     pub async fn originals(&self) -> Result<Vec<(String, String)>> {
         sqlx::query_as(
