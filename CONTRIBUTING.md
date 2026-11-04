@@ -67,22 +67,6 @@ checksums): a change to the schema is a new numbered file.
   on every pull request (and `make desktop-check` when `desktop/` changed).
 - By contributing you agree that your work is released under the [MIT licence](LICENSE).
 
-## The repository's bot
-
-Two workflows make commits of their own: the weekly OBS bump (`obs-bump.yml`) opens a pull
-request, and the release job (`ci.yml`) pushes the lock files to release-please's pull request.
-With the workflows' own token, GitHub starts no checks for either. With a GitHub App of the
-repository's, the checks start by themselves. To set it up:
-
-1. Create a GitHub App (your account's Settings, Developer settings, GitHub Apps) with the
-   webhook off and two repository permissions, Contents and Pull requests, both read and write.
-2. Install it on this repository alone, and generate a private key on its page.
-3. In the repository's Settings, Secrets and variables, Actions: the variable
-   `REEL_BOT_APP_ID` with the app's ID, and the secret `REEL_BOT_PRIVATE_KEY` with the key.
-
-Without them, both workflows run as before: close and reopen the bump's pull request to start
-its checks.
-
 ## Security
 
 Please do not open a public issue for a vulnerability: see [SECURITY.md](SECURITY.md).

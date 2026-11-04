@@ -305,12 +305,12 @@ protocol too: every request type reel's code sends must be one OBS lists in its 
 answer (`desktop/ci/check-obs-requests.sh`). The list is read from the code
 (`desktop/ci/obs-requests.sh`), and `make desktop-check` fails when a request is named in a
 way that list would miss. `desktop/OBS.md` has what reel uses of OBS and what checks each,
-the owner's part included.
+the tests by hand included.
 
 The scheduled workflow `.github/workflows/obs-bump.yml` opens a pull request that moves the
 pin, and the version `THIRD_PARTY.md` names, when a newer stable OBS is out. It is a
 `fix(desktop):`, so once it is merged release-please releases reel with that OBS. Its body lists
-what the owner checks by hand on Windows. `make check` fails
+what to check by hand on Windows. `make check` fails
 when `THIRD_PARTY.md` names another OBS than the pin (`ci/check-obs-version.sh`), so a bump by
 hand changes both too.
 
