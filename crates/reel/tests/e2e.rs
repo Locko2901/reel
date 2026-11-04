@@ -110,7 +110,7 @@ impl Env {
 }
 
 /// A wait's limit is stretched by this: on GitHub's four core runners the suite takes twenty
-/// minutes, and a clip's wait of 90 s ran out under that load.
+/// minutes, and the longest waits come near their own limits at that pace.
 const SLOW: u32 = 3;
 
 async fn start(mode: AuthMode, trusted: Vec<&str>) -> Option<Env> {
@@ -687,6 +687,46 @@ async fn unreadable_file_is_parked_and_not_retried() {
     assert_eq!(f.state, "failed");
     let (q, r) = env.store().job_counts().await.unwrap();
     assert_eq!((q, r), (0, 0), "no retry loop");
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn two_synthetic_clips_of_one_spec_are_two_clips() {
+    let Some(env) = start(AuthMode::Single, vec![]).await else {
+        return;
+    };
+    let staged = env._dir.path().join("staged");
+    std::fs::create_dir_all(&staged).unwrap();
+    let mut files = Vec::new();
+    for name in ["twin 0.mp4", "twin 1.mp4"] {
+        let out = staged.join(name);
+        let mut args = Synth::small(2.0, "twin").args(&out);
+        // one x264 thread makes the same bytes every time, as a busy machine's threads can
+        let at = args.len() - 1;
+        args.splice(at..at, ["-threads".to_string(), "1".to_string()]);
+        env.ctx
+            .ff
+            .run(&args, 2.0, None)
+            .await
+            .expect("synthetic clip");
+        files.push(out);
+    }
+    assert!(
+        std::fs::read(&files[0]).unwrap() != std::fs::read(&files[1]).unwrap(),
+        "two synthetic clips of one spec are two files"
+    );
+    for f in &files {
+        std::fs::rename(f, env.incoming().join(f.file_name().unwrap())).unwrap();
+    }
+    let mut ids = Vec::new();
+    for _ in &files {
+        let clip = env
+            .wait_clip(
+                |c| c.state == "ready" && !ids.contains(&c.id),
+                Duration::from_secs(90),
+            )
+            .await;
+        ids.push(clip.id);
+    }
 }
 
 #[tokio::test(flavor = "multi_thread")]
