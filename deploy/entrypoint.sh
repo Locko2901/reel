@@ -1,6 +1,5 @@
 #!/bin/sh
-# Runs as root only to join the render device's group, whatever gid the host gives it, so no
-# gid is written into the compose file; then runs reel as reel.
+# Root only to join the render device's group, whatever gid the host gives it; then reel as reel.
 set -eu
 if [ "$(id -u)" != "0" ]; then
   exec reel "$@"

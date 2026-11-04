@@ -18,6 +18,5 @@ node_modules/
 /desktop/app/nsis/reel-stop.exe
 /desktop/app/nsis/reel-elevate.exe
 /desktop/.wine-standins
-# the user site as `make docs` builds it
 /site/
 /shots/
