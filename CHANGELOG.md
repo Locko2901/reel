@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.11.2](https://github.com/Locko2901/reel/compare/v1.11.1...v1.11.2) (2026-11-04)
+
+
+### Bug Fixes
+
+* **deps:** rustls 0.23.46, and zip 9 under the app's updater ([#14](https://github.com/Locko2901/reel/issues/14)) ([8b79941](https://github.com/Locko2901/reel/commit/8b7994107ddb3db91ea172889a8f44bb562b1833))
+
 ## 1.11.1 (2026-11-04)
 
 ### Bug Fixes
