@@ -1,5 +1,4 @@
-//! The OBS that comes with the app: the portable OBS beside it, and what the app writes into its
-//! settings.
+//! The OBS that comes with the app, and what the app writes into its settings.
 use crate::readback::{
     in_mode, merge3, merge_collection, merge_ini3, observe, overlay, take, Live, Taken, Written,
 };
@@ -11,7 +10,6 @@ use std::path::{Path, PathBuf};
 pub const PORT: u16 = 4466;
 /// The profile's and the scene collection's name.
 pub const NAME: &str = "reel";
-/// reel's files under OBS's settings folder.
 const PROFILE: &str = "obs-studio/basic/profiles/reel/basic.ini";
 const ENCODER: &str = "obs-studio/basic/profiles/reel/recordEncoder.json";
 const SCENES: &str = "obs-studio/basic/scenes/reel.json";
@@ -107,9 +105,7 @@ pub const TRACKS: [&str; 6] = [
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(default)]
 pub struct ObsSetup {
-    /// The setup was gone through once.
     pub done: bool,
-    /// How long a clip is: what the replay buffer keeps.
     pub clip_seconds: u32,
     pub quality: Quality,
     pub rate: RateMode,
@@ -140,7 +136,6 @@ pub struct ObsSetup {
     pub elevated: bool,
     /// The WebSocket password the app made; never shown.
     pub password: String,
-    /// What cleans the microphone, once there is one.
     pub noise: Noise,
     /// OBS's noise gate on the microphone as well, after the noise suppression.
     pub gate: bool,
@@ -710,7 +705,6 @@ pub struct Bundled {
     pub exe: PathBuf,
     pub config_root: PathBuf,
     pub platform: Platform,
-    /// OBS from Flathub, which `flatpak run` starts in its sandbox.
     pub flatpak: bool,
 }
 
@@ -968,7 +962,6 @@ impl Bundled {
                     .unwrap_or(false))
     }
 
-    /// Which OBS this is, for the pages.
     pub fn which(&self) -> String {
         if self.flatpak {
             "OBS from Flathub".to_string()
@@ -1021,7 +1014,6 @@ impl Bundled {
         self.config_root.join("obs-studio")
     }
 
-    /// Where this OBS writes its own log, one file a start.
     pub fn logs_dir(&self) -> PathBuf {
         self.obs_dir().join("logs")
     }
@@ -1306,7 +1298,6 @@ fn keep_restore_token(had: Option<&str>, collection: &mut Value) {
     }
 }
 
-/// `b`'s obs-websocket settings with what reel needs of them set.
 fn websocket_file(b: &Bundled, setup: &ObsSetup) -> String {
     let mut w: Value = std::fs::read_to_string(b.config_root.join(WEBSOCKET))
         .ok()
@@ -1319,7 +1310,6 @@ fn websocket_file(b: &Bundled, setup: &ObsSetup) -> String {
     serde_json::to_string_pretty(&w).unwrap_or_default()
 }
 
-/// What reel needs of obs-websocket: its own port and password, on, no alerts.
 fn websocket_config(setup: &ObsSetup) -> Value {
     json!({
         "first_load": false,
@@ -1331,7 +1321,6 @@ fn websocket_config(setup: &ObsSetup) -> Value {
     })
 }
 
-/// Every key of `wanted` set into `had`, the rest of `had` as it is.
 fn merge_ini(had: Option<String>, wanted: &str) -> String {
     let mut out = had.unwrap_or_default();
     let mut section = String::new();
@@ -1855,7 +1844,6 @@ mod tests {
             first.contains("RecRBTime=90") && first.contains("[Video]"),
             "the whole setup, the first time"
         );
-        // changed in OBS
         std::fs::write(&profile, "[General]\nName=reel\n\n[Output]\nMode=Simple\n\n[SimpleOutput]\nRecEncoder=nvenc\nRecRB=false\nRecRBTime=30\nFilePath=D:\\Mine\n").unwrap();
         let scenes = obs.join("basic/scenes/reel.json");
         std::fs::write(
@@ -2546,7 +2534,6 @@ mod tests {
         let mux = usr.join("bin/obs-ffmpeg-mux");
         std::fs::write(&mux, b"\x7fELF the muxer").unwrap();
         std::fs::set_permissions(&mux, std::fs::Permissions::from_mode(0o755)).unwrap();
-        // a copy an older version made
         let ours = dir.path().join("data/obs");
         std::fs::create_dir_all(ours.join("obs-studio/basic")).unwrap();
         std::fs::write(ours.join("reel-capture"), b"\x7fELF OBS 32").unwrap();

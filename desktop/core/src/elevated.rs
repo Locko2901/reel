@@ -8,7 +8,6 @@ pub enum Step {
     Install,
     /// The settings alone, when the setup changes.
     Write,
-    /// Removes the tasks and the copy.
     Remove,
 }
 
@@ -558,7 +557,6 @@ pub mod win {
         Ok(())
     }
 
-    /// An item's owner and access list as SDDL.
     pub fn sddl(p: &Path) -> Result<String, String> {
         let name = HSTRING::from(p.as_os_str());
         let mut sd = PSECURITY_DESCRIPTOR::default();
@@ -1162,7 +1160,6 @@ mod tests {
                 String::new()
             ))
         );
-        // The second task puts the app's word in $(Arg0): anything else does nothing.
         for bad in [
             &[][..],
             &["window"],

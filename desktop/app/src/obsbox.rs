@@ -18,7 +18,6 @@ pub struct BoxLine {
     pub line: String,
     pub shown: bool,
     pub version: String,
-    /// OBS runs with the highest rights.
     pub elevated: bool,
     /// The setup asks for the rights, and OBS runs without them: no task starts it.
     pub without_rights: bool,
@@ -298,8 +297,6 @@ async fn supervise(
         }
         let asked = setup.elevated && cfg!(windows);
         let copy_there = asked && copy.as_ref().is_some_and(|c| c.exe.is_file());
-        // without the task that starts OBS with the highest rights, it runs without them and
-        // says why
         let missing = match asked {
             true => rights_missing(copy_there).await,
             false => None,
@@ -409,7 +406,6 @@ async fn supervise(
                 },
             }
         }
-        // OBS starts hidden, and its main window is hidden once more when it first answers.
         if let Ok(mut l) = line.lock() {
             l.shown = false;
         }
@@ -698,7 +694,7 @@ fn show(reach: Reach, pid: u32, shown: bool) {
 }
 
 /// Asks OBS to close and ends it after the grace period, unless the cell was cleared on exit;
-/// an OBS with the highest rights is reached through a task, as Windows' UIPI drops our messages.
+/// an OBS with the highest rights is reached through a task: Windows' UIPI drops the app's messages.
 fn close_then_end(cell: &Arc<AtomicU32>, reach: Reach) {
     let pid = cell.load(Ordering::Relaxed);
     if pid == 0 {
@@ -792,9 +788,8 @@ async fn rights_missing(copy_there: bool) -> Option<String> {
     }
 }
 
-/// The OBS processes as the supervisor counts them: `obs`'s own (with the highest rights, one
-/// whose path Windows does not show while reel's task runs) and the user's own; reel's other
-/// OBS is ended rather than taken for the user's.
+/// `obs`'s processes and the user's own OBS; one with the highest rights shows no path while
+/// reel's task runs, and reel's other OBS is ended rather than taken for the user's.
 async fn reel_running(
     obs: &Bundled,
     bundled: &Bundled,

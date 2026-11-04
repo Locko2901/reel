@@ -14,7 +14,7 @@ const STALE_SECS: u64 = 24 * 3600;
 /// How the update is put in place on this PC.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Kind {
-    /// The Windows installer, with OBS's thousands of files or without them.
+    /// The Windows installer, with OBS or without.
     Windows { with_obs: bool },
     /// The new AppImage written over the one reel runs from.
     AppImage,
@@ -259,7 +259,6 @@ mod tests {
                 "New: the installers in a light window".to_string()
             ))
         );
-        // an app of 1.9 leaves no note: the version alone says it
         assert_eq!(
             after(None, "1.10.0", "1.9.1", None).unwrap().1,
             "From 1.9.1."

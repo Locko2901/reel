@@ -1,4 +1,3 @@
-// The microphone's noise suppression in words, for the setup and This app's OBS page.
 const COST = {
   off: 'the microphone as it comes, at no cost',
   speex: 'takes steady hiss and hum; very little CPU',

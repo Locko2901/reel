@@ -1,5 +1,4 @@
-// The setup of the OBS that came with the app: seven steps, each with its default, saved once at
-// Finish. OBS runs with the defaults from the choice on, so the audio step can show its levels.
+// The bundled OBS's setup, saved at Finish; OBS runs on the defaults meanwhile so the audio step has levels.
 import { $, $$, invoke, listen, toast } from './shell.js';
 import { isOn, setOn } from './assets/js/switch.js';
 import { keycaps, recorder, recordersOffOnLeave } from './hotkeys.js';
@@ -69,8 +68,7 @@ function size(mb) {
   return mb >= 1000 ? `${(mb / 1024).toLocaleString('en', { maximumFractionDigits: 1 })} GB` : `${Math.round(mb)} MB`;
 }
 
-// OBS keeps the whole replay buffer in memory, so past a quarter of the PC's the game is short
-// of it; a clip larger than the paired server takes is refused there.
+// OBS keeps the whole replay buffer in memory: past a quarter of the PC's, the game runs short.
 let memoryMb;
 async function warnings(v) {
   if (memoryMb === undefined) {
@@ -177,8 +175,6 @@ async function testEncoders() {
   if (step === 'encoder') renderEncoders();
 }
 
-// On Linux reel's OBS is the installed one, run a second time; the screen comes through
-// PipeWire on Wayland, a game through obs-vkcapture where OBS has it.
 const linux = () => !!(status && status.obs_linux);
 function plugin(has, what) {
   if (has === true) return null;
@@ -213,8 +209,7 @@ function renderCapture() {
 }
 
 let devicesTried = 0;
-// The devices as Windows lists them, asked once, so the step never waits for OBS to list them;
-// null where the system gives no list, and OBS's own stands in.
+// Windows' own device list, so the step never waits for OBS; null where there is none and OBS's stands in.
 let winDevices;
 async function renderAudio() {
   await tracksByDefault();
@@ -260,7 +255,6 @@ async function renderAudio() {
   }
 }
 
-// A level row for each chosen source alone, and where each goes.
 let plan = { sources: [], words: [], apart: false };
 async function renderSources() {
   plan = await audioPlan(setup());
@@ -275,8 +269,6 @@ async function renderSources() {
   wordsInto($('#audio-words'), plan.words);
 }
 
-// The game alone: the game in front (its game capture's own sound, with the game capture on)
-// or a program of the user's choice, from the windows open now.
 let programs;
 async function renderGameAudio() {
   const s = setup(), sel = $('#game-audio');
@@ -302,7 +294,6 @@ async function renderGameAudio() {
     : 'only a program\'s sound, the one you pick (the game in front is there with its capture on)';
 }
 
-// The user's own OBS's microphone, whose filters are offered when it has some.
 let ownMic;
 async function renderNoise() {
   const s = setup();
@@ -329,7 +320,6 @@ function setLevel(name, db) {
   if (status && status.obs && status.obs.connected) invoke('obs_volume', { input: name, db }).catch(() => {});
 }
 
-// Each source on a track of its own once more than one is chosen, unless the switch was set by hand.
 let tracksTouched = false;
 async function tracksByDefault() {
   const p = await audioPlan(setup());
@@ -345,7 +335,6 @@ async function sourcesChanged() {
   liveFilters();
 }
 
-// The meters: OBS's levels of the devices picked, once OBS answers.
 function levels() {
   invoke('obs_meters', { on: true }).catch(() => {});
   if (setup().desktop) invoke('obs_input_set', { input: 'Desktop audio', settings: { device_id: setup().desktop_audio } }).catch(() => {});
@@ -353,7 +342,6 @@ function levels() {
   liveFilters();
 }
 
-// What the OBS that came with the app is doing, in words, for a page that waits on it.
 function obsWords(what) {
   const box = status && status.obs_box;
   if (!box) return `${what} once it runs`;
@@ -361,8 +349,6 @@ function obsWords(what) {
   return `${what} once it answers: ${box.line}`;
 }
 
-// A wait of more than a few seconds on OBS, or anything wrong with it, is said on every step,
-// with OBS's windows and the log a click away.
 let unanswered = null;
 function renderObsNotice() {
   renderObsBar(status);
@@ -484,12 +470,9 @@ async function save(force = false) {
   settings = await invoke('settings_save', { settings, force });
 }
 
-// After a Finish that saved everything but one part, Next leaves for the app's pages.
 let finishedTo = null;
 let finishing = false;
 
-// One step in Program Files at a time: while one runs, its switch and Finish wait, and the
-// line says what runs.
 function renderStepping() {
   const doing = status && status.obs_step;
   $('#elevated').disabled = !!doing;

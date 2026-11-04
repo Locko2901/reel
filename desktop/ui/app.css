@@ -1,4 +1,3 @@
-/* The app's own pages on reel's stylesheet: only what reel's pages do not have. */
 header.top [data-page].disabled, nav.sections [data-page].disabled { opacity: 0.5; pointer-events: none; }
 .group { scroll-margin-top: 66px; }
 .srow .err .again { margin-left: 8px; }
@@ -22,7 +21,6 @@ button.hotkey .unset { color: var(--text-3); }
 .meter i { display: block; height: 100%; width: 0; background: var(--ok); }
 .wizard[data-step="choose"] { grid-template-columns: minmax(0, 1fr); max-width: 760px; }
 .wizard[data-step="choose"] .steps { display: none; }
-/* A row whose controls need more than the control column: under its label. */
 .srow.wide { grid-template-columns: minmax(0, 1fr); }
 #where-notice { margin-bottom: var(--s2); }
 .srow.wide .sctl { justify-content: flex-start; }
@@ -31,10 +29,8 @@ details.advanced { margin-top: var(--gap-in); }
 details.advanced > summary { cursor: pointer; color: var(--text-2); font-size: var(--fs-s); padding: 6px 0; width: max-content; }
 details.advanced > summary:hover { color: var(--text); }
 details.advanced[open] > summary { margin-bottom: var(--s2); }
-/* A source's switch and its device on one line; a level's slider and its number too. */
 .srow .sctl .switch + select { max-width: calc(100% - 34px - var(--s2)); }
 .srow .sctl .vol { display: inline-flex; align-items: center; gap: var(--s2); }
-/* While OBS's window is up: the bar under the header, on every step and page. */
 .obs-bar { position: sticky; top: 48px; z-index: 4; margin-bottom: var(--s3); }
 .route-words span { display: block; color: var(--text-2); }
 .update-notes { white-space: pre-wrap; font-size: var(--fs-s); color: var(--text-2); max-height: 320px; overflow: auto; }

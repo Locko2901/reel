@@ -1077,7 +1077,6 @@ mod tests {
         );
         assert_eq!(t.mic, None, "muted in OBS: off");
         assert!(!t.game, "the game capture removed in OBS");
-        // an elevated OBS takes the Save key itself
         let up = ObsSetup {
             elevated: true,
             ..s.clone()

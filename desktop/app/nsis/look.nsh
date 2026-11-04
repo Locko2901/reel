@@ -228,7 +228,6 @@ Var ReelArt
       StrCpy $1 ${REEL_W}
       StrCpy $2 ${REEL_H}
     ${EndIf}
-    ; the window at that size, its frame kept, in the middle of its screen's work area
     !insertmacro REEL_PX $1 $1
     !insertmacro REEL_PX $2 $2
     System::Call '*(i, i, i, i) p .r3'
@@ -365,7 +364,6 @@ Var ReelArt
       IntOp $5 ${REEL_SMALL_M} + 58
       !insertmacro REEL_PLACE $0 ${REEL_SMALL_M} $5 $3 60
     ${Else}
-      ; the title, the bar and its line inside the page, in the middle under the wordmark
       IntOp $3 ${REEL_W} - ${REEL_M}
       IntOp $3 $3 - ${REEL_M}
       IntOp $4 ${REEL_H} - 62

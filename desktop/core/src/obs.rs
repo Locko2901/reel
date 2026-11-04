@@ -1000,7 +1000,6 @@ mod tests {
         );
     }
 
-    /// One connection with a password, a saved replay, GetVersion and GetRecordDirectory.
     async fn fake_obs(
         password: &'static str,
         salt: &'static str,
@@ -1109,7 +1108,6 @@ mod tests {
         );
     }
 
-    /// Profile parameters over a map, answering until the client hangs up.
     async fn fake_obs_profile(advanced: bool) -> (u16, tokio::task::JoinHandle<Vec<String>>) {
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
         let port = listener.local_addr().unwrap().port();

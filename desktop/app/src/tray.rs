@@ -1,4 +1,3 @@
-//! The tray menu, rebuilt whenever the status changes.
 use crate::status::Status;
 use reel_desktop_core::settings::TrayIcon;
 use tauri::image::Image;
@@ -20,8 +19,6 @@ fn act(id: &str, label: impl Into<String>, on: bool) -> Item {
     Item::Act(id.into(), label.into(), on)
 }
 
-/// The menu for a status. Standalone has no link to make or copy, and Pause uploads only while
-/// a server is paired.
 pub fn items(st: &Status) -> Vec<Item> {
     let standalone = st.mode == "standalone";
     let mut out = vec![

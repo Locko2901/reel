@@ -78,8 +78,6 @@ pub fn from_args(args: &[String]) -> Asked {
     }
 }
 
-/// The buttons use protocol activation so they reach the app from the notification centre
-/// after the toast has gone, or when the app is not running.
 /// A notification of Windows that shows and makes no sound: reel's own cues are its sounds.
 pub fn plain_toast_xml(title: &str, body: &str) -> String {
     format!(
@@ -91,6 +89,8 @@ pub fn plain_toast_xml(title: &str, body: &str) -> String {
 
 const SILENT: &str = "<audio silent=\"true\"/>";
 
+/// The buttons use protocol activation, so they reach the app from the notification centre
+/// after the toast has gone, or when the app is not running.
 pub fn toast_xml(title: &str, body: &str, clip: &str, copy: bool) -> String {
     let open = Link::Open(clip.to_string()).url();
     let copy = if copy {

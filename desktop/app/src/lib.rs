@@ -37,7 +37,6 @@ fn action(args: &[String]) -> Option<&'static str> {
 
 static STARTED: std::sync::OnceLock<std::time::Instant> = std::sync::OnceLock::new();
 
-/// Logs a step of the start with its time since the app started.
 fn start_step(what: &str) {
     let at = STARTED.get().map(|t| t.elapsed()).unwrap_or_default();
     tracing::info!(at = %updates::secs(at), "start: {what}");
@@ -265,7 +264,6 @@ pub fn run() {
                     g.settings.server_url.clone(),
                 )
             };
-            // a new install, or a connected app with no server yet
             let first_run = fresh || (!standalone && server_url.is_empty());
             let wizard = {
                 let g = rt.lock();
@@ -296,7 +294,6 @@ pub fn run() {
             if wizard {
                 shell::show(app.handle(), shell::View::Setup, None);
             } else if first_run && standalone {
-                // the library is on this PC, so OBS is what is left to connect
                 shell::show(app.handle(), shell::View::Settings, Some("obs"));
             } else if first_run {
                 shell::show(app.handle(), shell::View::Settings, Some("server"));

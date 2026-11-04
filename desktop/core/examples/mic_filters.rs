@@ -1,5 +1,4 @@
-//! The requests the app sends a running OBS to set the microphone's filters, for a check to
-//! send to a real one: each request as two lines, its type, then its data.
+//! The requests that set a running OBS's microphone filters, two lines each: type, then data.
 //! Usage: mic_filters <off|speex|rnnoise> <gate|no-gate> < GetSourceFilterList's answer
 use reel_desktop_core::bundled::{filter_requests, Noise, ObsSetup};
 use std::io::Read;

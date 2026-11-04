@@ -1,4 +1,4 @@
-// This app, the app's own Settings section: every row saves as it changes, like reel's Settings page.
+// The app's own Settings section: every row saves as it changes.
 import { $, $$, APP_SECTIONS, applyShape, invoke, listen, markSection, mount, renderParts, runSave, saveButtons, sectionsNav, toast } from './shell.js';
 import { isOn, setOn } from './assets/js/switch.js';
 import { keycaps, recorder, recordersOffOnLeave } from './hotkeys.js';
@@ -47,8 +47,7 @@ function read(row) {
   return ctl.value;
 }
 
-// The switch for games that run as administrator shows its own click until the answer, then
-// the setting the newest status says, whatever order the answers and the events come in.
+// The elevated switch shows its click until every answer is in, whatever order answers and events come in.
 let elevatedAsks = 0;
 function syncElevated() {
   if (elevatedAsks > 0 || !status || !settings || status.obs_elevated === undefined) return;
@@ -62,7 +61,6 @@ async function save(row, force = false) {
   const next = JSON.parse(JSON.stringify(settings));
   set(next, key, read(row));
   const err = $('.err', row);
-  // The switch that runs a step in Program Files waits for its answer.
   const held = key === 'obs.setup.elevated' && $(CTL, row);
   if (held) { elevatedAsks++; held.disabled = true; }
   let answer;
@@ -83,7 +81,6 @@ async function save(row, force = false) {
     elevatedAsks--;
     syncElevated();
     held.disabled = !!(status && status.obs_step) || elevatedAsks > 0;
-    // Declined or taken with newer ones: the switch shows what is, and the line under it why.
     if (!answer || get(answer, key) !== get(next, key)) { if (status) renderBundled(); return; }
   }
   if (!answer) return;
@@ -95,7 +92,6 @@ async function save(row, force = false) {
   if (key.startsWith('obs.setup.') && status) renderBundled();
 }
 
-// What the standalone library's cap would move to the trash at the size typed, before it is set.
 let capAsk = () => {}, capAt = 0;
 function capLine() {
   const field = $('.srow[data-key="standalone.cap_gb"] input'), line = $('#cap-line');
@@ -153,8 +149,6 @@ function bindHotkeys() {
   recordersOffOnLeave();
 }
 
-// One of the app's pages shows at a time; opening one pushes a history entry, so Back and
-// Forward walk them as they walk the server's sections.
 let current = 'status';
 function sections() {
   history.scrollRestoration = 'manual';
@@ -204,12 +198,9 @@ function sections() {
   });
 }
 
-// What the app's state hides stays hidden when a section opens or the filter runs.
+// data-off keeps it hidden when a section opens or the filter runs.
 function off(el, yes) { el.toggleAttribute('data-off', yes); el.hidden = yes; }
 
-// data-standalone: "hide" is off in standalone, "paired" off there until a server is paired,
-// "only" on there alone; data-standalone-text holds standalone's own words. data-os keeps a
-// row or a choice to one system, and data-linux-text holds Linux's words.
 function renderMode() {
   const here = status.mode === 'standalone', os = status.linux ? 'linux' : 'windows';
   for (const el of $$('[data-standalone], [data-os]')) {
@@ -341,9 +332,7 @@ function renderLocal() {
   $('#local-ffmpeg').textContent = f.name ? `${f.name}, ${f.license}; source ${f.source}; build ${f.build_page}; the licence text is ${f.license_file} next to the app` : '';
 }
 
-// The user's own OBS's microphone, whose filters are offered when it has some.
 let ownMicApp = null;
-// A quality, an encoder or a format set in OBS that no option here names shows as OBS has it.
 function renderChoicesApp() {
   if (!settings || !status) return;
   const s = settings.obs.setup;
@@ -356,7 +345,6 @@ function renderChoicesApp() {
   }
 }
 
-// What a clip hears: a volume for each chosen source beside its meter, and where each goes.
 let appDevices, appPrograms;
 async function renderLevelsApp() {
   if (!settings || !status) return;
@@ -410,8 +398,6 @@ async function saveLevel(name, db) {
   catch (e) { toast(String(e.message || e), 'err'); }
 }
 
-// The clip length's cost: the replay buffer's memory, and a word when it passes a quarter of
-// the PC's memory or the clip is longer than the server takes.
 let memoryMbApp;
 async function renderLengthApp() {
   if (!settings || !status || !status.bundled) return;
@@ -441,7 +427,6 @@ function renderNoiseApp() {
   if (ownMicApp) $('#own-mic-app-help').textContent = ownMicWords(ownMicApp);
 }
 
-// The copy of OBS in Program Files that OBS for games that run as administrator runs from.
 function renderCopyApp() {
   const c = status.obs_copy, s = settings && settings.obs.setup;
   const elevated = !!(s && s.elevated && status.obs_box);
@@ -480,14 +465,12 @@ function renderCopyApp() {
   $('#copy-app-help').textContent = help;
 }
 
-// The OBS that came with the app; while it is in use the panels for an OBS of one's own step aside.
 function renderBundled() {
   const box = status.obs_box, inUse = !!box;
   off($('#bundled-panel'), !status.bundled);
   $('#bundled-line').textContent = box ? box.line : (status.bundled ? 'not in use; the app connects to your own OBS' : '');
   renderObsBar(status);
-  // With OBS running as administrator the app cannot show its windows. On Wayland no app may
-  // show or hide another's window, so on Linux OBS keeps its own tray icon.
+  // Wayland lets no app show or hide another's window: on Linux OBS keeps its own tray icon.
   const lin = !!status.obs_linux;
   if (lin) {
     const enc = $('[data-key="obs.setup.encoder"] select');
@@ -515,7 +498,6 @@ function renderBundled() {
   renderLevelsApp();
   renderLengthApp();
   renderCopyApp();
-  // One step in Program Files at a time: while it runs, nothing that starts one.
   const doing = status.obs_step;
   for (const b of [$('#elevated-app-row .switch'), $('#copy-app-put'), $('#bundled-setup')]) b.disabled = !!doing;
   if (elevatedAsks > 0) $('#elevated-app-row .switch').disabled = true;
@@ -535,7 +517,6 @@ function renderBundled() {
     : 'OBS tells the app the moment a replay is saved (Tools, WebSocket Server Settings, enable the server). The folder watch below stays on as a safety net.';
 }
 
-// What was read from OBS, shown in the rows; a control in use is left as it is.
 async function doneInObs(r, always, quiet) {
   status = r.status;
   takeSettings(r.settings);
@@ -679,8 +660,7 @@ function renderStatus() {
   $('#update-releases').hidden = !here;
 }
 
-// release-please's Markdown as plain text: no heading marks, a dot for a list's star, a link's
-// words without its address.
+// release-please's Markdown as plain text, a link reduced to its words.
 function plainNotes(text) {
   return text.split('\n').map((l) => l.replace(/^#+\s*/, '').replace(/^\s*[*-]\s+/, '\u2022 ')
     .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1').replace(/\s*\(\s*\)/g, '')).join('\n').replace(/\n{3,}/g, '\n\n');
@@ -816,8 +796,6 @@ function bindButtons() {
   $('#log-folder').onclick = () => invoke('open_log_folder').catch(e => toast(String(e.message || e), 'err'));
 }
 
-// The header and the nav follow the server: a pairing, a mode switch or a server out of
-// reach changes what they show, so the shape is asked for again then.
 async function reshape() {
   const key = status ? `${status.mode}|${status.server_url}|${status.paired}|${!!status.offline}` : '';
   if (key === shapeKey) return;

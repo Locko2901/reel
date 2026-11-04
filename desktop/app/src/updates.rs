@@ -223,7 +223,7 @@ pub async fn check(rt: &Runtime, by_hand: bool) -> Result<(), String> {
         set_line(rt, format!("not asked: {e}"));
         return Ok(());
     }
-    // reel light sends no flavour, as apps before the two installers did
+    // reel light sends no flavour, the request of an app older than the two installers
     let flavour = if rt.lock().bundled.is_some() {
         "&flavour=with-obs"
     } else {

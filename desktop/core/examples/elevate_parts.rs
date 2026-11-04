@@ -198,7 +198,6 @@ mod hammer {
         *seed
     }
 
-    /// The settings staged for the copy, as the app hands them to each step.
     fn staged(dir: &Path, rel: &str, out: &mut Vec<(String, String)>) {
         for e in std::fs::read_dir(dir).into_iter().flatten().flatten() {
             let name = format!("{rel}{}", e.file_name().to_string_lossy());

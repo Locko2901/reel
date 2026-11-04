@@ -23,7 +23,7 @@ fn manager(app: &AppHandle) -> Option<State<'_, GlobalShortcut<Wry>>> {
 pub use reel_desktop_core::settings::HotkeyAction as Action;
 
 /// Ctrl+, opens the settings while the window has the focus. On Linux it stays registered:
-/// the library's unregister waits on the main thread for the next X event, which froze the app.
+/// the library's unregister waits on the main thread for the next X event and freezes the app.
 pub fn settings_shortcut(app: &AppHandle, focused: bool) {
     if (cfg!(target_os = "linux") && !focused) || manager(app).is_none() {
         return;

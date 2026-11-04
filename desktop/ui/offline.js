@@ -1,4 +1,4 @@
-// The page shown in place of the server's when it cannot be reached; it never needs the server.
+// Shown when the server cannot be reached, so it must never need the server.
 import { $, invoke, listen, mount, renderParts, toast } from './shell.js';
 
 let status = null;
@@ -31,8 +31,7 @@ async function main() {
     } catch (e) { toast(String(e.message || e), 'err'); }
   };
   try { status = await invoke('status_get'); render(); } catch (e) { $('#offline-words').textContent = 'no shell'; }
-  // the page stays only while the server is out of reach; reached from the history
-  // afterwards, it goes back to the server's pages by itself
+  // reached from the history once the server is back, the page leaves for the server's pages
   if (status && !status.offline) invoke('offline_retry').catch(() => {});
   await listen('status', (ev) => { status = ev.payload; render(); });
 }

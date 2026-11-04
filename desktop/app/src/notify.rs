@@ -27,7 +27,6 @@ pub fn show(app: &AppHandle, title: &str, body: &str) {
     }
 }
 
-/// The notification plugin's own, which sets no sound.
 #[cfg(not(target_os = "linux"))]
 fn by_plugin(app: &AppHandle, title: &str, body: &str) {
     use tauri_plugin_notification::NotificationExt;

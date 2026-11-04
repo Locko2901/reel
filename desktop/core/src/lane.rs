@@ -602,14 +602,12 @@ mod tests {
         saved: Settings,
         copy: bool,
         task: bool,
-        /// The running OBS: with the rights or not, and since when.
         obs: Option<(bool, Instant)>,
         held: u32,
         holds: (u32, u32),
         inside: u32,
         most_inside: u32,
         prompts: u32,
-        /// OBS asked to close while still starting takes no close and is ended after the grace.
         slow_closes: u32,
         starts: u32,
         starts_while_waiting: u32,
@@ -634,7 +632,6 @@ mod tests {
         Seen(mpsc::Sender<(bool, u32)>),
     }
 
-    /// Windows, Program Files, Task Scheduler and OBS as the steps see them, at `u` a second.
     struct World {
         w: Mutex<W>,
         u: Duration,
@@ -795,7 +792,6 @@ mod tests {
         *seed
     }
 
-    /// The page's switch as app.js runs it: held while its own request waits or a step runs.
     fn page(lane: Arc<Lane>, world: &Arc<World>, mut seed: u64) -> mpsc::Sender<Ev> {
         let (tx, rx) = mpsc::channel::<Ev>();
         *world.page.lock().unwrap() = Some(tx.clone());
@@ -874,7 +870,6 @@ mod tests {
         lane
     }
 
-    /// A ticket per request, the copy checked inside the step and OBS let go after every turn.
     #[derive(Default)]
     struct Tickets {
         m: Mutex<(u64, u64)>,
@@ -924,8 +919,6 @@ mod tests {
         t
     }
 
-    /// On, Remove; then on, off, on about a second apart, the first while the OBS the Remove
-    /// let start is still starting.
     fn remove_then_on_off_on(u: Duration, ask: impl Fn(bool) + Sync) {
         std::thread::scope(|s| {
             ask(false);
@@ -968,8 +961,7 @@ mod tests {
         let lane = new_lane(&world);
         let page = page(lane.clone(), &world, 7);
         settled(&lane, u);
-        // The page holds its switch while a request waits, so the later clicks come from
-        // elsewhere: the setup's switch, the tray, a script.
+        // The page holds its switch while a request waits: the later clicks come from elsewhere.
         let elsewhere = |want: bool| {
             let _ = lane.ask(Ask::Save(switched(!want, want)));
         };

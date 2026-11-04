@@ -26,12 +26,10 @@ pub struct Settings {
     pub startup: StartupSettings,
     /// In colour, or the mark alone in one colour for a tray whose icons are all one colour.
     pub tray_icon: TrayIcon,
-    /// The app's own updates from the paired server.
     pub updates: UpdateMode,
     /// The version that last ran, so the start after an update can say from which.
     pub last_version: String,
-    /// The app version that last asked Windows to update the copy of OBS for games that run as
-    /// administrator; it asks again only at another version.
+    /// The app version that last asked to update the copy of OBS; only another version asks again.
     pub copy_update_asked: String,
     pub log_level: String,
     /// WebView2's own audio process, for a PC where the default fails; a start with
@@ -98,7 +96,6 @@ pub struct ObsSettings {
     pub start_replay: bool,
     /// The app runs the OBS that came with it instead of connecting to the one above.
     pub bundled: bool,
-    /// What the setup chose for the OBS that came with the app.
     pub setup: crate::bundled::ObsSetup,
     /// The setup was skipped for now: the app opens on its pages.
     pub setup_later: bool,
@@ -181,7 +178,6 @@ pub struct HotkeySettings {
     pub save: String,
 }
 
-/// What a hotkey does.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum HotkeyAction {
     ShareLast,

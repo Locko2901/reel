@@ -8,7 +8,6 @@ function fpsWord([n, d]) {
   return d === 1 ? String(n) : (n / d).toFixed(3).replace(/0+$/, '').replace(/\.$/, '');
 }
 
-// The labels of what was set in OBS and no option here names.
 export function customVideo(s) {
   const v = s.custom_video;
   return v ? `In OBS: ${v.output[0]}x${v.output[1]} at ${fpsWord(v.fps)} fps` : 'As set in OBS';
@@ -29,7 +28,6 @@ export function syncCustom(select, s) {
   o.textContent = customVideo(s);
 }
 
-// Lays into a page's draft the fields a reading of OBS changed.
 export function takeInto(draft, before, after) {
   const b = before.obs.setup, a = after.obs.setup;
   for (const k of Object.keys(a)) {

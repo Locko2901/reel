@@ -187,7 +187,7 @@ impl Local {
     }
 }
 
-/// The pinned ffmpeg build from desktop/ffmpeg/pinned.json, for the Status page.
+/// The pinned ffmpeg build, for the Status page.
 pub fn ffmpeg_pin() -> serde_json::Value {
     serde_json::from_str(include_str!("../../ffmpeg/pinned.json")).unwrap_or_default()
 }

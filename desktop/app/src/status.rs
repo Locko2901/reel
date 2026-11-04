@@ -101,8 +101,6 @@ pub struct Status {
     /// Wayland, through X11 otherwise.
     pub obs_linux: bool,
     pub wayland: bool,
-    /// The app runs on Linux, where nothing reports a fullscreen game and the GPU encoders are
-    /// tried in Linux's order.
     pub linux: bool,
     /// Linux, once reel's OBS answered: whether it has the PipeWire audio capture plugin
     /// (a program's audio alone) and obs-vkcapture (a game's picture).

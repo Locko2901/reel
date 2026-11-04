@@ -37,7 +37,6 @@ pub fn kill(pid: u32) {
     sys::kill(pid)
 }
 
-/// Every process, with its program's path where the system says it.
 pub fn processes() -> Vec<crate::install::Process> {
     sys::processes()
 }
@@ -1152,8 +1151,6 @@ mod tests {
             minimized: false,
         };
         let main = "OBS 32.2.2 - Portable Mode - Profile: reel - Scenes: reel";
-        // As Windows lists OBS's windows: hidden helpers (one with the main title), a dialog,
-        // an error box.
         let mut ws = vec![
             w(1, main, true, false, true),
             w(2, "GDI+ Window (obs64.exe)", false, false, false),

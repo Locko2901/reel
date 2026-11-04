@@ -78,7 +78,6 @@ pub struct Inner {
     /// Saves waiting for OBS's word that the replay is written, in the order OBS took them,
     /// a Save and share's with its token.
     pub save_waits: VecDeque<(oneshot::Sender<PathBuf>, Option<CancellationToken>)>,
-    /// When a save was last pressed: a press within DOUBLE_TAP of it does nothing.
     pub last_save: Option<std::time::Instant>,
     /// Saves whose sound played when OBS took them, so their files come without one.
     pub cued_saves: Vec<std::time::Instant>,
@@ -100,7 +99,6 @@ pub struct Inner {
     pub update_bytes: Option<Vec<u8>>,
     pub update_line: String,
     pub update_told: Option<String>,
-    /// When the server was last asked for an update.
     pub update_checked_at: Option<std::time::SystemTime>,
     /// The version this one replaced, at its first start after an update.
     pub updated_from: Option<String>,
@@ -880,7 +878,6 @@ impl Runtime {
         })
     }
 
-    /// The app's version beside its server's, for the pill.
     fn versions(&self, g: &Inner) -> crate::status::Versions {
         let current = self.app.package_info().version.to_string();
         let shown = reel_desktop_core::version_line();
@@ -1126,7 +1123,6 @@ impl Runtime {
             tray::set_icon(&self.app, new.tray_icon);
         }
         if new.mode != old.mode {
-            // the previous mode's update offer and line go with it
             {
                 let mut g = self.lock();
                 g.update = None;
@@ -1184,9 +1180,8 @@ impl Runtime {
         }
     }
 
-    /// The hotkeys of this mode, each with whether the app registers it: standalone has Save a
-    /// clip alone (the other three make a link or upload), and with the highest rights OBS takes
-    /// Save a clip itself, as only that one reaches a game run as administrator.
+    /// The hotkeys of this mode, each with whether the app registers it; with the highest rights
+    /// OBS takes Save a clip itself, as only its hotkey reaches a game run as administrator.
     fn live_hotkeys<'a>(
         &self,
         s: &'a Settings,
@@ -1859,7 +1854,6 @@ impl Runtime {
         tokio::task::block_in_place(|| lane.ask(reel_desktop_core::lane::Ask::Again)).map(|_| ())
     }
 
-    /// Starts the supervisor again with the setup as it is, after the copy was made.
     fn restart_bundled(&self) {
         let s = self.settings();
         if let Some(bx) = self.lock().obs_box.clone() {
@@ -2366,8 +2360,6 @@ impl Runtime {
         })
     }
 
-    /// Right after a connection: read what OBS is set to, follow its folder, and start the
-    /// replay buffer when the setting says so.
     fn obs_connected(&self) {
         let rt = self.clone();
         tauri::async_runtime::spawn(async move {
@@ -2908,7 +2900,6 @@ impl Runtime {
         });
     }
 
-    /// Standalone: takes in the clips found that are not in the library yet.
     fn take_in_found(&self) {
         let found: Vec<PathBuf> = self
             .lock()
@@ -3111,8 +3102,6 @@ impl Runtime {
         });
     }
 
-    /// A save that gave no replay: said at once, in a notification and on the tray's line,
-    /// until OBS saves the next one.
     fn save_failed(&self, why: &str) {
         tracing::warn!(why, "no replay saved");
         self.lock().save_problem = Some(why.to_string());
@@ -3572,8 +3561,7 @@ impl Runtime {
         self.watch(nonce, base);
     }
 
-    /// The library is another one now: its front page loads, unless the user is in the app's
-    /// settings or setup.
+    /// The library is another one now: its front page loads.
     fn library_changed(&self) {
         if shell::owner_busy(&self.app) {
             self.lock().offline = None;
@@ -3706,7 +3694,6 @@ impl Runtime {
         silent
     }
 
-    /// Shows the fallback page in place of the server's and starts the tries.
     fn go_offline(&self, nonce: u64, why: Unreachable) {
         {
             let mut g = self.lock();
@@ -3750,8 +3737,6 @@ impl Runtime {
         });
     }
 
-    /// One try: probe, and when the server answers, load its page, unless the user is in the
-    /// app's settings or setup.
     async fn try_again(&self) {
         let base = self.library_base();
         if base.is_empty() {
@@ -3867,7 +3852,6 @@ impl Runtime {
         }
     }
 
-    /// Standalone: the shape straight from the reel in this process.
     async fn local_shape(&self) -> Option<Shape> {
         let local = self.local()?;
         let state = local.state.clone();

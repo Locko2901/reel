@@ -422,7 +422,6 @@ fn has_server(app: &AppHandle) -> bool {
         .unwrap_or(false)
 }
 
-/// Standalone: reloads the library for a new clip, only while it is on the front page.
 pub fn reload_library_if_home(app: &AppHandle) {
     if let Some(library) = app.get_webview(LIBRARY) {
         if let Ok(url) = library.url() {

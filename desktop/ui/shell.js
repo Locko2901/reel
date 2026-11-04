@@ -1,5 +1,4 @@
-// The app's own pages wear reel's header and section nav; every link goes to the server's page
-// in this same webview, so the browser's Back comes back here.
+// reel's header and nav for the app's own pages; links open in this webview, so Back comes back here.
 import { isOn, setOn, switches } from './assets/js/switch.js';
 import { mouseWalk } from './assets/js/walk.js';
 
@@ -26,13 +25,12 @@ export function goServer(path) {
 
 function serverHref(path) { return base ? base + path : path; }
 
-// The app's own pages under Settings, one entry each, as the server's page lists them too.
+// web/templates/settings.html lists the same entries.
 export const APP_SECTIONS = [
   ['status', 'Status'], ['server', 'Server'], ['obs', 'OBS'], ['clips', 'Clips folder and cache'], ['upload', 'Upload'],
   ['hotkeys', 'Hotkeys'], ['sounds', 'Sounds'], ['startup', 'Startup'], ['log', 'Log'],
 ];
 
-// The worst of several states, for the one dot of the chip.
 const WORST = ['err', 'warn', 'active', 'ok', 'neutral'];
 const worst = (states) => WORST.find(s => states.includes(s)) || 'ok';
 const APP_DOT = { error: 'err', unpaired: 'err', paused: 'warn', uploading: 'active', working: 'active', preparing: 'active', idle: 'ok' };
@@ -52,7 +50,7 @@ function setPart(id, state, word, line) {
   $('.muted', dd).textContent = line || '';
 }
 
-// reel's header as the server draws it: the user, the server's health, the jobs count.
+// Fills reel's header from the server's shape: the user, the server's health, the jobs count.
 export function applyShape(shape, baseUrl) {
   base = (baseUrl || '').replace(/\/$/, '');
   followServer();
@@ -81,8 +79,8 @@ export function applyShape(shape, baseUrl) {
   else { el.textContent = ''; el.className = 'count'; el.title = ''; }
 }
 
-// The server's stylesheet replaces the app's copy once loaded, so the pages match whichever is
-// newer; the copy's fonts stay, as the server sends its fonts to its own pages alone.
+// The server's stylesheet replaces the app's copy once loaded; the copy's fonts stay, as the
+// server sends its fonts to its own pages alone.
 function followServer() {
   const own = document.querySelector('link[rel="stylesheet"][href="assets/reel.css"]');
   let link = document.querySelector('link[data-server-css]');
@@ -106,7 +104,6 @@ function followServer() {
   own.after(link, fonts);
 }
 
-// reel's section nav: the server's sections, then the group "This app" with the app's own pages.
 export function sectionsNav(shape, current) {
   const nav = $('nav.sections');
   if (!nav) return;
@@ -145,12 +142,10 @@ export function markSection(current) {
   });
 }
 
-// Alt+Left and Alt+Right walk the history here: Windows' webview does it itself, the Linux one does not.
 export function bindHeader() {
   mouseWalk();
   document.addEventListener('click', (e) => {
-    // only a link or a button with a page, never the body's own data-page, which every
-    // click bubbles up to
+    // not the body's own data-page, which every click bubbles up to
     const a = e.target.closest('a[data-page], button[data-page]');
     if (!a || a.classList.contains('disabled')) return;
     e.preventDefault();
@@ -197,6 +192,7 @@ export function bindHeader() {
   });
   let chord = '';
   document.addEventListener('keydown', (e) => {
+    // Windows' webview walks the history on Alt+Left and Alt+Right itself, the Linux one does not.
     if (e.altKey && !e.ctrlKey && !e.metaKey) {
       if (e.key === 'ArrowLeft') { e.preventDefault(); history.back(); }
       if (e.key === 'ArrowRight') { e.preventDefault(); history.forward(); }
@@ -213,7 +209,6 @@ export function bindHeader() {
   });
 }
 
-// The app's parts in the header, as reel's pages draw them from app_status.
 export function renderParts(status) {
   modeParts(status);
   const app = APP_DOT[status.state] || 'ok';
@@ -238,14 +233,11 @@ export function renderParts(status) {
   $$('header.top [data-page], nav.sections [data-page]').forEach(a => a.classList.toggle('disabled', !hasPages));
 }
 
-// One number while the app and its server match, both while they differ; a coloured dot only
-// for an update ready or the app newer than its server.
 export function renderVersions(v, line) {
   if (!v) return;
   setPart('part-versions', v.standing === 'update' || v.standing === 'out' ? 'active' : v.standing === 'ahead' ? 'warn' : '', v.words, line || '');
 }
 
-// The parts of the header and the section nav that follow the mode, as the app's panel says.
 function modeParts(status) {
   const p = status.panel || {};
   here = status.mode === 'standalone';
@@ -261,7 +253,6 @@ function modeParts(status) {
   else setPart('part-server', serverState, 'on this PC', serverLine);
 }
 
-// Save clip and Save and share run what the two hotkeys run, off with the reason while they cannot.
 const SAVE_WHAT = ['OBS saves the replay and it goes up as any clip does', 'OBS saves the replay, the app uploads it and copies the link'];
 export function saveButtons(status, save, saveShare) {
   [[save, status.save], [saveShare, status.save_share]].forEach(([b, a], i) => {
@@ -276,7 +267,7 @@ export async function runSave(which) {
   try { const r = await invoke(which); toast(r.line, 'ok'); } catch (e) { toast(String(e.message || e), 'err'); }
 }
 
-// The header as reel's base template writes it, for both of the app's pages.
+// The header as web/templates/base.html writes it.
 export function header(page) {
   const cur = (p) => (p === page ? ' aria-current="page"' : '');
   return `<header class="top">

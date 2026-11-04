@@ -1,5 +1,5 @@
-; Shared by both installers' hooks. OBS's obs64.exe runs under a name of reel's; the firewall
-; rule names the program, so a rule for the old name is told apart without reading netsh.
+; OBS's obs64.exe runs under a name of reel's; the firewall rule names the program, so a rule
+; for the old name is told apart without reading netsh.
 !define REEL_OBS_EXE "reel-capture.exe"
 !define REEL_OBS_EXE_BEFORE "obs64.exe"
 !define REEL_OBS_RULE "reel: the bundled OBS (reel-capture.exe) takes no inbound connections"
@@ -19,8 +19,7 @@
   !insertmacro REEL_TIME "${TEXT}"
 !macroend
 
-; Each step with its time since the installer's start, in logs\installer.log, to read beside
-; the app's own log.
+; Each step with its time since the installer's start, in logs\installer.log.
 Var ReelTimes
 Var ReelT0
 Var ReelReadyAt

@@ -186,7 +186,7 @@ VIAddVersionKey "ProductVersion" "${VERSION}"
 !define MUI_CUSTOMFUNCTION_GUIINIT ReelLook
 !define MUI_CUSTOMFUNCTION_UNGUIINIT un.ReelLook
 
-; Pages in the order they show. OBS's licence, which nobody has to accept, is a line on the first.
+; OBS's licence, which nobody has to accept, is a line on the first page, not a page.
 Var ReelPage
 Var ReelInstalled
 Var ReelDesktop
@@ -963,7 +963,6 @@ Section Uninstall
     DeleteRegKey HKCU "${UNINSTKEY}"
   !endif
 
-  ; Autostart stays on an update.
   ${If} $UpdateMode <> 1
     DeleteRegValue HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "${PRODUCTNAME}"
   ${EndIf}
@@ -1009,7 +1008,6 @@ Function un.SkipIfPassive
 FunctionEnd
 
 Function CreateOrUpdateStartMenuShortcut
-  ; shortcuts of an install whose binary had the product's name
   StrCpy $R0 0
 
   !insertmacro IsShortcutTarget "$SMPROGRAMS\$AppStartMenuFolder\${PRODUCTNAME}.lnk" "$INSTDIR\$OldMainBinaryName"
@@ -1048,7 +1046,6 @@ Function CreateOrUpdateStartMenuShortcut
 FunctionEnd
 
 Function CreateOrUpdateDesktopShortcut
-  ; shortcuts of an install whose binary had the product's name
   !insertmacro IsShortcutTarget "$DESKTOP\${PRODUCTNAME}.lnk" "$INSTDIR\$OldMainBinaryName"
   Pop $0
   ${If} $0 = 1

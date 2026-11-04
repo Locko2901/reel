@@ -1,5 +1,4 @@
-// The hotkey recorder: the app's own hotkeys are off while a field listens, so pressing one is
-// recorded rather than run; the shell tries a combination before it is saved.
+// The hotkey recorder; the app's hotkeys are off while a field listens, so a press is recorded, not run.
 import { $, invoke } from './shell.js';
 
 const TYPES_NOTHING = /^(F\d{1,2}|Pause|ScrollLock|Insert|PrintScreen|Media(PlayPause|Stop|TrackNext|TrackPrevious)|AudioVolume(Up|Down|Mute))$/;

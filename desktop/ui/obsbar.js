@@ -1,5 +1,5 @@
-// The bar on every step and page while OBS's window is up, with Hide OBS, after which what was
-// changed in OBS is read back. `done` gets {taken, settings, status}, and what `prepare` gave.
+// The bar while OBS's window is up; after Hide OBS what changed is read back, and `done` gets
+// {taken, settings, status} and what `prepare` gave.
 import { $, invoke, toast } from './shell.js';
 
 export function renderObsBar(status) {

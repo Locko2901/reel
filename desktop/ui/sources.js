@@ -1,4 +1,4 @@
-// What a clip hears: the chosen sources, a level row with its meter for each, and where each goes.
+// What a clip hears: the chosen audio sources and a level row for each.
 import { $$, invoke } from './shell.js';
 
 export async function audioPlan(setup) {
@@ -21,8 +21,7 @@ function levelRow(name, onLevel) {
   return row;
 }
 
-// The level rows of `box` made the chosen sources' and nothing else, a row kept as it is
-// while it is still chosen; `onLevel(name, db, done)`.
+// Rows of `box` for the chosen sources only, a row kept while still chosen; `onLevel(name, db, done)`.
 export function renderLevelRows(box, sources, volumes, onLevel) {
   const had = new Map($$('.srow[data-vol]', box).map((r) => [r.dataset.vol, r]));
   const rows = sources.map((s) => had.get(s.name) || levelRow(s.name, onLevel));
