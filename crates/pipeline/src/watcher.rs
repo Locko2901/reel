@@ -108,9 +108,10 @@ pub async fn poll_once(ctx: &Ctx) -> anyhow::Result<usize> {
                 }
                 ctx.store.upsert_ingest_file(&f).await?;
             }
+            // a file never taken starts over once it is back; a taken one only when it changed
             Some(mut f)
-                if (f.state == "failed" || f.state == "done" || f.state == "gone")
-                    && f.size != size =>
+                if f.state == "gone"
+                    || ((f.state == "failed" || f.state == "done") && f.size != size) =>
             {
                 f.size = size;
                 f.stable_polls = 0;

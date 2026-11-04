@@ -690,6 +690,49 @@ async fn unreadable_file_is_parked_and_not_retried() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn a_file_out_of_sight_for_a_poll_is_taken_when_it_is_back() {
+    // the watcher's own poll runs once at the start; the test polls by hand
+    let Some(env) = start_with(AuthMode::Single, vec![], |c| {
+        c.ingest.poll_seconds = 3600;
+        c.ingest.stable_polls = 2;
+    })
+    .await
+    else {
+        return;
+    };
+    assert_eq!(
+        reel_pipeline::library::check(&env.ctx).await,
+        reel_pipeline::library::Status::Ready
+    );
+    let staged = env._dir.path().join("staged");
+    std::fs::create_dir_all(&staged).unwrap();
+    let name = "back again.mp4";
+    let (away, here) = (staged.join(name), env.incoming().join(name));
+    env.synth_at(&staged, name, Synth::small(2.0, "back again"))
+        .await;
+    let row = || async { env.store().ingest_file(name).await.unwrap().unwrap() };
+    let poll = || async { reel_pipeline::watcher::poll_once(&env.ctx).await.unwrap() };
+    std::fs::rename(&away, &here).unwrap();
+    poll().await;
+    assert_eq!(row().await.state, "seen");
+    // moved out and back, or a network folder that listed nothing for a moment
+    std::fs::rename(&here, &away).unwrap();
+    poll().await;
+    assert_eq!(row().await.state, "gone");
+    std::fs::rename(&away, &here).unwrap();
+    for _ in 0..=env.ctx.config().ingest.stable_polls {
+        poll().await;
+    }
+    let f = row().await;
+    assert!(
+        f.clip_id.is_some(),
+        "taken after the stable polls once it is back: {f:?}"
+    );
+    let clip = env.wait_ready(Duration::from_secs(90)).await;
+    assert_eq!(clip.source_name, name);
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn two_synthetic_clips_of_one_spec_are_two_clips() {
     let Some(env) = start(AuthMode::Single, vec![]).await else {
         return;
