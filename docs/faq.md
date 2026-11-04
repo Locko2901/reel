@@ -1,6 +1,6 @@
-# FAQ
+# Questions
 
-Short answers to what people ask first, each with the page that says
+Short answers to what you might ask first, each with the page that says
 more.
 
 ## The basics
