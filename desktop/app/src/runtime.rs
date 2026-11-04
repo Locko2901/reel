@@ -97,6 +97,7 @@ pub struct Inner {
     pub newest_share: Option<CancellationToken>,
     pub update: Option<tauri_plugin_updater::Update>,
     pub update_bytes: Option<Vec<u8>>,
+    /// Empty in standalone while the line is what reel on this PC's read of the releases found.
     pub update_line: String,
     pub update_told: Option<String>,
     pub update_checked_at: Option<std::time::SystemTime>,
@@ -348,6 +349,10 @@ impl Runtime {
         tracing::info!(backend = %player.backend().name(), "cue player");
         let (paused_tx, _) = watch::channel(false);
         let (queue_tx, queue_rx) = mpsc::unbounded_channel::<PathBuf>();
+        let first_line = match settings.mode {
+            Mode::Standalone => String::new(),
+            _ => "not checked yet".to_string(),
+        };
         let inner = Inner {
             paths,
             settings,
@@ -396,7 +401,7 @@ impl Runtime {
             newest_share: None,
             update: None,
             update_bytes: None,
-            update_line: "not checked yet".into(),
+            update_line: first_line,
             update_told: None,
             update_checked_at: None,
             updated_from: None,
@@ -800,22 +805,14 @@ impl Runtime {
             server_admin: g.who.as_ref().map(|w| w.admin).unwrap_or(false),
             normalize_new: g.who.as_ref().and_then(|w| w.normalize_new),
             loudness_target: g.who.as_ref().and_then(|w| w.loudness_target),
-            update_line: if standalone {
+            update_line: if standalone && g.update_line.is_empty() {
                 standalone_update_line(&g, &self.app.package_info().version.to_string())
             } else {
                 g.update_line.clone()
             },
-            update_version: g
-                .update
-                .as_ref()
-                .filter(|_| !standalone)
-                .map(|u| u.version.clone()),
-            update_notes: g
-                .update
-                .as_ref()
-                .filter(|_| !standalone)
-                .and_then(|u| u.body.clone()),
-            update_before: g.update.as_ref().filter(|_| !standalone).map(|u| {
+            update_version: g.update.as_ref().map(|u| u.version.clone()),
+            update_notes: g.update.as_ref().and_then(|u| u.body.clone()),
+            update_before: g.update.as_ref().map(|u| {
                 let kind = reel_desktop_core::update_steps::Kind::here(g.bundled.is_some());
                 let on_quit = g.settings.updates == UpdateMode::OnQuit && g.update_bytes.is_some();
                 reel_desktop_core::update_steps::before(&u.version, kind, on_quit)
@@ -894,7 +891,9 @@ impl Runtime {
             g.who.as_ref().and_then(|w| w.newest_release.clone())
         } else {
             let (latest, newer) = standalone_release(g, &current);
-            if newer {
+            if update.is_some() {
+                standing = "update";
+            } else if newer {
                 standing = "out";
             }
             latest

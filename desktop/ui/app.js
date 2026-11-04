@@ -657,13 +657,13 @@ function renderStatus() {
   $('#update-notes').textContent = plainNotes(status.update_notes || '');
   $('#update-install').hidden = !status.update_version;
   $('#update-install').textContent = status.update_version ? `Install reel ${status.update_version}` : 'Install';
-  $('#update-releases').hidden = !here;
+  $('#update-releases').hidden = !here || !!status.update_version;
 }
 
 // release-please's Markdown as plain text, a link reduced to its words.
 function plainNotes(text) {
   return text.split('\n').map((l) => l.replace(/^#+\s*/, '').replace(/^\s*[*-]\s+/, '\u2022 ')
-    .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1').replace(/\s*\(\s*\)/g, '')).join('\n').replace(/\n{3,}/g, '\n\n');
+    .replace(/\*\*([^*]+)\*\*/g, '$1').replace(/\[([^\]]+)\]\([^)]*\)/g, '$1').replace(/\s*\(\s*\)/g, '')).join('\n').replace(/\n{3,}/g, '\n\n');
 }
 
 function renderDiscord() {

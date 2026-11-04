@@ -1,7 +1,8 @@
 # Updating
 
 A new reel is one pull on the server, and the apps paired with it are
-offered the same version by themselves. This page covers updating the
+offered the same version by themselves. A standalone app installs the
+newest release when you ask it to. This page covers updating the
 server, choosing which versions it follows, going back, and the desktop
 app.
 
@@ -117,17 +118,36 @@ default) decides whether paired apps are offered updates at all.
 
 ### Standalone
 
-With no server, nothing offers the app updates and nothing asks by
-itself. Under This app, Startup, **Updates**, **Check now** reads the
-newest release, and **Open the releases** opens the
-[releases page](https://github.com/Locko2901/reel/releases) with its
-installers ([Standalone](setup/standalone.md#new-versions)). Install
-the new version over the one you have:
+With no server, the app takes its updates from reel's releases on
+GitHub, and it asks only when you ask:
 
-- **Windows**: run the installer of the package you have, **reel** over
-  reel, **reel light** over reel light (This app, Startup, **Versions**
-  names it). Its page says **Update reel** or **Update reel light** and
-  names the version on this PC; press **Update**. It closes reel
-  first, and your settings and your library stay.
+- **Check now** under This app, Startup, **Updates** asks for the newest
+  release when you press it.
+- Settings, **Advanced**, **Check for updates** (off in standalone until
+  you turn it on) asks once a day.
+
+When a newer reel is out, the update goes as it does for a paired app:
+the app takes the installer of its own package from the release (reel
+for reel, reel light for reel light, the AppImage for the AppImage),
+checks its signature against the key built into it, and **Install**
+puts it in place. **New versions** in the same panel decides what a
+newer release found by the daily check does; **Check now** offers one
+either way. Until the release job has put the installers on a new
+release, the panel says the release has none for this app yet.
+
+A standalone app of 1.11 or earlier cannot install an update by itself:
+its Updates panel says the new version is out and points at the
+releases page. Install that release by hand once, the same way as the
+first; from then on the app installs its updates itself.
+
+- **Windows**: download the installer of the package you have from the
+  [releases page](https://github.com/Locko2901/reel/releases) (**Open
+  the releases** under Updates opens it), **reel** over reel, **reel
+  light** over reel light (This app, Startup, **Versions** names it),
+  and run it. Its page says **Update reel** or **Update reel light** and
+  names the version on this PC; press **Update**. It closes reel first,
+  and your settings and your library stay.
 - **AppImage**: quit reel and replace the file with the new one.
-- **.deb**: `sudo apt install ./reel_<version>_amd64.deb`.
+
+The `.deb` never updates itself: download the next one from the releases
+page and install it with `sudo apt install ./reel_<version>_amd64.deb`.

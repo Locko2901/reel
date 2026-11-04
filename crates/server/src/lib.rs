@@ -279,6 +279,7 @@ pub fn router(state: AppState) -> Router {
         .route("/api/library/card/{id}", get(routes::pages::library_card))
         .route("/api/library/summary", get(routes::pages::library_summary))
         .route("/api/health", get(routes::health::healthz))
+        .route("/api/app/update", get(routes::device::release_update))
         .merge(
             Router::new()
                 .route("/shares", get(routes::pages::shares))

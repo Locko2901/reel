@@ -1,0 +1,6 @@
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "the public key of the tests' throwaway signing key"
+paths = ['''^desktop/app/tests/release/key\.pub$''']

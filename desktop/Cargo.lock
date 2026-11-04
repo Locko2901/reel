@@ -4476,6 +4476,7 @@ version = "1.11.2"
 dependencies = [
  "anyhow",
  "ashpd",
+ "axum",
  "base64 0.22.1",
  "futures-util",
  "gtk",

@@ -69,9 +69,18 @@ Save and share, Share the last clip and Copy link make links, and links need a s
 
 ## New versions
 
-Nothing asks by itself. Under Settings, This app, **Startup**, **Updates**, **Check now** reads
-the newest release, and **Open the releases** opens the page with its installers. Install the new
-version over this one, the same way as the first; your settings and your library stay.
+Nothing asks by itself. Under Settings, This app, **Startup**, **Updates**, **Check now** asks
+GitHub for the newest release; Settings, **Advanced**, **Check for updates** asks once a day
+instead, when you turn it on. When a newer reel is out, **Install reel** and the release's notes
+appear there and in the tray menu. The app takes the installer of its own package from the
+release (reel, reel light or the AppImage), checks its signature, and puts it in place; your
+settings and your library stay. On Windows, reel closes, its installer shows its progress in a
+small window, and reel opens again by itself ([Updates](../desktop-app.md#updates) has every
+step).
+
+A standalone app of 1.11 or earlier cannot install an update itself: install the new version by
+hand once, from the releases page (**Open the releases** opens it), the same way as the first.
+The `.deb` never updates itself.
 
 ## Add a server later
 

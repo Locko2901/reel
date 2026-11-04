@@ -11,11 +11,21 @@ pub struct UpdateState {
     pub error: Option<String>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct Release {
     pub version: String,
     pub url: String,
     pub published_at: String,
+    pub notes: String,
+    /// Each file at the address a browser downloads it from, which is no API request.
+    pub assets: Vec<Asset>,
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+pub struct Asset {
+    pub name: String,
+    #[serde(rename = "browser_download_url")]
+    pub url: String,
 }
 
 impl UpdateState {
@@ -54,7 +64,11 @@ struct GithubRelease {
     tag_name: String,
     html_url: String,
     #[serde(default)]
-    published_at: String,
+    published_at: Option<String>,
+    #[serde(default)]
+    body: Option<String>,
+    #[serde(default)]
+    assets: Vec<Asset>,
 }
 
 pub fn parse_release(json: &str) -> Result<Release, String> {
@@ -62,13 +76,21 @@ pub fn parse_release(json: &str) -> Result<Release, String> {
     Ok(Release {
         version: r.tag_name.trim_start_matches('v').to_string(),
         url: r.html_url,
-        published_at: r.published_at,
+        published_at: r.published_at.unwrap_or_default(),
+        notes: r.body.unwrap_or_default(),
+        assets: r.assets,
     })
 }
 
 pub async fn check_once(ctx: &Ctx) -> UpdateState {
+    check_at(ctx, &crate::app_update::github_api()).await
+}
+
+/// The repository's latest release from GitHub's API at `api`; the request carries reel's
+/// version and nothing else.
+pub async fn check_at(ctx: &Ctx, api: &str) -> UpdateState {
     let repo = ctx.config().advanced.update_repo.clone();
-    let url = format!("https://api.github.com/repos/{repo}/releases/latest");
+    let url = format!("{}/repos/{repo}/releases/latest", api.trim_end_matches('/'));
     let client = reqwest::Client::builder()
         .timeout(Duration::from_secs(15))
         .user_agent(format!("reel/{}", reel_core::VERSION))
@@ -80,9 +102,16 @@ pub async fn check_once(ctx: &Ctx) -> UpdateState {
             .header("accept", "application/vnd.github+json")
             .send()
             .await
-            .map_err(|e| e.to_string())?;
+            .map_err(|e| unreached(&e))?;
         if resp.status().as_u16() == 404 {
             return Err(format!("{repo} has no release yet"));
+        }
+        let spent = resp
+            .headers()
+            .get("x-ratelimit-remaining")
+            .is_some_and(|v| v.as_bytes() == b"0");
+        if spent && matches!(resp.status().as_u16(), 403 | 429) {
+            return Err("GitHub's limit for this address is spent (60 questions an hour without an account); it answers again within the hour".into());
         }
         if !resp.status().is_success() {
             return Err(format!("GitHub answered {}", resp.status()));
@@ -97,11 +126,14 @@ pub async fn check_once(ctx: &Ctx) -> UpdateState {
             latest: Some(r),
             error: None,
         },
-        Err(e) => UpdateState {
-            checked_at: Some(now()),
-            latest: ctx.updates.read().await.latest.clone(),
-            error: Some(e),
-        },
+        Err(e) => {
+            tracing::warn!(error = %e, "the newest release was not read");
+            UpdateState {
+                checked_at: Some(now()),
+                latest: ctx.updates.read().await.latest.clone(),
+                error: Some(e),
+            }
+        }
     };
     *ctx.updates.write().await = state.clone();
     if let Some(r) = state.newer() {
@@ -112,6 +144,23 @@ pub async fn check_once(ctx: &Ctx) -> UpdateState {
         });
     }
     state
+}
+
+/// A request that got no answer, in words without its address.
+fn unreached(e: &reqwest::Error) -> String {
+    let mut cause = e.to_string();
+    let mut src = std::error::Error::source(e);
+    while let Some(s) = src {
+        cause = s.to_string();
+        src = s.source();
+    }
+    if e.is_timeout() {
+        "GitHub did not answer in time".into()
+    } else if e.is_connect() {
+        format!("GitHub could not be reached ({cause})")
+    } else {
+        format!("the request to GitHub failed ({cause})")
+    }
 }
 
 pub async fn run(ctx: Ctx) {
@@ -157,6 +206,22 @@ mod tests {
         .unwrap();
         assert_eq!(r.version, next);
         assert!(r.url.ends_with(&format!("v{next}")));
+        assert_eq!(r.notes, "notes");
+        assert!(r.assets.is_empty());
+        let with_files = parse_release(r#"{"tag_name":"v2.0.0","html_url":"h","published_at":null,"body":null,"assets":[{"name":"reel_2.0.0_amd64.AppImage","browser_download_url":"https://github.com/o/r/releases/download/v2.0.0/reel_2.0.0_amd64.AppImage","url":"https://api.github.com/repos/o/r/releases/assets/1"}]}"#).unwrap();
+        assert_eq!(
+            with_files.assets,
+            vec![Asset {
+                name: "reel_2.0.0_amd64.AppImage".into(),
+                url: "https://github.com/o/r/releases/download/v2.0.0/reel_2.0.0_amd64.AppImage"
+                    .into()
+            }],
+            "a file at the address a browser downloads it from, which needs no API request"
+        );
+        assert_eq!(
+            (with_files.notes.as_str(), with_files.published_at.as_str()),
+            ("", "")
+        );
         let state = UpdateState {
             checked_at: None,
             latest: Some(r),

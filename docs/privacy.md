@@ -139,6 +139,14 @@ PC, and the app talks only to OBS on the same PC, over OBS's WebSocket on
 the newest version when you press it, and Settings, **Advanced**, **Check
 for updates** turns a daily check on.
 
+When that check finds a newer reel, the app reads the signature of its
+installer from the same release, and downloads the installer itself when
+you press **Install** (or right away, when **New versions** is set to
+install when the app quits). It checks the signature against the key
+built into it before it installs anything. Each of these requests goes to
+GitHub with reel's version in its user agent and nothing else: no token,
+no account, nothing of yours.
+
 Paired with a server, the app also talks to **your server**, at the
 address you paired it with: the clips it uploads, the library its window
 shows, the links it makes, and once a day the question whether a newer

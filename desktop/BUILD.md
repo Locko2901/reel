@@ -70,9 +70,14 @@ These run the installers and their helpers under Wine. They work on the installe
 | `make desktop-start-check` | the app of reel, with OBS, started under Wine over an older copy in Program Files |
 | `make desktop-installer-shots` | every page of both installers as a PNG, into `shots/installer/` |
 | `make desktop-installer-audit` | the same at 100, 125 and 150 %, into `shots/installer-audit/` |
+| `make desktop-release-update` | a standalone app's update from a stand-in release: the app's test built for Windows finds reel light through reel on this PC, refuses it forged, and runs it signed as an update does; the installer installs and starts reel again |
 
 `desktop-installer-shots` and `desktop-installer-audit` need `DESKTOP_VERSION` set to the
-version in the installers' names.
+version in the installers' names. `desktop-release-update` needs reel light of `DESKTOP_VERSION`
+signed: build it with `TAURI_SIGNING_PRIVATE_KEY` set (a key of your own made with `cargo tauri
+signer generate` does), and name that key's `.pub`, put in `$DESKTOP_OUT`, in `RELEASE_PUBKEY`
+(as `/out/<name>.pub`) unless it is the release key. With `UPDATE_FROM=github` it takes reel
+light from GitHub's newest release instead, checked against the release key.
 
 ### Variables
 
