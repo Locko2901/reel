@@ -1,8 +1,8 @@
 use crate::accounts::{
-    hash_password, Backend, Credentials, OidcPending, SessionUser, OIDC_PENDING,
+    self, hash_password, Backend, Credentials, LinkRefused, OidcPending, SessionUser, OIDC_PENDING,
     OIDC_PENDING_MINUTES, SIGNED_IN_AT,
 };
-use crate::auth::{client_ip, same_origin, User, SETUP_CODE_KEY};
+use crate::auth::{client_ip, error_page, same_origin, User, SETUP_CODE_KEY};
 use crate::error::{AppError, AppResult};
 use crate::routes::{html, html_status};
 use crate::AppState;
@@ -294,12 +294,21 @@ pub async fn oidc_start(
     State(st): State<AppState>,
     auth: AuthSession<Backend>,
 ) -> AppResult<Response> {
+    to_provider(&st, &auth, None).await
+}
+
+async fn to_provider(
+    st: &AppState,
+    auth: &AuthSession<Backend>,
+    link: Option<String>,
+) -> AppResult<Response> {
     let Some(oidc) = st.oidc.as_ref() else {
         return Err(AppError::Busy(
             "the identity provider is not reachable; the log says why".into(),
         ));
     };
-    let (url, pending) = oidc.start();
+    let (url, mut pending) = oidc.start();
+    pending.link = link;
     auth.session
         .insert(OIDC_PENDING, pending)
         .await
@@ -363,6 +372,16 @@ pub async fn oidc_callback(
         tracing::warn!(error = %e, "oidc sign-in failed");
         AppError::Forbidden(format!("the sign-in did not verify: {e}"))
     })?;
+    if let Some(token) = &pending.link {
+        if let Err(why) = accounts::redeem_link(&st.ctx.store, token, &identity).await? {
+            tracing::warn!(subject = %identity.subject, why = %why, "link refused");
+            return Ok(error_page(
+                StatusCode::CONFLICT,
+                &why.to_string(),
+                why.what_now(),
+            ));
+        }
+    }
     let user = auth
         .authenticate(Credentials::Identity(identity))
         .await
@@ -373,6 +392,32 @@ pub async fn oidc_callback(
     finish_login(&mut auth, &user, true, st.ctx.config().auth.session_days).await?;
     tracing::info!(user = %user.name, "signed in through the identity provider");
     Ok(Redirect::to("/").into_response())
+}
+
+/// A link an admin made: the sign-in through the provider that follows binds its user.
+pub async fn oidc_link(
+    State(st): State<AppState>,
+    auth: AuthSession<Backend>,
+    Path(token): Path<String>,
+) -> AppResult<Response> {
+    if st.ctx.config().auth.mode != AuthMode::Oidc {
+        return Ok(error_page(
+            StatusCode::GONE,
+            "This reel does not sign in through an identity provider.",
+            "Sign in on the sign-in page.",
+        ));
+    }
+    let why = match accounts::user_by_link(&st.ctx.store, &token).await? {
+        None => LinkRefused::Gone,
+        Some(u) if u.linked_to(&st.ctx.config().auth.oidc_issuer) => LinkRefused::Linked(u.name),
+        Some(u) if u.disabled_at.is_some() => LinkRefused::Disabled(u.name),
+        Some(_) => return to_provider(&st, &auth, Some(token)).await,
+    };
+    Ok(error_page(
+        StatusCode::GONE,
+        &why.to_string(),
+        why.what_now(),
+    ))
 }
 
 pub async fn list_users(State(st): State<AppState>) -> AppResult<Json<Value>> {
@@ -444,6 +489,7 @@ pub async fn create_user(
 
 #[derive(Deserialize)]
 pub struct PatchUser {
+    pub name: Option<String>,
     pub role: Option<String>,
     pub disabled: Option<bool>,
     pub password: Option<String>,
@@ -458,6 +504,22 @@ pub async fn patch_user(
     let user = st.ctx.store.user(&id).await?.ok_or(AppError::NotFound)?;
     let admins = st.ctx.store.admin_count().await?;
     let last_admin = user.is_admin() && user.disabled_at.is_none() && admins <= 1;
+    if let Some(name) = &body.name {
+        // behind a proxy or as the single user the name is who you are: renamed, you would come
+        // back as somebody new
+        let by_name = matches!(
+            st.ctx.config().auth.mode,
+            AuthMode::Proxy | AuthMode::Single
+        );
+        if by_name && user.id == me.id {
+            return Err(AppError::Conflict(
+                "you come in by this name; another admin, or reel users rename, renames you".into(),
+            ));
+        }
+        accounts::rename(&st.ctx.store, &user, name)
+            .await
+            .map_err(accounts::Refused::app)?;
+    }
     if let Some(role) = &body.role {
         if !["admin", "member"].contains(&role.as_str()) {
             return Err(AppError::BadRequest(format!("{role} is not a role")));
@@ -483,6 +545,36 @@ pub async fn patch_user(
         st.ctx.store.bump_session_version(&id).await?;
     }
     tracing::info!(user = %user.name, by = %me.name, "user changed");
+    Ok(Json(json!({ "ok": true })))
+}
+
+/// A one-time link for the user to sign in through the provider by, which binds them.
+pub async fn make_link(
+    State(st): State<AppState>,
+    Extension(me): Extension<User>,
+    Path(id): Path<String>,
+) -> AppResult<Json<Value>> {
+    let user = st.ctx.store.user(&id).await?.ok_or(AppError::NotFound)?;
+    let (url, until) = accounts::make_link(&st.ctx.store, &st.ctx.config(), &user, &me.name)
+        .await
+        .map_err(accounts::Refused::app)?;
+    Ok(Json(json!({
+        "url": url, "until": format::datetime(&until), "hours": accounts::LINK_HOURS,
+    })))
+}
+
+pub async fn unlink(
+    State(st): State<AppState>,
+    Extension(me): Extension<User>,
+    Path(id): Path<String>,
+) -> AppResult<Json<Value>> {
+    let user = st.ctx.store.user(&id).await?.ok_or(AppError::NotFound)?;
+    if user.id == me.id {
+        return Err(AppError::Conflict(
+            "you cannot unlink yourself; another admin can".into(),
+        ));
+    }
+    accounts::unlink(&st.ctx.store, &user, &me.name).await?;
     Ok(Json(json!({ "ok": true })))
 }
 

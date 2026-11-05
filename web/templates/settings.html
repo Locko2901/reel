@@ -75,8 +75,8 @@
               <td class="sub"><select class="small role" aria-label="Role"{% if u.me %} disabled{% endif %}><option value="member"{% if u.role == "member" %} selected{% endif %}>member</option><option value="admin"{% if u.role == "admin" %} selected{% endif %}>admin</option></select></td>
               <td class="num sub" data-l="clips">{{ u.clips }}</td>
               <td class="sub" data-l="seen">{{ u.last_seen }}</td>
-              <td class="sub">{% if u.disabled %}<span class="badge">disabled</span>{% else %}<span class="badge ok">active</span>{% endif %}</td>
-              <td class="right acts">{% if access.local && who.local %}<button class="small" type="button" data-user-act="password">Set password</button>{% endif %}{% if !u.me %} {% if u.disabled %}<button class="small" type="button" data-user-act="enable">Enable</button>{% else %}<button class="danger small" type="button" data-user-act="disable">Disable</button>{% endif %}{% endif %}</td>
+              <td class="sub">{% if u.disabled %}<span class="badge">disabled</span>{% else %}<span class="badge ok">active</span>{% endif %}{% if access.oidc && !u.linked %} <span class="badge warn">not linked</span>{% endif %}</td>
+              <td class="right acts">{% if !access.by_name || !u.me %}<button class="small" type="button" data-user-act="rename">Rename</button> {% endif %}{% if access.local && who.local %}<button class="small" type="button" data-user-act="password">Set password</button>{% endif %}{% if access.oidc %} {% if !u.linked %}<button class="small" type="button" data-user-act="link">Link</button>{% else if !u.me %}<button class="small" type="button" data-user-act="unlink">Unlink</button>{% endif %}{% endif %}{% if !u.me %} {% if u.disabled %}<button class="small" type="button" data-user-act="enable">Enable</button>{% else %}<button class="danger small" type="button" data-user-act="disable">Disable</button>{% endif %}{% endif %}</td>
             </tr>
             {% endfor %}
           </tbody>
@@ -151,6 +151,15 @@
     <label class="field" id="user-role-field"><span>Role</span><select name="role"><option value="member">member, sees everything and edits what they upload</option><option value="admin">admin, does everything</option></select></label>
   </form>
   <footer><button class="quiet" id="user-cancel" type="button">Cancel</button><button class="primary" id="user-save" type="button">Save</button></footer>
+</dialog>
+<dialog id="link-dialog">
+  <header id="link-dialog-title">Link to the identity provider</header>
+  <div class="body stack">
+    <p class="small muted" id="link-line"></p>
+    <p class="link-url" id="link-url"></p>
+    <p class="small faint" id="link-until"></p>
+  </div>
+  <footer><button class="quiet" id="link-copy" type="button">Copy the link</button><button class="primary" id="link-done" type="button">Done</button></footer>
 </dialog>
 {% endif %}
 {% endblock %}

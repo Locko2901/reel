@@ -479,6 +479,7 @@ label.check.pick:has(input:checked) { background: var(--raised-2); border-color:
 .panel .action-note { margin: 0; }
 .logbox { margin: 0; max-height: 360px; overflow: auto; font-family: var(--mono); font-size: var(--fs-xs); line-height: 1.5; color: var(--text-2); white-space: pre-wrap; overflow-wrap: anywhere; }
 .pair-code { font-size: var(--fs-xxl); letter-spacing: 0.08em; color: var(--text); font-family: var(--mono); }
+.link-url { font-family: var(--mono); font-size: var(--fs-s); overflow-wrap: anywhere; user-select: all; }
 
 table { border-collapse: collapse; width: 100%; }
 th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--line); vertical-align: middle; line-height: 18px; }

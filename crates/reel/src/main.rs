@@ -38,6 +38,23 @@ enum Cmd {
         #[arg(long)]
         make_admin: bool,
     },
+    /// The users, and the way across when the sign-in method changes
+    Users {
+        #[command(subcommand)]
+        cmd: UsersCmd,
+    },
+}
+
+#[derive(Subcommand)]
+enum UsersCmd {
+    /// Every user with their role, their state and how they sign in
+    List,
+    /// Print a one-time link: whoever opens it and signs in at the identity provider is that user
+    Link { name: String },
+    /// Take a user's identity at the provider away; every session of theirs ends
+    Unlink { name: String },
+    /// Rename a user, such as to the name a sign-in proxy sends for them
+    Rename { name: String, new_name: String },
 }
 
 const QUIET_CRATES: &str = "sqlx=warn,tower_http=info,hyper=warn";
@@ -130,6 +147,10 @@ async fn main() -> anyhow::Result<()> {
             let ctx = make_ctx(layers, false).await?;
             passwd(&ctx, &name, make_admin).await
         }
+        Cmd::Users { cmd } => {
+            let ctx = make_ctx(layers, false).await?;
+            users(&ctx, cmd).await
+        }
     }
 }
 
@@ -155,6 +176,9 @@ async fn serve(layers: Layers) -> anyhow::Result<()> {
         if ctx.store.user_count().await? == 0 {
             println!("no user yet: the first admin signs up at /signin with the setup code {code}");
         }
+    }
+    if let Some(line) = reel_server::accounts::admin_way_in(&ctx.store, &cfg).await? {
+        tracing::warn!("{line}");
     }
     let shutdown = ctx.shutdown.clone();
     let listen = ctx.config().listen.clone();
@@ -248,6 +272,9 @@ async fn doctor(layers: Layers) -> anyhow::Result<()> {
             _ => println!("users:    {users}"),
         }
     }
+    if let Some(line) = reel_server::accounts::admin_way_in(&ctx.store, &config).await? {
+        println!("sign-in:  {line}");
+    }
     Ok(())
 }
 
@@ -272,5 +299,89 @@ async fn passwd(ctx: &Ctx, name: &str, make_admin: bool) -> anyhow::Result<()> {
         .delete_setting(reel_server::auth::SETUP_CODE_KEY)
         .await;
     println!("password set for {name}; every session of theirs has ended");
+    Ok(())
+}
+
+async fn named(ctx: &Ctx, name: &str) -> anyhow::Result<reel_store::models::User> {
+    ctx.store
+        .user_by_name(name)
+        .await?
+        .ok_or_else(|| anyhow::anyhow!("no user named {name}; reel users list names them"))
+}
+
+/// How a user gets in under the sign-in mode in force.
+fn signs_in(u: &reel_store::models::User, cfg: &reel_core::Config) -> &'static str {
+    use reel_core::config::AuthMode;
+    let waiting = u
+        .link_until
+        .as_deref()
+        .is_some_and(|t| t > reel_core::format::now().as_str());
+    match cfg.auth.mode {
+        AuthMode::Local if u.password_hash.is_some() => "password",
+        AuthMode::Local => "no password",
+        AuthMode::Oidc if u.linked_to(&cfg.auth.oidc_issuer) => "linked",
+        AuthMode::Oidc if waiting => "not linked, a link waits",
+        AuthMode::Oidc => "not linked",
+        AuthMode::Proxy | AuthMode::Single => "by name",
+    }
+}
+
+async fn users(ctx: &Ctx, cmd: UsersCmd) -> anyhow::Result<()> {
+    let cfg = ctx.config();
+    match cmd {
+        UsersCmd::List => {
+            let all = ctx.store.users().await?;
+            let width = all
+                .iter()
+                .map(|u| u.name.chars().count())
+                .max()
+                .unwrap_or(4)
+                .max(4);
+            let mode = format!("{:?}", cfg.auth.mode).to_lowercase();
+            println!(
+                "{:width$}  {:6}  {:8}  sign-in ({mode})",
+                "name", "role", "state"
+            );
+            for u in &all {
+                let state = if u.disabled_at.is_some() {
+                    "disabled"
+                } else {
+                    "active"
+                };
+                println!(
+                    "{:width$}  {:6}  {:8}  {}",
+                    u.name,
+                    u.role,
+                    state,
+                    signs_in(u, &cfg)
+                );
+            }
+        }
+        UsersCmd::Link { name } => {
+            let user = named(ctx, &name).await?;
+            let (url, until) =
+                reel_server::accounts::make_link(&ctx.store, &cfg, &user, "reel users link")
+                    .await?;
+            println!("{url}");
+            println!(
+                "Whoever opens this link and signs in at the identity provider is {} from then on. It works once, until {}.",
+                user.name,
+                reel_core::format::datetime(&until)
+            );
+        }
+        UsersCmd::Unlink { name } => {
+            let user = named(ctx, &name).await?;
+            reel_server::accounts::unlink(&ctx.store, &user, "reel users unlink").await?;
+            println!(
+                "{} is unlinked from the identity provider; every session of theirs has ended",
+                user.name
+            );
+        }
+        UsersCmd::Rename { name, new_name } => {
+            let user = named(ctx, &name).await?;
+            let to = reel_server::accounts::rename(&ctx.store, &user, &new_name).await?;
+            println!("{} is {to} now", user.name);
+        }
+    }
     Ok(())
 }

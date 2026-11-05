@@ -207,6 +207,195 @@ pub async fn user_for_identity(
     }
 }
 
+/// What to run when no admin can sign in under the mode in force, as after a change of mode.
+pub async fn admin_way_in(
+    store: &Store,
+    cfg: &Config,
+) -> Result<Option<&'static str>, sqlx::Error> {
+    use reel_core::config::AuthMode;
+    let users = store.users().await?;
+    let mut admins = users
+        .iter()
+        .filter(|u| u.is_admin() && u.disabled_at.is_none());
+    Ok(match cfg.auth.mode {
+        AuthMode::Local if !users.is_empty() && !admins.any(|u| u.password_hash.is_some()) => {
+            Some("no admin has a password: reel passwd <name> sets one")
+        }
+        AuthMode::Oidc
+            if !users.is_empty() && !admins.any(|u| u.linked_to(&cfg.auth.oidc_issuer)) =>
+        {
+            Some("no admin is linked to the identity provider: reel users link <name> prints a link that makes your account there that user")
+        }
+        _ => None,
+    })
+}
+
+/// How long a link to the identity provider lasts: the person it is for opens it when they read
+/// it, and it binds nothing without a sign-in at the provider.
+pub const LINK_HOURS: i64 = 24;
+
+fn link_hash(token: &str) -> String {
+    reel_pipeline::hash::hex(&Sha256::digest(token.as_bytes()))
+}
+
+/// Why an admin's change to a user is refused, in words for the page and the command line.
+#[derive(Debug, thiserror::Error)]
+pub enum Refused {
+    #[error("{0} is linked to the identity provider already; unlink them first")]
+    Linked(String),
+    #[error("{0} is disabled; enable them first")]
+    Disabled(String),
+    #[error("links are for the identity provider; the sign-in mode is {0}")]
+    NotOidc(String),
+    #[error("a name has 1 to 40 characters")]
+    BadName,
+    #[error("the name {0} is taken")]
+    Taken(String),
+    #[error("{0}")]
+    Db(#[from] sqlx::Error),
+}
+
+impl Refused {
+    pub fn app(self) -> crate::error::AppError {
+        use crate::error::AppError;
+        match self {
+            Refused::BadName => AppError::BadRequest(self.to_string()),
+            Refused::Db(e) => AppError::Internal(e.into()),
+            other => AppError::Conflict(other.to_string()),
+        }
+    }
+}
+
+/// A new link for the user, replacing one that waits: the address to open, and when it runs out.
+/// `by` is who asked, for the log.
+pub async fn make_link(
+    store: &Store,
+    cfg: &Config,
+    user: &UserRow,
+    by: &str,
+) -> Result<(String, String), Refused> {
+    if cfg.auth.mode != reel_core::config::AuthMode::Oidc {
+        return Err(Refused::NotOidc(
+            format!("{:?}", cfg.auth.mode).to_lowercase(),
+        ));
+    }
+    if user.linked_to(&cfg.auth.oidc_issuer) {
+        return Err(Refused::Linked(user.name.clone()));
+    }
+    if user.disabled_at.is_some() {
+        return Err(Refused::Disabled(user.name.clone()));
+    }
+    let token = reel_core::ids::new_device_token();
+    let until = jiff::Timestamp::now()
+        .checked_add(jiff::Span::new().hours(LINK_HOURS))
+        .map_err(|e| sqlx::Error::Protocol(e.to_string()))?
+        .to_string();
+    store
+        .set_link(&user.id, Some((&link_hash(&token), &until)))
+        .await?;
+    tracing::info!(user = %user.name, by, hours = LINK_HOURS, "link to the identity provider made");
+    Ok((
+        format!("{}/oidc/link/{token}", cfg.public_url.trim_end_matches('/')),
+        until,
+    ))
+}
+
+/// The user a link names, while it lasts.
+pub async fn user_by_link(store: &Store, token: &str) -> Result<Option<UserRow>, sqlx::Error> {
+    store
+        .user_by_link(&link_hash(token), &reel_core::format::now())
+        .await
+}
+
+/// Why a link did not bind, for the person who opened it.
+#[derive(Debug, thiserror::Error)]
+pub enum LinkRefused {
+    #[error("This link is used or past its time.")]
+    Gone,
+    #[error("{0} is linked to the identity provider already.")]
+    Linked(String),
+    #[error("{0} is disabled.")]
+    Disabled(String),
+    #[error("Your account at the identity provider is the user {0} here already.")]
+    Taken(String),
+}
+
+impl LinkRefused {
+    pub fn what_now(&self) -> &'static str {
+        match self {
+            LinkRefused::Gone => "An admin can make a new link under Settings, Access.",
+            LinkRefused::Linked(_) => "That user signs in with the button on the sign-in page.",
+            LinkRefused::Disabled(_) => {
+                "An admin can enable that user under Settings, Access; then this link works."
+            }
+            LinkRefused::Taken(_) => {
+                "An admin can unlink that user under Settings, Access; then this link works."
+            }
+        }
+    }
+}
+
+/// Binds the identity to the user the link names, once: never to a disabled user or one with an
+/// identity at this issuer, and never an identity that is another user's.
+pub async fn redeem_link(
+    store: &Store,
+    token: &str,
+    id: &OidcIdentity,
+) -> Result<Result<UserRow, LinkRefused>, sqlx::Error> {
+    let Some(user) = user_by_link(store, token).await? else {
+        return Ok(Err(LinkRefused::Gone));
+    };
+    if user.disabled_at.is_some() {
+        return Ok(Err(LinkRefused::Disabled(user.name)));
+    }
+    if user.linked_to(&id.issuer) {
+        return Ok(Err(LinkRefused::Linked(user.name)));
+    }
+    if let Some(other) = store.user_by_oidc(&id.issuer, &id.subject).await? {
+        return Ok(Err(LinkRefused::Taken(other.name)));
+    }
+    let bound = store
+        .bind_by_link(
+            &link_hash(token),
+            &reel_core::format::now(),
+            &id.issuer,
+            &id.subject,
+        )
+        .await;
+    match bound {
+        Ok(Some(row)) => {
+            tracing::info!(user = %row.name, subject = %id.subject, "linked to the identity provider");
+            Ok(Ok(row))
+        }
+        Ok(None) => Ok(Err(LinkRefused::Gone)),
+        Err(sqlx::Error::Database(e)) if e.is_unique_violation() => {
+            let other = store.user_by_oidc(&id.issuer, &id.subject).await?;
+            let name = other.map(|u| u.name).unwrap_or_else(|| id.name.clone());
+            Ok(Err(LinkRefused::Taken(name)))
+        }
+        Err(e) => Err(e),
+    }
+}
+
+/// The user loses its identity at the provider and any link waiting; their sessions end.
+pub async fn unlink(store: &Store, user: &UserRow, by: &str) -> Result<(), sqlx::Error> {
+    store.unbind(&user.id).await?;
+    tracing::info!(user = %user.name, by, "unlinked from the identity provider");
+    Ok(())
+}
+
+pub async fn rename(store: &Store, user: &UserRow, name: &str) -> Result<String, Refused> {
+    let name = name.trim();
+    if name.is_empty() || name.chars().count() > 40 {
+        return Err(Refused::BadName);
+    }
+    if !store.rename_user(&user.id, name).await? {
+        return Err(Refused::Taken(name.to_string()));
+    }
+    tracing::info!(user = %user.name, to = name, "user renamed");
+    Ok(name.to_string())
+}
+
 impl AuthnBackend for Backend {
     type User = SessionUser;
     type Credentials = Credentials;
@@ -409,6 +598,9 @@ pub struct OidcPending {
     pub csrf: String,
     pub nonce: String,
     pub pkce: String,
+    /// The token of the link this sign-in came by, which binds the identity to its user.
+    #[serde(default)]
+    pub link: Option<String>,
 }
 
 pub struct Oidc {
@@ -503,6 +695,7 @@ impl Oidc {
                 csrf: csrf.secret().clone(),
                 nonce: nonce.secret().clone(),
                 pkce: verifier.secret().clone(),
+                link: None,
             },
         )
     }

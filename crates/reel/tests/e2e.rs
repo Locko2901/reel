@@ -7022,19 +7022,27 @@ async fn an_identity_provider_signs_in_and_its_claim_makes_the_admin() {
     );
 }
 
-/// Each call comes from its own forwarded address, so the sign-in limit does not count a
-/// test's many visitors together.
 async fn oidc_sign_in(env: &Env) -> (u16, String) {
+    let (status, cookie, _) = oidc_sign_in_by(env, "/oidc/start").await;
+    (status, cookie)
+}
+
+/// A browser's way through the provider from `path`: the last status, the session cookie when it
+/// signed in, and the page when it did not. Each call comes from its own forwarded address, so
+/// the sign-in limit does not count a test's many visitors together.
+async fn oidc_sign_in_by(env: &Env, path: &str) -> (u16, String, String) {
     static VISITOR: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(1);
     let n = VISITOR.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     let r = env
         .client
-        .get(format!("{}/oidc/start", env.base))
+        .get(format!("{}{path}", env.base))
         .header("x-forwarded-for", format!("203.0.113.{}", n % 250 + 1))
         .send()
         .await
         .unwrap();
-    assert_eq!(r.status(), 303);
+    if r.status() != 303 {
+        return (r.status().as_u16(), String::new(), r.text().await.unwrap());
+    }
     let to_issuer = r.headers()["location"].to_str().unwrap().to_string();
     let pending = cookie_of(&r);
     let r = env.client.get(&to_issuer).send().await.unwrap();
@@ -7047,12 +7055,11 @@ async fn oidc_sign_in(env: &Env) -> (u16, String) {
         .await
         .unwrap();
     let status = r.status().as_u16();
-    let cookie = if status == 303 {
-        cookie_of(&r)
+    if status == 303 {
+        (status, cookie_of(&r), String::new())
     } else {
-        String::new()
-    };
-    (status, cookie)
+        (status, String::new(), r.text().await.unwrap())
+    }
 }
 
 async fn oidc_env(persona: Personas, tweak: impl FnOnce(&mut Config)) -> Option<(Env, String)> {
@@ -7192,6 +7199,297 @@ async fn an_identity_is_bound_to_its_subject_not_its_name() {
     assert!(
         env.store().user(&pat.id).await.unwrap().unwrap().is_admin(),
         "and keeps the listed name an admin without the claim"
+    );
+}
+
+/// The server restarted with an identity provider in front, over the same database.
+async fn to_provider(env: Env, who: Personas) -> (Env, String) {
+    std::env::set_var("REEL_OIDC_CLIENT_SECRET", "secret-1");
+    let issuer = mock_issuer(who).await;
+    let i = issuer.clone();
+    let env = restart(env, move |c| {
+        c.auth.mode = AuthMode::Oidc;
+        c.auth.trusted_proxies = vec!["127.0.0.1/32".into()];
+        c.auth.oidc_issuer = i;
+        c.auth.oidc_client_id = "reel".into();
+    })
+    .await;
+    (env, issuer)
+}
+
+async fn link_for(env: &Env, user_id: &str, admin: &str) -> (u16, String) {
+    let (s, body) = as_user(
+        env,
+        reqwest::Method::POST,
+        &format!("/api/users/{user_id}/link"),
+        admin,
+    )
+    .await;
+    if s != 200 {
+        return (s, body);
+    }
+    let url = serde_json::from_str::<serde_json::Value>(&body).unwrap()["url"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    let path = url.strip_prefix(&env.base).expect("on the public URL");
+    (s, path.to_string())
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_server_moved_from_a_proxy_to_a_provider_keeps_its_people_by_a_link() {
+    let Some(env) = start(AuthMode::Proxy, vec!["127.0.0.1/32"]).await else {
+        return;
+    };
+    for name in ["robin", "mira"] {
+        let r = env
+            .client
+            .get(format!("{}/", env.base))
+            .header("x-authentik-username", name)
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(r.status(), 200);
+    }
+    let robin = env.store().user_by_name("robin").await.unwrap().unwrap();
+    let mira = env.store().user_by_name("mira").await.unwrap().unwrap();
+    assert!(robin.is_admin(), "the first user the proxy named");
+
+    let who = persona(Persona {
+        sub: "sub-robin".into(),
+        username: "robin".into(),
+        groups: vec![],
+        ..Persona::mira()
+    });
+    let (env, issuer) = to_provider(env, who.clone()).await;
+    let cfg = env.ctx.config();
+    let way_in = reel_server::accounts::admin_way_in(env.store(), &cfg)
+        .await
+        .unwrap();
+    assert!(
+        way_in.is_some_and(|l| l.contains("reel users link")),
+        "the log says how an admin gets in: {way_in:?}"
+    );
+
+    // what reel users link prints
+    let (url, _) = reel_server::accounts::make_link(env.store(), &cfg, &robin, "reel users link")
+        .await
+        .unwrap();
+    let link = url.strip_prefix(&env.base).unwrap().to_string();
+    let (status, admin, page) = oidc_sign_in_by(&env, &link).await;
+    assert_eq!(status, 303, "{page}");
+    let row = env
+        .store()
+        .user_by_oidc(&issuer, "sub-robin")
+        .await
+        .unwrap()
+        .expect("bound to the provider's subject");
+    assert_eq!(row.id, robin.id, "the same user, with all that is theirs");
+    assert!(row.is_admin());
+    assert_eq!(env.store().users().await.unwrap().len(), 2, "nobody new");
+    assert!(reel_server::accounts::admin_way_in(env.store(), &cfg)
+        .await
+        .unwrap()
+        .is_none());
+    assert_eq!(
+        as_user(&env, reqwest::Method::GET, "/api/users", &admin)
+            .await
+            .0,
+        200,
+        "signed in as the admin"
+    );
+    let (status, _, page) = oidc_sign_in_by(&env, &link).await;
+    assert_eq!(status, 410, "a link works once: {page}");
+
+    let (s, link) = link_for(&env, &mira.id, &admin).await;
+    assert_eq!(s, 200, "{link}");
+    {
+        let mut p = who.lock().await;
+        p.sub = "sub-mira".into();
+        p.username = "mira".into();
+    }
+    assert_eq!(oidc_sign_in_by(&env, &link).await.0, 303);
+    let bound = env
+        .store()
+        .user_by_oidc(&issuer, "sub-mira")
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(bound.id, mira.id);
+    assert!(!bound.is_admin());
+
+    let (s, body) = link_for(&env, &mira.id, &admin).await;
+    assert_eq!(s, 409, "a user with a binding gets no link: {body}");
+    assert!(
+        body.contains("linked to the identity provider already"),
+        "{body}"
+    );
+    assert_eq!(oidc_sign_in(&env).await.0, 303, "mira signs in as herself");
+    assert_eq!(env.store().users().await.unwrap().len(), 2);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_server_moved_from_its_own_accounts_to_a_provider_keeps_its_people_by_a_link() {
+    let Some(env) = start(AuthMode::Local, vec!["127.0.0.1/32"]).await else {
+        return;
+    };
+    let code = setup_code(&env).await;
+    let admin = cookie_of(&first_admin(&env, "robin", &code).await);
+    let r = env
+        .client
+        .post(format!("{}/api/users", env.base))
+        .header("cookie", &admin)
+        .json(&serde_json::json!({ "name": "mira", "password": "correct horse battery" }))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(r.status(), 200);
+    let robin = env.store().user_by_name("robin").await.unwrap().unwrap();
+    let mira = env.store().user_by_name("mira").await.unwrap().unwrap();
+
+    let who = persona(Persona {
+        sub: "sub-mira".into(),
+        username: "mira".into(),
+        groups: vec![],
+        ..Persona::mira()
+    });
+    let (env, issuer) = to_provider(env, who.clone()).await;
+    let (s, page) = as_user(&env, reqwest::Method::GET, "/settings/access", &admin).await;
+    assert_eq!(s, 200, "a session from before the switch still holds");
+    assert_eq!(
+        page.matches("not linked").count(),
+        2,
+        "the Access page shows who the provider does not know yet"
+    );
+
+    // mira signs in through the sign-in page before her link: a new user beside her own
+    assert_eq!(oidc_sign_in(&env).await.0, 303);
+    let fresh = env
+        .store()
+        .user_by_oidc(&issuer, "sub-mira")
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(fresh.name, "mira 2");
+
+    let (s, link) = link_for(&env, &mira.id, &admin).await;
+    assert_eq!(s, 200, "{link}");
+    let (status, _, page) = oidc_sign_in_by(&env, &link).await;
+    assert_eq!(status, 409);
+    assert!(
+        page.contains("is the user mira 2 here already"),
+        "an identity is never moved off another user: {page}"
+    );
+    let (s, body) = as_user(
+        &env,
+        reqwest::Method::DELETE,
+        &format!("/api/users/{}/link", fresh.id),
+        &admin,
+    )
+    .await;
+    assert_eq!(s, 200, "{body}");
+    assert_eq!(
+        oidc_sign_in_by(&env, &link).await.0,
+        303,
+        "a refused link is not spent"
+    );
+    let bound = env
+        .store()
+        .user_by_oidc(&issuer, "sub-mira")
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(bound.id, mira.id);
+    assert_eq!(
+        bound.password_hash, mira.password_hash,
+        "her password stays, for a way back"
+    );
+    let left = env.store().user(&fresh.id).await.unwrap().unwrap();
+    assert!(
+        left.oidc_subject.is_none(),
+        "the user made by mistake is nobody's"
+    );
+
+    let (s, link) = link_for(&env, &robin.id, &admin).await;
+    assert_eq!(s, 200, "an admin links themself from the Access page");
+    {
+        let mut p = who.lock().await;
+        p.sub = "sub-robin".into();
+        p.username = "robin".into();
+    }
+    assert_eq!(oidc_sign_in_by(&env, &link).await.0, 303);
+    let me = env
+        .store()
+        .user_by_oidc(&issuer, "sub-robin")
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!((me.id.as_str(), me.is_admin()), (robin.id.as_str(), true));
+    let (s, body) = as_user(
+        &env,
+        reqwest::Method::DELETE,
+        &format!("/api/users/{}/link", robin.id),
+        &admin,
+    )
+    .await;
+    assert_eq!(s, 409, "nobody unlinks themself: {body}");
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_rename_carries_a_user_across_to_the_name_a_proxy_sends() {
+    let Some(env) = start(AuthMode::Local, vec![]).await else {
+        return;
+    };
+    let code = setup_code(&env).await;
+    let admin = cookie_of(&first_admin(&env, "Robin Smith", &code).await);
+    let me = env
+        .store()
+        .user_by_name("Robin Smith")
+        .await
+        .unwrap()
+        .unwrap();
+    let r = env
+        .client
+        .patch(format!("{}/api/users/{}", env.base, me.id))
+        .header("cookie", &admin)
+        .json(&serde_json::json!({ "name": "robin" }))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(r.status(), 200, "{}", r.text().await.unwrap());
+
+    let env = restart(env, |c| {
+        c.auth.mode = AuthMode::Proxy;
+        c.auth.trusted_proxies = vec!["127.0.0.1/32".into()];
+    })
+    .await;
+    let r = env
+        .client
+        .get(format!("{}/", env.base))
+        .header("x-authentik-username", "robin")
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(r.status(), 200);
+    let users = env.store().users().await.unwrap();
+    assert_eq!(users.len(), 1, "nobody new");
+    assert_eq!(
+        (users[0].id.as_str(), users[0].is_admin()),
+        (me.id.as_str(), true)
+    );
+    let r = env
+        .client
+        .patch(format!("{}/api/users/{}", env.base, me.id))
+        .header("x-authentik-username", "robin")
+        .json(&serde_json::json!({ "name": "someone" }))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(
+        r.status(),
+        409,
+        "behind a proxy the name is who you are: {}",
+        r.text().await.unwrap()
     );
 }
 
