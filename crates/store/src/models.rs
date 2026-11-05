@@ -411,6 +411,9 @@ pub struct User {
     pub session_version: i64,
     pub oidc_issuer: Option<String>,
     pub oidc_subject: Option<String>,
+    #[serde(skip)]
+    pub link_hash: Option<String>,
+    pub link_until: Option<String>,
 }
 
 impl User {
@@ -426,10 +429,16 @@ impl User {
             session_version: 1,
             oidc_issuer: None,
             oidc_subject: None,
+            link_hash: None,
+            link_until: None,
         }
     }
     pub fn is_admin(&self) -> bool {
         self.role == "admin"
+    }
+    /// Bound to an identity at this issuer: a binding to another issuer counts for nothing there.
+    pub fn linked_to(&self, issuer: &str) -> bool {
+        self.oidc_subject.is_some() && self.oidc_issuer.as_deref() == Some(issuer)
     }
 }
 

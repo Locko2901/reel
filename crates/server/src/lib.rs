@@ -380,6 +380,10 @@ pub fn router(state: AppState) -> Router {
                     get(routes::users::list_users).post(routes::users::create_user),
                 )
                 .route("/api/users/{id}", patch(routes::users::patch_user))
+                .route(
+                    "/api/users/{id}/link",
+                    post(routes::users::make_link).delete(routes::users::unlink),
+                )
                 .route("/api/signin-attempts", get(routes::users::signin_attempts))
                 .route_layer(guard(Part::Accounts)),
         )
@@ -426,6 +430,7 @@ pub fn router(state: AppState) -> Router {
         .route("/signin", post(routes::users::signin))
         .route("/signin/first", post(routes::users::first_admin))
         .route("/oidc/start", get(routes::users::oidc_start))
+        .route("/oidc/link/{token}", get(routes::users::oidc_link))
         .route_layer(guard(Part::Accounts))
         .layer(
             tower_governor::GovernorLayer::new(governor).error_handler(|e| match e {

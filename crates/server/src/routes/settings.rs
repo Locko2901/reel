@@ -264,6 +264,8 @@ pub struct UserView {
     pub clips: i64,
     pub last_seen: String,
     pub me: bool,
+    /// Bound to an identity at the configured provider.
+    pub linked: bool,
 }
 
 pub struct AttemptView {
@@ -274,6 +276,9 @@ pub struct AttemptView {
 
 pub struct AccessView {
     pub local: bool,
+    pub oidc: bool,
+    /// The proxy or the single user's setting names who you are, so you are not renamed here.
+    pub by_name: bool,
     pub users: Vec<UserView>,
     pub attempts: Vec<AttemptView>,
 }
@@ -342,6 +347,8 @@ pub struct SettingsPage {
 }
 
 async fn access_view(st: &AppState, me: &User) -> AppResult<AccessView> {
+    use reel_core::config::AuthMode;
+    let cfg = st.ctx.config();
     let counts = st.ctx.store.owner_counts().await?;
     let users = st
         .ctx
@@ -365,6 +372,7 @@ async fn access_view(st: &AppState, me: &User) -> AppResult<AccessView> {
                 .map(reel_core::format::when)
                 .unwrap_or_else(|| "never".into()),
             me: u.id == me.id,
+            linked: u.linked_to(&cfg.auth.oidc_issuer),
         })
         .collect();
     let since = jiff::Timestamp::now()
@@ -385,10 +393,9 @@ async fn access_view(st: &AppState, me: &User) -> AppResult<AccessView> {
         })
         .collect();
     Ok(AccessView {
-        local: matches!(
-            st.ctx.config().auth.mode,
-            reel_core::config::AuthMode::Local | reel_core::config::AuthMode::Oidc
-        ),
+        local: matches!(cfg.auth.mode, AuthMode::Local | AuthMode::Oidc),
+        oidc: cfg.auth.mode == AuthMode::Oidc,
+        by_name: matches!(cfg.auth.mode, AuthMode::Proxy | AuthMode::Single),
         users,
         attempts,
     })

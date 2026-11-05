@@ -75,6 +75,78 @@ impl Store {
             .await
     }
 
+    /// The user a link names by the hash of its token, while the link lasts.
+    pub async fn user_by_link(&self, hash: &str, now: &str) -> Result<Option<User>> {
+        sqlx::query_as::<_, User>("SELECT * FROM user WHERE link_hash = ? AND link_until > ?")
+            .bind(hash)
+            .bind(now)
+            .fetch_optional(&self.pool)
+            .await
+    }
+
+    /// A user's link, as the hash of its token and when it runs out; a new one replaces the one
+    /// before, and None takes it away.
+    pub async fn set_link(&self, id: &str, link: Option<(&str, &str)>) -> Result<()> {
+        sqlx::query("UPDATE user SET link_hash = ?, link_until = ? WHERE id = ?")
+            .bind(link.map(|l| l.0))
+            .bind(link.map(|l| l.1))
+            .bind(id)
+            .execute(&self.pool)
+            .await?;
+        Ok(())
+    }
+
+    /// Spends the link and binds the identity to its user in one write, only while the link
+    /// lasts, the user is enabled and has no identity at this issuer. An identity that is bound
+    /// to another user already fails on the unique index.
+    pub async fn bind_by_link(
+        &self,
+        hash: &str,
+        now: &str,
+        issuer: &str,
+        subject: &str,
+    ) -> Result<Option<User>> {
+        sqlx::query_as::<_, User>(
+            "UPDATE user SET oidc_issuer = ?, oidc_subject = ?, link_hash = NULL, link_until = NULL \
+             WHERE link_hash = ? AND link_until > ? AND disabled_at IS NULL \
+             AND NOT (oidc_issuer IS ? AND oidc_subject IS NOT NULL) RETURNING *",
+        )
+        .bind(issuer)
+        .bind(subject)
+        .bind(hash)
+        .bind(now)
+        .bind(issuer)
+        .fetch_optional(&self.pool)
+        .await
+    }
+
+    /// The user loses its identity at the provider and any link waiting, and every session of
+    /// theirs ends.
+    pub async fn unbind(&self, id: &str) -> Result<()> {
+        sqlx::query(
+            "UPDATE user SET oidc_issuer = NULL, oidc_subject = NULL, link_hash = NULL, \
+             link_until = NULL, session_version = session_version + 1 WHERE id = ?",
+        )
+        .bind(id)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
+    /// False when another user has that name, in any case.
+    pub async fn rename_user(&self, id: &str, name: &str) -> Result<bool> {
+        match sqlx::query("UPDATE user SET name = ? WHERE id = ?")
+            .bind(name.trim())
+            .bind(id)
+            .execute(&self.pool)
+            .await
+        {
+            Ok(_) => Ok(true),
+            Err(sqlx::Error::Database(e)) if e.is_unique_violation() => Ok(false),
+            Err(e) => Err(e),
+        }
+    }
+
     pub async fn set_password(&self, id: &str, hash: &str) -> Result<()> {
         sqlx::query("UPDATE user SET password_hash = ? WHERE id = ?")
             .bind(hash)
@@ -192,5 +264,94 @@ impl Store {
             .await?;
         tx.commit().await?;
         Ok(true)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::models::User;
+    use crate::Store;
+
+    const NOW: &str = "2026-11-05T12:00:00Z";
+    const LATER: &str = "2026-11-06T12:00:00Z";
+
+    #[tokio::test]
+    async fn a_link_binds_once_and_only_a_user_without_an_identity_at_that_issuer() {
+        let s = Store::open_memory().await.unwrap();
+        let mira = User::new("mira", "admin", None);
+        s.insert_user(&mira).await.unwrap();
+        s.set_link(&mira.id, Some(("h1", LATER))).await.unwrap();
+        assert!(
+            s.user_by_link("h1", LATER).await.unwrap().is_none(),
+            "run out"
+        );
+        assert!(
+            s.bind_by_link("h1", LATER, "https://a", "s1")
+                .await
+                .unwrap()
+                .is_none(),
+            "a link past its time binds nothing"
+        );
+        let bound = s
+            .bind_by_link("h1", NOW, "https://a", "s1")
+            .await
+            .unwrap()
+            .unwrap();
+        assert!(bound.linked_to("https://a") && bound.link_hash.is_none());
+        assert!(
+            s.bind_by_link("h1", NOW, "https://a", "s2")
+                .await
+                .unwrap()
+                .is_none(),
+            "spent"
+        );
+
+        s.set_link(&mira.id, Some(("h2", LATER))).await.unwrap();
+        assert!(
+            s.bind_by_link("h2", NOW, "https://a", "s2")
+                .await
+                .unwrap()
+                .is_none(),
+            "a user with an identity at this issuer keeps it"
+        );
+        let moved = s
+            .bind_by_link("h2", NOW, "https://b", "s9")
+            .await
+            .unwrap()
+            .unwrap();
+        assert!(
+            moved.linked_to("https://b"),
+            "another provider's binding counts for nothing"
+        );
+
+        let pat = User::new("pat", "member", None);
+        s.insert_user(&pat).await.unwrap();
+        s.set_link(&pat.id, Some(("h3", LATER))).await.unwrap();
+        assert!(
+            s.bind_by_link("h3", NOW, "https://b", "s9").await.is_err(),
+            "an identity is one user's"
+        );
+        s.set_disabled(&pat.id, true).await.unwrap();
+        assert!(s
+            .bind_by_link("h3", NOW, "https://b", "s3")
+            .await
+            .unwrap()
+            .is_none());
+
+        s.unbind(&mira.id).await.unwrap();
+        let after = s.user(&mira.id).await.unwrap().unwrap();
+        assert!(after.oidc_issuer.is_none() && after.oidc_subject.is_none());
+        assert_eq!(
+            after.session_version,
+            mira.session_version + 1,
+            "sessions end"
+        );
+
+        assert!(
+            !s.rename_user(&pat.id, "MIRA").await.unwrap(),
+            "taken, in any case"
+        );
+        assert!(s.rename_user(&mira.id, "Mira").await.unwrap());
+        assert_eq!(s.user_by_name("mira").await.unwrap().unwrap().name, "Mira");
     }
 }
