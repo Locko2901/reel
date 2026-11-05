@@ -19,6 +19,182 @@ pub struct SectionView {
     pub changed: usize,
 }
 
+/// A line of the nav: a group's head, a section, or one of the desktop app's own pages (`app`),
+/// which show only in the app's window, as does a head over them alone.
+pub struct NavEntry {
+    pub head: bool,
+    pub app: bool,
+    pub id: &'static str,
+    pub label: &'static str,
+    pub line: String,
+    pub current: bool,
+    pub changed: usize,
+}
+
+impl NavEntry {
+    fn head(label: &'static str) -> NavEntry {
+        NavEntry {
+            head: true,
+            app: false,
+            id: "",
+            label,
+            line: String::new(),
+            current: false,
+            changed: 0,
+        }
+    }
+    fn app(id: &'static str, label: &'static str) -> NavEntry {
+        NavEntry {
+            head: false,
+            app: true,
+            id,
+            label,
+            line: String::new(),
+            current: false,
+            changed: 0,
+        }
+    }
+    fn section(s: &SectionView) -> NavEntry {
+        NavEntry {
+            head: false,
+            app: false,
+            id: s.id,
+            label: s.label,
+            line: s.line.clone(),
+            current: s.current,
+            changed: s.changed,
+        }
+    }
+}
+
+/// Where a page of the nav shows: always, in the app's standalone library alone, or beside a
+/// server alone.
+#[derive(Clone, Copy, PartialEq)]
+enum Shows {
+    Always,
+    Standalone,
+    WithServer,
+}
+
+/// A page of the nav: its id, whether it is one of the desktop app's own pages, where it shows.
+type NavPage = (&'static str, bool, Shows);
+
+const fn reel(id: &'static str) -> NavPage {
+    (id, false, Shows::Always)
+}
+
+const fn app(id: &'static str) -> NavPage {
+    (id, true, Shows::Always)
+}
+
+/// The nav by what a person does, the sections and the desktop app's pages side by side;
+/// desktop/ui/shell.js groups the same way.
+const NAV: [(&str, &[NavPage]); 4] = [
+    (
+        "Recording",
+        &[
+            app("obs"),
+            app("clips"),
+            app("upload"),
+            app("hotkeys"),
+            app("sounds"),
+        ],
+    ),
+    (
+        "Library",
+        &[
+            reel("storage"),
+            ("library", true, Shows::Standalone),
+            reel("ingest"),
+            ("encoder", true, Shows::Standalone),
+            ("sharing", false, Shows::Standalone),
+            reel("imports"),
+        ],
+    ),
+    (
+        "Server",
+        &[
+            app("server"),
+            ("sharing", false, Shows::WithServer),
+            reel("devices"),
+            reel("access"),
+            reel("notifications"),
+        ],
+    ),
+    (
+        "System",
+        &[
+            reel("general"),
+            reel("appearance"),
+            app("startup"),
+            app("status"),
+            app("log"),
+            reel("advanced"),
+        ],
+    ),
+];
+
+fn app_label(id: &str, standalone: bool) -> &'static str {
+    match id {
+        "status" => "Status",
+        "server" => "Server",
+        "obs" => "OBS",
+        "clips" if standalone => "Clips folder",
+        "clips" => "Clips folder and cache",
+        "upload" if standalone => "New clips",
+        "upload" => "Upload",
+        "hotkeys" => "Hotkeys",
+        "sounds" => "Sounds",
+        "startup" => "Startup",
+        "log" => "Log",
+        "library" => "Library folder",
+        "encoder" => "Encoder",
+        _ => "",
+    }
+}
+
+/// The sections in the nav's order, and the nav: the groups, a head shown in a browser only
+/// over a section of reel's, the app's pages only in the app's window.
+fn nav_of(mut sections: Vec<SectionView>, standalone: bool) -> (Vec<SectionView>, Vec<NavEntry>) {
+    let shows = |w: Shows| match w {
+        Shows::Always => true,
+        Shows::Standalone => standalone,
+        Shows::WithServer => !standalone,
+    };
+    let at = |id: &str| {
+        NAV.iter()
+            .flat_map(|(_, pages)| pages.iter())
+            .filter(|(_, app, w)| !app && shows(*w))
+            .position(|(p, _, _)| *p == id)
+    };
+    sections.sort_by_key(|s| at(s.id).unwrap_or(usize::MAX));
+    let mut nav = Vec::new();
+    for (head, pages) in NAV {
+        let mut entries = Vec::new();
+        for (id, is_app, _) in pages.iter().filter(|(_, _, w)| shows(*w)) {
+            if *is_app {
+                entries.push(NavEntry::app(id, app_label(id, standalone)));
+            } else if let Some(s) = sections.iter().find(|s| s.id == *id) {
+                entries.push(NavEntry::section(s));
+            }
+        }
+        if entries.is_empty() {
+            continue;
+        }
+        let mut h = NavEntry::head(head);
+        h.app = entries.iter().all(|e| e.app);
+        nav.push(h);
+        nav.extend(entries);
+    }
+    nav.extend(
+        sections
+            .iter()
+            .filter(|s| at(s.id).is_none())
+            .map(NavEntry::section),
+    );
+    (sections, nav)
+}
+
 /// One choice of a select or a set: the stored value, the word shown, whether it is on; a
 /// set's option is a row of its own, its words as the title and a short line under them.
 pub struct OptionView {
@@ -229,7 +405,7 @@ fn action_panels(
             name: "Export",
             line: String::new(),
             rows: vec![
-                action_row("The database", if cfg.standalone() { "a consistent copy taken while reel runs, the secrets blank; a copy of the clips' files with it is This app, Server, Library, Make a copy" } else { "a consistent copy taken while reel runs, the secrets blank" }, vec![link("export-database", "Download", "/api/export/database")]),
+                action_row("The database", if cfg.standalone() { "a consistent copy taken while reel runs, the secrets blank; a copy of the clips' files with it is Library folder, Make a copy" } else { "a consistent copy taken while reel runs, the secrets blank" }, vec![link("export-database", "Download", "/api/export/database")]),
                 action_row("The settings as config.toml", "the settings in force, the secrets blank", vec![link("export-config", "Download", "/api/export/config")]),
             ],
         },
@@ -335,6 +511,7 @@ pub struct SettingsPage {
     pub section: String,
     pub index: bool,
     pub sections: Vec<SectionView>,
+    pub nav_entries: Vec<NavEntry>,
     pub panels: Vec<PanelView>,
     pub actions: Vec<ActionPanel>,
     pub access: AccessView,
@@ -498,7 +675,7 @@ pub fn folder_notes(rows: &mut [RowView], disk: &crate::disk::DiskInfo, ctx: &re
 
 fn panels(eff: &Effective, under: &Config) -> Vec<PanelView> {
     let mut out: Vec<PanelView> = Vec::new();
-    // the unsent rule is the standalone library's alone, set under This app there
+    // the unsent rule is the standalone library's alone, set under Library folder there
     let here = |d: &&catalog::Def| {
         if eff.config.standalone() {
             catalog::in_standalone(d.key)
@@ -599,20 +776,23 @@ async fn render(st: AppState, me: User, current: Section, index: bool) -> AppRes
             None => actions.push(a),
         }
     }
-    let sections = Section::ALL
-        .iter()
-        .filter(|s| !standalone || s.in_standalone())
-        .map(|s| SectionView {
-            id: s.id(),
-            label: s.label_in(standalone),
-            line: s.line_in(standalone.then(|| eff.config.library_dir()).as_deref()),
-            current: *s == current,
-            changed: catalog::DEFS
-                .iter()
-                .filter(|d| d.section == *s && eff.source(d.key) == Source::Table)
-                .count(),
-        })
-        .collect();
+    let (sections, nav_entries) = nav_of(
+        Section::ALL
+            .iter()
+            .filter(|s| !standalone || s.in_standalone())
+            .map(|s| SectionView {
+                id: s.id(),
+                label: s.label_in(standalone),
+                line: s.line_in(standalone.then(|| eff.config.library_dir()).as_deref()),
+                current: *s == current,
+                changed: catalog::DEFS
+                    .iter()
+                    .filter(|d| d.section == *s && eff.source(d.key) == Source::Table)
+                    .count(),
+            })
+            .collect(),
+        standalone,
+    );
     Ok(html(SettingsPage {
         who: Who::at(&st, &me).await,
         nav: "settings",
@@ -621,6 +801,7 @@ async fn render(st: AppState, me: User, current: Section, index: bool) -> AppRes
         section: current.id().into(),
         index,
         sections,
+        nav_entries,
         panels,
         actions,
         access: access_view(&st, &me).await?,
@@ -699,7 +880,7 @@ pub async fn patch_api(
             .ok_or_else(|| AppError::BadRequest(format!("no setting named {key}")))?;
         if st.ctx.config().standalone() && !catalog::in_standalone(&key) {
             return Err(AppError::Standalone(format!(
-                "{} is not a setting of reel on this PC: it is a server's, or This app's",
+                "{} is not a setting of reel on this PC: it is a server's, or the app's own",
                 d.label
             )));
         }

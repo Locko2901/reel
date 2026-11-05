@@ -140,7 +140,7 @@ pub struct Status {
     pub update_installing: bool,
     /// What the update brings: the notes of the versions it spans, from the server.
     pub update_notes: Option<String>,
-    /// What installing the update does, said before it does (This app, Startup).
+    /// What installing the update does, said before it does (Settings, Startup).
     pub update_before: Option<String>,
     /// When the server was last asked, in milliseconds since 1970, for the page's clock.
     pub update_checked_at: Option<u64>,

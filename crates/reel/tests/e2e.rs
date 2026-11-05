@@ -3281,10 +3281,38 @@ async fn the_standalone_library_offers_nothing_of_a_servers() {
     }
     let (_, sharing) = ask(&env, "GET", "/settings/sharing", None).await;
     assert!(sharing.contains("Copies under a size") && sharing.contains("Limit list"));
+    assert_eq!(
+        settings_nav(&sharing),
+        [
+            "head Recording",
+            "app obs",
+            "app clips Clips folder",
+            "app upload New clips",
+            "app hotkeys",
+            "app sounds",
+            "head Library",
+            "section storage",
+            "app library Library folder",
+            "section ingest",
+            "app encoder",
+            "section sharing",
+            "section imports",
+            "head Server",
+            "app server",
+            "head System",
+            "section general",
+            "section appearance",
+            "app startup",
+            "app status",
+            "app log",
+            "section advanced",
+        ],
+        "the nav by what a person does, the app's pages beside reel's"
+    );
     let (_, storage) = ask(&env, "GET", "/settings/storage", None).await;
     assert!(
         storage.contains(&format!(
-            "The library is in {} on this PC; its cap is under This app, Server.",
+            "The library is in {} on this PC; its folder and its cap are under Library folder.",
             env.ctx.config().library_dir().display()
         )),
         "the Storage line names the library's folder"
@@ -10261,10 +10289,39 @@ async fn the_apps_parts_in_the_header_stay_hidden_in_a_browser() {
         .await
         .unwrap();
     assert!(
-        html.contains(r#"<span class="sections-head app-link" hidden>This app</span>"#)
-            && html.contains(r##"<a class="app-link" href="#" data-app-section="status" hidden>Status</a>"##)
-            && html.contains(r##"<a class="app-link" href="#" data-app-section="log" hidden>Log</a>"##),
-        "the group This app with the app's nine pages sits under the sections, hidden until the app unhides it"
+        html.contains(r#"<span class="sections-head app-link" hidden>Recording</span>"#)
+            && html.contains(r#"<span class="sections-head">Library</span>"#)
+            && html.contains(r##"<a class="app-link" href="#" data-app-section="status" hidden>Status</a>"##),
+        "the app's pages and a head over them alone are hidden until the app unhides them; a head over reel's sections shows in a browser"
+    );
+    assert_eq!(
+        settings_nav(&html),
+        [
+            "head Recording",
+            "app obs",
+            "app clips Clips folder and cache",
+            "app upload",
+            "app hotkeys",
+            "app sounds",
+            "head Library",
+            "section storage",
+            "section ingest",
+            "section imports",
+            "head Server",
+            "app server",
+            "section sharing",
+            "section devices",
+            "section access",
+            "section notifications",
+            "head System",
+            "section general",
+            "section appearance",
+            "app startup",
+            "app status",
+            "app log",
+            "section advanced",
+        ],
+        "a server's nav in the same groups, what only a server has under Server"
     );
     let js = env
         .client
@@ -10277,6 +10334,40 @@ async fn the_apps_parts_in_the_header_stay_hidden_in_a_browser() {
         200,
         "the shell script is served with the others"
     );
+}
+
+/// The Settings nav in order: "head <words>", "section <id>", "app <id>", with the app page's
+/// label where it is not the id's own word.
+fn settings_nav(html: &str) -> Vec<String> {
+    let a = html.find("<nav class=\"sections\"").expect("the nav");
+    let b = a + html[a..].find("</nav>").unwrap();
+    let text = |line: &str| {
+        let t = &line[line.find('>').unwrap() + 1..];
+        t[..t.find('<').unwrap_or(t.len())].trim().to_string()
+    };
+    let attr = |line: &str, name: &str| {
+        let at = line
+            .find(&format!("{name}=\""))
+            .map(|i| i + name.len() + 2)?;
+        Some(line[at..at + line[at..].find('"').unwrap()].to_string())
+    };
+    html[a..b]
+        .lines()
+        .filter_map(|line| {
+            if line.contains("sections-head") {
+                Some(format!("head {}", text(line)))
+            } else if let Some(id) = attr(line, "data-app-section") {
+                let label = text(line);
+                Some(if label.eq_ignore_ascii_case(&id) {
+                    format!("app {id}")
+                } else {
+                    format!("app {id} {label}")
+                })
+            } else {
+                attr(line, "data-section").map(|id| format!("section {id}"))
+            }
+        })
+        .collect()
 }
 
 async fn mean_volume(ff: &Ffmpeg, path: &std::path::Path, track: usize) -> f64 {

@@ -164,8 +164,9 @@ xdotool windowmove "$WIN" 0 0 2>/dev/null || true
 xdotool windowactivate --sync "$WIN" 2>/dev/null || true
 sleep 1
 import -display "$DISPLAY" -window "$WIN" "$SHOTS/hotkeys.png"
-# Share the last clip's field, the first in the Hotkeys panel, at y 234 to 264 under its head
-SHARE_FIELD="1137 249"
+# Share the last clip's field, the first in the Hotkeys panel, at y 264 to 294 under its head and
+# the page's line of three rows
+SHARE_FIELD="1137 279"
 n=$(log_n "hotkeys off while a field listens")
 xdotool mousemove $SHARE_FIELD click 1
 wait_more 10 "the app's hotkeys to go off while the field listens" "hotkeys off while a field listens" "$n"
@@ -236,7 +237,7 @@ sleep 1
 import -display "$DISPLAY" -window root "$SHOTS/tray-menu.png"
 xdotool key Escape 2>/dev/null || true
 
-say "This app: pages of reel's shape under Settings, the same header and nav as the server's"
+say "the app's pages: reel's shape under Settings, the same header and nav as the server's"
 WIN=$(xdotool search --name '^reel$' | head -1 || true)
 [ -n "$WIN" ] || fail "no window for the shape check"
 xdotool mousemove 640 760
@@ -247,10 +248,10 @@ sleep 2
 import -display "$DISPLAY" -window "$WIN" "$SHOTS/shape-reel.png"
 n=$(log_n "$APP_PAGE")
 "$APP" --section=status >/dev/null 2>&1 &
-wait_more 20 "This app" "$APP_PAGE" "$n"
+wait_more 20 "the app's Status page" "$APP_PAGE" "$n"
 sleep 2
 import -display "$DISPLAY" -window "$WIN" "$SHOTS/shape-app.png"
-# The nav's current entry differs by design (General there, This app here), hence the room.
+# The nav's current entry differs by design (General there, Status here), hence the room.
 same_enough() { # same_enough <crop> <name> <most differing pixels>
   local crop=$1 name=$2 most=$3 a b n
   a="$ROOT/shape-$name-reel.png"; b="$ROOT/shape-$name-app.png"
@@ -258,28 +259,28 @@ same_enough() { # same_enough <crop> <name> <most differing pixels>
   convert "$SHOTS/shape-app.png" -crop "$crop" +repage "$b"
   n=$({ compare -metric AE -fuzz 8% "$a" "$b" null: 2>&1 || true; } | awk '{printf "%d", $1}')
   echo "$name: $n pixels differ, at most $most allowed"
-  [ "${n:-999999}" -le "$most" ] || fail "the $name of This app differs from reel's by $n pixels"
+  [ "${n:-999999}" -le "$most" ] || fail "the $name of the app's page differs from reel's by $n pixels"
 }
 same_enough 1280x49+0+0 header 600
 same_enough 230x660+0+100 nav 2000
 convert "$SHOTS/shape-reel.png" "$SHOTS/shape-app.png" +append -crop 2560x560+0+0 +repage "$SHOTS/shape-side-by-side.png"
 
-say "Back and Forward across the switch, a section of reel's from This app, This app from reel's page"
+say "Back and Forward across the switch, a section of reel's from the app's page, the app's from reel's"
 n=$(log_n "$REEL_PAGE")
 xdotool key --clearmodifiers alt+Left
 wait_more 15 "Back to the server's page" "$REEL_PAGE" "$n"
 n=$(log_n "$APP_PAGE")
 xdotool key --clearmodifiers alt+Right
-wait_more 15 "Forward to This app" "$APP_PAGE" "$n"
+wait_more 15 "Forward to the app's page" "$APP_PAGE" "$n"
 sleep 1
-# The nav's entries are 30 px rows from y=110, General first; Status follows the head This app.
+# The nav's rows are 31 px apart, a group's head 35: General at y=672 and Status at 765, in System.
 n=$(log_n "$REEL_PAGE")
-xdotool mousemove 60 125 click 1
-wait_more 15 "General from This app" "$REEL_PAGE" "$n"
+xdotool mousemove 60 672 click 1
+wait_more 15 "General from the app's page" "$REEL_PAGE" "$n"
 sleep 2
 n=$(log_n "$APP_PAGE")
-xdotool mousemove 60 468 click 1
-wait_more 15 "Status under This app from reel's page" "$APP_PAGE" "$n"
+xdotool mousemove 60 765 click 1
+wait_more 15 "Status from reel's page" "$APP_PAGE" "$n"
 log_has "handed over the shape" || fail "the server's page did not hand the shape over"
 n=$(log_n "$REEL_PAGE")
 xdotool key --clearmodifiers alt+Left
@@ -287,27 +288,27 @@ wait_more 15 "Back to the server's page again" "$REEL_PAGE" "$n"
 xdotool mousemove 640 760
 echo "the switch works both ways, and so does Back"
 
-say "every entry of This app opens its page from the app's own pages, and Back walks them in order"
+say "every page of the app's opens from the app's own pages, and Back walks them in order"
 n=$(log_n 'app page section=status')
 "$APP" --section=status >/dev/null 2>&1 &
 wait_more 20 "the app's Status page" 'app page section=status' "$n"
 sleep 1
-# the group's entries, 31 px apart from Status at y=468
-walk=(server obs clips upload hotkeys sounds startup log)
-for i in "${!walk[@]}"; do
-  sec=${walk[$i]}
+# the app's pages in the nav: Recording's five from y=167, Server at 483, Startup and Log in System
+walk=(obs:167 clips:198 upload:229 hotkeys:260 sounds:291 server:483 startup:734 log:790)
+for entry in "${walk[@]}"; do
+  sec=${entry%%:*}
   n=$(log_n "app page section=$sec")
-  xdotool mousemove 60 $((499 + i * 31)) click 1
+  xdotool mousemove 60 "${entry#*:}" click 1
   wait_more 10 "the $sec page by its entry" "app page section=$sec" "$n"
 done
-back=(startup sounds hotkeys upload clips obs server status)
+back=(startup server sounds hotkeys upload clips obs status)
 for sec in "${back[@]}"; do
   n=$(log_n "app page section=$sec")
   xdotool key --clearmodifiers alt+Left
   wait_more 10 "Back to the $sec page" "app page section=$sec" "$n"
 done
 xdotool mousemove 640 760
-echo "the nine entries open from the app's pages, and Back walks them in order"
+echo "the nine pages open from the app's pages, and Back walks them in order"
 
 say "cues played, from the log"
 cat "$LOG"/reel-desktop.log* | grep -o 'cue [a-z_]* played ([^)]*)' | sort | uniq -c

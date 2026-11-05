@@ -295,8 +295,8 @@ pub fn app_download_open(app: AppHandle, id: u64, reveal: bool) -> R<()> {
     Ok(())
 }
 
-/// "This app" on a server's Settings page; the page hands over the shape of reel's Settings
-/// pages, checked before it is kept.
+/// One of the app's pages in a server's Settings nav; the page hands over the shape of reel's
+/// Settings pages, checked before it is kept.
 #[tauri::command]
 pub fn app_open_settings(
     app: AppHandle,

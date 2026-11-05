@@ -112,7 +112,7 @@ pub fn how_long(kind: Kind) -> &'static str {
     }
 }
 
-/// What happens when the update is installed, said where it is offered (This app, Startup).
+/// What happens when the update is installed, said where it is offered (Settings, Startup).
 pub fn before(version: &str, kind: Kind, quit: bool) -> String {
     let long = how_long(kind);
     match (kind, quit) {
@@ -175,7 +175,7 @@ pub fn after(
     );
     Some((
         format!("reel {} did not install", note.to),
-        format!("{why}. reel {now} runs as before; Install under This app, Startup tries again."),
+        format!("{why}. reel {now} runs as before; Install under Settings, Startup tries again."),
     ))
 }
 
@@ -287,7 +287,7 @@ mod tests {
             ),
             Some((
                 "reel 1.10.0 did not install".to_string(),
-                "reel could not stop what runs from its folder. reel 1.9.1 runs as before; Install under This app, Startup tries again.".to_string()
+                "reel could not stop what runs from its folder. reel 1.9.1 runs as before; Install under Settings, Startup tries again.".to_string()
             ))
         );
         assert!(after(Some(&note), "1.9.1", "1.9.1", None)

@@ -46,6 +46,7 @@ export function appShell() {
   appDownloads();
   $$('.browser-part').forEach(el => el.hidden = true);
   $$('.app-part:not(.app-paired), #app-share, #app-save, #app-save-share, .sections .app-link').forEach(el => el.hidden = false);
+  if (!document.body.hasAttribute('data-standalone')) $$('#sections-body .section-line').forEach(l => l.append(' Kept on the server: the same for every PC and browser.'));
   const chipDot = $('#chip-dot'), chipWord = $('#chip-word');
   const serverState = ['ok', 'warn', 'err'].find(c => chipDot?.classList.contains(c)) || 'ok';
   const pause = $('#app-pause'), share = $('#app-share');
