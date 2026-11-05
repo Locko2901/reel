@@ -135,7 +135,7 @@ name, whose it is, when it was last seen and how many clips it sent.
 A new install of the desktop app is standalone: the library lives on your
 PC, and the app talks only to OBS on the same PC, over OBS's WebSocket on
 `127.0.0.1`. Nothing leaves the PC, and no update check runs by itself.
-**Check now** under This app, Startup asks GitHub's public releases for
+**Check now** under Settings, Startup asks GitHub's public releases for
 the newest version when you press it, and Settings, **Advanced**, **Check
 for updates** turns a daily check on.
 

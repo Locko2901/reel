@@ -15,8 +15,8 @@ and the server.
 
 1. Start the uninstaller, either way:
     - Windows Settings, **Apps**, find **reel**, then **Uninstall**.
-    - In the app, Settings, This app, **Startup**, **About**, **Uninstall
-      reel...**. It starts the same uninstaller and quits the app.
+    - In the app, Settings, **Startup**, **About**, **Uninstall reel...**.
+      It starts the same uninstaller and quits the app.
 2. The page **Remove reel** says what goes in any case: reel, and with
    reel (the package with OBS) the OBS that came with it, OBS's settings
    included. reel light has no OBS of its own to remove. The
@@ -63,14 +63,14 @@ and the clips folder.
 
 === "The AppImage"
 
-    1. Turn off **Start at logon** (Settings, This app, **Startup**), so
-       nothing tries to start reel at your next login.
+    1. Turn off **Start at logon** (Settings, **Startup**), so nothing
+       tries to start reel at your next login.
     2. Quit reel from its tray icon.
     3. Delete the AppImage file.
 
 === "The .deb"
 
-    1. Turn off **Start at logon** (Settings, This app, **Startup**).
+    1. Turn off **Start at logon** (Settings, **Startup**).
     2. Quit reel from its tray icon.
     3. Remove the package:
 
@@ -123,4 +123,4 @@ Delete them for nothing to be left. Your clips folder stays either way.
 
 Each paired app then says **cannot reach the server**. Uninstall it as
 above, or switch it to standalone, so new clips go into a library on its
-PC: Settings, This app, **Server**, **Mode**: **standalone**.
+PC: Settings, **Server**, **Mode**: **standalone**.

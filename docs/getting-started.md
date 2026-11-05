@@ -56,10 +56,10 @@ step should show.
 ## 3. Pair the app with your server
 
 1. On the server, open Settings, Devices and press **Pair a device**. You get a code.
-2. In the app, open This app, **Server**, and under **A server, later** enter the server's
+2. In the app, open Settings, **Server**, and under **A server, later** enter the server's
    address and the code, then press **Pair**.
 3. Set **Mode** to **connected**, so new clips go to the server. Clips already in the PC's
-   library can go up too, one by one, from This app, Status.
+   library can go up too, one by one, from Settings, Status.
 
 ## 4. The first link
 

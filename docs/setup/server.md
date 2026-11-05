@@ -375,11 +375,11 @@ with one key.
    [Your own OBS](own-obs.md) or [Linux](linux.md).
 2. On the server, open Settings, **Devices** and press **Pair a device**.
    You get a code that works once, for ten minutes.
-3. In the app, open This app, **Server**. Under **A server, later**, enter
+3. In the app, open Settings, **Server**. Under **A server, later**, enter
    the **Server URL** and the **Pairing code**, then press **Pair**. When
    it worked, the device shows under Settings, **Devices** on the server.
 4. Optional: send clips already in the app's own library, one by one,
-   with **Upload to the server** on This app, Status.
+   with **Upload to the server** on Settings, Status.
 5. Set **Mode** to **connected**, so every new clip goes to the server.
 
 ## 7. Check on it

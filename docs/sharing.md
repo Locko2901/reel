@@ -431,8 +431,8 @@ would move at its next run: how many clips, how much, recorded when, and what it
 run moves clips, **Notifications** can tell you (the event "the library cap moved clips"), once a
 run, with the count and the size.
 
-In the desktop app on its own, the cap is under This app, Server, and by default it never moves
-a clip that is on no server yet; see [Standalone](setup/standalone.md).
+In the desktop app on its own, the cap is under Settings, Library folder, and by default it never
+moves a clip that is on no server yet; see [Standalone](setup/standalone.md).
 
 A server updated from a version before 1.7 that already has clips keeps the cap waiting, since
 before then it never moved a server's clips, and a cap set long ago could empty much of the

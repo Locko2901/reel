@@ -160,7 +160,7 @@ folder instead: the settings under `config`, the rest under `data`
 ([Configuration](configuration.md)).
 
 The clips folder, where OBS writes its replays, is a folder of yours:
-This app, **Clips folder and cache** (**Clips folder** in standalone)
+Settings, **Clips folder and cache** (**Clips folder** in standalone)
 names it.
 
 ### Back up a standalone library
@@ -169,8 +169,8 @@ The standalone library is a whole reel inside the app, with its own
 database, so the same rule holds: copy it with the app stopped, or take
 a consistent copy of the database while it runs.
 
-The app does it for you: Settings, This app, **Server**, **Library**,
-**Make a copy** puts a complete copy, every file checked, into a new
+The app does it for you: Settings, **Library folder**, **Make a copy**
+puts a complete copy, every file checked, into a new
 folder on the drive you pick, while reel runs. See
 [A copy of the library](setup/standalone.md#a-copy-of-the-library).
 
@@ -178,13 +178,13 @@ By hand:
 
 1. Quit reel from its tray icon.
 2. Copy the library folder to your backup drive, and the settings folder
-   with it. This app, **Server**, **Library folder** says where the
-   library is: `%LOCALAPPDATA%\reel\library` on Windows and
+   with it. Settings, **Library folder** says where the library is:
+   `%LOCALAPPDATA%\reel\library` on Windows and
    `~/.local/share/reel/library` on Linux, unless you moved it.
 3. Start reel again.
 
-To use a copy the app made, on this PC or a new one: Settings, This app,
-**Server**, **Library folder**, **Move**, and pick the copy's folder. To
+To use a copy the app made, on this PC or a new one: Settings, **Library
+folder**, **Move**, and pick the copy's folder. To
 restore a copy made by hand, quit reel, put the folders back, and start
 it. On a new Windows PC the pairing is not in those folders: pair the
-app again under This app, **Server**.
+app again under Settings, **Server**.
