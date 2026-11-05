@@ -82,7 +82,9 @@ docker exec reel reel doctor
 prints ffmpeg's version, the hardware route with its test encode and a
 line per codec, the folders and whether they can be read, the library
 size, the jobs, the sign-in mode, and, while nobody has an account yet,
-the setup code. The Status page's **Doctor** panel shows the same.
+the setup code. The Status page's **Doctor** panel shows the same. When
+no admin can sign in under the sign-in mode in force, `reel doctor` also
+says what to run.
 
 ## When the app or the PC crashed: Reliability Monitor
 
@@ -456,6 +458,14 @@ docker exec -e REEL_PASSWORD='a new long password' reel reel passwd --make-admin
 sets that user's password (twelve characters at least) and signs them
 out everywhere. With `--make-admin`, a user of that name that does not
 exist yet is made, as an admin.
+
+## Someone is a new, empty user after a change of the sign-in mode
+
+Under a new sign-in mode, reel finds people another way (by the proxy's
+name, or by their account at the identity provider), and someone it
+cannot match gets a new user. Their clips are still with their old one.
+[Switching the sign-in method](switching-sign-in.md) has what to do for
+each mode, and how to undo a user made by mistake.
 
 ## Asking for help
 

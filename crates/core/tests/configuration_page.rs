@@ -33,6 +33,12 @@ const OTHER: &[(&str, &str, &str)] = &[
     ),
 ];
 
+/// A line under a setting that points to the page about changing it.
+const SEE: &[(&str, &str)] = &[(
+    "auth.mode",
+    "Changing it on a server with users: [Switching the sign-in method](switching-sign-in.md)",
+)];
+
 const NOT_FOR_USERS: &[&str] = &[
     "REEL_GIT_SHA",
     "REEL_BUILD_DATE",
@@ -187,6 +193,9 @@ fn render() -> String {
                 );
             } else if d.restart {
                 let _ = writeln!(p, "- Takes effect at the next start");
+            }
+            if let Some((_, line)) = SEE.iter().find(|(key, _)| *key == d.key) {
+                let _ = writeln!(p, "- {line}");
             }
             p.push('\n');
         }

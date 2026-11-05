@@ -69,6 +69,7 @@ nav:
       - The desktop app: desktop-app.md
   - Looking after reel:
       - Updating: updating.md
+      - Switching the sign-in method: switching-sign-in.md
       - Backing up: backup.md
       - Uninstalling: uninstalling.md
       - Building from source: building.md

@@ -285,7 +285,9 @@ such as `127.0.0.1`, so it is for trying reel on one machine, never for a
 server others reach.
 
 Every mode and every other setting is on
-[Configuration](../configuration.md).
+[Configuration](../configuration.md). To change the mode of a server that
+has users, see [Switching the sign-in method](../switching-sign-in.md)
+first: it says who keeps their user and what to do.
 
 ## 4. The first run
 
