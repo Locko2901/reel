@@ -58,6 +58,8 @@ file of a re-encoded clip under **Keep originals**.
   the folder, five seconds apart, and it can be opened (Settings,
   **Ingest**, **Poll every** and **Stable polls**). If a slow connection
   pauses for longer than that, raise **Stable polls**.
+- A file that drops out of sight before reel took it (a share gone for a
+  moment, a file moved out and back) is counted again from its return.
 - A file ffmpeg cannot read moves to `failed/` inside the incoming
   folder, with a note beside it that says why.
 - The same video twice is one clip: reel compares the files' contents.

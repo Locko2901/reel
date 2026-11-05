@@ -110,7 +110,7 @@ impl Env {
 }
 
 /// A wait's limit is stretched by this: on GitHub's four core runners the suite takes twenty
-/// minutes, and a clip's wait of 90 s ran out under that load.
+/// minutes, and the longest waits come near their own limits at that pace.
 const SLOW: u32 = 3;
 
 async fn start(mode: AuthMode, trusted: Vec<&str>) -> Option<Env> {
@@ -687,6 +687,89 @@ async fn unreadable_file_is_parked_and_not_retried() {
     assert_eq!(f.state, "failed");
     let (q, r) = env.store().job_counts().await.unwrap();
     assert_eq!((q, r), (0, 0), "no retry loop");
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_file_out_of_sight_for_a_poll_is_taken_when_it_is_back() {
+    // the watcher's own poll runs once at the start; the test polls by hand
+    let Some(env) = start_with(AuthMode::Single, vec![], |c| {
+        c.ingest.poll_seconds = 3600;
+        c.ingest.stable_polls = 2;
+    })
+    .await
+    else {
+        return;
+    };
+    assert_eq!(
+        reel_pipeline::library::check(&env.ctx).await,
+        reel_pipeline::library::Status::Ready
+    );
+    let staged = env._dir.path().join("staged");
+    std::fs::create_dir_all(&staged).unwrap();
+    let name = "back again.mp4";
+    let (away, here) = (staged.join(name), env.incoming().join(name));
+    env.synth_at(&staged, name, Synth::small(2.0, "back again"))
+        .await;
+    let row = || async { env.store().ingest_file(name).await.unwrap().unwrap() };
+    let poll = || async { reel_pipeline::watcher::poll_once(&env.ctx).await.unwrap() };
+    std::fs::rename(&away, &here).unwrap();
+    poll().await;
+    assert_eq!(row().await.state, "seen");
+    // moved out and back, or a network folder that listed nothing for a moment
+    std::fs::rename(&here, &away).unwrap();
+    poll().await;
+    assert_eq!(row().await.state, "gone");
+    std::fs::rename(&away, &here).unwrap();
+    for _ in 0..=env.ctx.config().ingest.stable_polls {
+        poll().await;
+    }
+    let f = row().await;
+    assert!(
+        f.clip_id.is_some(),
+        "taken after the stable polls once it is back: {f:?}"
+    );
+    let clip = env.wait_ready(Duration::from_secs(90)).await;
+    assert_eq!(clip.source_name, name);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn two_synthetic_clips_of_one_spec_are_two_clips() {
+    let Some(env) = start(AuthMode::Single, vec![]).await else {
+        return;
+    };
+    let staged = env._dir.path().join("staged");
+    std::fs::create_dir_all(&staged).unwrap();
+    let mut files = Vec::new();
+    for name in ["twin 0.mp4", "twin 1.mp4"] {
+        let out = staged.join(name);
+        let mut args = Synth::small(2.0, "twin").args(&out);
+        // one x264 thread makes the same bytes every time, as a busy machine's threads can
+        let at = args.len() - 1;
+        args.splice(at..at, ["-threads".to_string(), "1".to_string()]);
+        env.ctx
+            .ff
+            .run(&args, 2.0, None)
+            .await
+            .expect("synthetic clip");
+        files.push(out);
+    }
+    assert!(
+        std::fs::read(&files[0]).unwrap() != std::fs::read(&files[1]).unwrap(),
+        "two synthetic clips of one spec are two files"
+    );
+    for f in &files {
+        std::fs::rename(f, env.incoming().join(f.file_name().unwrap())).unwrap();
+    }
+    let mut ids = Vec::new();
+    for _ in &files {
+        let clip = env
+            .wait_clip(
+                |c| c.state == "ready" && !ids.contains(&c.id),
+                Duration::from_secs(90),
+            )
+            .await;
+        ids.push(clip.id);
+    }
 }
 
 #[tokio::test(flavor = "multi_thread")]

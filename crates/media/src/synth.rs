@@ -150,6 +150,11 @@ impl Synth {
                 format!("{}k", self.abit_kbit),
             ]);
         }
+        // x264 makes the same bytes of one spec when its threads run one at a time, as on a
+        // busy machine, and the library keeps one clip per file: the name tells two apart
+        let file = output.file_name().unwrap_or_default().to_string_lossy();
+        let file = file.strip_suffix(".part").unwrap_or(&file);
+        a.extend([s("-metadata"), format!("comment={file}")]);
         let name = output.to_string_lossy();
         if name.ends_with(".mkv") || name.ends_with(".mkv.part") {
             a.extend([s("-f"), s("matroska")]);

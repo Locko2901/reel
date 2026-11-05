@@ -17,6 +17,15 @@ impl Store {
         Ok(())
     }
 
+    /// The watcher handed the file to `clip_id`. Its ingest may have finished the file before
+    /// this write lands, and then the ingest's state and clip stand.
+    pub async fn ingest_file_taken(&self, f: &IngestFile, clip_id: &str) -> Result<()> {
+        sqlx::query("UPDATE ingest_file SET size = ?, stable_polls = ?, clip_id = COALESCE(clip_id, ?), state = CASE state WHEN 'seen' THEN 'queued' ELSE state END WHERE path = ?")
+            .bind(f.size).bind(f.stable_polls).bind(clip_id).bind(&f.path)
+            .execute(&self.pool).await?;
+        Ok(())
+    }
+
     pub async fn ingest_files(&self) -> Result<Vec<IngestFile>> {
         sqlx::query_as::<_, IngestFile>("SELECT * FROM ingest_file ORDER BY first_seen_at")
             .fetch_all(&self.pool)
@@ -85,5 +94,50 @@ impl Store {
             .execute(&self.pool)
             .await?;
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::models::IngestFile;
+    use crate::Store;
+
+    fn seen(path: &str) -> IngestFile {
+        IngestFile {
+            path: path.into(),
+            size: 10,
+            first_seen_at: "2026-11-04T20:00:00Z".into(),
+            stable_polls: 1,
+            state: "seen".into(),
+            clip_id: None,
+            error: None,
+        }
+    }
+
+    async fn row(s: &Store, path: &str) -> (String, Option<String>) {
+        let f = s.ingest_file(path).await.unwrap().unwrap();
+        (f.state, f.clip_id)
+    }
+
+    #[tokio::test]
+    async fn the_watchers_mark_never_hides_a_finished_ingest() {
+        let s = Store::open_memory().await.unwrap();
+        let f = seen("a.mp4");
+        s.upsert_ingest_file(&f).await.unwrap();
+        s.ingest_file_taken(&f, "c1").await.unwrap();
+        assert_eq!(row(&s, "a.mp4").await, ("queued".into(), Some("c1".into())));
+
+        // a copy of a clip the library has is dropped within milliseconds, before the mark
+        let f = seen("b.mp4");
+        s.upsert_ingest_file(&f).await.unwrap();
+        s.ingest_file_done_as("b.mp4", "c0").await.unwrap();
+        s.ingest_file_taken(&f, "c2").await.unwrap();
+        assert_eq!(row(&s, "b.mp4").await, ("done".into(), Some("c0".into())));
+
+        let f = seen("c.mp4");
+        s.upsert_ingest_file(&f).await.unwrap();
+        s.ingest_file_state("c.mp4", "done", None).await.unwrap();
+        s.ingest_file_taken(&f, "c3").await.unwrap();
+        assert_eq!(row(&s, "c.mp4").await, ("done".into(), Some("c3".into())));
     }
 }
