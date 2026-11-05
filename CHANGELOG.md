@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.12.0](https://github.com/Locko2901/reel/compare/v1.11.2...v1.12.0) (2026-11-05)
+
+
+### Features
+
+* a copy of the library, its clips with it ([58091e0](https://github.com/Locko2901/reel/commit/58091e031d747bad9b4958ed8e73157a172ac0e3))
+* standalone apps install their own updates ([#19](https://github.com/Locko2901/reel/issues/19)) ([777fd33](https://github.com/Locko2901/reel/commit/777fd33bef7eb825436c309e6a96339a8202699f))
+* the library can live on another drive, and the app moves it there ([d831e0c](https://github.com/Locko2901/reel/commit/d831e0cebb85fab42fc22581cb8fbad420df66b5))
+
+
+### Bug Fixes
+
+* files in the incoming folder are no longer left waiting ([#20](https://github.com/Locko2901/reel/issues/20)) ([7282bea](https://github.com/Locko2901/reel/commit/7282bea79d4590cce37b806721a7a30a108a32f6))
+
 ## 1.11.2 (2026-11-04)
 
 ### Bug Fixes
