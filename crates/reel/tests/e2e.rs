@@ -11356,6 +11356,49 @@ async fn mock_latest_release(version: &'static str, asked: Asked) -> String {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn the_servers_pass_keeps_only_this_versions_installers() {
+    let Some(env) = start_with(AuthMode::Single, vec![], |c| {
+        c.device.app_updates = true;
+        c.advanced.update_repo = "o/pub".into();
+    })
+    .await
+    else {
+        return;
+    };
+    use reel_pipeline::app_update::{dir, installer_name, pass, Flavour};
+    let cfg = env.ctx.config();
+    let folder = dir(&cfg);
+    std::fs::create_dir_all(&folder).unwrap();
+    let mut older = Vec::new();
+    for f in Flavour::ALL {
+        let exe = installer_name("1.11.1", f);
+        older.push(format!("{exe}.sig"));
+        older.push(exe);
+    }
+    older.push("reel-with-obs_1.10.0_x64-setup.exe".into());
+    older.push("reel-with-obs_1.10.0_x64-setup.exe.sig".into());
+    for name in older.iter().map(String::as_str).chain(["notes.txt"]) {
+        std::fs::write(folder.join(name), b"an older one").unwrap();
+    }
+    let gh = mock_github_release(reel_core::VERSION).await;
+    pass(&cfg, &gh).await;
+    for name in &older {
+        assert!(!folder.join(name).exists(), "{name} is gone");
+    }
+    assert_eq!(
+        std::fs::read(folder.join("notes.txt")).unwrap(),
+        b"an older one",
+        "a file that is not an installer stays"
+    );
+    for f in Flavour::ALL {
+        let exe = installer_name(reel_core::VERSION, f);
+        assert!(folder.join(&exe).exists(), "{exe} is there");
+        assert!(folder.join(format!("{exe}.sig")).exists());
+    }
+    assert_eq!(std::fs::read_dir(&folder).unwrap().count(), 9);
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn the_standalone_library_hands_its_app_the_newer_release_of_its_kind() {
     use reel_pipeline::app_update::{installer_name, Flavour};
     let Some(env) = start_with(AuthMode::Single, vec![], |c| {

@@ -193,6 +193,111 @@ pub fn dir(cfg: &Config) -> PathBuf {
     cfg.data_dir.join("app-updates")
 }
 
+/// The name older versions gave the package with OBS; their installers can still be in the folder.
+const FORMER_WITH_OBS: &str = "reel-with-obs";
+
+/// The version and kind of an installer, its `.sig`, or a fetch's part file of either, named as
+/// `installer_name` names them for any version; None for every other name.
+fn installer_file(name: &str) -> Option<(&str, Flavour)> {
+    let name = name.strip_suffix(".part").unwrap_or(name);
+    let name = name.strip_suffix(".sig").unwrap_or(name);
+    let (version, flavour) = if let Some(rest) = name.strip_suffix("_x64-setup.exe") {
+        let (file, version) = rest.split_once('_')?;
+        let flavour = match file {
+            FORMER_WITH_OBS => Flavour::WithObs,
+            f if f == Flavour::WithObs.id() => Flavour::WithObs,
+            f if f == Flavour::Plain.id() => Flavour::Plain,
+            _ => return None,
+        };
+        (version, flavour)
+    } else if let Some(v) = name
+        .strip_prefix("reel_")
+        .and_then(|r| r.strip_suffix("_amd64.AppImage"))
+    {
+        (v, Flavour::AppImage)
+    } else {
+        let v = name.strip_prefix("reel_")?.strip_suffix("_amd64.deb")?;
+        (v, Flavour::Deb)
+    };
+    let (number, label) = version.split_once('-').unwrap_or((version, ""));
+    let number_ok = number.split('.').count() == 3
+        && number
+            .split('.')
+            .all(|n| !n.is_empty() && n.bytes().all(|b| b.is_ascii_digit()));
+    let label_ok = label
+        .bytes()
+        .all(|b| b.is_ascii_alphanumeric() || b == b'.' || b == b'-');
+    (number_ok && label_ok).then_some((version, flavour))
+}
+
+/// Removes the installers and signatures of other versions, kind by kind: all of them once this
+/// version's of that kind is in place, else all but the newest, which a server rolled back to
+/// that version offers again at once. Nothing else in the folder is touched.
+pub async fn clear_other_versions(cfg: &Config) {
+    let folder = dir(cfg);
+    let Ok(mut rd) = tokio::fs::read_dir(&folder).await else {
+        return;
+    };
+    let mut found = Vec::new();
+    while let Ok(Some(entry)) = rd.next_entry().await {
+        let name = entry.file_name().to_string_lossy().into_owned();
+        let Some((version, flavour)) = installer_file(&name) else {
+            continue;
+        };
+        if version == reel_core::VERSION {
+            continue;
+        }
+        let version = version.to_string();
+        let Ok(meta) = entry.metadata().await else {
+            continue;
+        };
+        if meta.is_file() {
+            found.push((name, version, flavour, meta.len()));
+        }
+    }
+    let (mut files, mut bytes, mut versions) = (0usize, 0u64, Vec::<String>::new());
+    for flavour in Flavour::ALL {
+        let mine = found.iter().filter(|f| f.2 == flavour);
+        let keep = match offer(cfg, flavour).await {
+            Some(_) => None,
+            None => mine
+                .clone()
+                .map(|f| f.1.as_str())
+                .reduce(|a, b| if older(a, b) { b } else { a }),
+        };
+        for (name, version, _, len) in mine {
+            if Some(version.as_str()) == keep {
+                continue;
+            }
+            match tokio::fs::remove_file(folder.join(name)).await {
+                Ok(()) => {
+                    files += 1;
+                    bytes += len;
+                    if !versions.contains(version) {
+                        versions.push(version.clone());
+                    }
+                }
+                Err(e) => {
+                    tracing::warn!(file = %name, error = %e, "an installer of another version could not be removed")
+                }
+            }
+        }
+    }
+    if files > 0 {
+        versions.sort_by(|a, b| match (older(a, b), older(b, a)) {
+            (true, _) => std::cmp::Ordering::Less,
+            (_, true) => std::cmp::Ordering::Greater,
+            _ => std::cmp::Ordering::Equal,
+        });
+        tracing::info!(
+            versions = %versions.join(", "),
+            files,
+            size = %reel_core::format::size(bytes),
+            "the installers of other versions are removed"
+        );
+    }
+}
+
 /// The app of this server's version, ready to hand to a paired app.
 #[derive(Debug, Clone)]
 pub struct Offer {
@@ -392,50 +497,56 @@ pub async fn release_signature(url: &str) -> Result<String, String> {
     Ok(sig)
 }
 
-/// At start and once a day while one of this version's installers is missing, fetches every
-/// kind; each pass also reads the repository's releases.
+/// One pass of `run` against the releases at `api`: the repository's releases, this version's
+/// installer of each kind that is missing, then the other versions' installers.
+pub async fn pass(cfg: &Config, api: &str) {
+    if !cfg.device.app_updates {
+        return;
+    }
+    let token = &cfg.device.updates_token;
+    match read_releases(api, &cfg.advanced.update_repo, token).await {
+        Ok(list) => {
+            keep_releases(list);
+            tracing::info!(newest = ?newest(), "the repository's releases read");
+        }
+        Err(e) => tracing::info!(error = %e, "the repository's releases were not read"),
+    }
+    for flavour in Flavour::ALL {
+        if offer(cfg, flavour).await.is_some() {
+            continue;
+        }
+        match fetch_from_release(
+            api,
+            &cfg.advanced.update_repo,
+            reel_core::VERSION,
+            token,
+            &dir(cfg),
+            flavour,
+        )
+        .await
+        {
+            Ok(true) => tracing::info!(
+                version = reel_core::VERSION,
+                installer = flavour.id(),
+                "the app's installer for this version is fetched"
+            ),
+            Ok(false) => tracing::info!(
+                version = reel_core::VERSION,
+                installer = flavour.id(),
+                "the release has no signed installer of this kind for this version yet"
+            ),
+            Err(e) => {
+                tracing::warn!(error = %e, installer = flavour.id(), "the app's installer could not be fetched")
+            }
+        }
+    }
+    clear_other_versions(cfg).await;
+}
+
+/// A `pass` at start and once a day.
 pub async fn run(ctx: Ctx) {
     loop {
-        let cfg = ctx.config();
-        let token = cfg.device.updates_token.clone();
-        if cfg.device.app_updates {
-            match read_releases(&github_api(), &cfg.advanced.update_repo, &token).await {
-                Ok(list) => {
-                    keep_releases(list);
-                    tracing::info!(newest = ?newest(), "the repository's releases read");
-                }
-                Err(e) => tracing::info!(error = %e, "the repository's releases were not read"),
-            }
-        }
-        for flavour in Flavour::ALL {
-            if !cfg.device.app_updates || offer(&cfg, flavour).await.is_some() {
-                continue;
-            }
-            match fetch_from_release(
-                &github_api(),
-                &cfg.advanced.update_repo,
-                reel_core::VERSION,
-                &token,
-                &dir(&cfg),
-                flavour,
-            )
-            .await
-            {
-                Ok(true) => tracing::info!(
-                    version = reel_core::VERSION,
-                    installer = flavour.id(),
-                    "the app's installer for this version is fetched"
-                ),
-                Ok(false) => tracing::info!(
-                    version = reel_core::VERSION,
-                    installer = flavour.id(),
-                    "the release has no signed installer of this kind for this version yet"
-                ),
-                Err(e) => {
-                    tracing::warn!(error = %e, installer = flavour.id(), "the app's installer could not be fetched")
-                }
-            }
-        }
+        pass(&ctx.config(), &github_api()).await;
         tokio::select! {
             _ = tokio::time::sleep(Duration::from_secs(24 * 3600)) => {},
             _ = ctx.shutdown.cancelled() => return,
@@ -551,6 +662,79 @@ mod tests {
             Err(NotOffered::TestBuild),
             "a test build on the release is not offered"
         );
+    }
+
+    #[test]
+    fn only_the_names_of_reels_installers_are_its_own() {
+        for f in Flavour::ALL {
+            assert_eq!(
+                installer_file(&installer_name("1.11.0", f)),
+                Some(("1.11.0", f))
+            );
+        }
+        for (name, version, flavour) in [
+            (
+                "reel-light_1.11.0_x64-setup.exe.sig",
+                "1.11.0",
+                Flavour::Plain,
+            ),
+            (
+                "reel-with-obs_1.4.2_x64-setup.exe",
+                "1.4.2",
+                Flavour::WithObs,
+            ),
+            ("reel_1.2.0_amd64.AppImage.sig", "1.2.0", Flavour::AppImage),
+            ("reel_1.12.0-rc.1_amd64.deb", "1.12.0-rc.1", Flavour::Deb),
+            ("reel_1.10.0_amd64.deb.sig.part", "1.10.0", Flavour::Deb),
+        ] {
+            assert_eq!(installer_file(name), Some((version, flavour)), "{name}");
+        }
+        for name in [
+            "notes.txt",
+            "reel_latest_amd64.deb",
+            "reel_1.2_amd64.deb",
+            "reel_1.2.0_arm64.deb",
+            "reel_1.2.0_amd64.deb.sig.sig",
+            "reel_1.2.0_x64-setup.exe.sha256",
+            "my-reel_1.2.0_x64-setup.exe",
+            "reel_1.2.0_x64-setup.exe.bak",
+        ] {
+            assert_eq!(installer_file(name), None, "{name} is not reel's");
+        }
+    }
+
+    #[tokio::test]
+    async fn other_versions_go_and_a_kind_without_this_version_keeps_its_newest() {
+        let tmp = tempfile::tempdir().unwrap();
+        let cfg = Config {
+            data_dir: tmp.path().into(),
+            ..Config::default()
+        };
+        let folder = dir(&cfg);
+        std::fs::create_dir_all(&folder).unwrap();
+        let v = reel_core::VERSION;
+        let files = |version: &str, f: Flavour| {
+            let exe = installer_name(version, f);
+            [format!("{exe}.sig"), exe]
+        };
+        let mut gone = Vec::new();
+        let mut kept = vec!["notes.txt".to_string()];
+        for version in ["1.2.0", "1.10.0"] {
+            gone.extend(files(version, Flavour::AppImage));
+        }
+        kept.extend(files(v, Flavour::AppImage));
+        gone.extend(files("1.2.0", Flavour::Deb));
+        kept.extend(files("1.10.0", Flavour::Deb));
+        for name in gone.iter().chain(&kept) {
+            std::fs::write(folder.join(name), b"x").unwrap();
+        }
+        clear_other_versions(&cfg).await;
+        for name in &gone {
+            assert!(!folder.join(name).exists(), "{name} goes");
+        }
+        for name in &kept {
+            assert!(folder.join(name).exists(), "{name} stays");
+        }
     }
 
     #[test]
