@@ -88,7 +88,7 @@ docs-config: check-image ## Write docs/configuration.md again from the settings 
 
 # The desktop container runs as the host user, so its caches have volumes of their own: the
 # server's are root-owned.
-.PHONY: desktop-image desktop-cap desktop-sidecars-linux desktop-sidecars-windows desktop-check desktop-check-windows desktop-stop-helper desktop-obs-fresh desktop-elevate-check desktop-windows desktop-appimage desktop-appimage-check desktop-appimage-arch desktop-installers-check desktop-start-check desktop-obs-start-check desktop-previous desktop-obs-window-check desktop-installer-shots desktop-installer-audit desktop-obs-sources desktop-obs-image desktop-obs-e2e desktop-dev desktop-linux desktop-shell desktop-e2e desktop-shots desktop-save-actions desktop-quit desktop-waited-upload desktop-presses desktop-downloads desktop-zip-download desktop-back
+.PHONY: desktop-image desktop-cap desktop-sidecars-linux desktop-sidecars-windows desktop-check desktop-check-windows desktop-stop-helper desktop-obs-fresh desktop-elevate-check desktop-windows desktop-appimage desktop-appimage-check desktop-appimage-arch desktop-installers-check desktop-start-check desktop-obs-start-check desktop-previous desktop-obs-window-check desktop-installer-shots desktop-installer-audit desktop-obs-sources desktop-obs-image desktop-obs-e2e desktop-dev desktop-linux desktop-shell desktop-e2e desktop-shots desktop-save-actions desktop-quit desktop-waited-upload desktop-presses desktop-downloads desktop-zip-download desktop-back desktop-release-update
 
 DESKTOP_IMAGE ?= reel-desktop:local
 DESKTOP_OUT ?= $(HOME)/reel-desktop-out
@@ -180,6 +180,14 @@ desktop-previous: desktop-image ## The newest older release's installer with OBS
 
 desktop-obs-window-check: desktop-stop-helper ## Open OBS and Hide OBS on the real OBS under Wine
 	$(DESKTOP_RUN) -w /work -e OBS_CACHE=/cargo-home/obs-cache $(DESKTOP_IMAGE) sh desktop/ci/check-obs-window.sh
+
+# RELEASE_PUBKEY names the .pub, in DESKTOP_OUT, of the key desktop-windows signed with when it
+# is not the release key.
+RELEASE_PUBKEY ?=
+UPDATE_FROM ?= /out
+desktop-release-update: desktop-sidecars-windows ## A standalone app's update under Wine from a stand-in release of reel light (UPDATE_FROM=github: GitHub's newest)
+	$(DESKTOP_RUN) -w /work/desktop $(DESKTOP_IMAGE) sh -c 'cargo xwin test --no-run --target x86_64-pc-windows-msvc -p reel-desktop --lib'
+	$(DESKTOP_RUN) -w /work $(DESKTOP_IMAGE) sh desktop/ci/check-release-update.sh $(UPDATE_FROM) "$(APP_VERSION)" $(RELEASE_PUBKEY)
 
 desktop-start-check: desktop-stop-helper ## The app with OBS started under Wine over an older copy in Program Files
 	$(DESKTOP_RUN) -w /work $(DESKTOP_IMAGE) sh desktop/ci/check-start.sh /out "$(DESKTOP_VERSION)"

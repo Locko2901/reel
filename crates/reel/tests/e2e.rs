@@ -5079,6 +5079,7 @@ async fn the_header_dot_says_how_reel_is_and_opens_status() {
             version: "99.0.0".into(),
             url: "https://example.org/reel/releases/v99.0.0".into(),
             published_at: "2026-10-14T10:00:00Z".into(),
+            ..Default::default()
         }),
         error: None,
     };
@@ -5145,6 +5146,7 @@ async fn status_page_shows_the_build_the_doctor_and_an_update() {
             version: "99.0.0".into(),
             url: "https://example.org/reel/releases/v99.0.0".into(),
             published_at: "2026-10-14T10:00:00Z".into(),
+            ..Default::default()
         }),
         error: None,
     };
@@ -5288,6 +5290,7 @@ async fn a_signed_in_browser_has_the_servers_version_in_the_header_menu() {
             version: version.into(),
             url: format!("https://example.org/reel/releases/v{version}"),
             published_at: "2026-10-14T10:00:00Z".into(),
+            ..Default::default()
         }),
         error: None,
     };
@@ -11163,6 +11166,240 @@ async fn a_paired_app_is_offered_the_signed_app_of_this_version() {
         .await
         .unwrap();
     assert!(status.contains("app update"));
+}
+
+type Asked = Arc<std::sync::Mutex<Vec<(String, String, bool)>>>;
+
+/// GitHub's latest release of `o/r`, reel light's installer without its signature; `o/spent`
+/// answers as GitHub does once an address's hourly limit is spent.
+async fn mock_latest_release(version: &'static str, asked: Asked) -> String {
+    use axum::extract::Path;
+    use axum::http::{HeaderMap, StatusCode};
+    use axum::response::IntoResponse;
+    use axum::routing::get;
+    use reel_pipeline::app_update::{installer_name, Flavour};
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let base = format!("http://{}", listener.local_addr().unwrap());
+    let note = |asked: &Asked, path: String, h: &HeaderMap| {
+        let ua = h
+            .get("user-agent")
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or("")
+            .to_string();
+        asked
+            .lock()
+            .unwrap()
+            .push((path, ua, h.contains_key("authorization")));
+    };
+    let mut assets = Vec::new();
+    for f in Flavour::ALL {
+        let name = installer_name(version, f);
+        assets.push(name.clone());
+        if f != Flavour::Plain {
+            assets.push(format!("{name}.sig"));
+        }
+    }
+    let release = serde_json::json!({
+        "tag_name": format!("v{version}"),
+        "html_url": format!("{base}/o/r/releases/tag/v{version}"),
+        "published_at": "2026-11-03T10:00:00Z",
+        "body": "### Features\n\n* a standalone app installs its own updates",
+        "assets": assets.iter().map(|n| serde_json::json!({
+            "name": n,
+            "browser_download_url": format!("{base}/o/r/releases/download/v{version}/{n}"),
+            "url": format!("{base}/api-only/{n}"),
+        })).collect::<Vec<_>>(),
+    });
+    let (a1, a2, a3) = (asked.clone(), asked.clone(), asked);
+    let app = axum::Router::new()
+        .route(
+            "/repos/o/r/releases/latest",
+            get(move |h: HeaderMap| async move {
+                note(&a1, "/repos/o/r/releases/latest".into(), &h);
+                axum::Json(release)
+            }),
+        )
+        .route(
+            "/repos/o/spent/releases/latest",
+            get(move |h: HeaderMap| async move {
+                note(&a2, "/repos/o/spent/releases/latest".into(), &h);
+                (
+                    StatusCode::FORBIDDEN,
+                    [("x-ratelimit-remaining", "0")],
+                    "API rate limit exceeded",
+                )
+                    .into_response()
+            }),
+        )
+        .route(
+            "/o/r/releases/download/{tag}/{name}",
+            get(
+                move |Path((_tag, name)): Path<(String, String)>, h: HeaderMap| async move {
+                    note(&a3, format!("/download/{name}"), &h);
+                    match name.strip_suffix(".sig") {
+                        Some(of) => format!("the signature of {of}\n").into_response(),
+                        None => b"the installer".to_vec().into_response(),
+                    }
+                },
+            ),
+        );
+    tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+    base
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn the_standalone_library_hands_its_app_the_newer_release_of_its_kind() {
+    use reel_pipeline::app_update::{installer_name, Flavour};
+    let Some(env) = start_with(AuthMode::Single, vec![], |c| {
+        c.make_standalone();
+        c.advanced.update_repo = "o/r".into();
+    })
+    .await
+    else {
+        return;
+    };
+    let ask = |query: &str| {
+        let r = env
+            .client
+            .get(format!("{}/api/app/update{query}", env.base));
+        async move {
+            let r = r.send().await.unwrap();
+            let status = r.status().as_u16();
+            let body: serde_json::Value = r.json().await.unwrap_or_default();
+            (status, body)
+        }
+    };
+    let with_obs = "?current=0.1.0&target=windows&arch=x86_64&flavour=with-obs";
+    assert_eq!(
+        ask(with_obs).await.0,
+        204,
+        "nothing before a read of the releases"
+    );
+
+    let asked: Asked = Default::default();
+    let gh = mock_latest_release("99.0.0", asked.clone()).await;
+    let read = reel_pipeline::updates::check_at(&env.ctx, &gh).await;
+    assert_eq!(
+        read.latest.as_ref().map(|r| r.version.as_str()),
+        Some("99.0.0"),
+        "{:?}",
+        read.error
+    );
+
+    let (s, m) = ask(with_obs).await;
+    assert_eq!(s, 200, "{m}");
+    let exe = installer_name("99.0.0", Flavour::WithObs);
+    assert_eq!(m["version"], "99.0.0");
+    assert_eq!(
+        m["url"],
+        format!("{gh}/o/r/releases/download/v99.0.0/{exe}"),
+        "the installer straight from the release, at its download address"
+    );
+    assert_eq!(m["signature"], format!("the signature of {exe}"));
+    assert_eq!(m["pub_date"], "2026-11-03T10:00:00Z");
+    assert!(m["notes"]
+        .as_str()
+        .unwrap()
+        .contains("installs its own updates"));
+    let (s, m) = ask("?current=0.1.0&target=linux&arch=x86_64").await;
+    assert_eq!(s, 200);
+    assert_eq!(
+        m["url"],
+        format!(
+            "{gh}/o/r/releases/download/v99.0.0/{}",
+            installer_name("99.0.0", Flavour::AppImage)
+        ),
+        "a Linux app is offered the AppImage"
+    );
+    assert_eq!(
+        ask("?current=0.1.0&target=windows&arch=x86_64").await.0,
+        204,
+        "reel light's installer is on the release without its signature: not offered"
+    );
+    assert_eq!(
+        ask("?current=99.0.0&target=windows&arch=x86_64&flavour=with-obs")
+            .await
+            .0,
+        204,
+        "an app as new as the release"
+    );
+    assert_eq!(
+        ask("?current=0.1.0&target=darwin&arch=x86_64").await.0,
+        204,
+        "not an app the release has"
+    );
+    assert_eq!(ask(with_obs).await.0, 200);
+    {
+        let asked = asked.lock().unwrap();
+        assert_eq!(
+            asked
+                .iter()
+                .filter(|(p, _, _)| p == &format!("/download/{exe}.sig"))
+                .count(),
+            1,
+            "a signature is read from the release once: {asked:?}"
+        );
+        assert!(
+            !asked
+                .iter()
+                .any(|(p, _, _)| p.ends_with(".exe") || p.ends_with(".AppImage")),
+            "reel on this PC downloads no installer itself: {asked:?}"
+        );
+        for (path, ua, auth) in asked.iter() {
+            assert_eq!(ua, &format!("reel/{}", reel_core::VERSION), "{path}");
+            assert!(!auth, "{path} carried an authorisation");
+        }
+    }
+
+    env.ctx.updates.write().await.latest = Some(reel_pipeline::updates::Release {
+        version: "99.1.0-rc.1".into(),
+        ..read.latest.clone().unwrap()
+    });
+    assert_eq!(ask(with_obs).await.0, 204, "a test build is not offered");
+
+    let (s, body) = patch_setting(
+        &env,
+        serde_json::json!({ "advanced.update_repo": "o/spent" }),
+    )
+    .await;
+    assert_eq!(s, 200, "{body}");
+    let read = reel_pipeline::updates::check_at(&env.ctx, &gh).await;
+    assert!(
+        read.error
+            .as_deref()
+            .unwrap_or("")
+            .contains("60 questions an hour"),
+        "{:?}",
+        read.error
+    );
+
+    let closed = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let nobody = format!("http://{}", closed.local_addr().unwrap());
+    drop(closed);
+    let read = reel_pipeline::updates::check_at(&env.ctx, &nobody).await;
+    assert!(
+        read.error
+            .as_deref()
+            .unwrap_or("")
+            .starts_with("GitHub could not be reached ("),
+        "{:?}",
+        read.error
+    );
+
+    let Some(server) = start(AuthMode::Single, vec![]).await else {
+        return;
+    };
+    let r = server
+        .client
+        .get(format!("{}/api/app/update{with_obs}", server.base))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(
+        r.status().as_u16(),
+        404,
+        "a server's apps ask its device API, with their token"
+    );
 }
 
 #[tokio::test(flavor = "multi_thread")]

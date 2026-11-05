@@ -20,10 +20,12 @@ downloads, the app on Windows and on Linux, and the server.
 - **Not there at all**: no feed, no social layer, no Windows service (the
   app runs while you are logged in and stops when you quit it), no
   telemetry. The app talks to your server and to OBS on the same PC,
-  nothing else. The server asks GitHub once a day whether a newer release
-  is out (Settings, Advanced, **Check for updates** turns that off), and
-  fetches the app's installers of its own version from the release while
-  they are missing (Settings, Devices, **Offer app updates**).
+  nothing else; standalone, it asks GitHub for a newer release only when
+  you press **Check now** or turn on the daily check. The server asks
+  GitHub once a day whether a newer release is out (Settings, Advanced,
+  **Check for updates** turns that off), and fetches the app's installers
+  of its own version from the release while they are missing (Settings,
+  Devices, **Offer app updates**).
 
 ## Why the app stays light
 

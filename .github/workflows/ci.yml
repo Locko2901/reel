@@ -343,7 +343,7 @@ jobs:
               notes += `\n\nThe Windows app, two installers, each with its SHA-256 in the .sha256 next to it: ${names.with_obs_name}, ${withObs}, with OBS included, and ${names.plain_name}, ${plain}, for a PC with OBS already. The OBS in ${names.with_obs_name} is unmodified; its source, the same version, is ${sources[0]}.`;
             }
             if (!body.includes(appimage)) {
-              notes += `\n\nThe Linux app, with the OBS of your distribution or Flathub: ${appimage} for any distribution, which updates itself from your server; ${deb} for Debian and Ubuntu, which does not update itself (install each new version's .deb the same way).`;
+              notes += `\n\nThe Linux app, with the OBS of your distribution or Flathub: ${appimage} for any distribution, which updates itself (from your server, or in standalone from the release); ${deb} for Debian and Ubuntu, which does not update itself (install each new version's .deb the same way).`;
             }
             if (notes !== body.trimEnd()) {
               await github.rest.repos.updateRelease({ owner, repo, release_id: release.id, body: `${notes}\n` });

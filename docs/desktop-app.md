@@ -190,18 +190,23 @@ Hotkeys page shows.
 
 ## Updates
 
-The app keeps itself up to date from the server it is paired with, and you see each step:
+The app keeps itself up to date from the server it is paired with, or in standalone from reel's
+releases, and you see each step:
 
-- **From your server only.** The server offers the app of its own version, so updating the server
-  brings the new app to every paired PC. Each app gets its own kind: reel stays reel, with its OBS,
-  reel light stays reel light, the AppImage gets the next AppImage.
+- **From your server, or from the release.** Paired, the server offers the app of its own version,
+  so updating the server brings the new app to every paired PC. Standalone, the app takes the
+  newest release from GitHub. Each app gets its own kind: reel stays reel, with its OBS, reel light
+  stays reel light, the AppImage gets the next AppImage.
 - **Signed.** Every installer is signed with reel's release key, and the app checks the signature
   against the key built into it before it runs anything.
-- **When.** The app asks its server 45 seconds after it starts, then every six hours. **Check
-  now** under This app, Startup, **Updates** asks at once. **New versions** there decides what
-  happens: **ask, then install** (the default) tells you in a notification, in the tray menu and
-  on the Updates panel, with the release notes; **install when the app quits** downloads it and
-  installs it when you quit from the tray; **off** asks only on **Check now**.
+- **When.** Paired, the app asks its server 45 seconds after it starts, then every six hours.
+  Standalone, it asks GitHub only when you ask: **Check now**, or once a day when Settings,
+  **Advanced**, **Check for updates** is on ([What leaves your PC](privacy.md#what-leaves-your-pc)).
+  **Check now** under This app, Startup, **Updates** asks at once. **New versions** there decides
+  what happens with a version found without it: **ask, then install** (the default) tells you in a
+  notification, in the tray menu and on the Updates panel, with the release notes; **install when
+  the app quits** downloads it and installs it when you quit from the tray; **off** offers it only
+  on **Check now**.
 - **Before you press Install**, the panel says what happens next and about how long it takes.
   On Windows: reel closes, its installer shows its progress in a small window, and reel opens
   again by itself, in about a minute with reel and half a minute with reel light. A
@@ -228,8 +233,9 @@ The app keeps itself up to date from the server it is paired with, and you see e
 - **The AppImage** puts the new version in place of its own file and opens again by itself, in a
   few seconds.
 - **The .deb** does not update itself: install the next version's `.deb` the same way as the first.
-- **Standalone** asks nothing by itself. **Check now** reads the newest release, and **Open the
-  releases** opens the page with its installers.
+- **Standalone** asks nothing by itself. A standalone app of 1.11 or earlier cannot install an
+  update: it says the new version is out, and **Open the releases** opens the page with its
+  installers. Install that one by hand, once; from then on the app installs its updates itself.
 
 The **Versions** panel on This app, Status names this app's version and kind, the server's, and
 the newest release. The status chip's **Versions** row shows the version, or both while the app

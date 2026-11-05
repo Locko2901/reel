@@ -139,8 +139,9 @@ so you can check you got the file the release published. See
 
 ### Does the app run on Linux?
 
-Yes, as an AppImage and as a `.deb` for Debian and Ubuntu. Paired with a
-server, the AppImage updates itself from it; the `.deb` does not. Both
+Yes, as an AppImage and as a `.deb` for Debian and Ubuntu. The AppImage
+updates itself, from your server or in standalone from the release; the
+`.deb` does not. Both
 need an x86_64 system with glibc 2.36 or later: Arch, Fedora, Debian 12,
 Ubuntu 24.04 and later. reel runs the OBS you installed from your
 distribution or Flathub a second time, with settings of its own, so your
@@ -240,8 +241,10 @@ cost follows OBS's settings. The numbers and how they were taken are on
 On the server, pull the new image and start it again; the database
 updates itself at start, and the Status page says when a newer release
 is out. A paired app is then offered the server's version, signed and
-checked before it installs. The Linux `.deb` and a standalone app do not
-update this way: their new version is on the
+checked before it installs. A standalone app installs the newest release
+when you press **Check now** under This app, Startup, **Updates**, with
+the same signature check. The Linux `.deb` does not update itself: its
+new version is on the
 [releases page](https://github.com/Locko2901/reel/releases). See
 [Updating](updating.md).
 

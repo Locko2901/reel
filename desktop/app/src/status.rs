@@ -205,7 +205,8 @@ pub fn panel(st: &Status) -> Panel {
     }
 }
 
-/// Standalone's line about new versions, from the local reel's daily release check.
+/// Standalone's line about new versions while no update is offered: what reel on this PC's
+/// read of the releases found.
 pub fn release_line(
     running: bool,
     check_on: bool,
@@ -214,20 +215,19 @@ pub fn release_line(
     current: &str,
 ) -> String {
     if !running {
-        return "new versions are on the releases page".into();
+        return "reel on this PC is not running to read the releases: new versions are on the releases page".into();
     }
     match (latest, error) {
-        (Some(v), _) if reel_core::versions::older(current, v) => {
-            format!("reel {v} is out: install it from the releases page")
+        (_, Some(e)) => format!("the releases could not be read: {e}"),
+        (Some(v), None) if reel_core::versions::older(current, v) => {
+            format!("reel {v} is out; Check now offers it to install")
         }
-        (Some(v), _) => format!("up to date: {v} is the newest release"),
-        (None, Some(e)) => format!("the releases could not be read: {e}"),
+        (Some(v), None) => format!("up to date: {v} is the newest release"),
         (None, None) if check_on => {
-            "the newest release is read a minute after reel on this PC starts, then once a day"
-                .into()
+            "the newest release is read a minute after reel on this PC starts, then once a day".into()
         }
         (None, None) => {
-            "new versions are on the releases page; Check now reads the newest from it".into()
+            "not asked yet: Check now asks GitHub for the newest release, and nothing asks by itself".into()
         }
     }
 }
@@ -519,11 +519,16 @@ mod tests {
     fn standalone_says_what_the_release_check_read_and_asks_no_server() {
         assert_eq!(
             release_line(true, true, Some("1.10.0"), None, "1.9.0"),
-            "reel 1.10.0 is out: install it from the releases page"
+            "reel 1.10.0 is out; Check now offers it to install"
+        );
+        assert_eq!(
+            release_line(true, true, Some("1.9.0"), None, "1.9.0"),
+            "up to date: 1.9.0 is the newest release"
         );
         assert_eq!(
             release_line(true, true, Some("1.9.0"), Some("timed out"), "1.9.0"),
-            "up to date: 1.9.0 is the newest release"
+            "the releases could not be read: timed out",
+            "a read that failed says so, not the read before it"
         );
         assert_eq!(
             release_line(true, true, None, Some("GitHub answered 503"), "1.9.0"),
@@ -532,17 +537,10 @@ mod tests {
         assert!(release_line(true, true, None, None, "1.9.0").contains("once a day"));
         assert_eq!(
             release_line(true, false, None, None, "1.9.0"),
-            "new versions are on the releases page; Check now reads the newest from it",
+            "not asked yet: Check now asks GitHub for the newest release, and nothing asks by itself",
             "the default: nothing asked by itself"
         );
-        assert!(
-            release_line(true, false, Some("1.10.0"), None, "1.9.0").contains("1.10.0 is out"),
-            "what Check now read"
-        );
-        assert_eq!(
-            release_line(false, true, None, None, "1.9.0"),
-            "new versions are on the releases page"
-        );
+        assert!(release_line(false, true, None, None, "1.9.0").ends_with("on the releases page"));
         for line in [
             release_line(true, true, Some("1.10.0"), None, "1.9.0"),
             release_line(false, true, None, None, "1.9.0"),

@@ -196,9 +196,10 @@ Then make your first link:
   your own OBS, Discord still switches: in Discord, **User Settings**, **Streamer Mode** (in newer
   versions under **Appearance**), turn off **Automatically Enable/Disable**. Discord from Flathub
   never turns it on by itself.
-- **Updates**: an AppImage paired with a server installs a new version from This app, Startup,
-  **Install**, replaces itself and starts again. The `.deb` does not update itself: install the
-  next `.deb` the same way as the first. See [Updates](../desktop-app.md#updates).
+- **Updates**: the AppImage installs a new version from This app, Startup, **Install** (from its
+  server when paired, from the release in standalone), replaces itself and starts again. The
+  `.deb` does not update itself: install the next `.deb` the same way as the first. See
+  [Updates](../desktop-app.md#updates).
 - **reel's OBS keeps its own settings** in `~/.local/share/reel/obs` (its log in
   `obs-studio/logs` there; for OBS from Flathub in `~/.var/app/com.obsproject.Studio/reel`), beside
   the program it runs as, `reel-capture` in `program/bin`, with links to OBS's helpers and to the

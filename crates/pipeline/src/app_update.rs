@@ -16,6 +16,14 @@ pub fn serves(target: Option<&str>, arch: Option<&str>) -> bool {
 }
 pub const GITHUB_API: &str = "https://api.github.com";
 
+/// GitHub's API, or the stand-in that `REEL_GITHUB_API` names for the checks of the updates.
+pub fn github_api() -> String {
+    std::env::var("REEL_GITHUB_API")
+        .ok()
+        .filter(|a| !a.trim().is_empty())
+        .unwrap_or_else(|| GITHUB_API.to_string())
+}
+
 /// Whether an app at `current` is older than this server: by number, and a pre-release of
 /// the same number (a dev build) counts as older, as the updater's own comparison does.
 pub fn offers_to(current: &str) -> bool {
@@ -289,6 +297,101 @@ pub async fn fetch_from_release(
     Ok(true)
 }
 
+/// A newer release's installer of one kind for a standalone app, at its address on the release.
+#[derive(Debug, Clone, PartialEq)]
+pub struct FromRelease {
+    pub version: String,
+    pub notes: String,
+    pub published: String,
+    pub installer: String,
+    pub signature: String,
+}
+
+/// Why a release offers an app nothing.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NotOffered {
+    NotNewer,
+    Deb,
+    TestBuild,
+    NoInstaller,
+    NoSignature,
+}
+
+pub fn from_release(
+    release: &crate::updates::Release,
+    current: &str,
+    flavour: Flavour,
+) -> Result<FromRelease, NotOffered> {
+    let version = release.version.as_str();
+    if current.trim().is_empty() || !older(current, version) {
+        return Err(NotOffered::NotNewer);
+    }
+    if flavour == Flavour::Deb {
+        return Err(NotOffered::Deb);
+    }
+    if version.contains('-') {
+        return Err(NotOffered::TestBuild);
+    }
+    let name = installer_name(version, flavour);
+    let url_of = |n: &str| {
+        release
+            .assets
+            .iter()
+            .find(|a| a.name == n)
+            .map(|a| a.url.clone())
+    };
+    Ok(FromRelease {
+        version: version.to_string(),
+        notes: release.notes.clone(),
+        published: release.published_at.clone(),
+        installer: url_of(&name).ok_or(NotOffered::NoInstaller)?,
+        signature: url_of(&format!("{name}.sig")).ok_or(NotOffered::NoSignature)?,
+    })
+}
+
+/// The signatures read from releases, by address, so each is read once.
+static SIGNATURES: std::sync::Mutex<Vec<(String, String)>> = std::sync::Mutex::new(Vec::new());
+
+/// An installer's `.sig` on the release; the request carries reel's version and nothing else.
+pub async fn release_signature(url: &str) -> Result<String, String> {
+    let known = SIGNATURES
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .iter()
+        .find(|(u, _)| u == url)
+        .map(|(_, s)| s.clone());
+    if let Some(sig) = known {
+        return Ok(sig);
+    }
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(30))
+        .user_agent(format!("reel/{}", reel_core::VERSION))
+        .build()
+        .map_err(|e| e.to_string())?;
+    let resp = client
+        .get(url)
+        .header("accept", "application/octet-stream")
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+    if !resp.status().is_success() {
+        return Err(format!("GitHub answered {}", resp.status()));
+    }
+    let bytes = resp.bytes().await.map_err(|e| e.to_string())?;
+    if bytes.len() > 4096 {
+        return Err("the signature file is too large to be one".into());
+    }
+    let sig = String::from_utf8_lossy(&bytes).trim().to_string();
+    if sig.is_empty() {
+        return Err("the signature file is empty".into());
+    }
+    SIGNATURES
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .push((url.to_string(), sig.clone()));
+    Ok(sig)
+}
+
 /// At start and once a day while one of this version's installers is missing, fetches every
 /// kind; each pass also reads the repository's releases.
 pub async fn run(ctx: Ctx) {
@@ -296,7 +399,7 @@ pub async fn run(ctx: Ctx) {
         let cfg = ctx.config();
         let token = cfg.device.updates_token.clone();
         if cfg.device.app_updates {
-            match read_releases(GITHUB_API, &cfg.advanced.update_repo, &token).await {
+            match read_releases(&github_api(), &cfg.advanced.update_repo, &token).await {
                 Ok(list) => {
                     keep_releases(list);
                     tracing::info!(newest = ?newest(), "the repository's releases read");
@@ -309,7 +412,7 @@ pub async fn run(ctx: Ctx) {
                 continue;
             }
             match fetch_from_release(
-                GITHUB_API,
+                &github_api(),
                 &cfg.advanced.update_repo,
                 reel_core::VERSION,
                 &token,
@@ -378,6 +481,76 @@ mod tests {
         );
         keep_releases(Vec::new());
         assert_eq!(newest(), None);
+    }
+
+    #[test]
+    fn a_release_offers_an_older_app_its_own_kind_signed() {
+        use crate::updates::{Asset, Release};
+        let file = |n: String| Asset {
+            url: format!("https://github.com/o/r/releases/download/v1.11.0/{n}"),
+            name: n,
+        };
+        let mut release = Release {
+            version: "1.11.0".into(),
+            notes: "* the app installs its own updates".into(),
+            published_at: "2026-11-03T10:00:00Z".into(),
+            ..Default::default()
+        };
+        for f in [Flavour::WithObs, Flavour::AppImage, Flavour::Deb] {
+            let name = installer_name("1.11.0", f);
+            release.assets.push(file(format!("{name}.sig")));
+            release.assets.push(file(name));
+        }
+        release
+            .assets
+            .push(file(installer_name("1.11.0", Flavour::Plain)));
+        let got = from_release(&release, "1.10.0", Flavour::WithObs).unwrap();
+        assert_eq!(got.version, "1.11.0");
+        assert!(got
+            .installer
+            .ends_with(&installer_name("1.11.0", Flavour::WithObs)));
+        assert_eq!(got.signature, format!("{}.sig", got.installer));
+        assert_eq!(got.notes, release.notes);
+        assert!(from_release(&release, "1.10.0", Flavour::AppImage).is_ok());
+        assert_eq!(
+            from_release(&release, "1.10.0", Flavour::Plain),
+            Err(NotOffered::NoSignature),
+            "an installer without its signature"
+        );
+        assert_eq!(
+            from_release(&release, "1.10.0", Flavour::Deb),
+            Err(NotOffered::Deb),
+            "the .deb does not update itself"
+        );
+        assert_eq!(
+            from_release(&release, "1.11.0", Flavour::WithObs),
+            Err(NotOffered::NotNewer)
+        );
+        assert_eq!(
+            from_release(&release, "", Flavour::WithObs),
+            Err(NotOffered::NotNewer)
+        );
+        assert_eq!(
+            from_release(&release, "1.11.0", Flavour::Deb),
+            Err(NotOffered::NotNewer),
+            "a .deb as new as the release is up to date"
+        );
+        assert!(
+            from_release(&release, "1.11.0-dev.abc1234", Flavour::WithObs).is_ok(),
+            "a test build of the app is offered the release, as a server offers it"
+        );
+        let mut without = release.clone();
+        without.assets.retain(|a| !a.name.contains("AppImage"));
+        assert_eq!(
+            from_release(&without, "1.10.0", Flavour::AppImage),
+            Err(NotOffered::NoInstaller)
+        );
+        release.version = "1.12.0-rc.1".into();
+        assert_eq!(
+            from_release(&release, "1.10.0", Flavour::WithObs),
+            Err(NotOffered::TestBuild),
+            "a test build on the release is not offered"
+        );
     }
 
     #[test]

@@ -774,6 +774,51 @@ pub async fn update(
     .into_response())
 }
 
+/// Standalone only: the newer release the last check read, with this app's installer at its
+/// address on the release, in the updater's format; 204 if none.
+pub async fn release_update(
+    State(st): State<AppState>,
+    Query(q): Query<UpdateQuery>,
+) -> AppResult<Response> {
+    use reel_pipeline::app_update;
+    if !st.ctx.config().standalone() {
+        return Err(AppError::NotFound);
+    }
+    let none = || StatusCode::NO_CONTENT.into_response();
+    let current = q.current.unwrap_or_default();
+    if !app_update::serves(q.target.as_deref(), q.arch.as_deref()) {
+        return Ok(none());
+    }
+    let flavour = app_update::Flavour::for_update(q.flavour.as_deref(), q.target.as_deref());
+    let latest = st.ctx.updates.read().await.latest.clone();
+    let Some(offer) = latest
+        .as_ref()
+        .and_then(|r| app_update::from_release(r, &current, flavour).ok())
+    else {
+        return Ok(none());
+    };
+    let signature = match app_update::release_signature(&offer.signature).await {
+        Ok(s) => s,
+        Err(e) => {
+            tracing::warn!(error = %e, version = %offer.version, "the installer's signature was not read from the release");
+            return Ok((
+                StatusCode::BAD_GATEWAY,
+                Json(json!({ "error": format!("the installer's signature was not read: {e}") })),
+            )
+                .into_response());
+        }
+    };
+    tracing::info!(from = %current, to = %offer.version, installer = flavour.id(), "the release's app offered to this app");
+    Ok(Json(json!({
+        "version": offer.version,
+        "notes": offer.notes,
+        "pub_date": Some(offer.published).filter(|d| !d.is_empty()),
+        "url": offer.installer,
+        "signature": signature,
+    }))
+    .into_response())
+}
+
 pub async fn update_installer(
     State(st): State<AppState>,
     Extension(me): Extension<DeviceAuth>,

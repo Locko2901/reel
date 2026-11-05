@@ -1,14 +1,16 @@
-//! The app's own updates from its paired server: the installer of the server's version, signed
-//! with the release key and checked against the key built into the app.
+//! The app's own updates: from its paired server, the installer of the server's version; in
+//! standalone, the newer release's installer, which reel on this PC finds on GitHub. Either is
+//! signed with the release key and checked against the key built into the app.
 use crate::notify;
 use crate::runtime::Runtime;
-use reel_desktop_core::settings::{Mode, UpdateMode};
+use reel_desktop_core::settings::{Mode, Settings, UpdateMode};
 use reel_desktop_core::update_steps::{self, Kind, Note};
+use reel_pipeline::app_update::{Flavour, NotOffered};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 use std::time::{Duration, Instant, SystemTime};
 use tauri::Manager;
-use tauri_plugin_updater::UpdaterExt;
+use tauri_plugin_updater::{Updater, UpdaterBuilder, UpdaterExt};
 
 pub fn releases_url() -> String {
     "https://github.com/Locko2901/reel/releases".into()
@@ -22,7 +24,8 @@ fn set_line(rt: &Runtime, line: impl Into<String>) {
 const EVERY: Duration = Duration::from_secs(6 * 3600);
 
 /// 45 s after the start, then every six hours by the wall clock: a timer stops while the PC
-/// sleeps, so a long one comes days late on a PC that sleeps at night.
+/// sleeps, so a long one comes days late on a PC that sleeps at night. Standalone also looks
+/// within a minute of each read of the releases by reel on this PC.
 pub fn spawn_checks(rt: Runtime) {
     tauri::async_runtime::spawn(async move {
         tokio::time::sleep(Duration::from_secs(45)).await;
@@ -32,6 +35,9 @@ pub fn spawn_checks(rt: Runtime) {
             }
             loop {
                 tokio::time::sleep(Duration::from_secs(60)).await;
+                if new_read(&rt).await {
+                    break;
+                }
                 let last = rt.lock().update_checked_at;
                 let since = last.and_then(|t| SystemTime::now().duration_since(t).ok());
                 if since.map(|d| d >= EVERY).unwrap_or(true) {
@@ -62,7 +68,10 @@ pub fn none_line(v: &crate::status::Versions) -> String {
 }
 
 /// Progress in the line every 5 %: the installer with OBS is 232 MB.
-async fn download(rt: &Runtime, update: &tauri_plugin_updater::Update) -> Result<Vec<u8>, String> {
+async fn download(
+    rt: &Runtime,
+    update: &tauri_plugin_updater::Update,
+) -> Result<Vec<u8>, tauri_plugin_updater::Error> {
     let version = update.version.clone();
     let (mut got, mut said) = (0u64, 0u64);
     let line = rt.clone();
@@ -89,12 +98,94 @@ async fn download(rt: &Runtime, update: &tauri_plugin_updater::Update) -> Result
             || {},
         )
         .await
-        .map_err(|e| e.to_string())
+}
+
+/// A download that failed, after "reel x.y": one the key built into the app refuses is never
+/// installed, any other failure may pass on a second try.
+fn not_downloaded(version: &str, e: &tauri_plugin_updater::Error, again: &str) -> String {
+    use tauri_plugin_updater::Error as E;
+    match e {
+        E::Minisign(_)
+        | E::Base64(_)
+        | E::SignatureUtf8(_)
+        | E::SignedVersionMismatch { .. }
+        | E::MissingSignedVersion => format!(
+            "reel {version} was refused: the download does not match a signature of the release key built into this app, so nothing was installed"
+        ),
+        e => format!("reel {version} did not download: {e}; {again}"),
+    }
 }
 
 /// How the update is put in place: the Windows installer, with OBS or without, or the AppImage.
 pub fn kind(rt: &Runtime) -> Kind {
     Kind::here(rt.lock().bundled.is_some())
+}
+
+/// Which of the release's downloads this app came from, which its update brings again.
+pub fn flavour(with_obs: bool) -> Flavour {
+    #[cfg(target_os = "linux")]
+    {
+        let _ = with_obs;
+        if crate::linux::appimage().is_some() {
+            Flavour::AppImage
+        } else {
+            Flavour::Deb
+        }
+    }
+    #[cfg(not(target_os = "linux"))]
+    if with_obs {
+        Flavour::WithObs
+    } else {
+        Flavour::Plain
+    }
+}
+
+/// The updater's question to the paired server or to reel on this PC; reel light names no
+/// flavour, as an app older than the two installers asks.
+pub fn endpoint(base: &str, path: &str, with_obs: bool) -> Result<url::Url, String> {
+    let flavour = if with_obs { "&flavour=with-obs" } else { "" };
+    format!(
+        "{}{path}?current={{{{current_version}}}}&target={{{{target}}}}&arch={{{{arch}}}}{flavour}",
+        base.trim_end_matches('/')
+    )
+    .parse()
+    .map_err(|e| format!("{e}"))
+}
+
+/// Where reel on this PC answers the app's own updater in standalone.
+pub const RELEASE_PATH: &str = "/api/app/update";
+
+/// The installer starts reel again in the tray, its integrity check skipped: the updater has
+/// checked the signature.
+pub fn builder<R: tauri::Runtime>(
+    app: &tauri::AppHandle<R>,
+    endpoint: url::Url,
+) -> Result<UpdaterBuilder, String> {
+    app.updater_builder()
+        .endpoints(vec![endpoint])
+        .and_then(|b| b.header("User-Agent", format!("reel/{}", app.package_info().version)))
+        .map(|b| {
+            b.restart_after_install(false)
+                .installer_args(["/NCRC", "/R", "/ARGS", "--hidden"])
+        })
+        .map_err(|e| e.to_string())
+}
+
+fn updater(rt: &Runtime, endpoint: url::Url, token: Option<&str>) -> Result<Updater, String> {
+    let mut b = builder(&rt.app, endpoint)?;
+    if let Some(token) = token {
+        b = b
+            .header("Authorization", format!("Bearer {token}"))
+            .map_err(|e| e.to_string())?;
+    }
+    // Windows' installer ends the app at once: the log's last lines go first
+    let out = rt.clone();
+    b.on_before_exit(move || {
+        tracing::info!("quit: the update's installer starts, and the app exits");
+        drop(out.lock().log.take());
+    })
+    .build()
+    .map_err(|e| e.to_string())
 }
 
 fn now_secs() -> u64 {
@@ -128,6 +219,7 @@ pub fn spawn_updated(rt: Runtime) {
     }
     if note.is_some() || (!was.is_empty() && was != now) {
         log_installer_steps();
+        clear_installers(&rt.app.package_info().name);
     }
     let said = update_steps::after(note.as_ref(), &now, &was, failure.as_deref());
     let place = note
@@ -169,6 +261,44 @@ pub fn spawn_updated(rt: Runtime) {
     });
 }
 
+/// The updater leaves Windows' installer in a folder of its own in the temporary folder as the
+/// app exits.
+fn clear_installers(name: &str) {
+    if !cfg!(windows) {
+        return;
+    }
+    let Ok(dir) = std::fs::read_dir(std::env::temp_dir()) else {
+        return;
+    };
+    for entry in dir.flatten() {
+        let file = entry.file_name().to_string_lossy().into_owned();
+        if !updaters_folder(name, &file) || !entry.file_type().is_ok_and(|t| t.is_dir()) {
+            continue;
+        }
+        match std::fs::remove_dir_all(entry.path()) {
+            Ok(()) => {
+                tracing::info!(folder = %file, "the update's installer is removed from the temporary folder")
+            }
+            Err(e) => {
+                tracing::warn!(folder = %file, error = %e, "the update's installer was not removed")
+            }
+        }
+    }
+}
+
+/// The updater's folder for an installer: `<name>-<version>-updater-` and six random letters.
+fn updaters_folder(name: &str, file: &str) -> bool {
+    let Some(rest) = file.strip_prefix(name).and_then(|r| r.strip_prefix('-')) else {
+        return false;
+    };
+    rest.rsplit_once("-updater-")
+        .is_some_and(|(version, tail)| {
+            version.starts_with(|c: char| c.is_ascii_digit())
+                && tail.len() == 6
+                && tail.chars().all(|c| c.is_ascii_alphanumeric())
+        })
+}
+
 fn log_installer_steps() {
     let file = reel_desktop_core::settings::paths()
         .logs_dir()
@@ -191,14 +321,7 @@ fn log_installer_steps() {
 pub async fn check(rt: &Runtime, by_hand: bool) -> Result<(), String> {
     let s = rt.settings();
     if s.mode == Mode::Standalone {
-        // the line is what the standalone release check read; Check now reads the release again
-        rt.lock().update_checked_at = Some(SystemTime::now());
-        let local = rt.lock().local.clone();
-        if let (true, Some(local)) = (by_hand, local) {
-            reel_pipeline::updates::check_once(&local.ctx).await;
-        }
-        rt.push_status();
-        return Ok(());
+        return check_release(rt, by_hand, &s).await;
     }
     #[cfg(target_os = "linux")]
     if crate::linux::appimage().is_none() {
@@ -223,81 +346,11 @@ pub async fn check(rt: &Runtime, by_hand: bool) -> Result<(), String> {
         set_line(rt, format!("not asked: {e}"));
         return Ok(());
     }
-    // reel light sends no flavour, the request of an app older than the two installers
-    let flavour = if rt.lock().bundled.is_some() {
-        "&flavour=with-obs"
-    } else {
-        ""
-    };
-    let url = format!(
-        "{}/api/device/update?current={{{{current_version}}}}&target={{{{target}}}}&arch={{{{arch}}}}{flavour}",
-        s.server_url.trim_end_matches('/')
-    )
-    .parse()
-    .map_err(|e| format!("{e}"))?;
-    let updater = rt
-        .app
-        .updater_builder()
-        .endpoints(vec![url])
-        .and_then(|b| b.header("Authorization", format!("Bearer {token}")))
-        .map(|b| {
-            // the installer starts reel again in the tray; its integrity check is skipped, the
-            // update's signature having been checked
-            b.restart_after_install(false)
-                .installer_args(["/NCRC", "/R", "/ARGS", "--hidden"])
-        })
-        .and_then(|b| {
-            // Windows' installer ends the app at once: the log's last lines go first
-            let out = rt.clone();
-            b.on_before_exit(move || {
-                tracing::info!("quit: the update's installer starts, and the app exits");
-                drop(out.lock().log.take());
-            })
-            .build()
-        })
-        .map_err(|e| e.to_string())?;
+    let with_obs = rt.lock().bundled.is_some();
+    let url = endpoint(&s.server_url, "/api/device/update", with_obs)?;
+    let updater = updater(rt, url, Some(&token))?;
     match updater.check().await {
-        Ok(Some(update)) => {
-            let version = update.version.clone();
-            tracing::info!(version, "an update of the app is ready on the server");
-            rt.lock().update = Some(update.clone());
-            let current = rt.app.package_info().version.to_string();
-            match s.updates {
-                _ if test_build(&current) => {
-                    set_line(
-                        rt,
-                        format!("reel {version} is on the server; this test build ({current}) installs it only when asked"),
-                    );
-                }
-                UpdateMode::OnQuit => {
-                    set_line(
-                        rt,
-                        format!("reel {version} is downloading, to install when the app quits"),
-                    );
-                    match download(rt, &update).await {
-                        Ok(bytes) => {
-                            rt.lock().update_bytes = Some(bytes);
-                            set_line(rt, format!("reel {version} installs when the app quits"));
-                        }
-                        Err(e) => set_line(
-                            rt,
-                            format!("reel {version} did not download: {e}; Check now tries again"),
-                        ),
-                    }
-                }
-                _ => {
-                    set_line(rt, format!("reel {version} is ready to install"));
-                    let told = rt.lock().update_told.replace(version.clone());
-                    if told.as_deref() != Some(version.as_str()) {
-                        notify::show(
-                            &rt.app,
-                            &format!("reel {version} is ready"),
-                            "Install it from the tray, or under This app, Startup.",
-                        );
-                    }
-                }
-            }
-        }
+        Ok(Some(update)) => ready(rt, &s, update, Source::Server).await,
         Ok(None) => {
             tracing::info!("the app is up to date");
             rt.lock().update = None;
@@ -308,6 +361,183 @@ pub async fn check(rt: &Runtime, by_hand: bool) -> Result<(), String> {
             rt,
             format!("the server did not answer the check: {e}; it is asked again in six hours, or now with Check now"),
         ),
+    }
+    Ok(())
+}
+
+#[derive(Clone, Copy, PartialEq)]
+enum Source {
+    Server,
+    Release,
+}
+
+async fn ready(rt: &Runtime, s: &Settings, update: tauri_plugin_updater::Update, from: Source) {
+    let version = update.version.clone();
+    tracing::info!(
+        version,
+        from = if from == Source::Server {
+            "the server"
+        } else {
+            "the release"
+        },
+        "an update of the app is ready"
+    );
+    let held = {
+        let g = rt.lock();
+        g.update_bytes.is_some() && g.update.as_ref().is_some_and(|u| u.version == version)
+    };
+    rt.lock().update = Some(update.clone());
+    let current = rt.app.package_info().version.to_string();
+    match s.updates {
+        _ if test_build(&current) => {
+            let at = match from {
+                Source::Server => "is on the server",
+                Source::Release => "is out",
+            };
+            set_line(
+                rt,
+                format!(
+                    "reel {version} {at}; this test build ({current}) installs it only when asked"
+                ),
+            );
+        }
+        UpdateMode::OnQuit if held => {
+            set_line(rt, format!("reel {version} installs when the app quits"));
+        }
+        UpdateMode::OnQuit => {
+            set_line(
+                rt,
+                format!("reel {version} is downloading, to install when the app quits"),
+            );
+            match download(rt, &update).await {
+                Ok(bytes) => {
+                    rt.lock().update_bytes = Some(bytes);
+                    set_line(rt, format!("reel {version} installs when the app quits"));
+                }
+                Err(e) => {
+                    tracing::warn!(version, error = %e, "the update did not download");
+                    set_line(rt, not_downloaded(&version, &e, "Check now tries again"));
+                }
+            }
+        }
+        _ => {
+            set_line(rt, format!("reel {version} is ready to install"));
+            let told = rt.lock().update_told.replace(version.clone());
+            if told.as_deref() != Some(version.as_str()) {
+                notify::show(
+                    &rt.app,
+                    &format!("reel {version} is ready"),
+                    "Install it from the tray, or under This app, Startup.",
+                );
+            }
+        }
+    }
+}
+
+/// When reel on this PC made the read of the releases the app last looked at.
+static ACTED_ON: Mutex<Option<String>> = Mutex::new(None);
+
+async fn new_read(rt: &Runtime) -> bool {
+    if rt.settings().mode != Mode::Standalone {
+        return false;
+    }
+    let Some(local) = rt.lock().local.clone() else {
+        return false;
+    };
+    let at = local.ctx.updates.read().await.checked_at.clone();
+    at.is_some() && *ACTED_ON.lock().unwrap_or_else(|e| e.into_inner()) != at
+}
+
+/// The line for a newer release that offers this app nothing.
+fn not_offered(version: &str, why: NotOffered) -> String {
+    let v = version;
+    match why {
+        NotOffered::NotNewer => String::new(),
+        NotOffered::Deb => format!(
+            "reel {v} is out; the .deb does not update itself: install the new .deb from the releases page"
+        ),
+        NotOffered::TestBuild => format!("reel {v} is a test build, which is not offered"),
+        NotOffered::NoInstaller => format!(
+            "reel {v} is out, and its release has no installer for this app yet; Check now asks again"
+        ),
+        NotOffered::NoSignature => format!(
+            "reel {v} is out, but its release has no signature for this app's installer, and none is installed without one; Check now asks again"
+        ),
+    }
+}
+
+/// Standalone: the newest release as reel on this PC last read it, which Check now reads again,
+/// and this app's installer on it, offered by reel on this PC as a server offers one.
+async fn check_release(rt: &Runtime, by_hand: bool, s: &Settings) -> Result<(), String> {
+    rt.lock().update_checked_at = Some(SystemTime::now());
+    let local = rt.lock().local.clone();
+    let Some(local) = local else {
+        set_line(rt, "");
+        return Ok(());
+    };
+    if by_hand {
+        reel_pipeline::updates::check_once(&local.ctx).await;
+    }
+    let read = local.ctx.updates.read().await.clone();
+    *ACTED_ON.lock().unwrap_or_else(|e| e.into_inner()) = read.checked_at.clone();
+    if read.error.is_some() {
+        // an update found before stays offered; without one the line says why the read failed
+        if rt.lock().update.is_none() {
+            set_line(rt, "");
+        }
+        return Ok(());
+    }
+    let Some(latest) = read.latest else {
+        rt.lock().update = None;
+        set_line(rt, "");
+        return Ok(());
+    };
+    let current = rt.app.package_info().version.to_string();
+    let with_obs = rt.lock().bundled.is_some();
+    let v = latest.version.clone();
+    let offer = match reel_pipeline::app_update::from_release(&latest, &current, flavour(with_obs))
+    {
+        Ok(offer) => offer,
+        Err(why) => {
+            tracing::info!(version = %v, ?why, "the release offers this app nothing");
+            rt.lock().update = None;
+            set_line(rt, not_offered(&v, why));
+            return Ok(());
+        }
+    };
+    if s.updates == UpdateMode::Off && !by_hand {
+        rt.lock().update = None;
+        set_line(
+            rt,
+            format!("reel {v} is out; New versions is off, so Check now offers it"),
+        );
+        return Ok(());
+    }
+    if let Err(e) = reel_pipeline::app_update::release_signature(&offer.signature).await {
+        tracing::warn!(error = %e, version = %v, "the installer's signature was not read from the release");
+        rt.lock().update = None;
+        set_line(
+            rt,
+            format!("reel {v} is out, but the signature of its installer could not be read from the release ({e}); Check now tries again"),
+        );
+        return Ok(());
+    }
+    let url = endpoint(&local.url, RELEASE_PATH, with_obs)?;
+    let updater = updater(rt, url, None)?;
+    match updater.check().await {
+        Ok(Some(update)) => ready(rt, s, update, Source::Release).await,
+        Ok(None) => {
+            rt.lock().update = None;
+            set_line(rt, "");
+        }
+        Err(e) => {
+            tracing::warn!(error = %e, version = %v, "the release's installer was not offered");
+            rt.lock().update = None;
+            set_line(
+                rt,
+                format!("reel {v} is out, but its installer was not offered: {e}; Check now tries again"),
+            );
+        }
     }
     Ok(())
 }
@@ -354,10 +584,8 @@ pub async fn install_now(rt: &Runtime) -> Result<(), String> {
     let bytes = match ready {
         Some(b) => b,
         None => download(rt, &update).await.map_err(|e| {
-            let words = format!(
-                "reel {} did not download: {e}; Install tries again",
-                update.version
-            );
+            tracing::warn!(version = %update.version, error = %e, "the update did not download");
+            let words = not_downloaded(&update.version, &e, "Install tries again");
             set_line(rt, words.clone());
             words
         })?,
@@ -608,6 +836,25 @@ mod tests {
     }
 
     #[test]
+    fn only_the_updaters_own_folders_go_from_the_temporary_folder() {
+        assert!(super::updaters_folder("reel", "reel-1.11.0-updater-a1B2c3"));
+        assert!(super::updaters_folder(
+            "reel",
+            "reel-1.11.0-dev.e58080a-updater-zzzzzz"
+        ));
+        for other in [
+            "reel-1.11.0-updater-abc",
+            "reel-updater-abcdef",
+            "reels-1.11.0-updater-abcdef",
+            "obs-1.11.0-updater-abcdef",
+            "reel-1.11.0-installer.exe",
+            "reel",
+        ] {
+            assert!(!super::updaters_folder("reel", other), "{other}");
+        }
+    }
+
+    #[test]
     fn a_build_named_after_a_commit_never_updates_itself() {
         assert!(super::test_build("1.2.0-dev.e58080a"));
         assert!(!super::test_build("1.2.0"));
@@ -638,6 +885,355 @@ mod tests {
             Some(&["reel-desktop".to_string(), "--hidden".to_string()][..])
         );
         assert!(!super::leaving());
+    }
+
+    struct StandIn {
+        base: String,
+        forged: std::sync::Arc<std::sync::atomic::AtomicBool>,
+        asked: Asked,
+    }
+
+    const RELEASE: &str = "9.9.0";
+
+    type Asked = std::sync::Arc<std::sync::Mutex<Vec<(String, String, bool)>>>;
+
+    impl StandIn {
+        async fn start(files: Vec<(String, Vec<u8>)>) -> StandIn {
+            use axum::extract::{Path, State};
+            use axum::http::{HeaderMap, StatusCode};
+            use axum::response::IntoResponse;
+            use std::sync::atomic::Ordering;
+            let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+            let base = format!("http://{}", listener.local_addr().unwrap());
+            let forged = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+            let asked: Asked = Default::default();
+            let assets: Vec<serde_json::Value> = files
+                .iter()
+                .map(|(name, _)| {
+                    serde_json::json!({ "name": name, "browser_download_url": format!("{base}/download/v{RELEASE}/{name}"), "url": format!("{base}/api-only") })
+                })
+                .collect();
+            let release = serde_json::json!({
+                "tag_name": format!("v{RELEASE}"),
+                "html_url": format!("{base}/releases/tag/v{RELEASE}"),
+                "published_at": "2026-11-03T10:00:00Z",
+                "body": "### Features\n\n* **desktop:** a standalone app installs its own updates ([#50](https://example.org/50))\n",
+                "assets": assets,
+            });
+            type Shared = (
+                std::sync::Arc<std::sync::atomic::AtomicBool>,
+                Asked,
+                serde_json::Value,
+                std::sync::Arc<Vec<(String, Vec<u8>)>>,
+            );
+            fn note(asked: &Asked, path: String, h: &HeaderMap) {
+                let ua = h
+                    .get("user-agent")
+                    .and_then(|v| v.to_str().ok())
+                    .unwrap_or("")
+                    .to_string();
+                asked
+                    .lock()
+                    .unwrap()
+                    .push((path, ua, h.contains_key("authorization")));
+            }
+            let app = axum::Router::new()
+                .route(
+                    "/repos/{owner}/{repo}/releases/latest",
+                    axum::routing::get(
+                        |State((_, asked, release, _)): State<Shared>,
+                         Path((owner, repo)): Path<(String, String)>,
+                         h: HeaderMap| async move {
+                            note(&asked, format!("/repos/{owner}/{repo}/releases/latest"), &h);
+                            axum::Json(release)
+                        },
+                    ),
+                )
+                .route(
+                    "/download/{tag}/{name}",
+                    axum::routing::get(
+                        |State((forged, asked, _, files)): State<Shared>,
+                         Path((_tag, name)): Path<(String, String)>,
+                         h: HeaderMap| async move {
+                            note(&asked, format!("/download/{name}"), &h);
+                            let Some((_, bytes)) = files.iter().find(|(n, _)| *n == name) else {
+                                return StatusCode::NOT_FOUND.into_response();
+                            };
+                            let mut bytes = bytes.clone();
+                            if !name.ends_with(".sig") && forged.load(Ordering::SeqCst) {
+                                bytes.extend_from_slice(b"forged");
+                            }
+                            bytes.into_response()
+                        },
+                    ),
+                )
+                .with_state((
+                    forged.clone(),
+                    asked.clone(),
+                    release,
+                    std::sync::Arc::new(files),
+                ));
+            tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+            StandIn {
+                base,
+                forged,
+                asked,
+            }
+        }
+    }
+
+    async fn standalone_read(api: &str, dir: &std::path::Path) -> crate::standalone::Local {
+        let local = crate::standalone::Local::start(&crate::standalone::LocalSettings {
+            data_dir: dir.join("data"),
+            hwaccel: "none".into(),
+            cap_gb: 0,
+            cap_keeps_unsent: true,
+            copies_on_hardware: false,
+        })
+        .await
+        .unwrap();
+        let read = reel_pipeline::updates::check_at(&local.ctx, api).await;
+        assert!(read.latest.is_some(), "{:?}", read.error);
+        local
+    }
+
+    fn mock_app(pubkey: &str) -> tauri::App<tauri::test::MockRuntime> {
+        let mut ctx = tauri::test::mock_context(tauri::test::noop_assets());
+        let mut conf: serde_json::Value =
+            serde_json::from_str(include_str!("../tauri.conf.json")).unwrap();
+        conf["plugins"]["updater"]["pubkey"] = pubkey.trim().into();
+        ctx.config_mut()
+            .plugins
+            .0
+            .insert("updater".into(), conf["plugins"]["updater"].clone());
+        tauri::test::mock_builder()
+            .plugin(tauri_plugin_updater::Builder::new().build())
+            .build(ctx)
+            .unwrap()
+    }
+
+    #[cfg(target_os = "linux")]
+    fn release_key() -> String {
+        let conf: serde_json::Value =
+            serde_json::from_str(include_str!("../tauri.conf.json")).unwrap();
+        conf["plugins"]["updater"]["pubkey"]
+            .as_str()
+            .unwrap()
+            .to_string()
+    }
+
+    /// Run under Wine by desktop/ci/check-release-update.sh, which follows the installer once
+    /// the updater has ended the process. With `STANDIN_INSTALLER` the release is a stand-in's
+    /// with that installer of reel light; without, it is GitHub's newest.
+    #[cfg(windows)]
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore = "under Wine, by desktop/ci/check-release-update.sh"]
+    async fn a_standalone_app_on_windows_runs_the_releases_installer() {
+        use reel_pipeline::app_update::{installer_name, Flavour};
+        use std::sync::atomic::Ordering;
+        use tauri::Manager;
+        let pubkey = std::env::var("UPDATE_PUBKEY").expect("UPDATE_PUBKEY");
+        let gh = match std::env::var("STANDIN_INSTALLER") {
+            Ok(exe) => {
+                let name = installer_name(RELEASE, Flavour::Plain);
+                Some(
+                    StandIn::start(vec![
+                        (name.clone(), std::fs::read(&exe).unwrap()),
+                        (
+                            format!("{name}.sig"),
+                            std::fs::read(format!("{exe}.sig")).unwrap(),
+                        ),
+                    ])
+                    .await,
+                )
+            }
+            Err(_) => None,
+        };
+        let api = gh
+            .as_ref()
+            .map(|g| g.base.clone())
+            .unwrap_or_else(reel_pipeline::app_update::github_api);
+        let dir = tempfile::tempdir().unwrap();
+        let local = standalone_read(&api, dir.path()).await;
+        let app = mock_app(&pubkey);
+        let url = super::endpoint(&local.url, super::RELEASE_PATH, false).unwrap();
+        let updater = super::builder(app.app_handle(), url)
+            .unwrap()
+            .build()
+            .unwrap();
+        let update = updater
+            .check()
+            .await
+            .unwrap()
+            .expect("the newer release is offered");
+        let name = installer_name(&update.version, Flavour::Plain);
+        assert!(
+            update.download_url.as_str().ends_with(&name),
+            "{}",
+            update.download_url
+        );
+        eprintln!(
+            "ok   reel {} found on the release, its installer without OBS offered: {}",
+            update.version, update.download_url
+        );
+        if let Some(gh) = &gh {
+            gh.forged.store(true, Ordering::SeqCst);
+            let refused = update.download(|_, _| {}, || {}).await.unwrap_err();
+            assert!(
+                super::not_downloaded(&update.version, &refused, "").contains("was refused"),
+                "{refused}"
+            );
+            eprintln!("ok   a forged installer refused for its signature: {refused}");
+            gh.forged.store(false, Ordering::SeqCst);
+        }
+        let bytes = update.download(|_, _| {}, || {}).await.unwrap();
+        eprintln!(
+            "ok   the installer downloaded ({} bytes), its signature checked; it runs as an update",
+            bytes.len()
+        );
+        if let Some(gh) = &gh {
+            for (path, ua, auth) in gh.asked.lock().unwrap().iter() {
+                assert!(ua.starts_with("reel/") && !auth, "{path}: {ua}");
+            }
+        }
+        update.install(bytes).unwrap();
+        unreachable!("the updater ends the app as the installer starts");
+    }
+
+    #[cfg(target_os = "linux")]
+    #[tokio::test(flavor = "multi_thread")]
+    async fn a_standalone_app_installs_the_newer_release_signed_and_refuses_a_forged_one() {
+        use reel_pipeline::app_update::{installer_name, Flavour};
+        use std::sync::atomic::Ordering;
+        use tauri::Manager;
+        let name = installer_name(RELEASE, Flavour::AppImage);
+        let gh = StandIn::start(vec![
+            (
+                name.clone(),
+                include_bytes!("../tests/release/reel.AppImage").to_vec(),
+            ),
+            (
+                format!("{name}.sig"),
+                include_bytes!("../tests/release/reel.AppImage.sig").to_vec(),
+            ),
+        ])
+        .await;
+        let dir = tempfile::tempdir().unwrap();
+        let local = standalone_read(&gh.base, dir.path()).await;
+        let app = mock_app(include_str!("../tests/release/key.pub"));
+        let running = dir.path().join("reel.AppImage");
+        std::fs::write(&running, b"the AppImage that runs").unwrap();
+        let updater = |pubkey: Option<String>| {
+            let url = super::endpoint(&local.url, super::RELEASE_PATH, false).unwrap();
+            let mut b = super::builder(app.app_handle(), url)
+                .unwrap()
+                .executable_path(&running);
+            if let Some(key) = pubkey {
+                b = b.pubkey(key);
+            }
+            b.build().unwrap()
+        };
+
+        let update = updater(None)
+            .check()
+            .await
+            .unwrap()
+            .expect("the newer release is offered");
+        assert_eq!(update.version, RELEASE);
+        assert_eq!(
+            update.download_url.as_str(),
+            format!(
+                "{}/download/v{RELEASE}/reel_{RELEASE}_amd64.AppImage",
+                gh.base
+            ),
+            "the release's own file, straight from it"
+        );
+        assert_eq!(
+            update.signature,
+            include_str!("../tests/release/reel.AppImage.sig").trim()
+        );
+        assert_eq!(
+            update
+                .body
+                .as_deref()
+                .and_then(reel_desktop_core::update_steps::news_line),
+            Some("a standalone app installs its own updates".to_string())
+        );
+
+        gh.forged.store(true, Ordering::SeqCst);
+        let refused = update.download(|_, _| {}, || {}).await.unwrap_err();
+        assert_eq!(
+            super::not_downloaded(RELEASE, &refused, "Install tries again"),
+            "reel 9.9.0 was refused: the download does not match a signature of the release key built into this app, so nothing was installed",
+            "{refused}"
+        );
+        gh.forged.store(false, Ordering::SeqCst);
+
+        let by_another = updater(Some(release_key()))
+            .check()
+            .await
+            .unwrap()
+            .expect("offered, as the key is checked on the download");
+        let refused = by_another.download(|_, _| {}, || {}).await.unwrap_err();
+        assert!(
+            super::not_downloaded(RELEASE, &refused, "").contains("was refused"),
+            "a signature by a key other than the app's: {refused}"
+        );
+        assert_eq!(std::fs::read(&running).unwrap(), b"the AppImage that runs");
+
+        let bytes = update.download(|_, _| {}, || {}).await.unwrap();
+        update.install(&bytes).unwrap();
+        assert_eq!(
+            std::fs::read(&running).unwrap(),
+            include_bytes!("../tests/release/reel.AppImage"),
+            "the new AppImage in the place of the one that ran"
+        );
+
+        let asked = gh.asked.lock().unwrap().clone();
+        assert!(
+            asked
+                .iter()
+                .any(|(p, _, _)| p.ends_with("/releases/latest"))
+                && asked.iter().any(|(p, _, _)| p.ends_with(".AppImage.sig"))
+                && asked.iter().any(|(p, _, _)| p.ends_with(".AppImage")),
+            "{asked:?}"
+        );
+        for (path, ua, auth) in &asked {
+            assert!(ua.starts_with("reel/"), "{path}: {ua}");
+            assert!(!auth, "{path} carried an authorisation");
+        }
+        assert_eq!(
+            asked.iter().filter(|(p, _, _)| p.ends_with(".sig")).count(),
+            1,
+            "the signature is read from the release once: {asked:?}"
+        );
+
+        let mut read = local.ctx.updates.read().await.clone();
+        if let Some(r) = read.latest.as_mut() {
+            r.version = "0.1.0".into();
+        }
+        *local.ctx.updates.write().await = read;
+        assert!(
+            updater(None).check().await.unwrap().is_none(),
+            "a release as old as the app offers nothing"
+        );
+        local.stop();
+    }
+
+    #[test]
+    fn a_release_that_offers_nothing_says_why() {
+        use reel_pipeline::app_update::NotOffered;
+        assert_eq!(super::not_offered("1.12.0", NotOffered::NotNewer), "");
+        assert_eq!(
+            super::not_offered("1.12.0", NotOffered::NoInstaller),
+            "reel 1.12.0 is out, and its release has no installer for this app yet; Check now asks again"
+        );
+        assert_eq!(
+            super::not_offered("1.12.0", NotOffered::NoSignature),
+            "reel 1.12.0 is out, but its release has no signature for this app's installer, and none is installed without one; Check now asks again"
+        );
+        assert!(super::not_offered("1.12.0", NotOffered::Deb).contains("install the new .deb"));
+        assert!(super::not_offered("1.12.0-rc.1", NotOffered::TestBuild).contains("test build"));
     }
 
     #[test]

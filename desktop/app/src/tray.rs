@@ -58,7 +58,7 @@ pub fn items(st: &Status) -> Vec<Item> {
             .collect();
         out.push(Item::Sub("recent".into(), "Last clips".into(), clips));
     }
-    if let Some(v) = st.update_version.as_ref().filter(|_| !standalone) {
+    if let Some(v) = st.update_version.as_ref() {
         out.push(act("update", format!("Install reel {v}"), true));
     }
     out.push(act("save", "Save clip", st.save.ok));
@@ -315,12 +315,16 @@ mod tests {
     fn standalone_the_tray_makes_and_copies_no_link() {
         let st = status("standalone", false, "");
         let got = ids(&st);
-        for gone in ["save-share", "share", "pause", "update", "copy:"] {
+        for gone in ["save-share", "share", "pause", "copy:"] {
             assert!(
                 !got.iter().any(|i| i.starts_with(gone)),
                 "{gone} in {got:?}"
             );
         }
+        assert!(
+            on(&st, "update"),
+            "the release's update installs from the tray as a server's does"
+        );
         assert_eq!(
             got.iter()
                 .filter(|i| i.starts_with("open:"))
