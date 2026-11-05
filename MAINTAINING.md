@@ -46,12 +46,13 @@ checks.
 1. Each push to main updates release-please's pull request, "chore(main): release X.Y.Z": the
    version bumped everywhere and a new entry at the top of `CHANGELOG.md`, written from the
    commits' first lines.
-2. Before merging it, read that entry as a user would. A squash merge's body is not split into
-   lines, so write the entry out on the pull request's branch: one line for each change a user
-   notices, and no links. The server shows the newest five entries on its Status page from the
-   `CHANGELOG.md` built into its image, so the entry has to be right before the merge. The
-   release's notes on GitHub come from the pull request's description: make it match, or edit
-   the release afterwards.
+2. Pull requests are merged by rebase, never squashed, so every commit lands on main as it is:
+   each `feat:` and `fix:` commit is one line of the entry, in the words of its first line, and
+   `docs:`, `test:`, `ci:` and `chore:` commits stay out of it. A commit's first line therefore
+   says what a user notices, and a branch is tidied before it merges (no commits like "review"
+   or "typo"). The server shows the newest five entries on its Status page from the
+   `CHANGELOG.md` built into its image, so read the entry before merging the release. A line
+   that reads badly is best reworded in its commit, before that pull request merges.
 3. Merging it makes CI tag `vX.Y.Z`, publish the release, give the image built from that commit
    the tags `X.Y.Z`, `X.Y`, `X` and `latest`, and build the installers onto the release: both
    Windows installers, the AppImage and the .deb, each with its `.sig` and `.sha256`, and the
