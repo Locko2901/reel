@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.12.1](https://github.com/Locko2901/reel/compare/v1.12.0...v1.12.1) (2026-11-05)
+
+
+### Bug Fixes
+
+* a server keeps only its own version's installers for the apps ([e56ecac](https://github.com/Locko2901/reel/commit/e56ecac72fcec8d585bd15789598d470d9ee4c9d))
+* an update waits for a library move or copy to finish ([da39157](https://github.com/Locko2901/reel/commit/da3915713465f045bbc672c0d7902c5dd29d4b0e))
+
 ## [1.12.0](https://github.com/Locko2901/reel/compare/v1.11.2...v1.12.0) (2026-11-05)
 
 
