@@ -264,8 +264,10 @@ provider to sign in, with no proxy asking first.
     REEL_OIDC_CLIENT_SECRET_FILE: /run/secrets/reel_oidc
     ```
 
-    The client secret goes in `REEL_OIDC_CLIENT_SECRET`, or in a file
-    that `REEL_OIDC_CLIENT_SECRET_FILE` names. It is never stored in the
+    Copy the issuer exactly as the provider shows it, with its last slash
+    if it has one: reel compares it character for character. The client
+    secret goes in `REEL_OIDC_CLIENT_SECRET`, or in a file that
+    `REEL_OIDC_CLIENT_SECRET_FILE` names. It is never stored in the
     database.
 
 3. Optional: set a [Role claim](../configuration.md#role-claim) such as

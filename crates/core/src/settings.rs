@@ -293,7 +293,7 @@ pub static DEFS: &[Def] = &[
     def("auth.admins", "REEL_ADMINS", Section::Access, "Identity", "Admins", "users with these names are admins; the first user ever seen is one too; with an identity provider the name is the provider's claim, trusted at first sight", Kind::List),
     restart(def("auth.session_days", "REEL_SESSION_DAYS", Section::Access, "Sessions", "Idle timeout", "a session ends this long after its last use", int(1, 365, "days"))),
     def("auth.session_max_days", "REEL_SESSION_MAX_DAYS", Section::Access, "Sessions", "Session lifetime", "a session ends this long after the sign-in, however active; 0 is no limit", int(0, 3650, "days")),
-    restart(def("auth.oidc_issuer", "REEL_OIDC_ISSUER", Section::Access, "Identity provider", "Issuer", "the OpenID Connect issuer URL, such as https://auth.example.org/application/o/reel/; discovery runs at start", Kind::Url)),
+    restart(def("auth.oidc_issuer", "REEL_OIDC_ISSUER", Section::Access, "Identity provider", "Issuer", "the OpenID Connect issuer URL exactly as the provider gives it, its last slash included, such as https://auth.example.org/application/o/reel/; discovery runs at start", Kind::Url)),
     restart(def("auth.oidc_client_id", "REEL_OIDC_CLIENT_ID", Section::Access, "Identity provider", "Client id", "the client registered at the issuer; its secret comes from REEL_OIDC_CLIENT_SECRET or the file REEL_OIDC_CLIENT_SECRET_FILE names, never from here", Kind::Text)),
     restart(def("auth.oidc_scopes", "REEL_OIDC_SCOPES", Section::Access, "Identity provider", "Scopes", "what is asked of the issuer, space separated", Kind::Text)),
     def("auth.oidc_username_claim", "REEL_OIDC_USERNAME_CLAIM", Section::Access, "Identity provider", "Name claim", "the claim shown as the user's name (email only when the provider marks it verified); the subject when it is missing; who the user is comes from the issuer and subject, never from the name", Kind::Text),
@@ -513,7 +513,13 @@ pub fn set(cfg: &mut Config, key: &str, raw: &str) -> Result<(), String> {
         Kind::Bool => parse_bool(raw)?.to_string(),
         Kind::Select(options) => parse_select(raw, options)?,
         Kind::Url => {
-            let v = raw.trim().trim_end_matches('/').to_string();
+            // discovery compares an issuer character for character, its last slash included
+            let v = if key == "auth.oidc_issuer" {
+                raw.trim()
+            } else {
+                raw.trim().trim_end_matches('/')
+            }
+            .to_string();
             if !(v.is_empty() || v.starts_with("http://") || v.starts_with("https://")) {
                 return Err("a URL starts with http:// or https://".into());
             }
@@ -1317,5 +1323,22 @@ mod tests {
         assert!(set(&mut c, "notify.webhook_url", "https://example.org/hook").is_ok());
         assert!(set(&mut c, "notify.ntfy_url", "http://ntfy.lan").is_ok());
         assert!(set(&mut c, "public_url", "http://example.org").is_ok());
+    }
+
+    #[test]
+    fn an_issuer_keeps_its_last_slash_and_other_urls_lose_it() {
+        let mut c = Config::default();
+        set(
+            &mut c,
+            "auth.oidc_issuer",
+            " https://auth.example.org/application/o/reel/ ",
+        )
+        .unwrap();
+        assert_eq!(
+            c.auth.oidc_issuer,
+            "https://auth.example.org/application/o/reel/"
+        );
+        set(&mut c, "public_url", "https://clips.example.org/").unwrap();
+        assert_eq!(c.public_url, "https://clips.example.org");
     }
 }
