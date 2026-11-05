@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.12.2](https://github.com/Locko2901/reel/compare/v1.12.1...v1.12.2) (2026-11-05)
+
+
+### Bug Fixes
+
+* reel finds an identity provider whose issuer ends in a slash, such as Authentik's ([feb6f1c](https://github.com/Locko2901/reel/commit/feb6f1c91452a5e328651e34ab9c2ba52b20e13a))
+* switching the sign-in method keeps a server's people ([1d68c29](https://github.com/Locko2901/reel/commit/1d68c29e3beae34890eb9c0845e25f55872ce95f))
+* the settings are grouped by what you do ([40e8757](https://github.com/Locko2901/reel/commit/40e87570a69c9cd4750ac743ba18bc367f37d004))
+
 ## [1.12.1](https://github.com/Locko2901/reel/compare/v1.12.0...v1.12.1) (2026-11-05)
 
 
