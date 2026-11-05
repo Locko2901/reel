@@ -711,6 +711,7 @@ Local: reel's own accounts; proxy: a proxy in front names the user; oidc: an ide
 - Accepts: one of `local` (local accounts), `proxy` (a proxy in front), `oidc` (an identity provider), `single` (single user)
 - Default: `local` (local accounts)
 - Read when the process starts, from `config.toml` or the environment only
+- Changing it on a server with users: [Switching the sign-in method](switching-sign-in.md)
 
 ### Trusted proxies
 
