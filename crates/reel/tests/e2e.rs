@@ -6737,6 +6737,12 @@ fn persona(p: Persona) -> Personas {
 }
 
 async fn mock_issuer(persona: Personas) -> String {
+    mock_issuer_as(persona, "").await
+}
+
+/// A stand-in provider whose issuer is its address followed by `tail`: Authentik's ends in a
+/// slash.
+async fn mock_issuer_as(persona: Personas, tail: &str) -> String {
     use axum::extract::{Form, Query, State};
     use axum::response::{IntoResponse, Redirect};
     use axum::routing::{get, post};
@@ -6758,6 +6764,7 @@ async fn mock_issuer(persona: Personas) -> String {
     #[derive(Clone)]
     struct Issuer {
         base: String,
+        issuer: String,
         key: Arc<CoreRsaPrivateSigningKey>,
         nonce: Arc<tokio::sync::Mutex<Option<String>>>,
         persona: Personas,
@@ -6766,6 +6773,7 @@ async fn mock_issuer(persona: Personas) -> String {
     let base = format!("http://{}", listener.local_addr().unwrap());
     let issuer = Issuer {
         base: base.clone(),
+        issuer: format!("{base}{tail}"),
         key: Arc::new(
             CoreRsaPrivateSigningKey::from_pem(
                 throwaway_signing_pem(),
@@ -6781,7 +6789,7 @@ async fn mock_issuer(persona: Personas) -> String {
             "/.well-known/openid-configuration",
             get(|State(s): State<Issuer>| async move {
                 let md = CoreProviderMetadata::new(
-                    IssuerUrl::new(s.base.clone()).unwrap(),
+                    IssuerUrl::new(s.issuer.clone()).unwrap(),
                     AuthUrl::new(format!("{}/authorize", s.base)).unwrap(),
                     JsonWebKeySetUrl::new(format!("{}/jwks", s.base)).unwrap(),
                     vec![ResponseTypes::new(vec![CoreResponseType::Code])],
@@ -6832,7 +6840,7 @@ async fn mock_issuer(persona: Personas) -> String {
                             .set_email_verified(who.email_verified);
                     }
                     let claims = IdTokenClaims::<ExtraClaims, CoreGenderClaim>::new(
-                        IssuerUrl::new(s.base.clone()).unwrap(),
+                        IssuerUrl::new(s.issuer.clone()).unwrap(),
                         vec![Audience::new("reel".into())],
                         chrono::Utc::now() + chrono::Duration::minutes(5),
                         chrono::Utc::now(),
@@ -6867,7 +6875,7 @@ async fn mock_issuer(persona: Personas) -> String {
     tokio::spawn(async move {
         axum::serve(listener, app).await.unwrap();
     });
-    base
+    format!("{base}{tail}")
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -7463,6 +7471,46 @@ async fn a_rename_carries_a_user_across_to_the_name_a_proxy_sends() {
         "behind a proxy the name is who you are: {}",
         r.text().await.unwrap()
     );
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_provider_whose_issuer_ends_in_a_slash_signs_in_and_its_users_count_as_linked() {
+    std::env::set_var("REEL_OIDC_CLIENT_SECRET", "secret-1");
+    let who = persona(Persona {
+        groups: vec![],
+        ..Persona::mira()
+    });
+    let issuer = mock_issuer_as(who, "/").await;
+    assert!(issuer.ends_with('/'));
+    let i = issuer.clone();
+    let Some(env) = start_with(AuthMode::Oidc, vec!["127.0.0.1/32"], move |c| {
+        reel_core::settings::set(c, "auth.oidc_issuer", &i).unwrap();
+        c.auth.oidc_client_id = "reel".into();
+    })
+    .await
+    else {
+        return;
+    };
+    assert_eq!(env.ctx.config().auth.oidc_issuer, issuer, "kept as given");
+    let (status, admin) = oidc_sign_in(&env).await;
+    assert_eq!(status, 303, "discovery found the provider");
+    let mira = env
+        .store()
+        .user_by_oidc(&issuer, "sub-mira")
+        .await
+        .unwrap()
+        .expect("bound under the issuer as the provider spells it");
+    assert!(mira.is_admin(), "the first user");
+    assert!(
+        reel_server::accounts::admin_way_in(env.store(), &env.ctx.config())
+            .await
+            .unwrap()
+            .is_none(),
+        "the admin counts as linked"
+    );
+    let (s, page) = as_user(&env, reqwest::Method::GET, "/settings/access", &admin).await;
+    assert_eq!(s, 200);
+    assert!(!page.contains("not linked"), "{page}");
 }
 
 #[tokio::test(flavor = "multi_thread")]
