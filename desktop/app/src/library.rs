@@ -964,7 +964,7 @@ impl Runtime {
             g.moving = true;
             g.local_line = "the library is moving; reel on this PC waits".into();
         }
-        crate::shell::go(&self.app, crate::shell::View::Settings, Some("server"));
+        crate::shell::go(&self.app, crate::shell::View::Settings, Some("library"));
         let local = self.lock().local.take();
         if let Some(l) = local {
             l.close().await;

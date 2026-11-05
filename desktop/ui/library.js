@@ -1,4 +1,4 @@
-// This app, Server, Library: where the library is, a move to another drive, a copy to keep.
+// Settings, Library folder: where the library is, a move to another drive, a copy to keep.
 import { $, invoke, toast } from './shell.js';
 
 let info = null;

@@ -237,10 +237,10 @@ reel.db     the database: the titles, versions, collections, stars and settings
 library     every clip with its versions, poster and loops; the trash in .trash
 originals   the raw files reel kept of clips it encoded again
 
-To use it, in the reel app on this PC or another one: Settings, This app,
-Server, Library folder, Move, and pick this folder. reel takes up the library
-in it as it is and works in this folder from then on. To keep this copy as it
-is, copy the folder to where the library should live first, and pick that one.
+To use it, in the reel app on this PC or another one, standalone: Settings,
+Library folder, Move, and pick this folder. reel takes up the library in it as
+it is and works in this folder from then on. To keep this copy as it is, copy
+the folder to where the library should live first, and pick that one.
 ",
         version = reel_core::VERSION,
         day = at.strftime("%Y-%m-%d"),

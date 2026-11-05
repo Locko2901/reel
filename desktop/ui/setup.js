@@ -508,7 +508,7 @@ async function saveAndLeave() {
   const to = { view: ready ? 'library' : 'settings', section: ready ? null : 'server' };
   if (wantElevated && !settings.obs.setup.elevated) {
     try { status = await invoke('status_get'); } catch (e) { /* the words below stand without it */ }
-    $('#finish-note-line').textContent = `Saved, and OBS starts with it. ${(status && status.obs_task_problem) || 'Capture games that run as administrator stayed off'}; it can be tried again under This app, OBS.`;
+    $('#finish-note-line').textContent = `Saved, and OBS starts with it. ${(status && status.obs_task_problem) || 'Capture games that run as administrator stayed off'}; it can be tried again under Settings, OBS.`;
     $('#finish-note').hidden = false;
     $('#log-link').hidden = false;
     $('#next').textContent = ready ? 'Open the library' : 'Pair with a server';

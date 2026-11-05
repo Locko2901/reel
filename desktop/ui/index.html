@@ -12,7 +12,7 @@
   <div class="notice active obs-bar" id="obs-bar" role="status" hidden><span class="grow"><b>OBS is open.</b> In its Settings: Output, Replay Buffer for the clip length; Video for the quality; Output, Recording for the encoder, the format and the tracks; Hotkeys. The levels: its Audio Mixer.</span><div class="actions"><button class="small primary" id="obs-bar-hide" type="button">Hide OBS</button></div></div>
   <div class="page-head">
     <h1>Settings</h1>
-    <span class="sub">a change saves as you make it; these pages are the app's own, kept on this PC</span>
+    <span class="sub">a change saves as you make it</span>
     <div class="tools"><input type="search" id="settings-filter" placeholder="Filter settings" aria-label="Filter settings" autocomplete="off"></div>
   </div>
   <div class="settings" id="settings" data-section="status">
@@ -51,23 +51,6 @@
             <div class="srow" data-key="mode" data-kind="select"><div class="slabel"><b>Mode</b><span class="shelp">connected uploads every clip to the server below; standalone keeps the library on this PC and shows it in the window</span></div><div class="sctl"><select aria-label="Mode"><option value="connected">connected</option><option value="standalone">standalone</option></select><span class="err" hidden></span></div></div>
           </div>
         </div>
-        <div class="panel" id="standalone-panel" data-off hidden>
-          <header><h2>Standalone</h2><span class="desc">reel on this PC: the encoder, the library cap, the copies</span></header>
-          <div class="body flush">
-            <div class="srow" data-key="standalone.hwaccel" data-kind="select"><div class="slabel"><b>GPU encoder</b><span class="shelp" data-linux-text="probed with a test encode when reel starts; auto tries Quick Sync, then VAAPI; NVENC and AMF are tried only when picked">probed with a test encode when reel starts; auto tries NVENC, AMF, then QSV</span></div><div class="sctl"><select aria-label="GPU encoder"><option value="auto">automatic</option><option value="nvenc">NVIDIA NVENC</option><option value="amf">AMD AMF</option><option value="qsv">Intel Quick Sync</option><option value="vaapi" data-os="linux">VAAPI</option><option value="none">none, the CPU</option></select><span class="err" hidden></span></div></div>
-            <div class="srow" data-key="standalone.cap_gb" data-kind="int" data-min="0" data-max="100000"><div class="slabel"><b>Library cap</b><span class="shelp">the library is kept under this size: the oldest clips go to the trash first; a starred clip or one in a collection never goes; 0 is no cap</span><span class="snote" id="cap-line" aria-live="polite"></span></div><div class="sctl"><span class="ctl-group"><input type="number" class="in-num" min="0" max="100000" aria-label="Library cap"><span class="unit">GB</span></span><span class="err" hidden></span></div></div>
-            <div class="srow" data-key="standalone.cap_keeps_unsent" data-kind="bool"><div class="slabel"><b>The cap spares unsent clips</b><span class="shelp">a clip that is not on a server too is never trimmed</span></div><div class="sctl"><button type="button" class="switch" role="switch" aria-checked="false" aria-label="The cap spares unsent clips"><i></i></button><span class="err" hidden></span></div></div>
-            <div class="srow" data-key="standalone.copies_on_hardware" data-kind="bool"><div class="slabel"><b>Copies on the GPU</b><span class="shelp">copies under a size on the GPU encoder in one pass instead of two-pass x264: faster, a little larger</span></div><div class="sctl"><button type="button" class="switch" role="switch" aria-checked="false" aria-label="Copies on the GPU"><i></i></button><span class="err" hidden></span></div></div>
-          </div>
-        </div>
-        <div class="panel" id="library-panel" data-off hidden>
-          <header><h2>Library</h2><span class="desc">where reel keeps it on this PC, and a copy to keep</span></header>
-          <div class="body flush">
-            <div class="srow" id="library-row"><div class="slabel"><b>Library folder</b><span class="shelp">the clips with every version, their database and the kept originals; Move puts them on another drive, and a folder that holds a reel library, such as a copy, is taken up as it is</span><span class="snote" id="library-line" aria-live="polite"></span></div><div class="sctl"><button class="small quiet" type="button" id="library-open">Open folder</button><button class="small" type="button" id="library-move">Move</button></div></div>
-            <div class="srow" id="library-copy-row"><div class="slabel"><b>A copy of the library</b><span class="shelp">the database and every clip's files in a new folder in one you pick, each file checked: to keep on another drive, or to take to another PC; reel goes on while it copies</span></div><div class="sctl"><button class="small" type="button" id="library-copy">Make a copy</button></div></div>
-          </div>
-          <div class="body" id="library-job" hidden></div>
-        </div>
         <div class="panel" id="server-panel">
           <header><h2 data-standalone-text="A server, later">Server</h2><span class="desc" data-standalone="only">to add one: pair the app with it here, send clips to it from Status, then switch Mode to connected</span></header>
           <div class="body flush">
@@ -80,6 +63,36 @@
           <div class="body flush">
             <div class="srow" id="pair-row"><div class="slabel"><b>Pairing code</b><span class="shelp">on the server: Settings, Devices, Pair a device; the code works once, for ten minutes</span></div><div class="sctl"><input type="text" class="in-short mono" id="pair-code" placeholder="abcd-2345" aria-label="Pairing code" autocomplete="off"><button class="primary" id="pair-btn" type="button">Pair</button><span class="err" id="pair-err" hidden></span></div></div>
             <div class="srow" id="unpair-row" data-off hidden><div class="slabel"><b>This device</b><span class="shelp" id="paired-as"></span></div><div class="sctl"><button class="danger" id="unpair-btn" type="button">Unpair</button></div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="group" id="g-library" data-app-section="library" hidden>
+        <p class="section-line">Where the library is on this PC, a copy of it to keep, and how big it may grow. What it keeps and for how long is under Library and storage.</p>
+        <div class="panel" id="library-panel" data-off hidden>
+          <header><h2>Library</h2><span class="desc">where reel keeps it on this PC, and a copy to keep</span></header>
+          <div class="body flush">
+            <div class="srow" id="library-row"><div class="slabel"><b>Library folder</b><span class="shelp">the clips with every version, their database and the kept originals; Move puts them on another drive, and a folder that holds a reel library, such as a copy, is taken up as it is</span><span class="snote" id="library-line" aria-live="polite"></span></div><div class="sctl"><button class="small quiet" type="button" id="library-open">Open folder</button><button class="small" type="button" id="library-move">Move</button></div></div>
+            <div class="srow" id="library-copy-row"><div class="slabel"><b>A copy of the library</b><span class="shelp">the database and every clip's files in a new folder in one you pick, each file checked: to keep on another drive, or to take to another PC; reel goes on while it copies</span></div><div class="sctl"><button class="small" type="button" id="library-copy">Make a copy</button></div></div>
+          </div>
+          <div class="body" id="library-job" hidden></div>
+        </div>
+        <div class="panel" id="cap-panel" data-off hidden>
+          <header><h2>Size</h2></header>
+          <div class="body flush">
+            <div class="srow" data-key="standalone.cap_gb" data-kind="int" data-min="0" data-max="100000"><div class="slabel"><b>Library cap</b><span class="shelp">the library is kept under this size: the oldest clips go to the trash first; a starred clip or one in a collection never goes; 0 is no cap</span><span class="snote" id="cap-line" aria-live="polite"></span></div><div class="sctl"><span class="ctl-group"><input type="number" class="in-num" min="0" max="100000" aria-label="Library cap"><span class="unit">GB</span></span><span class="err" hidden></span></div></div>
+            <div class="srow" data-key="standalone.cap_keeps_unsent" data-kind="bool"><div class="slabel"><b>The cap spares unsent clips</b><span class="shelp">a clip that is not on a server too is never trimmed</span></div><div class="sctl"><button type="button" class="switch" role="switch" aria-checked="false" aria-label="The cap spares unsent clips"><i></i></button><span class="err" hidden></span></div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="group" id="g-encoder" data-app-section="encoder" hidden>
+        <p class="section-line">The encoder reel on this PC makes new versions and copies under a size with. What is encoded again at all is under Ingest.</p>
+        <div class="panel" id="encoder-panel" data-off hidden>
+          <header><h2>Encoder</h2><span class="desc" id="encoder-line"></span></header>
+          <div class="body flush">
+            <div class="srow" data-key="standalone.hwaccel" data-kind="select"><div class="slabel"><b>GPU encoder</b><span class="shelp" data-linux-text="probed with a test encode when reel starts; auto tries Quick Sync, then VAAPI; NVENC and AMF are tried only when picked">probed with a test encode when reel starts; auto tries NVENC, AMF, then QSV</span></div><div class="sctl"><select aria-label="GPU encoder"><option value="auto">automatic</option><option value="nvenc">NVIDIA NVENC</option><option value="amf">AMD AMF</option><option value="qsv">Intel Quick Sync</option><option value="vaapi" data-os="linux">VAAPI</option><option value="none">none, the CPU</option></select><span class="err" hidden></span></div></div>
+            <div class="srow" data-key="standalone.copies_on_hardware" data-kind="bool"><div class="slabel"><b>Copies on the GPU</b><span class="shelp">copies under a size on the GPU encoder in one pass instead of two-pass x264: faster, a little larger</span></div><div class="sctl"><button type="button" class="switch" role="switch" aria-checked="false" aria-label="Copies on the GPU"><i></i></button><span class="err" hidden></span></div></div>
           </div>
         </div>
       </div>
@@ -175,7 +188,7 @@
         <div class="panel">
           <header><h2 data-standalone-text="New clips">Upload</h2></header>
           <div class="body flush">
-            <div class="srow" data-key="upload.mode" data-kind="select" data-standalone="hide"><div class="slabel"><b>Upload</b><span class="shelp">every clip as it is found, the last clip on the hotkey, or by hand from the Status page</span></div><div class="sctl"><select aria-label="Upload"><option value="auto">every clip, automatically</option><option value="hotkey">the last clip, on the hotkey</option><option value="manual">by hand</option></select><span class="err" hidden></span></div></div>
+            <div class="srow" data-key="upload.mode" data-kind="select" data-standalone="hide"><div class="slabel"><b>Upload</b><span class="shelp">every clip as it is found, the last clip on the hotkey, or by hand from Status</span></div><div class="sctl"><select aria-label="Upload"><option value="auto">every clip, automatically</option><option value="hotkey">the last clip, on the hotkey</option><option value="manual">by hand</option></select><span class="err" hidden></span></div></div>
             <div class="srow" data-key="upload.bandwidth_kbit" data-kind="int" data-min="0" data-max="10000000" data-standalone="paired"><div class="slabel"><b>Bandwidth limit</b><span class="shelp">0 is unlimited</span></div><div class="sctl"><span class="ctl-group"><input type="number" class="in-num" min="0" max="10000000" aria-label="Bandwidth limit"><span class="unit">kbit/s</span></span><span class="err" hidden></span></div></div>
             <div class="srow" data-key="upload.pause_in_fullscreen" data-kind="bool" data-os="windows"><div class="slabel"><b data-standalone-text="Wait while a game is fullscreen">Pause while a game is fullscreen</b><span class="shelp" data-standalone-text="Windows says when a fullscreen app has the screen; the library's heavy work (a re-encode, the copies, the loop and the strip) waits and goes on after">Windows says when a fullscreen app has the screen; the queue waits and goes on after</span></div><div class="sctl"><button type="button" class="switch" role="switch" aria-checked="false" aria-label="Pause while a game is fullscreen"><i></i></button><span class="err" hidden></span></div></div>
             <div class="srow" data-key="upload.pause_only_on_wan" data-kind="bool" data-standalone="paired" data-os="windows"><div class="slabel"><b>Only on the internet, not on the LAN</b><span class="shelp">when the server's address is on the local network the upload goes on during a game</span></div><div class="sctl"><button type="button" class="switch" role="switch" aria-checked="false" aria-label="Only on the internet"><i></i></button><span class="err" hidden></span></div></div>

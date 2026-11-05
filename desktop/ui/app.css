@@ -37,3 +37,4 @@ details.advanced[open] > summary { margin-bottom: var(--s2); }
 #library-job .notice .bar { flex-basis: 100%; width: 100%; }
 #library-job .notice .grow { flex: 1 1 320px; overflow-wrap: anywhere; }
 #library-line .mono { overflow-wrap: anywhere; }
+.settings[data-paired] .group > .section-line::after { content: " Kept on this PC: each PC has its own."; }

@@ -387,7 +387,7 @@ dialog > footer { padding: 10px 14px; border-top: 1px solid var(--line); display
 body.over::after { content: "Drop to upload"; position: fixed; inset: 12px; z-index: 50; display: grid; place-items: center; border: 2px dashed var(--accent); border-radius: var(--radius); background: var(--overlay); color: var(--text); font-size: var(--fs-l); pointer-events: none; }
 
 .settings { display: grid; grid-template-columns: 190px minmax(0, 1fr); gap: 22px; align-items: start; }
-.sections { display: flex; flex-direction: column; gap: 1px; position: sticky; top: 66px; }
+.sections { display: flex; flex-direction: column; gap: 1px; position: sticky; top: 66px; max-height: calc(100vh - 76px); overflow-y: auto; }
 .sections a { display: flex; align-items: center; justify-content: space-between; height: var(--ctl); padding: 0 10px; border-radius: var(--radius); color: var(--text-2); border-left: 2px solid transparent; }
 .sections a:hover { background: var(--raised); color: var(--text); text-decoration: none; }
 .sections a[aria-current="page"] { color: var(--text); border-left-color: var(--accent); border-radius: 0; }
@@ -844,7 +844,7 @@ html[data-native-play] .play-overlay, html[data-native-play] .player .cover { di
   .settings { grid-template-columns: 1fr; }
   .sections { display: none; }
   .sections-select { display: block; margin-bottom: 14px; width: 100%; }
-  .settings[data-index] .sections { display: flex; position: static; gap: 0; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); }
+  .settings[data-index] .sections { display: flex; position: static; max-height: none; overflow: visible; gap: 0; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); }
   .settings[data-index] .sections a { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: var(--s3); height: auto; min-height: 56px; padding: 9px 14px; color: var(--text); font-weight: 500; border-left: 0; border-bottom: 1px solid var(--line); border-radius: 0; }
   .settings[data-index] .sections a:last-of-type { border-bottom: 0; }
   .settings[data-index] .sections a .n { grid-column: 2; grid-row: 1 / span 2; align-self: center; }

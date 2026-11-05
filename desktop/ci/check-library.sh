@@ -101,13 +101,13 @@ clips() { # the clips the library on this PC lists
   port=$(cat "$L"/reel-desktop.log* | sed -n 's/.*standalone: reel serves on the loopback.*addr=127.0.0.1:\([0-9]*\).*/\1/p' | tail -1)
   curl -fsS "http://127.0.0.1:$port/" | grep -o '/clips/[0-9A-Z]\{26\}' | sort -u | wc -l
 }
-server_page() { # This app, Server, the window at the size the coordinates are for
-  b=$(logged "app page section=server")
-  "$APP" --section=server > /dev/null 2>&1 || true
+library_page() { # Settings, Library folder, the window at the size the coordinates are for
+  b=$(logged "app page section=library")
+  "$APP" --section=library > /dev/null 2>&1 || true
   # a section asked for while the window is made can land on the first page: asked again
-  for _ in $(seq 1 20); do [ "$(logged "app page section=server")" -gt "$b" ] && break; sleep 0.5; done
-  [ "$(logged "app page section=server")" -gt "$b" ] || "$APP" --section=server > /dev/null 2>&1 || true
-  waitlog "app page section=server" 20 "This app, Server did not open" "$b"
+  for _ in $(seq 1 20); do [ "$(logged "app page section=library")" -gt "$b" ] && break; sleep 0.5; done
+  [ "$(logged "app page section=library")" -gt "$b" ] || "$APP" --section=library > /dev/null 2>&1 || true
+  waitlog "app page section=library" 20 "Settings, Library folder did not open" "$b"
   sleep 2
   WIN=$(window)
   [ -n "$WIN" ] || fail "no window"
@@ -153,11 +153,11 @@ C1=$(ls "$LIB/library" | grep -v '^\.' | head -1)
 head -c "${REEL_FILLER_MB:-800}M" /dev/urandom > "$LIB/library/$C1/filler.bin"
 ok "standalone with two clips in $LIB"
 
-server_page
+library_page
 shot "1-library-panel"
 
 # the move, with a second folder for the other drive
-click "${REEL_LIB_MOVE:-1222 738}"
+click "${REEL_LIB_MOVE:-1222 279}"
 pick "$X/drive"
 sleep 2
 shot "2-move-plan"
@@ -184,7 +184,7 @@ ok "a clip saved after the move goes into the moved library"
 
 # on the same drive: one rename
 mkdir -p "$X/same"
-click "${REEL_LIB_MOVE:-1222 738}"
+click "${REEL_LIB_MOVE:-1222 279}"
 pick "$X/same"
 sleep 2
 shot "5-move-same-drive-plan"
@@ -196,7 +196,7 @@ waitlog "standalone: reel serves on the loopback" 30 "reel on this PC did not st
 ok "a move on the same drive: the folder renamed, reel runs from $X/same"
 
 # the copy, while reel works
-click "${REEL_LIB_COPY:-1202 829}"
+click "${REEL_LIB_COPY:-1202 370}"
 pick "$W/backup"
 sleep 2
 shot "6-copy-plan"
@@ -216,9 +216,9 @@ stop
 b=$(logged "standalone: reel serves on the loopback")
 start --hidden
 waitlog "standalone: reel serves on the loopback" 60 "reel on this PC did not start again" "$b"
-server_page
+library_page
 mkdir -p "$W/other"
-click "${REEL_LIB_MOVE:-1222 738}"
+click "${REEL_LIB_MOVE:-1222 279}"
 pick "$W/other"
 sleep 2
 xdotool key Return
@@ -235,7 +235,7 @@ waitlog "standalone: reel serves on the loopback" 60 "reel on this PC did not st
 [ -z "$(ls -A "$W/other")" ] || fail "the target still holds: $(ls -A "$W/other")"
 grep -q "\"library_dir\": \"$X/same\"" "$D/config/settings.json" || fail "the settings moved on"
 [ "$(clips)" -eq 3 ] || fail "after the roll back: $(clips) clips"
-server_page
+library_page
 shot "9-move-cut-short"
 stop
 ok "a move cut short by the app's end: the next start rolled it back, the library stayed whole in $X/same"
@@ -244,8 +244,8 @@ ok "a move cut short by the app's end: the next start rolled it back, the librar
 b=$(logged "standalone: reel serves on the loopback")
 start --hidden
 waitlog "standalone: reel serves on the loopback" 60 "reel on this PC did not start" "$b"
-server_page
-click "${REEL_LIB_MOVE:-1222 738}"
+library_page
+click "${REEL_LIB_MOVE:-1222 279}"
 pick_open "$COPY"
 sleep 2
 shot "10-use-plan"
@@ -265,7 +265,7 @@ mv "$COPY" "$W/away"
 b=$(logged "standalone: reel on this PC waits for its library")
 start --hidden
 waitlog "standalone: reel on this PC waits for its library" 30 "reel on this PC did not wait for its library" "$b"
-server_page
+library_page
 shot "12-library-away"
 b=$(logged "standalone: reel serves on the loopback")
 mv "$W/away" "$COPY"

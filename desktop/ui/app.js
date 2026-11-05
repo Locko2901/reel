@@ -1,5 +1,5 @@
 // The app's own Settings section: every row saves as it changes.
-import { $, $$, APP_SECTIONS, applyShape, invoke, listen, markSection, mount, renderParts, runSave, saveButtons, sectionsNav, toast } from './shell.js';
+import { $, $$, APP_SECTIONS, STANDALONE_ONLY, applyShape, invoke, listen, markSection, mount, renderParts, runSave, saveButtons, sectionsNav, toast } from './shell.js';
 import { isOn, setOn } from './assets/js/switch.js';
 import { keycaps, recorder, recordersOffOnLeave } from './hotkeys.js';
 import { noiseHelp, noiseOptions, ownMicWords } from './noise.js';
@@ -158,7 +158,7 @@ function sections() {
   const open = (id, push) => {
     if (!known(id)) id = 'status';
     current = id;
-    if (id === 'server') capAsk();
+    if (id === 'library') capAsk();
     root.dataset.section = id;
     $$('.group', body).forEach(g => g.hidden = g.dataset.appSection !== id);
     $$('.section-line, .panel, .srow', body).forEach(el => el.hidden = el.hasAttribute('data-off'));
@@ -217,6 +217,8 @@ function renderMode() {
     if (el.dataset.windowsText == null) el.dataset.windowsText = el.textContent;
     el.textContent = status.linux ? el.dataset.linuxText : el.dataset.windowsText;
   }
+  // beside a server, each page's line says it is this PC's (app.css); reel's say theirs are the server's
+  $('#settings')?.toggleAttribute('data-paired', !here);
 }
 
 function esc(s) { return String(s ?? ''); }
@@ -314,14 +316,13 @@ function bindObs() {
 
 function renderLocal() {
   const standalone = status.mode === 'standalone';
-  off($('#local-panel'), !standalone);
-  off($('#standalone-panel'), !standalone);
-  off($('#library-panel'), !standalone);
+  for (const id of ['#local-panel', '#library-panel', '#cap-panel', '#encoder-panel']) off($(id), !standalone);
   renderLibrary(status);
   $('#mode-line').textContent = standalone ? (status.local ? 'reel runs on this PC' : status.local_line || 'standalone') : 'connected to a server';
-  if (!standalone) return;
+  if (!standalone) { if (STANDALONE_ONLY.includes(current)) window.openSection?.('status'); return; }
   $('#local-line').textContent = status.local_line || '';
   const l = status.local;
+  $('#encoder-line').textContent = l ? `in use: ${HW_WORD[l.backend] || l.backend}` : '';
   const dl = $('#local-kv');
   if (!l) { dl.innerHTML = ''; $('#local-ffmpeg').textContent = ''; return; }
   kv(dl, [
@@ -806,7 +807,7 @@ async function reshape() {
   try {
     const ps = await invoke('page_shape_get');
     applyShape(ps.shape, ps.base);
-    sectionsNav(ps.shape, current);
+    sectionsNav(ps.shape, current, status?.mode === 'standalone');
     if (status) renderParts(status);
   } catch (e) { /* the shell is gone; the page stays as it is */ }
 }
@@ -832,7 +833,7 @@ async function main() {
   } catch (e) {
     toast(`no shell: ${String(e.message || e)}`, 'err');
   }
-  sectionsNav(await shaped, current);
+  sectionsNav(await shaped, current, status?.mode === 'standalone');
   if (status) renderParts(status);
   await listen('status', (ev) => { status = ev.payload; renderStatus(); reshape(); if (Date.now() - capAt > 5000) capAsk(); });
   await listen('open-section', (ev) => { if (window.openSection) window.openSection(ev.payload); });

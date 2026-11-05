@@ -25,10 +25,20 @@ export function goServer(path) {
 
 function serverHref(path) { return base ? base + path : path; }
 
-// web/templates/settings.html lists the same entries.
 export const APP_SECTIONS = [
   ['status', 'Status'], ['server', 'Server'], ['obs', 'OBS'], ['clips', 'Clips folder and cache'], ['upload', 'Upload'],
   ['hotkeys', 'Hotkeys'], ['sounds', 'Sounds'], ['startup', 'Startup'], ['log', 'Log'],
+  ['library', 'Library folder'], ['encoder', 'Encoder'],
+];
+export const STANDALONE_ONLY = ['library', 'encoder'];
+// The nav by what a person does: reel's sections ('r') and the app's pages ('a'), each always, in
+// standalone alone ('s') or beside a server alone ('p'); crates/server/src/routes/settings.rs
+// groups reel's pages the same way.
+const NAV = [
+  ['Recording', ['a obs', 'a clips', 'a upload', 'a hotkeys', 'a sounds']],
+  ['Library', ['r storage', 'as library', 'r ingest', 'as encoder', 'rs sharing', 'r imports']],
+  ['Server', ['a server', 'rp sharing', 'r devices', 'r access', 'r notifications']],
+  ['System', ['r general', 'r appearance', 'a startup', 'a status', 'a log', 'r advanced']],
 ];
 
 const WORST = ['err', 'warn', 'active', 'ok', 'neutral'];
@@ -104,11 +114,11 @@ function followServer() {
   own.after(link, fonts);
 }
 
-export function sectionsNav(shape, current) {
+export function sectionsNav(shape, current, standalone) {
   const nav = $('nav.sections');
   if (!nav) return;
   nav.textContent = '';
-  for (const s of shape.sections || []) {
+  const reels = (s) => {
     const a = document.createElement('a');
     a.href = serverHref(`/settings/${s.id}`);
     a.dataset.page = `/settings/${s.id}`;
@@ -120,20 +130,38 @@ export function sectionsNav(shape, current) {
       n.textContent = s.changed;
       a.append(' ', n);
     }
-    nav.append(a);
-  }
-  const head = document.createElement('span');
-  head.className = 'sections-head';
-  head.textContent = 'This app';
-  nav.append(head);
-  for (const [id, label] of APP_SECTIONS) {
+    return a;
+  };
+  const own = (id) => {
     const a = document.createElement('a');
     a.href = `#${id}`;
     a.dataset.appSection = id;
-    a.textContent = label;
+    a.textContent = (standalone && STANDALONE_LABELS[id]) || APP_SECTIONS.find(([k]) => k === id)[1];
     if (id === current) a.setAttribute('aria-current', 'page');
-    nav.append(a);
+    return a;
+  };
+  const head = (words) => {
+    const h = document.createElement('span');
+    h.className = 'sections-head';
+    h.textContent = words;
+    return h;
+  };
+  const sections = shape.sections || [];
+  const placed = [];
+  for (const [words, pages] of NAV) {
+    const entries = [];
+    for (const page of pages) {
+      const [kind, id] = page.split(' ');
+      if ((kind.includes('s') && !standalone) || (kind.includes('p') && standalone)) continue;
+      if (kind[0] === 'a') entries.push(own(id));
+      else {
+        const s = sections.find((x) => x.id === id);
+        if (s) { entries.push(reels(s)); placed.push(id); }
+      }
+    }
+    if (entries.length) nav.append(head(words), ...entries);
   }
+  nav.append(...sections.filter((s) => !placed.includes(s.id)).map(reels));
 }
 
 export function markSection(current) {
@@ -242,10 +270,6 @@ function modeParts(status) {
   const p = status.panel || {};
   here = status.mode === 'standalone';
   $$('[data-panel]').forEach(el => { el.hidden = p[el.dataset.panel] === false; });
-  for (const [id, label] of APP_SECTIONS) {
-    const a = $(`nav.sections a[data-app-section="${id}"]`);
-    if (a) a.textContent = (here && STANDALONE_LABELS[id]) || label;
-  }
   const dt = $('#part-server')?.previousElementSibling;
   if (dt) dt.textContent = p.place || 'Server';
   if (!here) return;

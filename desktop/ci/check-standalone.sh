@@ -141,7 +141,7 @@ shot "6-clip"
 "$APP" --section=status > /dev/null 2>&1 || true
 sleep 2
 shot "7-this-app-status"
-ok "the window: the library on this PC, the chip, a clip's page, This app, Status (shots)"
+ok "the window: the library on this PC, the chip, a clip's page, Settings, Status (shots)"
 "$APP" --section=hotkeys > /dev/null 2>&1 || true
 waitlog "app page section=hotkeys" 20 "the Hotkeys page did not open"
 sleep 2

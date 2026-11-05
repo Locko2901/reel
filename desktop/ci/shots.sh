@@ -87,7 +87,7 @@ xdotool mousemove 640 880
 shoot clip-edit
 n=$(log_n "library loaded at=localhost/index.html")
 "$APP" --section=status >/dev/null 2>&1 &
-wait_more 20 "This app" "library loaded at=localhost/index.html" "$n"
+wait_more 20 "the app's Status page" "library loaded at=localhost/index.html" "$n"
 sleep 1
 shoot this-app
 n=$(log_n "library loaded at=localhost/index.html")

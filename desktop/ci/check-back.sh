@@ -73,7 +73,7 @@ goes "the mouse's back button goes back to the library" "$LIBRARY" xdotool click
 goes "Alt+Right goes to the clip again" "$CLIP" xdotool key alt+Right
 goes "Alt+Left goes back to the library" "$LIBRARY" xdotool key alt+Left
 
-goes "This app, Status opens in the window" "library loaded at=localhost/" "$APP" --section=status
+goes "Settings, Status opens in the window" "library loaded at=localhost/" "$APP" --section=status
 shot app-status
 goes "the mouse's back button goes from it to the library" "$LIBRARY" xdotool mousemove 640 500 click 8
 ! grep -q "panicked" "$W/app.out" || fail "a thread panicked"

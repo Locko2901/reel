@@ -3,23 +3,15 @@
 {% block content %}
 <div class="page-head">
   <h1>Settings</h1>
-  <span class="sub">a change saves as you make it and can be undone</span>
+  <span class="sub">a change saves as you make it</span>
   <div class="tools"><input type="search" id="settings-filter" placeholder="Filter settings" aria-label="Filter settings" autocomplete="off"></div>
 </div>
 <div class="settings" id="settings" data-section="{{ section }}"{% if index %} data-index{% endif %}>
   <nav class="sections" aria-label="Sections">
-    {% for s in sections %}<a href="/settings/{{ s.id }}" data-section="{{ s.id }}"{% if s.current %} aria-current="page"{% endif %}>{{ s.label }}{% if s.changed > 0 %} <span class="n">{{ s.changed }}</span>{% endif %}<span class="section-desc">{{ s.line }}</span></a>
-    {% endfor %}
-    <span class="sections-head app-link" hidden>This app</span>
-    <a class="app-link" href="#" data-app-section="status" hidden>Status</a>
-    <a class="app-link" href="#" data-app-section="server" hidden>Server</a>
-    <a class="app-link" href="#" data-app-section="obs" hidden>OBS</a>
-    <a class="app-link" href="#" data-app-section="clips" hidden>{% if who.standalone %}Clips folder{% else %}Clips folder and cache{% endif %}</a>
-    <a class="app-link" href="#" data-app-section="upload" hidden>{% if who.standalone %}New clips{% else %}Upload{% endif %}</a>
-    <a class="app-link" href="#" data-app-section="hotkeys" hidden>Hotkeys</a>
-    <a class="app-link" href="#" data-app-section="sounds" hidden>Sounds</a>
-    <a class="app-link" href="#" data-app-section="startup" hidden>Startup</a>
-    <a class="app-link" href="#" data-app-section="log" hidden>Log</a>
+    {% for e in nav_entries %}{% if e.head %}<span class="sections-head{% if e.app %} app-link{% endif %}"{% if e.app %} hidden{% endif %}>{{ e.label }}</span>
+    {% else if e.app %}<a class="app-link" href="#" data-app-section="{{ e.id }}" hidden>{{ e.label }}</a>
+    {% else %}<a href="/settings/{{ e.id }}" data-section="{{ e.id }}"{% if e.current %} aria-current="page"{% endif %}>{{ e.label }}{% if e.changed > 0 %} <span class="n">{{ e.changed }}</span>{% endif %}<span class="section-desc">{{ e.line }}</span></a>
+    {% endif %}{% endfor %}
   </nav>
   <select class="sections-select" id="sections-select" aria-label="Section">{% for s in sections %}<option value="{{ s.id }}"{% if s.current %} selected{% endif %}>{{ s.label }}</option>{% endfor %}</select>
   <div id="sections-body">
@@ -142,7 +134,7 @@
 <dialog id="pair-dialog">
   <header>Pair a device</header>
   <div class="body stack">
-    <p class="small muted">In the app, under Server, enter this address and the code. The code works once and for {{ devices.pair_minutes }} minutes.</p>
+    <p class="small muted">In the app, under Settings, Server, enter this address and the code. The code works once and for {{ devices.pair_minutes }} minutes.</p>
     <p class="small faint">Server</p>
     <p class="mono" id="pair-url">{{ devices.server_url }}</p>
     <p class="small faint">Code</p>
