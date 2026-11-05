@@ -55,10 +55,10 @@ The first page offers three ways:
 
 - **Set it up for me** (recommended): press **Set it up**. Seven short steps follow, each with a
   sensible default, so pressing **Next** through them gives a working setup. Everything stays
-  changeable later under Settings, This app, **OBS**.
+  changeable later under Settings, **OBS**.
 - **Use my own OBS**: for an OBS you have set up already. The app connects to it as in
   [Your own OBS](own-obs.md).
-- **Later**: press **Skip for now**, and the app opens on its own pages. This app, **OBS** has the
+- **Later**: press **Skip for now**, and the app opens on its own pages. Settings, **OBS** has the
   setup whenever you want it.
 
 If OBS is slow to answer, or something is wrong with it, a line at the top of the step says what,
@@ -123,7 +123,7 @@ error appears.
 When it worked, OBS starts with your setup, hidden (no window, no second tray icon), and the window
 opens on your library. From now on OBS starts and stops with the app. If one part could not be
 done (Windows refused the task for games that run as administrator, say), Finish still saves
-everything else and says which part failed and why. You can try that part again under This app,
+everything else and says which part failed and why. You can try that part again under Settings,
 **OBS**.
 
 ## 4. The first clip
@@ -135,7 +135,7 @@ everything else and says which part failed and why. You can try that part again 
    upload limit, and drag the file into the chat ([Standalone](standalone.md) has the details).
 
 When something does not happen, click the status chip at the top of the window: it says what the
-app and OBS are doing. Settings, This app, **Status** has more.
+app and OBS are doing. Settings, **Status** has more.
 
 ## Add a server for links
 
@@ -172,16 +172,16 @@ as well.
 
 ## Afterwards
 
-- **Change the setup**: Settings, This app, **OBS** has every choice of the setup, the sources a
+- **Change the setup**: Settings, **OBS** has every choice of the setup, the sources a
   clip hears among them, and **Run the setup again**. Its values are OBS's own: reel reads them
   from OBS, so a change you make in OBS shows there too. A change made here goes into OBS, that
   setting alone. When it starts, reel writes nothing into OBS; it only makes sure the WebSocket and
   the replay buffer are on.
-- **Open OBS**, at the top of This app, OBS, opens OBS's own window, for anything reel's choices
+- **Open OBS**, at the top of Settings, OBS, opens OBS's own window, for anything reel's choices
   do not name. Change what you like there; reel keeps working as long as the WebSocket and the
   replay buffer stay on. While OBS's window is up, a bar at the top of every page says where reel's
   settings are in OBS (Settings, Output, Replay Buffer for the clip length, and so on). Press
-  **Hide OBS** to hide it again; what you changed shows under This app, OBS.
+  **Hide OBS** to hide it again; what you changed shows under Settings, OBS.
 - **Your own OBS at the same time**: while it is open, reel's OBS waits ("your own OBS is running
   ...; reel's OBS starts once it is closed"), so two captures never run at once.
 - **If OBS crashes**, the app starts it again, a little later each time, and tells you after the
@@ -190,7 +190,7 @@ as well.
   switch to Streamer Mode while it records in the background. The files are OBS's own, unchanged,
   and their source ships with every release. The OBS for games that run as administrator, when an
   earlier reel put it in place, keeps OBS's name (`obs64.exe`) until you press **Update the copy**
-  under This app, OBS.
+  under Settings, OBS.
 - **Updates** keep the package: reel stays reel, with its OBS. Press **Install** and reel
   closes, a small window shows the installer's progress, and reel opens again by itself about a
   minute later ([Updates](../desktop-app.md#updates)).
@@ -210,16 +210,16 @@ as well.
   keep OBS, cancel and run `reel_<version>_x64-setup.exe` instead. Run silently (`/S`), it stops
   without touching anything unless it is also given `/WITHOUTOBS`. reel over reel light says
   **Switch to reel** and brings the OBS back.
-- **Uninstall** (Windows Settings, Apps, **reel**, or This app, Startup, About, **Uninstall
-  reel...**) removes the app, the OBS that came with it and OBS's settings. reel's own settings,
-  the pairing and your clips folder go only when you tick them on its page
+- **Uninstall** (Windows Settings, Apps, **reel**, or in the app Settings, Startup, About,
+  **Uninstall reel...**) removes the app, the OBS that came with it and OBS's settings. reel's own
+  settings, the pairing and your clips folder go only when you tick them on its page
   ([Uninstalling](../desktop-app.md#uninstalling)).
 
 ## Games that run as administrator
 
 A few games run with administrator rights, and OBS can only capture them when it runs with those
 rights too. Turn on **Capture games that run as administrator**, in the setup's step 4 or under
-This app, **OBS**:
+Settings, **OBS**:
 
 - **Windows asks once**, when you press **Finish** or flip the switch, to run `reel-elevate.exe`,
   reel's own small helper, as administrator. It puts a copy of OBS, its settings included, in
@@ -228,24 +228,24 @@ This app, **OBS**:
   never reel, with the highest rights at logon, hidden and loading no plugin but OBS's own. "reel
   OBS window (games that run as administrator)" shows, hides and closes it when reel asks. There is
   no prompt at every start. If it fails, the switch stays off and says why.
-- **A change of the setup** under This app, OBS (the clip length, the quality, the encoder ...)
+- **A change of the setup** under Settings, OBS (the clip length, the quality, the encoder ...)
   is written into the copy while the switch is on, and Windows asks once for each, as the page
   says. The levels and the microphone's filters change without asking.
 - **When an update of reel brings another OBS**, reel updates the copy itself at its first start
   after the update, once no game or other fullscreen app is in front. Windows asks once, and on
-  **Yes** OBS starts again from the updated copy. This app, OBS says so in its first line while it
+  **Yes** OBS starts again from the updated copy. Settings, OBS says so in its first line while it
   waits and while Windows asks. If you say **No**, or it fails, the copy keeps the OBS it had:
-  This app, OBS names its version, a notification says so each time reel starts, and **Update the
+  Settings, OBS names its version, a notification says so each time reel starts, and **Update the
   copy** does it whenever you like. reel asks by itself again only after its next update, never at
   every start.
 - **If the copy or its task is gone** while the switch is on (reel light was installed over reel,
   or reel was uninstalled and installed again with its settings kept), OBS runs without
   the highest rights: your other games are captured as before, games that run as administrator
-  are not. This app, OBS and a notification say so, with **Put it in place**, or **Update the
+  are not. Settings, OBS and a notification say so, with **Put it in place**, or **Update the
   copy** when only the task is missing. Windows asks once.
 - **Open OBS** and **Hide OBS** work as without the switch, through the second task: Windows does
   not let reel itself show or hide a program with more rights. A copy an earlier reel put in place
-  starts OBS in its own tray icon until This app, OBS, **Update the copy** (Windows asks once).
+  starts OBS in its own tray icon until Settings, OBS, **Update the copy** (Windows asks once).
 - **The Save a clip key** is taken by OBS itself, since Windows does not pass keys pressed in such
   a game to reel. Save and share and Share the last clip work again once the game is not in front.
 - **Turning the switch off** removes the task and the copy. Windows asks once more for that, and
@@ -256,4 +256,4 @@ This app, **OBS**:
   they end, or not at all when the switch is back where it was. If you say **No**, the switch goes
   back to what is there and says so.
 - **A copy or task left in Program Files** with the switch off (a step that stopped halfway, for
-  example) shows on This app, OBS, with **Remove it**. Windows asks once.
+  example) shows on Settings, OBS, with **Remove it**. Windows asks once.

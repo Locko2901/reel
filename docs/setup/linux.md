@@ -63,8 +63,8 @@ A reel server you run offers both under Settings, Devices: **reel for Linux, the
     video without a copy). reel is then in the menu, and `reel-desktop` starts it from a terminal.
 
 When it worked, reel's icon is in the tray and the window opens: on **reel's own OBS** when OBS is
-installed (the setup, step 3), else on Settings, This app, **OBS**. On a desktop without a tray
-(GNOME without the AppIndicator extension) the app runs all the same and says so under This app,
+installed (the setup, step 3), else on Settings, **OBS**. On a desktop without a tray
+(GNOME without the AppIndicator extension) the app runs all the same and says so under Settings,
 **Status**; starting it again opens its window.
 
 ## 3. The setup
@@ -108,7 +108,7 @@ well.
 
 !!! note "One game capture at a time"
     obs-vkcapture serves one OBS at a time. If your own OBS is open and captures games through it
-    too, give reel's OBS the screen alone (turn **The game in front** off under This app, OBS).
+    too, give reel's OBS the screen alone (turn **The game in front** off under Settings, OBS).
 
 ### Use my own OBS
 
@@ -117,7 +117,7 @@ reel connects to your OBS as in the next step; nothing of reel's runs inside OBS
 ## 4. Your own OBS
 
 With **Use my own OBS**, start OBS once, then look at the panel **What reel needs from OBS** at the
-top of This app, **OBS**. It checks two things for as long as the app runs, and says in words what
+top of Settings, **OBS**. It checks two things for as long as the app runs, and says in words what
 to do about each:
 
 1. **OBS's WebSocket**: in OBS, open **Tools**, **WebSocket Server Settings**, tick **Enable
@@ -140,12 +140,12 @@ sandbox.
 Global hotkeys on Linux depend on your desktop: they may not work, or may need to be set up in the
 desktop's own keyboard settings. There you can bind a key to `reel-desktop --save` (Save a clip),
 or with a server `--save-and-share` and `--share-last`. With the AppImage, the command is the
-AppImage's path, which This app, **Hotkeys** shows.
+AppImage's path, which Settings, **Hotkeys** shows.
 
 ## 6. The first clip
 
 1. Play a game and press **Save a clip**: Alt+F10 after **Set it up for me** or **Use my own OBS**;
-   otherwise set a key under This app, **Hotkeys**. The "clip captured" sound plays.
+   otherwise set a key under Settings, **Hotkeys**. The "clip captured" sound plays.
 2. A moment later the notification "Clip in the library" appears. Click **Open** to see the clip.
 3. To send it, open **Send** on the clip's page, download the original or a copy under your chat's
    upload limit, and drag the file into the chat ([Standalone](standalone.md) has the details).
@@ -163,7 +163,7 @@ With a server of your own ([The server](server.md)), every clip goes up as you s
 2. In the app, during **Set it up for me**: pick **A reel server** in **Where clips go**, enter the
    **Server URL** (`https://clips.example.com`) and the **Pairing code**, and press **Pair**. The
    setup moves on to **Done**, and the library opens once you finish it.
-3. Otherwise, follow [Add a server later](standalone.md#add-a-server-later): pair under This app,
+3. Otherwise, follow [Add a server later](standalone.md#add-a-server-later): pair under Settings,
    **Server**, then set **Mode** to **connected**.
 
 The device's token is kept in `~/.config/reel/token`, readable by your user alone. **Revoke** under
@@ -178,7 +178,7 @@ Then make your first link:
 
 ## Good to know
 
-- **Start at logon**: This app, **Startup**. For the AppImage the entry points at the AppImage's
+- **Start at logon**: Settings, **Startup**. For the AppImage the entry points at the AppImage's
   own path, so after moving the file, turn it off and on again.
 - **NVIDIA**: with NVIDIA's driver, WebKitGTK's DMA-BUF renderer leaves windows blank, and on
   Wayland NVIDIA's explicit sync breaks them. reel turns both off for itself unless you set
@@ -188,7 +188,7 @@ Then make your first link:
   your system's. If a plugin a clip needs is missing, or the page stops answering while it plays,
   the app loads the page again without video and sound rather than let the window freeze, and its
   log says why. Links and the pages in a browser play as always.
-- **reel's OBS or yours**: This app, OBS switches between them at any time (**Run a second OBS of
+- **reel's OBS or yours**: Settings, OBS switches between them at any time (**Run a second OBS of
   reel's**); off, reel connects to your own. Its line there says which OBS reel runs.
 - **Its name**: reel runs its second OBS as `reel-capture`, so Discord does not switch to Streamer
   Mode while it records in the background. It is a copy of the OBS you installed, OBS's own program
@@ -196,7 +196,7 @@ Then make your first link:
   your own OBS, Discord still switches: in Discord, **User Settings**, **Streamer Mode** (in newer
   versions under **Appearance**), turn off **Automatically Enable/Disable**. Discord from Flathub
   never turns it on by itself.
-- **Updates**: the AppImage installs a new version from This app, Startup, **Install** (from its
+- **Updates**: the AppImage installs a new version from Settings, Startup, **Install** (from its
   server when paired, from the release in standalone), replaces itself and starts again. The
   `.deb` does not update itself: install the next `.deb` the same way as the first. See
   [Updates](../desktop-app.md#updates).

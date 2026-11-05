@@ -243,7 +243,7 @@ On the server, pull the new image and start it again; the database
 updates itself at start, and the Status page says when a newer release
 is out. A paired app is then offered the server's version, signed and
 checked before it installs. A standalone app installs the newest release
-when you press **Check now** under This app, Startup, **Updates**, with
+when you press **Check now** under Settings, Startup, **Updates**, with
 the same signature check. The Linux `.deb` does not update itself: its
 new version is on the
 [releases page](https://github.com/Locko2901/reel/releases). See
@@ -254,8 +254,8 @@ new version is on the
 On a server, keep the data folder (the database and the library) and the
 originals folder; copy the database with reel stopped, or with a
 consistent copy while it runs. The app keeps its settings and a
-standalone library in two folders of your user, and This app, **Server**,
-**Library**, **Make a copy** copies the whole library while it runs. See
+standalone library in two folders of your user, and Settings, **Library
+folder**, **Make a copy** copies the whole library while it runs. See
 [Backing up](backup.md).
 
 ### How do I uninstall it?

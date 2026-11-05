@@ -85,13 +85,13 @@ the backup from before an update until the new version has run a while.
 The server offers each paired app the app of its own version, so
 updating the server is what updates the apps. The app asks its server
 45 seconds after it starts and then every six hours, and **Check now**
-under This app, Startup, **Updates** asks at once. Every installer is
+under Settings, Startup, **Updates** asks at once. Every installer is
 signed with reel's release key, and the app checks the signature before
 it installs anything.
 
 By default the app asks first: a notification says "reel 1.10.1 is
 ready", and **Install reel 1.10.1** appears in the tray menu and under
-This app, Startup, **Updates**, which says what Install does before you
+Settings, Startup, **Updates**, which says what Install does before you
 press it. On Windows, reel closes, a small window shows the installer's
 progress, and reel opens again by itself about a minute later (half a
 minute for reel light), back on the page it showed and with a
@@ -121,7 +121,7 @@ default) decides whether paired apps are offered updates at all.
 With no server, the app takes its updates from reel's releases on
 GitHub, and it asks only when you ask:
 
-- **Check now** under This app, Startup, **Updates** asks for the newest
+- **Check now** under Settings, Startup, **Updates** asks for the newest
   release when you press it.
 - Settings, **Advanced**, **Check for updates** (off in standalone until
   you turn it on) asks once a day.
@@ -143,7 +143,7 @@ first; from then on the app installs its updates itself.
 - **Windows**: download the installer of the package you have from the
   [releases page](https://github.com/Locko2901/reel/releases) (**Open
   the releases** under Updates opens it), **reel** over reel, **reel
-  light** over reel light (This app, Startup, **Versions** names it),
+  light** over reel light (Settings, Startup, **Versions** names it),
   and run it. Its page says **Update reel** or **Update reel light** and
   names the version on this PC; press **Update**. It closes reel first,
   and your settings and your library stay.
