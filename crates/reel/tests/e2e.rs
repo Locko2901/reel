@@ -3255,8 +3255,13 @@ async fn the_standalone_library_offers_nothing_of_a_servers() {
         "/settings/advanced".into(),
     ];
     for page in &pages {
-        let (status, html) = ask(&env, "GET", page, None).await;
+        let (status, mut html) = ask(&env, "GET", page, None).await;
         assert_eq!(status, 200, "{page}");
+        // the changelog on Status is the commits' words, which may name any part of reel
+        if let Some(a) = html.find("<div class=\"panel changelog\">") {
+            let b = html[a..].find("</section>").map_or(html.len(), |i| a + i);
+            html.replace_range(a..b, "");
+        }
         for m in marks {
             assert!(!html.contains(m), "{page} has {m}");
         }
