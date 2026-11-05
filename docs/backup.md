@@ -20,7 +20,7 @@ example compose file:
 | Your compose file, with the environment it sets | `docker-compose.yml` | Yes. |
 | The copies under a size, the web copies, the GIFs and WebPs | `./data/cache/` | No: each is made again when it is next asked for. |
 | Uploads on their way in | `./data/uploads/` | No. |
-| The app's installers for paired apps | `./data/app-updates/` | No: the server fetches them again from the release. |
+| The app's installers of the server's own version, for paired apps; those of other versions are removed | `./data/app-updates/` | No: the server fetches them again from the release. |
 | Raw clips waiting to be taken in | `./incoming` | No: it is a drop folder, emptied as reel takes each file. |
 
 The clips are almost all of the space; the database and the rest are
