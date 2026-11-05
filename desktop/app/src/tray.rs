@@ -59,7 +59,17 @@ pub fn items(st: &Status) -> Vec<Item> {
         out.push(Item::Sub("recent".into(), "Last clips".into(), clips));
     }
     if let Some(v) = st.update_version.as_ref() {
-        out.push(act("update", format!("Install reel {v}"), true));
+        if st.update_installing {
+            let line = &st.update_line;
+            let line = if line.starts_with("reel ") {
+                line.clone()
+            } else {
+                capital(line)
+            };
+            out.push(Item::Line("update".into(), line));
+        } else {
+            out.push(act("update", format!("Install reel {v}"), true));
+        }
     }
     out.push(act("save", "Save clip", st.save.ok));
     if !standalone {
@@ -364,5 +374,29 @@ mod tests {
                 .any(|i| matches!(i, Item::Line(id, _) if id == "save-why")),
             "no word about Save and share"
         );
+    }
+
+    #[test]
+    fn an_install_that_waits_says_so_in_the_tray_and_cannot_be_asked_twice() {
+        for mode in ["connected", "standalone"] {
+            let mut st = status(mode, true, "https://clips.example.org");
+            assert!(on(&st, "update"));
+            st.update_installing = true;
+            st.update_line = "reel 9.9.9 installs once the library has moved".into();
+            let line = items(&st).into_iter().find_map(|i| match i {
+                Item::Line(id, l) if id == "update" => Some(l),
+                _ => None,
+            });
+            assert_eq!(
+                line.as_deref(),
+                Some("reel 9.9.9 installs once the library has moved"),
+                "{mode}: the update's line, greyed, its reel in lower case"
+            );
+            assert!(!on(&st, "update"), "{mode}");
+            st.update_line = "installing reel 9.9.9".into();
+            assert!(items(&st).iter().any(
+                |i| matches!(i, Item::Line(id, l) if id == "update" && l == "Installing reel 9.9.9")
+            ));
+        }
     }
 }
