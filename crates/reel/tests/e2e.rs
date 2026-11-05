@@ -152,6 +152,15 @@ async fn restart(env: Env, tweak: impl FnOnce(&mut Config)) -> Env {
         .unwrap()
 }
 
+/// Points every test server's reads of GitHub at port 1, where nothing listens (bind(0) never
+/// hands out a port below 1024): a stray read fails at once instead of spending the 60
+/// requests an hour GitHub allows an address without a token. A test that reads a release
+/// names a stand-in.
+fn no_github() {
+    static ONCE: std::sync::Once = std::sync::Once::new();
+    ONCE.call_once(|| std::env::set_var("REEL_GITHUB_API", "http://127.0.0.1:1"));
+}
+
 async fn start_in(
     dir: tempfile::TempDir,
     mode: AuthMode,
@@ -160,6 +169,7 @@ async fn start_in(
     file: Option<toml::Value>,
     set_up: bool,
 ) -> Option<Env> {
+    no_github();
     let Some((ff, fp)) = ffmpeg_paths() else {
         eprintln!("skipping: no ffmpeg (set REEL_FFMPEG and REEL_FFPROBE)");
         return None;
@@ -180,6 +190,7 @@ async fn start_in(
     cfg.share.discord_limit_mb = 1;
     cfg.pipeline.nice = 0;
     cfg.advanced.update_check = false;
+    cfg.device.app_updates = false;
     cfg.auth.mode = mode;
     cfg.auth.trusted_proxies = trusted.into_iter().map(String::from).collect();
     tweak(&mut cfg);
@@ -10970,9 +10981,18 @@ async fn mock_github_release(version: &'static str) -> String {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn a_paired_app_is_offered_the_signed_app_of_this_version() {
-    let Some(env) = start(AuthMode::Single, vec![]).await else {
+    let Some(env) = start_with(AuthMode::Single, vec![], |c| {
+        c.device.app_updates = true;
+    })
+    .await
+    else {
         return;
     };
+    assert_eq!(
+        reel_pipeline::app_update::github_api(),
+        "http://127.0.0.1:1",
+        "the server's own fetch of the release asks nobody"
+    );
     let (token, _) = pair(&env, "pc").await;
     let v = reel_core::VERSION;
     let ask = |query: String, bearer: Option<String>| {
