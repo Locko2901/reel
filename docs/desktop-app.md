@@ -217,7 +217,10 @@ releases, and you see each step:
 - **While it installs**, a small window shows "Updating reel to" the new version ("Updating reel
   light to" with reel light), with a bar and
   one line of what it is doing. It has no buttons and closes by itself. reel waits for a clip on
-  its way to the server before it starts.
+  its way to the server before it starts, and, in standalone, for a
+  [move or a copy of the library](setup/standalone.md#the-library-on-another-drive) for as long
+  as it goes on: the Updates panel and the tray say "reel 1.12.1 installs once the library has
+  moved". **Stop** on the move or the copy lets the update go on at once.
 
     ![The small window of an update](setup/img/update-small.png)
 
@@ -226,7 +229,9 @@ releases, and you see each step:
   showed. Your settings and the pairing stay as they were. When you update from 1.9, the small
   window shows too, and the notification names the version you came from.
 - **Install when the app quits** shows the small window as reel quits, and reel stays closed until
-  you open it. It tells you it is updated at its next start.
+  you open it. It tells you it is updated at its next start. A quit while the library moves or a
+  copy is made does not install it: the next start fetches the update again, and the quit after
+  that installs it.
 - **If an update does not install**, for example because another program holds one of reel's
   files and you pressed **Cancel** at its question, the reel you had starts again and says why
   ("reel 1.10.1 did not install: ..."). **Install** under This app, Startup tries again.

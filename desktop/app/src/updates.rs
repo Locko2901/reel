@@ -548,6 +548,184 @@ fn test_build(version: &str) -> bool {
     version.contains('-')
 }
 
+/// What an install waits for before reel closes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Busy {
+    /// A clip on its way to the server, or a share being made.
+    Clip,
+    Move,
+    /// reel on this PC switching to a folder that holds a library.
+    Use,
+    Copy,
+}
+
+impl Busy {
+    fn until(self) -> &'static str {
+        match self {
+            Busy::Clip => "the clip on its way is up",
+            Busy::Move => "the library has moved",
+            Busy::Use => "the library is taken up",
+            Busy::Copy => "the copy of the library is made",
+        }
+    }
+
+    fn what(self) -> &'static str {
+        match self {
+            Busy::Clip => "the clip on its way",
+            Busy::Move => "the library's move",
+            Busy::Use => "taking up the library",
+            Busy::Copy => "the copy of the library",
+        }
+    }
+
+    fn library(self) -> bool {
+        self != Busy::Clip
+    }
+}
+
+/// The library goes first: a clip holds an install for a while, a move or a copy as long as it
+/// goes on.
+pub fn busy(uploading: bool, job: Option<&crate::library::Job>) -> Option<Busy> {
+    match job.filter(|j| j.running).map(|j| j.kind.as_str()) {
+        Some("copy") => Some(Busy::Copy),
+        Some("use") => Some(Busy::Use),
+        Some(_) => Some(Busy::Move),
+        None => uploading.then_some(Busy::Clip),
+    }
+}
+
+/// A clip holds an install this long at most.
+const CLIP_BOUND: Duration = Duration::from_secs(600);
+/// A move or a copy whose phase and bytes stood this long has a drive that stopped answering.
+const STILL_BOUND: Duration = Duration::from_secs(600);
+
+#[derive(Debug, PartialEq)]
+pub enum Verdict {
+    Go,
+    Wait(Busy),
+    /// A move or a copy stood still: the update waits for another Install or the next start.
+    GiveUp(Busy),
+}
+
+/// One install's wait: since when a clip holds it, and the library job's last progress.
+#[derive(Default)]
+pub struct Hold {
+    clip_since: Option<Instant>,
+    last: Option<(String, u64, Instant)>,
+}
+
+impl Hold {
+    pub fn look(
+        &mut self,
+        now: Instant,
+        uploading: bool,
+        job: Option<&crate::library::Job>,
+    ) -> Verdict {
+        let Some(b) = busy(uploading, job) else {
+            return Verdict::Go;
+        };
+        if b == Busy::Clip {
+            let since = *self.clip_since.get_or_insert(now);
+            return if now.duration_since(since) >= CLIP_BOUND {
+                Verdict::Go
+            } else {
+                Verdict::Wait(b)
+            };
+        }
+        let (phase, done) = job.map(|j| (j.phase.clone(), j.done)).unwrap_or_default();
+        match &self.last {
+            Some((p, d, since)) if *p == phase && *d == done => {
+                if now.duration_since(*since) >= STILL_BOUND {
+                    Verdict::GiveUp(b)
+                } else {
+                    Verdict::Wait(b)
+                }
+            }
+            _ => {
+                self.last = Some((phase, done, now));
+                Verdict::Wait(b)
+            }
+        }
+    }
+}
+
+/// The update's line; for one held for the quit while a move or a copy runs, that its quit does
+/// not install it.
+pub fn line_now(line: String, held: Option<&str>, job: Option<&crate::library::Job>) -> String {
+    match (held, busy(false, job)) {
+        (Some(v), Some(b)) => format!("reel {v} installs at the first quit after {}", b.until()),
+        _ => line,
+    }
+}
+
+fn gave_up_line(version: &str, b: Busy) -> String {
+    format!(
+        "reel {version} did not install: {} has not gone on for 10 minutes; Install tries again, and the next start offers it again",
+        b.what()
+    )
+}
+
+fn holder(rt: &Runtime) -> Option<Busy> {
+    let g = rt.lock();
+    busy(
+        g.uploading.is_some() || g.share_running,
+        g.library_job.as_ref(),
+    )
+}
+
+/// Waits while something holds the install; an Err once a move or a copy stood still.
+async fn hold(rt: &Runtime, version: &str) -> Result<(), String> {
+    let mut hold = Hold::default();
+    let mut said = None;
+    loop {
+        let verdict = {
+            let g = rt.lock();
+            hold.look(
+                Instant::now(),
+                g.uploading.is_some() || g.share_running,
+                g.library_job.as_ref(),
+            )
+        };
+        match verdict {
+            Verdict::Go => return Ok(()),
+            Verdict::GiveUp(b) => {
+                let words = gave_up_line(version, b);
+                tracing::warn!(
+                    version,
+                    "the update did not install: {} stood still",
+                    b.what()
+                );
+                set_line(rt, words.clone());
+                return Err(words);
+            }
+            Verdict::Wait(b) if said != Some(b) => {
+                said = Some(b);
+                tracing::info!(version, "the update waits: {}", b.what());
+                set_line(rt, format!("reel {version} installs once {}", b.until()));
+            }
+            Verdict::Wait(_) => {}
+        }
+        tokio::time::sleep(Duration::from_secs(2)).await;
+    }
+}
+
+/// An Install under way, from the first look to reel closing: a second one is not a second
+/// install.
+static INSTALLING: AtomicBool = AtomicBool::new(false);
+
+pub fn installing() -> bool {
+    INSTALLING.load(Ordering::Relaxed)
+}
+
+struct Installing(Runtime);
+
+impl Drop for Installing {
+    fn drop(&mut self) {
+        INSTALLING.store(false, Ordering::SeqCst);
+        self.0.push_status();
+    }
+}
+
 /// Downloads with the window there, then installs as the app quits: on Windows the installer's
 /// small window, then reel again; on Linux the new AppImage over the running one.
 pub async fn install_now(rt: &Runtime) -> Result<(), String> {
@@ -556,40 +734,47 @@ pub async fn install_now(rt: &Runtime) -> Result<(), String> {
         .update
         .clone()
         .ok_or_else(|| "no update to install".to_string())?;
-    let (title, body) = update_steps::going(&update.version, kind(rt), false);
-    notify::show(&rt.app, &title, &body);
-    // never in the middle of a clip: one on its way to the server goes up first
-    for n in 0..300 {
-        let busy = {
-            let g = rt.lock();
-            g.uploading.is_some() || g.share_running
-        };
-        if !busy {
-            break;
-        }
-        if n == 0 {
-            set_line(
-                rt,
-                format!(
-                    "reel {} installs once the clip on its way is up",
-                    update.version
-                ),
-            );
-        }
-        tokio::time::sleep(Duration::from_secs(2)).await;
+    if INSTALLING.swap(true, Ordering::SeqCst) {
+        return Ok(());
     }
-    set_line(rt, format!("installing reel {}", update.version));
-    tracing::info!(version = %update.version, "installing the update");
+    let _installing = Installing(rt.clone());
+    rt.push_status();
+    let version = update.version.clone();
+    let going = update_steps::going(&version, kind(rt), false);
+    let first = holder(rt).filter(|b| b.library());
+    if let Some(b) = first {
+        let stop = match b {
+            Busy::Move => "; the move's Stop lets it install now",
+            Busy::Copy => "; the copy's Stop lets it install now",
+            _ => "",
+        };
+        notify::show(
+            &rt.app,
+            &format!("reel {version} waits for the library"),
+            &format!("It installs once {}{stop}.", b.until()),
+        );
+    } else {
+        notify::show(&rt.app, &going.0, &going.1);
+    }
+    hold(rt, &version).await?;
+    set_line(rt, format!("installing reel {version}"));
+    tracing::info!(version, "installing the update");
     let ready = rt.lock().update_bytes.take();
     let bytes = match ready {
         Some(b) => b,
         None => download(rt, &update).await.map_err(|e| {
-            tracing::warn!(version = %update.version, error = %e, "the update did not download");
-            let words = not_downloaded(&update.version, &e, "Install tries again");
+            tracing::warn!(version, error = %e, "the update did not download");
+            let words = not_downloaded(&version, &e, "Install tries again");
             set_line(rt, words.clone());
             words
         })?,
     };
+    // a move begun during the download holds it as well
+    let late = holder(rt).is_some_and(Busy::library);
+    hold(rt, &version).await?;
+    if first.is_some() || late {
+        notify::show(&rt.app, &going.0, &going.1);
+    }
     leave(rt, "Install reel", Then::Install(Box::new(update), bytes));
     Ok(())
 }
@@ -628,8 +813,13 @@ pub fn uninstall(rt: &Runtime) -> Result<(), String> {
 pub fn quit(rt: &Runtime, from: &'static str) {
     let ready = {
         let mut g = rt.lock();
-        match (g.update.clone(), g.update_bytes.take()) {
-            (Some(u), Some(b)) => Some((u, b)),
+        let library = busy(false, g.library_job.as_ref());
+        match (g.update.clone(), g.update_bytes.take(), library) {
+            (Some(u), Some(_), Some(b)) => {
+                tracing::info!(version = %u.version, "the update is not installed on this quit: {} runs; the next start reads it again", b.what());
+                None
+            }
+            (Some(u), Some(b), None) => Some((u, b)),
             _ => None,
         }
     };
@@ -806,7 +996,144 @@ fn failed(why: &str) {
 
 #[cfg(test)]
 mod tests {
+    use super::{busy, line_now, Busy, Hold, Verdict};
+    use crate::library::Job;
     use base64::Engine;
+    use std::time::{Duration, Instant};
+
+    fn job(kind: &str, phase: &str, done: u64) -> Job {
+        Job {
+            kind: kind.into(),
+            phase: phase.into(),
+            done,
+            total: 500_000_000_000,
+            running: true,
+            ..Job::default()
+        }
+    }
+
+    #[test]
+    fn an_install_waits_for_a_move_a_copy_or_a_clip_and_the_library_first() {
+        let moving = job("move", "copying", 1);
+        let copying = job("copy", "copying", 1);
+        let using = job("use", "starting", 0);
+        assert_eq!(busy(false, Some(&moving)), Some(Busy::Move));
+        assert_eq!(busy(false, Some(&copying)), Some(Busy::Copy));
+        assert_eq!(busy(false, Some(&using)), Some(Busy::Use));
+        assert_eq!(busy(true, None), Some(Busy::Clip));
+        assert_eq!(
+            busy(true, Some(&copying)),
+            Some(Busy::Copy),
+            "the library first"
+        );
+        assert_eq!(busy(false, None), None);
+        let ended = Job {
+            running: false,
+            ok: true,
+            line: "The library moved".into(),
+            ..moving
+        };
+        assert_eq!(
+            busy(false, Some(&ended)),
+            None,
+            "a move that ended holds nothing"
+        );
+        assert_eq!(busy(true, Some(&ended)), Some(Busy::Clip));
+    }
+
+    #[test]
+    fn a_move_holds_an_install_as_long_as_it_goes_on_and_a_stop_lets_it_go() {
+        let t0 = Instant::now();
+        let mins = |m: u64| t0 + Duration::from_secs(m * 60);
+        let mut hold = Hold::default();
+        // five hours of a move across drives, its bytes going on every few minutes
+        for m in (0..300).step_by(4) {
+            let j = job("move", "copying", m * 1_000_000_000);
+            assert_eq!(
+                hold.look(mins(m), false, Some(&j)),
+                Verdict::Wait(Busy::Move),
+                "{m} min"
+            );
+        }
+        let checking = job("move", "checking", 0);
+        assert_eq!(
+            hold.look(mins(300), false, Some(&checking)),
+            Verdict::Wait(Busy::Move),
+            "a new phase is progress"
+        );
+        assert_eq!(
+            hold.look(mins(309), false, Some(&checking)),
+            Verdict::Wait(Busy::Move)
+        );
+        assert_eq!(
+            hold.look(mins(310), false, Some(&checking)),
+            Verdict::GiveUp(Busy::Move),
+            "ten minutes without a byte: the drive stopped answering"
+        );
+        let mut hold = Hold::default();
+        let copy = job("copy", "database", 0);
+        assert_eq!(
+            hold.look(mins(0), false, Some(&copy)),
+            Verdict::Wait(Busy::Copy)
+        );
+        let stopped = Job {
+            running: false,
+            line: "The copy was stopped".into(),
+            ..copy
+        };
+        assert_eq!(
+            hold.look(mins(1), false, Some(&stopped)),
+            Verdict::Go,
+            "a Stop lets the update go on"
+        );
+        assert!(super::gave_up_line("1.12.1", Busy::Copy).starts_with(
+            "reel 1.12.1 did not install: the copy of the library has not gone on for 10 minutes"
+        ));
+    }
+
+    #[test]
+    fn a_clip_holds_an_install_ten_minutes_at_most() {
+        let t0 = Instant::now();
+        let mut hold = Hold::default();
+        assert_eq!(hold.look(t0, true, None), Verdict::Wait(Busy::Clip));
+        let nine = t0 + Duration::from_secs(9 * 60);
+        assert_eq!(hold.look(nine, true, None), Verdict::Wait(Busy::Clip));
+        let ten = t0 + Duration::from_secs(10 * 60);
+        assert_eq!(
+            hold.look(ten, true, None),
+            Verdict::Go,
+            "the clip goes up again after the start"
+        );
+        assert_eq!(
+            Hold::default().look(t0, false, None),
+            Verdict::Go,
+            "nothing holds it"
+        );
+    }
+
+    #[test]
+    fn an_update_held_for_the_quit_says_it_waits_for_the_first_quit_after_the_library() {
+        let line = || "reel 1.12.1 installs when the app quits".to_string();
+        let moving = job("move", "copying", 1);
+        assert_eq!(
+            line_now(line(), Some("1.12.1"), Some(&moving)),
+            "reel 1.12.1 installs at the first quit after the library has moved"
+        );
+        assert_eq!(
+            line_now(line(), Some("1.12.1"), Some(&job("copy", "checking", 1))),
+            "reel 1.12.1 installs at the first quit after the copy of the library is made"
+        );
+        assert_eq!(
+            line_now(line(), Some("1.12.1"), None),
+            line(),
+            "no move: the quit installs it"
+        );
+        assert_eq!(
+            line_now(line(), None, Some(&moving)),
+            line(),
+            "nothing held for the quit"
+        );
+    }
 
     #[test]
     fn the_line_of_a_check_that_found_nothing_says_where_the_app_stands() {

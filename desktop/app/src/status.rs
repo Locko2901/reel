@@ -136,6 +136,8 @@ pub struct Status {
     pub loudness_target: Option<i32>,
     pub update_line: String,
     pub update_version: Option<String>,
+    /// An Install under way: it waits for what holds it, downloads, and reel closes.
+    pub update_installing: bool,
     /// What the update brings: the notes of the versions it spans, from the server.
     pub update_notes: Option<String>,
     /// What installing the update does, said before it does (This app, Startup).

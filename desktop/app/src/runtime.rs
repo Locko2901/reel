@@ -835,12 +835,20 @@ impl Runtime {
             server_admin: g.who.as_ref().map(|w| w.admin).unwrap_or(false),
             normalize_new: g.who.as_ref().and_then(|w| w.normalize_new),
             loudness_target: g.who.as_ref().and_then(|w| w.loudness_target),
-            update_line: if standalone && g.update_line.is_empty() {
-                standalone_update_line(&g, &self.app.package_info().version.to_string())
-            } else {
-                g.update_line.clone()
-            },
+            update_line: crate::updates::line_now(
+                if standalone && g.update_line.is_empty() {
+                    standalone_update_line(&g, &self.app.package_info().version.to_string())
+                } else {
+                    g.update_line.clone()
+                },
+                g.update
+                    .as_ref()
+                    .filter(|_| g.update_bytes.is_some() && !crate::updates::installing())
+                    .map(|u| u.version.as_str()),
+                g.library_job.as_ref(),
+            ),
             update_version: g.update.as_ref().map(|u| u.version.clone()),
+            update_installing: crate::updates::installing(),
             update_notes: g.update.as_ref().and_then(|u| u.body.clone()),
             update_before: g.update.as_ref().map(|u| {
                 let kind = reel_desktop_core::update_steps::Kind::here(g.bundled.is_some());
