@@ -34,17 +34,22 @@ async fn receive(
 ) -> AppResult<Vec<Value>> {
     crate::error::library_ready(&st.ctx).await?;
     let cfg = st.ctx.config();
+    let limit = cfg.upload_max_bytes() as u64;
+    let too_large = || {
+        AppError::TooLarge(format!(
+            "an upload over {} GB is refused; the limit is under Settings, Imports",
+            cfg.import.upload_max_gb
+        ))
+    };
     let length: u64 = headers
         .get("content-length")
         .and_then(|v| v.to_str().ok())
         .and_then(|v| v.parse().ok())
         .unwrap_or(0);
-    if length > cfg.upload_max_bytes() as u64 {
-        return Err(AppError::TooLarge(format!(
-            "an upload over {} GB is refused; the limit is under Settings, Imports",
-            cfg.import.upload_max_gb
-        )));
+    if length > limit {
+        return Err(too_large());
     }
+    let mut total: u64 = 0;
     let mut clips = Vec::new();
     while let Some(mut field) = multipart
         .next_field()
@@ -75,16 +80,29 @@ async fn receive(
         let part = reel_media::ffmpeg::part_path(&target);
         let mut f = tokio::fs::File::create(&part).await?;
         let mut bytes: u64 = 0;
-        while let Some(chunk) = field
-            .chunk()
-            .await
-            .map_err(|e| AppError::BadRequest(e.to_string()))?
-        {
-            bytes += chunk.len() as u64;
-            f.write_all(&chunk).await?;
+        // a body sent in chunks has no Content-Length: the limit is counted as it arrives
+        let wrote = async {
+            while let Some(chunk) = field
+                .chunk()
+                .await
+                .map_err(|e| AppError::BadRequest(e.to_string()))?
+            {
+                bytes += chunk.len() as u64;
+                total += chunk.len() as u64;
+                if total > limit {
+                    return Err(too_large());
+                }
+                f.write_all(&chunk).await?;
+            }
+            f.flush().await?;
+            Ok::<(), AppError>(())
         }
-        f.flush().await?;
+        .await;
         drop(f);
+        if let Err(e) = wrote {
+            let _ = tokio::fs::remove_dir_all(&dir).await;
+            return Err(e);
+        }
         if bytes == 0 {
             let _ = tokio::fs::remove_dir_all(&dir).await;
             return Err(AppError::BadRequest(format!("{name} is empty")));
