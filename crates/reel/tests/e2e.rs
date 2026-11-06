@@ -16637,3 +16637,34 @@ fn walk(dir: &std::path::Path) -> Vec<PathBuf> {
     }
     out
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_member_cannot_make_reel_ask_github_while_the_check_is_off() {
+    let Some(env) = start(AuthMode::Local, vec![]).await else {
+        return;
+    };
+    assert!(!env.ctx.config().advanced.update_check);
+    let (admin, members) = admin_and_members(&env, &["mira"]).await;
+    let ask = |who: &str| {
+        let (env, who) = (&env, who.to_string());
+        async move {
+            as_user(env, reqwest::Method::POST, "/api/status/update-check", &who)
+                .await
+                .0
+        }
+    };
+    assert_eq!(ask(&members[0]).await, 403, "Check now is the admins'");
+    assert_eq!(ask(&admin).await, 409, "and refused while the check is off");
+    assert!(
+        env.ctx.updates.read().await.checked_at.is_none(),
+        "the check is off and the page hides its button, yet the API asked GitHub"
+    );
+    let (_, page) = as_user(&env, reqwest::Method::GET, "/status", &members[0]).await;
+    assert!(page.contains(r#"id="update-btn" type="button" hidden"#));
+    save_setting_as(&env, &admin, "advanced.update_check", "true").await;
+    ask(&admin).await;
+    assert!(
+        env.ctx.updates.read().await.checked_at.is_some(),
+        "switched on, an admin's Check now asks"
+    );
+}

@@ -30,7 +30,9 @@ app.
 The server asks GitHub for the newest release a minute after it starts,
 then once a day. When one is out, the Status page says so on its
 **update** line ("1.9.2 is out since 2026-11-10; you run 1.9.1") with a
-link to the release notes, and **Check now** asks again at once.
+link to the release notes, and **Check now** asks again at once (an
+admin's button, there while **Check for updates** is on under Settings,
+**Advanced**; switched off, reel asks GitHub nothing).
 
 - To be told without looking, set up ntfy or a webhook under Settings,
   **Notifications** and turn on the event **an update is available**
