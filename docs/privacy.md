@@ -44,10 +44,12 @@ the app need them:
 
 - `/assets/`: reel's own stylesheet, fonts, icons and scripts, the same on
   every server, nothing of yours.
-- `/healthz`: the health check. It answers with reel's version, how long
-  it has run, whether the database and ffmpeg work, the hardware route,
-  how many jobs wait and how many clips the library holds. Nothing about
-  any clip.
+- `/healthz`: the health check. To anyone on the internet it answers
+  whether reel is ok, and 503 while the library is away. The details
+  (reel's version, how long it has run, whether the database and ffmpeg
+  work, the hardware route, how many jobs wait and how many clips the
+  library holds; nothing about any clip) go to a signed-in admin and to a
+  request from the machine itself, such as the container's health check.
 - `/api/device/`: the desktop app's way in. Every request there has to
   carry a device token (below), and without one it is refused.
 
