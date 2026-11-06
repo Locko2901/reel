@@ -218,7 +218,7 @@ pub async fn require_user(State(st): State<AppState>, mut req: Request, next: Ne
             match crate::accounts::user_on_sight(&st.ctx.store, &cfg, &cfg.auth.dev_user, None)
                 .await
             {
-                Ok(row) => {
+                Ok(Some(row)) => {
                     let user = admit(&st, row).await;
                     if let Some(r) = to_setup(&st, &user, &req) {
                         return r;
@@ -226,6 +226,7 @@ pub async fn require_user(State(st): State<AppState>, mut req: Request, next: Ne
                     req.extensions_mut().insert(user);
                     next.run(req).await
                 }
+                Ok(None) => table_down(&req, "no row for the name", "single user"),
                 Err(e) => table_down(&req, e, "single user"),
             }
         }
@@ -244,8 +245,14 @@ pub async fn require_user(State(st): State<AppState>, mut req: Request, next: Ne
             match (trusted, name) {
                 (true, Some(n)) => {
                     match crate::accounts::user_on_sight(&st.ctx.store, &cfg, &n, None).await {
-                        Ok(row) if row.disabled_at.is_some() => disabled(&req),
-                        Ok(row) => {
+                        Ok(None) => refuse(
+                            &req,
+                            StatusCode::FORBIDDEN,
+                            "Another user has this name in another case.",
+                            "reel takes a name exactly as the proxy sends it. An admin can rename one of the two under Settings, Access.",
+                        ),
+                        Ok(Some(row)) if row.disabled_at.is_some() => disabled(&req),
+                        Ok(Some(row)) => {
                             let user = admit(&st, row).await;
                             if let Some(r) = to_setup(&st, &user, &req) {
                                 return r;

@@ -24,6 +24,15 @@ impl Store {
             .await
     }
 
+    /// By the name as it is spelt, case included; `user_by_name` ignores case as the unique
+    /// index does.
+    pub async fn user_by_exact_name(&self, name: &str) -> Result<Option<User>> {
+        sqlx::query_as::<_, User>("SELECT * FROM user WHERE name = ? COLLATE BINARY")
+            .bind(name.trim())
+            .fetch_optional(&self.pool)
+            .await
+    }
+
     pub async fn user_count(&self) -> Result<i64> {
         let row = sqlx::query("SELECT COUNT(*) AS n FROM user")
             .fetch_one(&self.pool)
