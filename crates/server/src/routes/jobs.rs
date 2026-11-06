@@ -302,7 +302,31 @@ pub async fn list(
         "history" => st.ctx.store.finished_jobs(100).await?,
         _ => st.ctx.store.jobs_now().await?,
     };
+    let cfg = st.ctx.config();
+    let jobs: Vec<Job> = jobs.into_iter().map(|j| shown(j, &cfg)).collect();
     Ok(Json(json!({ "jobs": jobs })))
+}
+
+/// A job as the API shows it: the server's folders in its payload and its error named, as the
+/// pages show them.
+pub fn shown(mut job: Job, cfg: &reel_core::Config) -> Job {
+    fn hide(v: &mut Value, cfg: &reel_core::Config) {
+        match v {
+            Value::String(s) => *s = cfg.hide_paths(s),
+            Value::Array(items) => items.iter_mut().for_each(|i| hide(i, cfg)),
+            Value::Object(map) => map.values_mut().for_each(|i| hide(i, cfg)),
+            _ => {}
+        }
+    }
+    job.payload = match serde_json::from_str::<Value>(&job.payload) {
+        Ok(mut v) => {
+            hide(&mut v, cfg);
+            v.to_string()
+        }
+        Err(_) => cfg.hide_paths(&job.payload),
+    };
+    job.error = job.error.map(|e| cfg.hide_paths(&e));
+    job
 }
 
 pub async fn cancel(
