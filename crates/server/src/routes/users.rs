@@ -427,10 +427,12 @@ async fn to_provider(
         .insert(OIDC_PENDING, pending)
         .await
         .map_err(|e| AppError::Internal(anyhow::anyhow!("session: {e}")))?;
-    auth.session
-        .set_expiry(Some(tower_sessions::Expiry::AtDateTime(
-            time::OffsetDateTime::now_utc() + time::Duration::minutes(OIDC_PENDING_MINUTES),
-        )));
+    if auth.user.is_none() {
+        auth.session
+            .set_expiry(Some(tower_sessions::Expiry::AtDateTime(
+                time::OffsetDateTime::now_utc() + time::Duration::minutes(OIDC_PENDING_MINUTES),
+            )));
+    }
     Ok(Redirect::to(&url).into_response())
 }
 
@@ -475,6 +477,11 @@ pub async fn oidc_callback(
         .remove::<OidcPending>(OIDC_PENDING)
         .await
         .map_err(|e| AppError::Internal(anyhow::anyhow!("session: {e}")))?;
+    if pending.too_old(jiff::Timestamp::now().as_second()) {
+        return Err(AppError::BadRequest(
+            "this sign-in waited too long for the provider; try again".into(),
+        ));
+    }
     if let Some(e) = q.error {
         tracing::warn!(error = %e, why = q.error_description.as_deref().unwrap_or(""), "the provider refused");
         return Ok(Redirect::to(&format!("/signin?error={REFUSED}")).into_response());
