@@ -650,7 +650,7 @@ Off, an ntfy topic, or a webhook that takes JSON.
 
 ### ntfy server
 
-The server's address, such as https://ntfy.example.org.
+The server's address, such as https://ntfy.example.org; a new address clears the token below, which is then entered again for that server.
 
 - Under Settings: Notifications, Where
 - In `config.toml`: `ntfy_url` under `[notify]`
