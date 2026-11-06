@@ -147,11 +147,11 @@ impl ProbeInfo {
                     let generic = handler.is_empty()
                         || handler.to_ascii_lowercase().starts_with("sound")
                         || handler.to_ascii_lowercase().starts_with("core media");
-                    match tag("title") {
+                    track_title(&match tag("title") {
                         t if !t.is_empty() => t,
                         _ if !generic => handler,
                         _ => String::new(),
-                    }
+                    })
                 })
                 .collect(),
         })
@@ -166,6 +166,23 @@ impl ProbeInfo {
     pub fn vbitrate_mbit(&self) -> f64 {
         self.vbitrate.unwrap_or(0) as f64 / 1_000_000.0
     }
+}
+
+/// The most characters a track's name keeps.
+pub const TRACK_TITLE_MAX: usize = 40;
+
+/// A track's name as reel keeps and shows it, from a file or a device: no control characters,
+/// trimmed, at most `TRACK_TITLE_MAX` characters.
+pub fn track_title(raw: &str) -> String {
+    raw.chars()
+        .filter(|c| !c.is_control())
+        .collect::<String>()
+        .trim()
+        .chars()
+        .take(TRACK_TITLE_MAX)
+        .collect::<String>()
+        .trim_end()
+        .to_string()
 }
 
 #[cfg(test)]
@@ -189,6 +206,21 @@ mod tests {
         assert_eq!(
             p.creation_time.as_deref(),
             Some("2026-10-06T19:14:03.000000Z")
+        );
+    }
+
+    #[test]
+    fn a_track_title_is_kept_short_and_without_control_characters() {
+        assert_eq!(track_title("  Game\u{0}\n "), "Game");
+        assert_eq!(
+            track_title(&"x".repeat(100)).chars().count(),
+            TRACK_TITLE_MAX
+        );
+        let json = r#"{"streams":[{"codec_type":"video","codec_name":"h264"},{"codec_type":"audio","tags":{"title":"Mic\u0007 of a very long name that goes on and on and on"}}],"format":{}}"#;
+        let p = ProbeInfo::from_ffprobe_json(json).unwrap();
+        assert_eq!(
+            p.audio_titles,
+            vec!["Mic of a very long name that goes on and"]
         );
     }
 

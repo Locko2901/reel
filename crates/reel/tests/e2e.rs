@@ -16005,3 +16005,101 @@ async fn a_session_behind_a_provider_lasts_seven_days_from_its_last_use() {
     let left = days_left().await;
     assert!(left < 1.1, "and is written at most once an hour: {left}");
 }
+
+/// A server with its own accounts: the first admin's cookie, and a cookie for each member the
+/// admin makes.
+async fn admin_and_members(env: &Env, members: &[&str]) -> (String, Vec<String>) {
+    let code = setup_code(env).await;
+    let admin = cookie_of(&first_admin(env, "robin", &code).await);
+    let mut cookies = Vec::new();
+    for name in members {
+        let r = env
+            .client
+            .post(format!("{}/api/users", env.base))
+            .header("cookie", &admin)
+            .json(&serde_json::json!({ "name": name, "password": "a member's password", "role": "member" }))
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(r.status(), 200);
+        let r = env
+            .client
+            .post(format!("{}/signin", env.base))
+            .form(&[
+                ("name", *name),
+                ("password", "a member's password"),
+                ("next", "/"),
+            ])
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(r.status(), 303);
+        cookies.push(cookie_of(&r));
+    }
+    (admin, cookies)
+}
+
+/// A file made from `spec`, uploaded from the browser by whoever `cookie` is: its clip once ready.
+async fn upload_as(env: &Env, cookie: &str, name: &str, spec: Synth) -> Clip {
+    let dir = env._dir.path().join("made");
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = env.synth_at(&dir, name, spec).await;
+    let form = reqwest::multipart::Form::new().part(
+        "file",
+        reqwest::multipart::Part::bytes(std::fs::read(&path).unwrap()).file_name(name.to_string()),
+    );
+    let r = env
+        .client
+        .post(format!("{}/upload", env.base))
+        .header("cookie", cookie)
+        .multipart(form)
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(r.status(), 200);
+    let v: serde_json::Value = r.json().await.unwrap();
+    let id = v["clips"][0]["id"].as_str().unwrap().to_string();
+    env.wait_clip(
+        |c| c.id == id && c.state == "ready",
+        Duration::from_secs(90),
+    )
+    .await
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_track_title_in_an_upload_cannot_end_the_clip_pages_script() {
+    let Some(env) = start(AuthMode::Local, vec![]).await else {
+        return;
+    };
+    let (admin, members) = admin_and_members(&env, &["mira"]).await;
+    let hostile = "</script><script>document.title='taken'</script>";
+    let spec = Synth {
+        track_titles: vec![hostile.into()],
+        ..Synth::small(2.0, "tracks")
+    };
+    let clip = upload_as(&env, &members[0], "tracks.mkv", spec).await;
+    let (status, page) = as_user(
+        &env,
+        reqwest::Method::GET,
+        &format!("/clips/{}", clip.id),
+        &admin,
+    )
+    .await;
+    assert_eq!(status, 200);
+    let block = page
+        .split(r#"<script type="application/json" id="level-json">"#)
+        .nth(1)
+        .and_then(|rest| rest.split("</script>").next())
+        .expect("the admin gets the editor and its JSON");
+    let level: serde_json::Value =
+        serde_json::from_str(block).expect("a track title cannot end the editor's JSON block");
+    assert_eq!(
+        level["tracks"][0].as_str(),
+        Some(reel_core::probe::track_title(hostile).as_str()),
+        "the title is in the data, cut to a track title's length"
+    );
+    assert!(
+        !page.contains("<script>document.title"),
+        "no markup of the title reaches the page"
+    );
+}

@@ -368,7 +368,7 @@ pub async fn create_upload(
         .map(|n| {
             let n: Vec<String> = n
                 .into_iter()
-                .map(|t| short(Some(t), 40).unwrap_or_default())
+                .map(|t| reel_core::probe::track_title(&t))
                 .collect();
             serde_json::to_string(&n).unwrap_or_default()
         });

@@ -467,7 +467,44 @@ pub fn serves_text(share: &Share, versions: &[Rendition], current_id: Option<&st
     }
 }
 
+/// JSON for a `<script type="application/json">` block: no character in it can end the block or
+/// start markup, and JSON.parse reads the same value.
+pub fn script_json(json: &str) -> String {
+    let mut out = String::with_capacity(json.len());
+    for c in json.chars() {
+        match c {
+            '<' => out.push_str("\\u003c"),
+            '>' => out.push_str("\\u003e"),
+            '&' => out.push_str("\\u0026"),
+            '\u{2028}' => out.push_str("\\u2028"),
+            '\u{2029}' => out.push_str("\\u2029"),
+            c => out.push(c),
+        }
+    }
+    out
+}
+
 /// Server paths never reach a page: the data, incoming, originals and upload folders become their names.
 pub fn hide_paths(text: &str, cfg: &reel_core::Config) -> String {
     cfg.hide_paths(text)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn json_in_a_script_block_cannot_end_it() {
+        let value = serde_json::json!({ "tracks": ["</script><script>x()</script>", "a & b", "\u{2028}\u{2029}"] });
+        let text = script_json(&value.to_string());
+        assert!(
+            !text.contains(['<', '>', '&', '\u{2028}', '\u{2029}']),
+            "{text}"
+        );
+        assert_eq!(
+            serde_json::from_str::<serde_json::Value>(&text).unwrap(),
+            value,
+            "the page reads the same value"
+        );
+    }
 }
