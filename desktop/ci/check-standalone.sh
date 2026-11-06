@@ -192,6 +192,17 @@ sleep 16
 [ "$(logged 'the page stopped answering')" -eq "$stalls" ] || fail "the clip page, back from Status, stopped calling the app and was taken for stalled"
 [ "$(logged 'no sign of life from the page')" -eq "$lifeless" ] || fail "the clip page, back from Status, never called the app"
 ok "back from Status to the clip page WebKit kept: it calls the app again, no stall in 16 s"
+b=$(logged "$CLIP_AT")
+stalls=$(logged "the page stopped answering")
+pkill -STOP -f WebKitWebProcess || fail "no web process to stop"
+for _ in $(seq 1 60); do [ "$(logged 'the page stopped answering')" -gt "$stalls" ] && break; sleep 0.5; done
+pkill -CONT -f WebKitWebProcess || true
+[ "$(logged 'the page stopped answering')" -gt "$stalls" ] || fail "a web process that stopped answering was not taken for stalled"
+for _ in $(seq 1 40); do [ "$(logged "$CLIP_AT")" -gt "$b" ] && break; sleep 0.5; done
+sleep 2
+last=$(cat "$L"/reel-desktop.log* | grep "library loaded" | tail -1)
+printf '%s\n' "$last" | grep -q -- "$CLIP_AT" || fail "the stalled clip page loaded again elsewhere: $(cat "$L"/reel-desktop.log* | grep 'the page loads again' | tail -1 | sed 's/.*INFO //'); $last"
+ok "a clip page whose web process stopped answering loads again on the clip"
 kill "$SNI" 2>/dev/null || true
 stop
 
