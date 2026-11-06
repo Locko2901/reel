@@ -254,6 +254,35 @@ impl Store {
 
     /// Makes the first user inside one write transaction, so two requests at once cannot both
     /// become the admin; false when a user exists already.
+    /// Makes the user the first admin and spends the setup code, in one transaction, only while
+    /// no enabled admin exists and the user is enabled.
+    pub async fn claim_first_admin(&self, id: &str, code_key: &str) -> Result<bool> {
+        let mut tx = self.pool.begin_with("BEGIN IMMEDIATE").await?;
+        let admins: i64 = sqlx::query(
+            "SELECT COUNT(*) AS n FROM user WHERE role = 'admin' AND disabled_at IS NULL",
+        )
+        .fetch_one(&mut *tx)
+        .await?
+        .get("n");
+        let made = admins == 0
+            && sqlx::query("UPDATE user SET role = 'admin' WHERE id = ? AND disabled_at IS NULL")
+                .bind(id)
+                .execute(&mut *tx)
+                .await?
+                .rows_affected()
+                == 1;
+        if !made {
+            tx.rollback().await?;
+            return Ok(false);
+        }
+        sqlx::query("DELETE FROM setting WHERE key = ?")
+            .bind(code_key)
+            .execute(&mut *tx)
+            .await?;
+        tx.commit().await?;
+        Ok(true)
+    }
+
     pub async fn insert_first_admin(&self, u: &User, code_key: &str) -> Result<bool> {
         let mut tx = self.pool.begin_with("BEGIN IMMEDIATE").await?;
         let n: i64 = sqlx::query("SELECT COUNT(*) AS n FROM user")

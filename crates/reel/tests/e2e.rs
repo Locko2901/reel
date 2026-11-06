@@ -7265,7 +7265,11 @@ async fn oidc_env(persona: Personas, tweak: impl FnOnce(&mut Config)) -> Option<
 
 #[tokio::test(flavor = "multi_thread")]
 async fn the_sign_in_button_names_the_provider_as_the_admin_calls_it() {
-    let Some((env, _)) = oidc_env(persona(Persona::mira()), |_| {}).await else {
+    let Some((env, _)) = oidc_env(persona(Persona::mira()), |c| {
+        c.auth.admins = vec!["sub-mira".into()]
+    })
+    .await
+    else {
         return;
     };
     let page = page_text(&env, "/signin").await.1;
@@ -7767,6 +7771,7 @@ async fn a_provider_whose_issuer_ends_in_a_slash_signs_in_and_its_users_count_as
     let Some(env) = start_with(AuthMode::Oidc, vec!["127.0.0.1/32"], move |c| {
         reel_core::settings::set(c, "auth.oidc_issuer", &i).unwrap();
         c.auth.oidc_client_id = "reel".into();
+        c.auth.admins = vec!["sub-mira".into()];
     })
     .await
     else {
@@ -7781,7 +7786,7 @@ async fn a_provider_whose_issuer_ends_in_a_slash_signs_in_and_its_users_count_as
         .await
         .unwrap()
         .expect("bound under the issuer as the provider spells it");
-    assert!(mira.is_admin(), "the first user");
+    assert!(mira.is_admin(), "listed in Admins");
     assert!(
         reel_server::accounts::admin_way_in(env.store(), &env.ctx.config())
             .await
@@ -7881,13 +7886,14 @@ async fn the_claim_settings_count_at_the_next_sign_in_without_a_restart() {
     let Some(env) = start_with(AuthMode::Oidc, vec!["127.0.0.1/32"], move |c| {
         c.auth.oidc_issuer = i;
         c.auth.oidc_client_id = "reel".into();
+        c.auth.admins = vec!["sub-mira".into()];
     })
     .await
     else {
         return;
     };
     let (status, admin, _) = oidc_sign_in_by(&env, "/oidc/start").await;
-    assert_eq!(status, 303, "mira, the first user and so an admin");
+    assert_eq!(status, 303, "mira, an admin by her subject in Admins");
     let asked = stand.asked();
     save_setting_as(&env, &admin, "auth.oidc_username_claim", "email").await;
     save_setting_as(&env, &admin, "auth.oidc_role_claim", "roles").await;
@@ -7952,11 +7958,13 @@ async fn a_name_added_to_the_admins_counts_at_the_next_sign_in_without_a_restart
         groups: vec![],
         ..Persona::mira()
     });
-    let Some((env, issuer)) = oidc_env(who.clone(), |_| {}).await else {
+    let Some((env, issuer)) =
+        oidc_env(who.clone(), |c| c.auth.admins = vec!["sub-mira".into()]).await
+    else {
         return;
     };
     let (status, admin) = oidc_sign_in(&env).await;
-    assert_eq!(status, 303, "mira, the first user and so an admin");
+    assert_eq!(status, 303, "mira, an admin by her subject in Admins");
     let sign_in_as = |name: &'static str| {
         let (who, env, issuer) = (who.clone(), &env, &issuer);
         async move {
@@ -15631,4 +15639,115 @@ async fn a_name_from_the_proxy_that_differs_from_a_user_only_in_case_is_refused(
     assert_eq!(r.status(), 403);
     assert!(r.text().await.unwrap().contains("another case"));
     assert_eq!(users.len(), 1, "and made nobody of them");
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_fresh_server_behind_a_provider_makes_no_admin_of_whoever_signs_in_first() {
+    let who = persona(Persona {
+        sub: "sub-stranger".into(),
+        username: "stranger".into(),
+        groups: vec![],
+        ..Persona::mira()
+    });
+    let Some((env, issuer)) = oidc_env(who.clone(), |_| {}).await else {
+        return;
+    };
+    assert_eq!(env.store().user_count().await.unwrap(), 0);
+    let code = setup_code(&env).await;
+    assert_eq!(oidc_sign_in(&env).await.0, 303);
+    let row = env
+        .store()
+        .user_by_oidc(&issuer, "sub-stranger")
+        .await
+        .unwrap()
+        .unwrap();
+    assert!(
+        !row.is_admin(),
+        "anyone with an account at the provider who finds the server first is its admin"
+    );
+
+    who.lock().await.sub = "sub-owner".into();
+    who.lock().await.username = "owner".into();
+    let r = env
+        .client
+        .get(format!("{}/oidc/start", env.base))
+        .header("x-forwarded-for", "203.0.113.70")
+        .send()
+        .await
+        .unwrap();
+    let pending = cookie_of(&r);
+    let to_issuer = r.headers()["location"].to_str().unwrap().to_string();
+    let back = env.client.get(&to_issuer).send().await.unwrap().headers()["location"]
+        .to_str()
+        .unwrap()
+        .to_string();
+    let r = env
+        .client
+        .get(&back)
+        .header("cookie", &pending)
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(
+        r.headers()["location"],
+        "/signin",
+        "a sign-in on a server without an admin goes on to the setup code"
+    );
+    let owner = cookie_of(&r);
+    let page = env
+        .client
+        .get(format!("{}/signin", env.base))
+        .header("cookie", &owner)
+        .send()
+        .await
+        .unwrap()
+        .text()
+        .await
+        .unwrap();
+    assert!(
+        page.contains("/signin/claim") && page.contains("owner") && !page.contains(&code),
+        "the page asks the signed-in owner for the code and never shows it"
+    );
+    let claim = |cookie: String, code: String| {
+        env.client
+            .post(format!("{}/signin/claim", env.base))
+            .header("cookie", cookie)
+            .header("x-forwarded-for", "203.0.113.71")
+            .form(&[("code", code)])
+            .send()
+    };
+    assert_eq!(
+        claim(owner.clone(), "wrong-code1".into())
+            .await
+            .unwrap()
+            .status(),
+        403
+    );
+    let r = claim(owner.clone(), code.clone()).await.unwrap();
+    assert_eq!(r.status(), 303);
+    let owner_row = env
+        .store()
+        .user_by_oidc(&issuer, "sub-owner")
+        .await
+        .unwrap()
+        .unwrap();
+    assert!(owner_row.is_admin(), "the setup code made the admin");
+    assert!(
+        env.store()
+            .setting(reel_server::auth::SETUP_CODE_KEY)
+            .await
+            .unwrap()
+            .is_none(),
+        "and is spent"
+    );
+    let (_, stranger, _) = {
+        who.lock().await.sub = "sub-stranger".into();
+        oidc_sign_in_by(&env, "/oidc/start").await
+    };
+    assert_eq!(
+        claim(stranger, code).await.unwrap().status(),
+        409,
+        "once there is an admin the code makes no other"
+    );
+    assert!(!env.store().user(&row.id).await.unwrap().unwrap().is_admin());
 }

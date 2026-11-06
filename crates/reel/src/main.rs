@@ -173,8 +173,14 @@ async fn serve(layers: Layers) -> anyhow::Result<()> {
     let state = reel_server::AppState::new(ctx.clone()).await?;
     tokio::spawn(reel_server::expire_sessions(state.sessions.clone()));
     if let Some(code) = ctx.store.setting(reel_server::auth::SETUP_CODE_KEY).await? {
-        if ctx.store.user_count().await? == 0 {
-            println!("no user yet: the first admin signs up at /signin with the setup code {code}");
+        if reel_server::accounts::wants_setup_code(&ctx.store, &cfg).await? {
+            if cfg.auth.mode == reel_core::config::AuthMode::Oidc {
+                println!("no admin yet: sign in through the identity provider, then type the setup code {code}");
+            } else {
+                println!(
+                    "no user yet: the first admin signs up at /signin with the setup code {code}"
+                );
+            }
         }
     }
     if let Some(line) = reel_server::accounts::admin_way_in(&ctx.store, &cfg).await? {
@@ -263,14 +269,19 @@ async fn doctor(layers: Layers) -> anyhow::Result<()> {
         "auth:     {:?}, public url {}",
         config.auth.mode, config.public_url
     );
-    if config.auth.mode == reel_core::config::AuthMode::Local {
-        let users = ctx.store.user_count().await?;
-        match ctx.store.setting(reel_server::auth::SETUP_CODE_KEY).await? {
-            Some(code) if users == 0 => println!(
-                "setup:    no user yet; the first admin needs the setup code {code} at /signin"
-            ),
-            _ => println!("users:    {users}"),
+    let waits = reel_server::accounts::wants_setup_code(&ctx.store, &config).await?;
+    let code = ctx.store.setting(reel_server::auth::SETUP_CODE_KEY).await?;
+    match (config.auth.mode, code) {
+        (reel_core::config::AuthMode::Local, Some(code)) if waits => println!(
+            "setup:    no user yet; the first admin needs the setup code {code} at /signin"
+        ),
+        (reel_core::config::AuthMode::Oidc, Some(code)) if waits => println!(
+            "setup:    no admin yet; sign in through the identity provider, then type the setup code {code}"
+        ),
+        (reel_core::config::AuthMode::Local | reel_core::config::AuthMode::Oidc, _) => {
+            println!("users:    {}", ctx.store.user_count().await?)
         }
+        _ => {}
     }
     if let Some(line) = reel_server::accounts::admin_way_in(&ctx.store, &config).await? {
         println!("sign-in:  {line}");

@@ -52,10 +52,17 @@ impl AppState {
         reel_pipeline::housekeeping::remake_utc_titles_once(&ctx).await?;
         reel_pipeline::housekeeping::remake_not_game_titles_once(&ctx).await?;
         if let Some(code) = auth::ensure_setup_code(&ctx).await? {
-            tracing::warn!(
-                code,
-                "no user yet: the first admin needs this setup code at /signin"
-            );
+            if cfg.auth.mode == AuthMode::Oidc {
+                tracing::warn!(
+                    code,
+                    "no admin yet: sign in through the identity provider, then type this setup code"
+                );
+            } else {
+                tracing::warn!(
+                    code,
+                    "no user yet: the first admin needs this setup code at /signin"
+                );
+            }
         }
         let provider = if cfg.auth.mode == AuthMode::Oidc {
             let p = std::sync::Arc::new(accounts::Provider::new(cfg.clone()));
@@ -440,6 +447,7 @@ pub fn router(state: AppState) -> Router {
     let limited = Router::new()
         .route("/signin", post(routes::users::signin))
         .route("/signin/first", post(routes::users::first_admin))
+        .route("/signin/claim", post(routes::users::claim_admin))
         .route("/oidc/start", get(routes::users::oidc_start))
         .route("/oidc/link/{token}", get(routes::users::oidc_link))
         .route_layer(guard(Part::Accounts))

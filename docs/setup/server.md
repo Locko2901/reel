@@ -281,10 +281,13 @@ provider to sign in, with no proxy asking first.
    `REEL_OIDC_NAME: Authentik` ([Provider name](../configuration.md#provider-name)).
 
 When it worked, the sign-in page has a button **Sign in with** followed
-by that name, or by your provider's address without one, and the first
-user to come back from it is an admin. reel binds each user to the
-provider's issuer and subject, never to a name, so a renamed account
-stays the same user.
+by that name, or by your provider's address without one. A user who
+comes back from it listed in Admins, or with the admin value, is an
+admin. Anyone else who comes first finds a page that asks for the setup
+code: reel's log has it from the start (`docker logs reel`), and so has
+`docker exec reel reel doctor`. Type it there and you are the admin; the
+code then works no more. reel binds each user to the provider's issuer
+and subject, never to a name, so a renamed account stays the same user.
 
 ### No sign-in (single)
 
