@@ -32,6 +32,9 @@ pub struct SigninPage {
     pub mode_line: String,
     /// The provider has not answered yet: the page asks again by itself.
     pub retry: bool,
+    /// Behind an identity provider with no admin yet: the signed-in user's name, to whom the
+    /// page offers the setup code's field.
+    pub claim: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -89,17 +92,32 @@ async fn signin_view(st: &AppState, next: &str, error: &str) -> SigninPage {
             AuthMode::Local | AuthMode::Oidc => String::new(),
         },
         retry: waiting,
+        claim: None,
     }
 }
 
 pub async fn signin_page(
     State(st): State<AppState>,
+    auth: AuthSession<Backend>,
     Query(q): Query<SigninQuery>,
 ) -> AppResult<Response> {
     let next = safe_next(q.next.as_deref(), &st.ctx.config().public_url);
-    Ok(html(
-        signin_view(&st, &next, q.error.as_deref().unwrap_or("")).await,
-    ))
+    let mut page = signin_view(&st, &next, q.error.as_deref().unwrap_or("")).await;
+    page.claim = claimer(&st, &auth).await?;
+    Ok(html(page))
+}
+
+/// The signed-in user's name when the server behind an identity provider waits for its first
+/// admin's setup code.
+async fn claimer(st: &AppState, auth: &AuthSession<Backend>) -> AppResult<Option<String>> {
+    let cfg = st.ctx.config();
+    let Some(me) = auth.user.as_ref() else {
+        return Ok(None);
+    };
+    let waits = cfg.auth.mode == AuthMode::Oidc
+        && !me.admin
+        && accounts::wants_setup_code(&st.ctx.store, &cfg).await?;
+    Ok(waits.then(|| me.name.clone()))
 }
 
 #[derive(Deserialize)]
@@ -282,6 +300,66 @@ pub async fn first_admin(
     Ok(Redirect::to("/").into_response())
 }
 
+#[derive(Deserialize)]
+pub struct ClaimForm {
+    #[serde(default)]
+    pub code: String,
+}
+
+/// The first admin behind an identity provider: a user signed in through it, with the setup
+/// code, once, while there is no admin.
+pub async fn claim_admin(
+    State(st): State<AppState>,
+    auth: AuthSession<Backend>,
+    ConnectInfo(peer): ConnectInfo<SocketAddr>,
+    headers: HeaderMap,
+    Form(f): Form<ClaimForm>,
+) -> AppResult<Response> {
+    let cfg = st.ctx.config();
+    if cfg.auth.mode != AuthMode::Oidc {
+        return Err(AppError::Conflict(
+            "the setup code here is for a server behind an identity provider".into(),
+        ));
+    }
+    if !same_origin(&Method::POST, &headers) {
+        return Err(AppError::Forbidden("that came from another site".into()));
+    }
+    let Some(me) = claimer(&st, &auth).await? else {
+        return if auth.user.is_some() {
+            Err(AppError::Conflict("this reel has an admin already".into()))
+        } else {
+            Ok(Redirect::to("/signin").into_response())
+        };
+    };
+    let Some(code) = st.ctx.store.setting(SETUP_CODE_KEY).await? else {
+        return Err(AppError::Conflict(
+            "no setup code is waiting; restart reel to get one".into(),
+        ));
+    };
+    let ip = client_ip(&headers, peer.ip(), &cfg).to_string();
+    if !same_code(&f.code, &code) {
+        st.ctx
+            .store
+            .add_signin_attempt(&ip, "setup code", false)
+            .await?;
+        tracing::warn!(ip, user = %me, "first admin refused: wrong setup code");
+        let mut page = signin_view(
+            &st,
+            "/",
+            "That is not the setup code; it is in reel's log and in reel doctor.",
+        )
+        .await;
+        page.claim = Some(me);
+        return Ok(html_status(StatusCode::FORBIDDEN, page));
+    }
+    let id = auth.user.as_ref().map(|u| u.id.clone()).unwrap_or_default();
+    if !st.ctx.store.claim_first_admin(&id, SETUP_CODE_KEY).await? {
+        return Err(AppError::Conflict("this reel has an admin already".into()));
+    }
+    tracing::info!(user = %me, ip, "first admin made with the setup code");
+    Ok(Redirect::to("/").into_response())
+}
+
 pub async fn signout(mut auth: AuthSession<Backend>) -> AppResult<Response> {
     auth.logout()
         .await
@@ -423,6 +501,9 @@ pub async fn oidc_callback(
     };
     finish_login(&mut auth, &user, true, st.ctx.config().auth.session_days).await?;
     tracing::info!(user = %user.name, "signed in through the identity provider");
+    if !user.admin && accounts::wants_setup_code(&st.ctx.store, &cfg).await? {
+        return Ok(Redirect::to("/signin").into_response());
+    }
     Ok(Redirect::to("/").into_response())
 }
 

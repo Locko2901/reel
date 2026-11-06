@@ -737,7 +737,7 @@ The name everyone is in single mode.
 
 ### Admins
 
-Users with these names are admins, each exactly as reel gets it, case included; the first user ever seen is one too; with an identity provider, the subject the provider sends instead of a name (Authentik's is the username unless its client says otherwise), counted at the first sign-in, and at every sign-in with a role claim.
+Users with these names are admins, each exactly as reel gets it, case included; the first user ever seen is one too, except behind an identity provider, where the first admin is listed here, carries the admin value or types the setup code; with an identity provider, the subject the provider sends instead of a name (Authentik's is the username unless its client says otherwise), counted at the first sign-in, and at every sign-in with a role claim.
 
 - Under Settings: Access, Identity
 - In `config.toml`: `admins` under `[auth]`

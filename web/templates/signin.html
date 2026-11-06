@@ -14,7 +14,16 @@
   <a class="wordmark" href="/"><svg class="mark" viewBox="8.6 3 16.2 26" aria-hidden="true"><path d="M8.6 3L16 10.4V29H8.6Z"/><path class="arm" d="M8.6 3H24.8V10.4H16Z"/></svg>{{ site }}</a>
 </header>
 <main class="signin">
-  {% if let Some(provider) = oidc %}
+  {% if let Some(me) = claim %}
+  <form method="post" action="/signin/claim">
+    <h1>The first admin</h1>
+    <p class="muted small">This reel has no admin yet. You are signed in as {{ me }}: type the setup code to become its admin, the one who changes the settings and the users. The code is in reel's log from its start, and in reel doctor.</p>
+    {% if !error.is_empty() %}<p class="st-err small">{{ error }}</p>{% endif %}
+    <label class="field"><span>Setup code</span><input type="text" name="code" autocomplete="off" class="mono" placeholder="xxxxx-xxxxx" required autofocus></label>
+    <button class="primary big" type="submit">Become the admin</button>
+    <p class="faint small"><a href="/">Open the library without</a></p>
+  </form>
+  {% else if let Some(provider) = oidc %}
   <div class="stack">
     <h1>Sign in</h1>
     {% if !error.is_empty() %}<p class="st-err small">{{ error }}</p>{% endif %}

@@ -87,9 +87,12 @@ pub fn same_origin(method: &Method, headers: &HeaderMap) -> bool {
     }
 }
 
-/// The first admin's one-time setup code, in local mode while the user table is empty.
+/// The first admin's one-time setup code: with built-in accounts while the user table is
+/// empty, behind an identity provider while there is no admin. A code nobody needs any more is
+/// dropped.
 pub async fn ensure_setup_code(ctx: &reel_pipeline::Ctx) -> anyhow::Result<Option<String>> {
-    if ctx.config().auth.mode != AuthMode::Local || ctx.store.user_count().await? > 0 {
+    if !crate::accounts::wants_setup_code(&ctx.store, &ctx.config()).await? {
+        ctx.store.delete_setting(SETUP_CODE_KEY).await?;
         return Ok(None);
     }
     if let Some(code) = ctx.store.setting(SETUP_CODE_KEY).await? {

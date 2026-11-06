@@ -209,12 +209,11 @@ pub async fn user_for_identity(
             })
         }
         None => {
-            let first = store.user_count().await? == 0;
             let mut row = UserRow::new(&id.name, "member", None);
             row.oidc_issuer = Some(id.issuer.clone());
             row.oidc_subject = Some(id.subject.clone());
             let row = store.insert_user_freely(row).await?;
-            let admin = first || id.admin_claim == Some(true) || listed(cfg, &id.subject);
+            let admin = id.admin_claim == Some(true) || listed(cfg, &id.subject);
             if admin {
                 store.set_role(&row.id, "admin").await?;
             }
@@ -235,19 +234,40 @@ pub async fn admin_way_in(
 ) -> Result<Option<&'static str>, sqlx::Error> {
     use reel_core::config::AuthMode;
     let users = store.users().await?;
-    let mut admins = users
+    let admins: Vec<&UserRow> = users
         .iter()
-        .filter(|u| u.is_admin() && u.disabled_at.is_none());
+        .filter(|u| u.is_admin() && u.disabled_at.is_none())
+        .collect();
     Ok(match cfg.auth.mode {
-        AuthMode::Local if !users.is_empty() && !admins.any(|u| u.password_hash.is_some()) => {
+        AuthMode::Local
+            if !users.is_empty() && !admins.iter().any(|u| u.password_hash.is_some()) =>
+        {
             Some("no admin has a password: reel passwd <name> sets one")
         }
+        AuthMode::Oidc if admins.is_empty() => Some(NO_ADMIN_YET),
         AuthMode::Oidc
-            if !users.is_empty() && !admins.any(|u| u.linked_to(&cfg.auth.oidc_issuer)) =>
+            if !users.is_empty()
+                && !admins
+                    .iter()
+                    .any(|u| u.linked_to(&cfg.auth.oidc_issuer)) =>
         {
             Some("no admin is linked to the identity provider: reel users link <name> prints a link that makes your account there that user")
         }
         _ => None,
+    })
+}
+
+/// The way to the first admin behind an identity provider, for the log and reel doctor.
+pub const NO_ADMIN_YET: &str = "no admin yet: sign in through the identity provider, then type the setup code that reel's log and reel doctor show; Admins and the role claim make an admin by themselves";
+
+/// Whether the server waits for its first admin's setup code: with built-in accounts while it
+/// has no user, behind an identity provider while it has no admin.
+pub async fn wants_setup_code(store: &Store, cfg: &Config) -> Result<bool, sqlx::Error> {
+    use reel_core::config::AuthMode;
+    Ok(match cfg.auth.mode {
+        AuthMode::Local => store.user_count().await? == 0,
+        AuthMode::Oidc => store.admin_count().await? == 0,
+        AuthMode::Proxy | AuthMode::Single => false,
     })
 }
 
