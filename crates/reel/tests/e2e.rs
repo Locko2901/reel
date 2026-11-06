@@ -16571,3 +16571,69 @@ async fn a_clip_in_the_trash_plays_for_no_other_member() {
     .await;
     assert_eq!(status, 200, "its uploader still plays it from the trash");
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn an_upload_without_a_length_stops_at_the_size_limit() {
+    let Some(env) = start_with(AuthMode::Single, vec![], |c| c.import.upload_max_gb = 1).await
+    else {
+        return;
+    };
+    const MB: u64 = 1 << 20;
+    let blocks = env.ctx.config().upload_max_bytes() as u64 / MB + 8;
+    let body =
+        futures::stream::iter((0..blocks).map(|_| Ok::<_, std::io::Error>(vec![0u8; MB as usize])));
+    let form = reqwest::multipart::Form::new().part(
+        "file",
+        reqwest::multipart::Part::stream(reqwest::Body::wrap_stream(body)).file_name("big.mp4"),
+    );
+    let status = env
+        .client
+        .post(format!("{}/upload", env.base))
+        .multipart(form)
+        .send()
+        .await
+        .map(|r| r.status().as_u16())
+        .unwrap_or(0);
+    assert_ne!(
+        status, 200,
+        "a body sent in chunks has no Content-Length, and the limit counts only that header"
+    );
+    let uploads = env.ctx.config().uploads_dir();
+    let start = Instant::now();
+    let left = loop {
+        let left: Vec<PathBuf> = walk(&uploads)
+            .into_iter()
+            .filter(|p| p.to_string_lossy().contains("big.mp4"))
+            .collect();
+        if left.is_empty() || start.elapsed() > Duration::from_secs(10) {
+            break left;
+        }
+        tokio::time::sleep(Duration::from_millis(200)).await;
+    };
+    assert!(left.is_empty(), "the partial file is removed: {left:?}");
+    assert!(
+        env.store()
+            .clips("", reel_store::Sort::Newest)
+            .await
+            .unwrap()
+            .is_empty(),
+        "no clip"
+    );
+}
+
+/// Every file under a folder.
+fn walk(dir: &std::path::Path) -> Vec<PathBuf> {
+    let mut out = Vec::new();
+    let mut stack = vec![dir.to_path_buf()];
+    while let Some(d) = stack.pop() {
+        for e in std::fs::read_dir(&d).into_iter().flatten().flatten() {
+            let p = e.path();
+            if p.is_dir() {
+                stack.push(p);
+            } else {
+                out.push(p);
+            }
+        }
+    }
+    out
+}
