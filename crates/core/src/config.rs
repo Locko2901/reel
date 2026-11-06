@@ -550,6 +550,13 @@ impl Config {
                 "auth.mode is oidc: set auth.oidc_issuer and auth.oidc_client_id (and the secret in REEL_OIDC_CLIENT_SECRET or REEL_OIDC_CLIENT_SECRET_FILE)".into(),
             ));
         }
+        if !self.auth.oidc_role_claim.trim().is_empty()
+            && self.auth.oidc_admin_value.trim().is_empty()
+        {
+            return Err(ConfigError::Invalid(
+                "auth.oidc_admin_value: a role claim needs the value in it that makes an admin, or every empty claim would make one; empty the role claim to go without".into(),
+            ));
+        }
         if self.auth.session_max_days > 0 && self.auth.session_max_days < self.auth.session_days {
             return Err(ConfigError::Invalid(
                 "auth.session_max_days must not be shorter than auth.session_days".into(),
@@ -832,6 +839,21 @@ mod tests {
             };
             assert!(cfg.validate().is_err(), "{bad}");
         }
+    }
+
+    #[test]
+    fn a_role_claim_needs_an_admin_value() {
+        let mut cfg = Config::default();
+        cfg.auth.oidc_role_claim = "groups".into();
+        assert!(cfg.validate().is_ok(), "the default value is admin");
+        cfg.auth.oidc_admin_value = " ".into();
+        let e = cfg.validate().unwrap_err().to_string();
+        assert!(e.contains("auth.oidc_admin_value"), "{e}");
+        cfg.auth.oidc_role_claim = String::new();
+        assert!(
+            cfg.validate().is_ok(),
+            "without a role claim the value is not read"
+        );
     }
 
     #[test]
