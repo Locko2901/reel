@@ -82,6 +82,7 @@ mod tests {
         Encoder {
             hw,
             device: "/dev/dri/renderD128".into(),
+            windows: false,
             mbit: 10,
             fps: 60.0,
             hw_decoder: decoder.map(String::from),

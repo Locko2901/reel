@@ -28,6 +28,8 @@ const LOUDNORM_LRA: f64 = 20.0;
 pub struct Encoder {
     pub hw: HwBackend,
     pub device: String,
+    /// ffmpeg runs on Windows, where every hardware encoder takes its frames from memory.
+    pub windows: bool,
     pub mbit: u32,
     pub fps: f64,
     pub hw_decoder: Option<String>,
@@ -45,8 +47,8 @@ impl Encoder {
     pub fn route(&self) -> Route {
         match (self.hw, &self.hw_decoder) {
             (HwBackend::Software, _) => Route::Software,
-            (_, Some(_)) => Route::Full,
-            (_, None) => Route::EncodeOnly,
+            (_, Some(_)) if self.uploads() => Route::Full,
+            _ => Route::EncodeOnly,
         }
     }
 
@@ -72,9 +74,17 @@ impl Encoder {
             Route::Full => format!("{}, hardware decode", self.hw.name()),
         }
     }
+
+    fn uploads(&self) -> bool {
+        !self.hw.takes_system_frames(self.windows)
+    }
 }
 
-pub fn hw_decoder(backend: HwBackend, vcodec: Option<&str>) -> Option<String> {
+/// The decoder of the full hardware route, for a backend that keeps its frames on its device.
+pub fn hw_decoder(backend: HwBackend, vcodec: Option<&str>, windows: bool) -> Option<String> {
+    if backend.takes_system_frames(windows) {
+        return None;
+    }
     let codec = vcodec?;
     match backend {
         HwBackend::Qsv => match codec {
@@ -99,15 +109,6 @@ pub fn target_size(source: (u32, u32), max_height: Option<u32>) -> Option<(u32, 
     Some((scaled - scaled % 2, max))
 }
 
-/// The QSV device: the DRI node on Linux, the default adapter on Windows.
-fn qsv_device(device: &str) -> String {
-    if device.is_empty() {
-        s("qsv=hw")
-    } else {
-        format!("qsv=hw:{device}")
-    }
-}
-
 fn input_args(enc: &Encoder, before_input: &[String], input: &Path) -> Vec<String> {
     let mut a = vec![];
     match enc.route() {
@@ -115,7 +116,7 @@ fn input_args(enc: &Encoder, before_input: &[String], input: &Path) -> Vec<Strin
             HwBackend::Qsv => {
                 a.extend([
                     s("-init_hw_device"),
-                    qsv_device(&enc.device),
+                    format!("qsv=hw:{}", enc.device),
                     s("-filter_hw_device"),
                     s("hw"),
                     s("-hwaccel"),
@@ -139,10 +140,11 @@ fn input_args(enc: &Encoder, before_input: &[String], input: &Path) -> Vec<Strin
             }
             HwBackend::Nvenc | HwBackend::Amf | HwBackend::Software => {}
         },
+        Route::EncodeOnly if !enc.uploads() => {}
         Route::EncodeOnly => match enc.hw {
             HwBackend::Qsv => a.extend([
                 s("-init_hw_device"),
-                qsv_device(&enc.device),
+                format!("qsv=hw:{}", enc.device),
                 s("-filter_hw_device"),
                 s("hw"),
             ]),
@@ -154,6 +156,17 @@ fn input_args(enc: &Encoder, before_input: &[String], input: &Path) -> Vec<Strin
     a.extend(before_input.iter().cloned());
     a.extend([s("-i"), p(input)]);
     a
+}
+
+/// The end of a filter chain on the CPU: the encoder's pixel format (Quick Sync takes NV12 only),
+/// uploaded when the encoder works on its device's frames.
+fn to_encoder(enc: &Encoder) -> Vec<String> {
+    match (enc.uploads(), enc.hw) {
+        (false, HwBackend::Qsv) => vec![s("format=nv12")],
+        (false, _) => vec![s("format=yuv420p")],
+        (true, HwBackend::Qsv) => vec![s("format=nv12"), s("hwupload=extra_hw_frames=64")],
+        (true, _) => vec![s("format=nv12"), s("hwupload")],
+    }
 }
 
 fn video_filter(enc: &Encoder, max_height: Option<u32>) -> String {
@@ -175,16 +188,7 @@ fn video_filter(enc: &Encoder, max_height: Option<u32>) -> String {
                     "scale='if(gt(ih,{h}),-2,iw)':'if(gt(ih,{h}),{h},ih)':flags=lanczos"
                 ));
             }
-            if enc.hw.takes_system_frames() {
-                f.push(s("format=yuv420p"));
-            } else {
-                f.push(s("format=nv12"));
-                f.push(if enc.hw == HwBackend::Qsv {
-                    s("hwupload=extra_hw_frames=64")
-                } else {
-                    s("hwupload")
-                });
-            }
+            f.extend(to_encoder(enc));
             f.join(",")
         }
         Route::Software => {
@@ -217,8 +221,6 @@ fn video_encoder(hw: HwBackend, vbit: u64, gop: u32, preset: &str) -> Vec<String
             buf,
             s("-g"),
             gop.to_string(),
-            s("-look_ahead"),
-            s("0"),
         ],
         HwBackend::Vaapi => vec![
             s("-c:v"),
@@ -643,16 +645,7 @@ fn copy_filter(enc: &Encoder, plan: &CopyPlan) -> String {
             if plan.scales {
                 f.push(format!("scale=-2:{}:flags=lanczos", plan.height));
             }
-            if enc.hw.takes_system_frames() {
-                f.push(s("format=yuv420p"));
-            } else {
-                f.push(s("format=nv12"));
-                f.push(if enc.hw == HwBackend::Qsv {
-                    s("hwupload=extra_hw_frames=64")
-                } else {
-                    s("hwupload")
-                });
-            }
+            f.extend(to_encoder(enc));
             f.join(",")
         }
         Route::Software => {
@@ -697,6 +690,7 @@ pub fn copy_pass(pass: u8, plan: &CopyPlan, input: &Path, passlog: &Path) -> Vec
     let sw = Encoder {
         hw: HwBackend::Software,
         device: String::new(),
+        windows: cfg!(windows),
         mbit: 0,
         fps: plan.fps,
         hw_decoder: None,
@@ -1008,36 +1002,24 @@ pub fn filmstrip(input: &Path, duration: f64, frames: u32) -> Vec<String> {
     ]
 }
 
-/// A one-second encode through the backend, software decode: proves the device and the encoder.
-pub fn hw_self_test(hw: HwBackend, device: &str) -> Vec<String> {
+/// A one-second encode through the backend, software decode, the frames as a real encode
+/// gives them: proves the device and the encoder.
+pub fn hw_self_test(hw: HwBackend, device: &str, windows: bool) -> Vec<String> {
     let enc = Encoder {
         hw,
         device: device.into(),
+        windows,
         mbit: 1,
         fps: 30.0,
         hw_decoder: None,
         source: (320, 240),
     };
-    let mut a = match hw {
-        HwBackend::Qsv => vec![
-            s("-init_hw_device"),
-            qsv_device(device),
-            s("-filter_hw_device"),
-            s("hw"),
-        ],
-        HwBackend::Vaapi => vec![s("-vaapi_device"), s(device)],
-        HwBackend::Nvenc | HwBackend::Amf | HwBackend::Software => vec![],
-    };
-    a.extend([
-        s("-f"),
-        s("lavfi"),
-        s("-i"),
-        s("testsrc2=size=320x240:rate=30"),
-        s("-t"),
-        s("1"),
-        s("-vf"),
-        video_filter(&enc, None),
-    ]);
+    let mut a = input_args(
+        &enc,
+        &[s("-f"), s("lavfi")],
+        Path::new("testsrc2=size=320x240:rate=30"),
+    );
+    a.extend([s("-t"), s("1"), s("-vf"), video_filter(&enc, None)]);
     a.extend(video_encoder(hw, 1_000_000, 60, "medium"));
     a.extend([s("-an"), s("-f"), s("null"), s("-")]);
     a
@@ -1079,6 +1061,7 @@ pub fn hw_decode_test(hw: HwBackend, device: &str, decoder: &str, sample: &Path)
     let enc = Encoder {
         hw,
         device: device.into(),
+        windows: cfg!(windows),
         mbit: 1,
         fps: 30.0,
         hw_decoder: Some(decoder.into()),
@@ -1103,10 +1086,19 @@ mod tests {
         Encoder {
             hw,
             device: "/dev/dri/renderD128".into(),
+            windows: false,
             mbit: 10,
             fps: 60.0,
             hw_decoder: decoder.map(String::from),
             source: (2560, 1440),
+        }
+    }
+
+    fn on_windows(hw: HwBackend, decoder: Option<&str>) -> Encoder {
+        Encoder {
+            device: String::new(),
+            windows: true,
+            ..enc(hw, decoder)
         }
     }
     #[test]
@@ -1176,6 +1168,16 @@ mod tests {
             "the device for the hardware encoder"
         );
         assert!(vaapi.contains("[vc]format=nv12,hwupload[vout]") && vaapi.contains("h264_vaapi"));
+        let qsv = montage(
+            &on_windows(HwBackend::Qsv, None),
+            &parts,
+            (1280, 720),
+            30,
+            &style,
+        )
+        .join(" ");
+        assert!(qsv.starts_with("-i /l/a.mp4"), "{qsv}");
+        assert!(qsv.contains("[vc]format=nv12[vout]") && qsv.contains("-c:v h264_qsv"));
     }
 
     #[test]
@@ -1350,30 +1352,89 @@ mod tests {
     }
 
     #[test]
-    fn nvenc_and_amf_take_system_frames_and_windows_qsv_needs_no_device() {
+    fn nvenc_and_amf_take_system_frames() {
         for (hw, name) in [
             (HwBackend::Nvenc, "h264_nvenc"),
             (HwBackend::Amf, "h264_amf"),
         ] {
-            let a = hw_self_test(hw, "").join(" ");
-            assert!(a.contains(&format!("-c:v {name}")), "{a}");
-            assert!(a.contains("format=yuv420p"), "{a}");
-            assert!(
-                !a.contains("hwupload") && !a.contains("init_hw_device"),
-                "{a}"
-            );
-            assert!(a.ends_with("-f null -"), "{a}");
+            for windows in [false, true] {
+                let a = hw_self_test(hw, "", windows).join(" ");
+                assert!(a.starts_with("-f lavfi -i testsrc2"), "{a}");
+                assert!(a.contains(&format!("format=yuv420p -c:v {name}")), "{a}");
+                assert!(!a.contains("hwupload"), "{a}");
+                assert!(a.ends_with("-f null -"), "{a}");
+                assert!(hw_decoder(hw, Some("h264"), windows).is_none());
+            }
             let e = enc(hw, None);
             assert_eq!(e.route(), Route::EncodeOnly);
             assert_eq!(e.label(), format!("{}, software decode", hw.name()));
-            assert!(hw_decoder(hw, Some("h264")).is_none());
         }
-        let q = hw_self_test(HwBackend::Qsv, "").join(" ");
-        assert!(
-            q.contains("-init_hw_device qsv=hw -filter_hw_device hw"),
-            "{q}"
+        assert_eq!(
+            hw_self_test(HwBackend::Nvenc, "", true),
+            hw_self_test(HwBackend::Nvenc, "", false)
         );
-        assert!(HwBackend::Nvenc.takes_system_frames() && !HwBackend::Qsv.takes_system_frames());
+        assert_eq!(
+            hw_self_test(HwBackend::Nvenc, "", true).join(" "),
+            "-f lavfi -i testsrc2=size=320x240:rate=30 -t 1 -vf format=yuv420p -c:v h264_nvenc -preset p4 -tune hq -rc vbr -profile:v high -b:v 1000000 -maxrate 1000000 -bufsize 2000000 -g 60 -bf 2 -an -f null -"
+        );
+    }
+
+    #[test]
+    fn on_linux_quick_sync_and_vaapi_upload_to_the_device() {
+        let dev = "/dev/dri/renderD128";
+        let input = Path::new("in.mkv");
+        assert_eq!(
+            hw_self_test(HwBackend::Qsv, dev, false).join(" "),
+            "-init_hw_device qsv=hw:/dev/dri/renderD128 -filter_hw_device hw -f lavfi -i testsrc2=size=320x240:rate=30 -t 1 -vf format=nv12,hwupload=extra_hw_frames=64 -c:v h264_qsv -preset medium -b:v 1000000 -maxrate 1000000 -bufsize 2000000 -g 60 -an -f null -"
+        );
+        assert_eq!(
+            hw_self_test(HwBackend::Vaapi, dev, false).join(" "),
+            "-vaapi_device /dev/dri/renderD128 -f lavfi -i testsrc2=size=320x240:rate=30 -t 1 -vf format=nv12,hwupload -c:v h264_vaapi -b:v 1000000 -maxrate 1000000 -bufsize 2000000 -g 60 -an -f null -"
+        );
+        assert_eq!(
+            master(&encode_plan(), &enc(HwBackend::Qsv, None), input).join(" "),
+            "-init_hw_device qsv=hw:/dev/dri/renderD128 -filter_hw_device hw -i in.mkv -map 0:v:0 -map 0:a? -vf scale='if(gt(ih,1080),-2,iw)':'if(gt(ih,1080),1080,ih)':flags=lanczos,format=nv12,hwupload=extra_hw_frames=64 -c:v h264_qsv -preset medium -b:v 10000000 -maxrate 10000000 -bufsize 20000000 -g 120 -c:a aac -b:a 320000 -ar 48000 -ac 2 -movflags +faststart -f mp4"
+        );
+        assert_eq!(
+            master(&encode_plan(), &enc(HwBackend::Qsv, Some("hevc_qsv")), input).join(" "),
+            "-init_hw_device qsv=hw:/dev/dri/renderD128 -filter_hw_device hw -hwaccel qsv -hwaccel_output_format qsv -c:v hevc_qsv -i in.mkv -map 0:v:0 -map 0:a? -vf vpp_qsv=w=1920:h=1080:format=nv12 -c:v h264_qsv -preset medium -b:v 10000000 -maxrate 10000000 -bufsize 20000000 -g 120 -c:a aac -b:a 320000 -ar 48000 -ac 2 -movflags +faststart -f mp4"
+        );
+        let copy = plan(1080, 60.0, true, true, AudioChoice::Copy { bits: 160_000 });
+        assert_eq!(
+            embed(&copy, &enc(HwBackend::Qsv, None), input).join(" "),
+            "-init_hw_device qsv=hw:/dev/dri/renderD128 -filter_hw_device hw -i in.mkv -map 0:v:0 -map 0:a:0? -vf scale=-2:1080:flags=lanczos,format=nv12,hwupload=extra_hw_frames=64 -r 60 -c:v h264_qsv -preset medium -b:v 3000000 -maxrate 3000000 -bufsize 6000000 -g 120 -c:a copy -movflags +faststart -f mp4"
+        );
+        assert_eq!(
+            hw_decode_test(HwBackend::Qsv, dev, "hevc_qsv", Path::new("s.mkv")).join(" "),
+            "-init_hw_device qsv=hw:/dev/dri/renderD128 -filter_hw_device hw -hwaccel qsv -hwaccel_output_format qsv -c:v hevc_qsv -i s.mkv -vf vpp_qsv=format=nv12 -f null -"
+        );
+    }
+
+    #[test]
+    fn on_windows_quick_sync_takes_frames_from_memory_as_nvenc_and_amf_do() {
+        let input = Path::new("in.mkv");
+        assert_eq!(
+            hw_self_test(HwBackend::Qsv, "", true).join(" "),
+            "-f lavfi -i testsrc2=size=320x240:rate=30 -t 1 -vf format=nv12 -c:v h264_qsv -preset medium -b:v 1000000 -maxrate 1000000 -bufsize 2000000 -g 60 -an -f null -"
+        );
+        assert_eq!(
+            master(&encode_plan(), &on_windows(HwBackend::Qsv, None), input).join(" "),
+            "-i in.mkv -map 0:v:0 -map 0:a? -vf scale='if(gt(ih,1080),-2,iw)':'if(gt(ih,1080),1080,ih)':flags=lanczos,format=nv12 -c:v h264_qsv -preset medium -b:v 10000000 -maxrate 10000000 -bufsize 20000000 -g 120 -c:a aac -b:a 320000 -ar 48000 -ac 2 -movflags +faststart -f mp4"
+        );
+        let copy = plan(1080, 60.0, true, true, AudioChoice::Copy { bits: 160_000 });
+        assert_eq!(
+            embed(&copy, &on_windows(HwBackend::Qsv, None), input).join(" "),
+            "-i in.mkv -map 0:v:0 -map 0:a:0? -vf scale=-2:1080:flags=lanczos,format=nv12 -r 60 -c:v h264_qsv -preset medium -b:v 3000000 -maxrate 3000000 -bufsize 6000000 -g 120 -c:a copy -movflags +faststart -f mp4"
+        );
+        for codec in ["h264", "hevc", "av1", "vp9"] {
+            assert_eq!(hw_decoder(HwBackend::Qsv, Some(codec), true), None);
+        }
+        let given = on_windows(HwBackend::Qsv, Some("hevc_qsv"));
+        assert_eq!(given.route(), Route::EncodeOnly, "no full route on Windows");
+        assert_eq!(given.label(), "qsv, software decode");
+        assert!(HwBackend::Qsv.takes_system_frames(true));
+        assert!(!HwBackend::Qsv.takes_system_frames(false));
+        assert!(!HwBackend::Vaapi.takes_system_frames(true));
     }
 
     #[test]
@@ -1447,24 +1508,24 @@ mod tests {
     #[test]
     fn decoders_per_backend_and_codec() {
         assert_eq!(
-            hw_decoder(HwBackend::Qsv, Some("hevc")).as_deref(),
+            hw_decoder(HwBackend::Qsv, Some("hevc"), false).as_deref(),
             Some("hevc_qsv")
         );
         assert_eq!(
-            hw_decoder(HwBackend::Qsv, Some("av1")).as_deref(),
+            hw_decoder(HwBackend::Qsv, Some("av1"), false).as_deref(),
             Some("av1_qsv")
         );
         assert_eq!(
-            hw_decoder(HwBackend::Qsv, Some("vp9")).as_deref(),
+            hw_decoder(HwBackend::Qsv, Some("vp9"), false).as_deref(),
             Some("vp9_qsv")
         );
-        assert_eq!(hw_decoder(HwBackend::Qsv, Some("mpeg2video")), None);
+        assert_eq!(hw_decoder(HwBackend::Qsv, Some("mpeg2video"), false), None);
         assert_eq!(
-            hw_decoder(HwBackend::Vaapi, Some("h264")).as_deref(),
+            hw_decoder(HwBackend::Vaapi, Some("h264"), false).as_deref(),
             Some("vaapi")
         );
-        assert_eq!(hw_decoder(HwBackend::Software, Some("h264")), None);
-        assert_eq!(hw_decoder(HwBackend::Qsv, None), None);
+        assert_eq!(hw_decoder(HwBackend::Software, Some("h264"), false), None);
+        assert_eq!(hw_decoder(HwBackend::Qsv, None, false), None);
     }
 
     #[test]

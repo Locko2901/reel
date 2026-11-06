@@ -34,21 +34,15 @@ impl HwBackend {
         }
     }
 
-    /// NVENC, AMF and libx264 take frames from system memory; QSV and VAAPI want them
-    /// uploaded to the device.
-    pub fn takes_system_frames(&self) -> bool {
-        matches!(
-            self,
-            HwBackend::Nvenc | HwBackend::Amf | HwBackend::Software
-        )
-    }
-
-    /// Whether the backend is opened through a device path (the DRI node on Linux).
-    pub fn needs_device(&self) -> bool {
+    /// Whether the encoder takes its frames from system memory. NVENC, AMF and libx264 do, and
+    /// so does Quick Sync on Windows, where a pool of frames on its D3D11 device fails on some
+    /// Intel drivers. The others upload to their device, open it by its path (the DRI node) and
+    /// can decode on it.
+    pub fn takes_system_frames(&self, windows: bool) -> bool {
         match self {
-            HwBackend::Vaapi => true,
-            HwBackend::Qsv => !cfg!(windows),
-            _ => false,
+            HwBackend::Nvenc | HwBackend::Amf | HwBackend::Software => true,
+            HwBackend::Qsv => windows,
+            HwBackend::Vaapi => false,
         }
     }
 }
@@ -112,7 +106,7 @@ impl HwStatus {
 
     /// The backend's hardware decoder for a codec, unless the start-up probe showed it failing.
     pub fn decoder_for(&self, vcodec: Option<&str>) -> Option<String> {
-        let decoder = args::hw_decoder(self.backend, vcodec)?;
+        let decoder = args::hw_decoder(self.backend, vcodec, cfg!(windows))?;
         let probed = self
             .decoders
             .iter()
@@ -124,8 +118,11 @@ impl HwStatus {
     }
 
     pub fn decoders_line(&self) -> String {
-        if self.decoders.is_empty() {
+        if self.backend == HwBackend::Software {
             return "none (software backend)".into();
+        }
+        if self.decoders.is_empty() {
+            return format!("none, the CPU decodes for {}", self.backend.name());
         }
         self.decoders
             .iter()
@@ -182,9 +179,10 @@ async fn detect_backend(ff: &Ffmpeg, cfg: &MediaConfig) -> HwStatus {
         notes.push("hardware encoding disabled by config".into());
         return HwStatus::software(&cfg.render_device, ffmpeg_version, notes);
     }
-    if wanted.iter().any(|b| b.needs_device()) && !Path::new(&cfg.render_device).exists() {
+    let uploads = |b: &HwBackend| !b.takes_system_frames(cfg!(windows));
+    if wanted.iter().any(uploads) && !Path::new(&cfg.render_device).exists() {
         notes.push(format!("{} not present", cfg.render_device));
-        wanted.retain(|b| !b.needs_device());
+        wanted.retain(|b| !uploads(b));
         if wanted.is_empty() {
             notes.push("using libx264".into());
             return HwStatus::software(&cfg.render_device, ffmpeg_version, notes);
@@ -197,7 +195,7 @@ async fn detect_backend(ff: &Ffmpeg, cfg: &MediaConfig) -> HwStatus {
             notes.push(format!("ffmpeg has no {enc}"));
             continue;
         }
-        let a = args::hw_self_test(b, &cfg.render_device);
+        let a = args::hw_self_test(b, &cfg.render_device, cfg!(windows));
         match ff.run(&a, 1.0, None).await {
             Ok(()) => {
                 notes.push(format!("{} test encode ok", b.name()));
@@ -229,7 +227,7 @@ pub async fn probe_decoders(
     let _ = tokio::fs::create_dir_all(&dir).await;
     let mut out = Vec::new();
     for (codec, sample_encoders) in PROBE_CODECS {
-        let Some(decoder) = args::hw_decoder(backend, Some(codec)) else {
+        let Some(decoder) = args::hw_decoder(backend, Some(codec), cfg!(windows)) else {
             continue;
         };
         let Some(sw) = sample_encoders
