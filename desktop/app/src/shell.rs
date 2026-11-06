@@ -182,7 +182,9 @@ pub fn build(app: &AppHandle, server_url: &str) -> tauri::Result<Window> {
             if standalone { "status" } else { "server" }
         ))
     } else {
-        library_url(server_url, "/")
+        app.try_state::<Runtime>()
+            .and_then(|rt| rt.library_page("/").parse().ok())
+            .unwrap_or_else(|| library_url(server_url, "/"))
     };
     let make = || library(app, first.clone());
     #[cfg(windows)]
@@ -438,10 +440,12 @@ pub fn reload_library_if_home(app: &AppHandle) {
 }
 
 /// Takes the webview to a page of the server, granting its origin the remote commands first.
-pub fn navigate(app: &AppHandle, server_url: &str, path: &str) {
+pub fn navigate(app: &AppHandle, server_url: &str, page: &str) {
     allow_origin(app, server_url);
     if let Some(library) = app.get_webview(LIBRARY) {
-        let url = library_url(server_url, path);
+        let url = page
+            .parse()
+            .unwrap_or_else(|_| library_url(server_url, "/"));
         tracing::info!(to = %where_to(&url), "library window opens");
         let _ = library.navigate(url);
     }

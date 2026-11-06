@@ -97,9 +97,9 @@ pick_open() { # pick_open <folder>
   [ -z "$(picker)" ] || fail "the folder picker did not close"
   xdotool windowfocus "$(window)" 2>/dev/null || true
 }
-clips() { # the clips the library on this PC lists
-  port=$(cat "$L"/reel-desktop.log* | sed -n 's/.*standalone: reel serves on the loopback.*addr=127.0.0.1:\([0-9]*\).*/\1/p' | tail -1)
-  curl -fsS "http://127.0.0.1:$port/" | grep -o '/clips/[0-9A-Z]\{26\}' | sort -u | wc -l
+clips() { # the clips in the library on this PC, which answers the app's window alone
+  dir=$(sed -n 's/^ *"library_dir": "\(.*\)",*$/\1/p' "$D/config/settings.json" 2>/dev/null)
+  python3 -c 'import sqlite3, sys; print(sqlite3.connect(f"file:{sys.argv[1]}?mode=ro", uri=True).execute("SELECT count(*) FROM clip WHERE deleted_at IS NULL").fetchone()[0])' "${dir:-$LIB}/reel.db"
 }
 library_page() { # Settings, Library folder, the window at the size the coordinates are for
   b=$(logged "app page section=library")

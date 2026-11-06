@@ -171,13 +171,24 @@ pub fn builder<R: tauri::Runtime>(
         .map_err(|e| e.to_string())
 }
 
-fn updater(rt: &Runtime, endpoint: url::Url, token: Option<&str>) -> Result<Updater, String> {
-    let mut b = builder(&rt.app, endpoint)?;
-    if let Some(token) = token {
-        b = b
-            .header("Authorization", format!("Bearer {token}"))
-            .map_err(|e| e.to_string())?;
-    }
+/// The updater's question to reel on this PC, which answers the app alone: with this run's key.
+pub fn local_builder<R: tauri::Runtime>(
+    app: &tauri::AppHandle<R>,
+    local: &crate::standalone::Local,
+    with_obs: bool,
+) -> Result<UpdaterBuilder, String> {
+    builder(app, endpoint(&local.url, RELEASE_PATH, with_obs)?)?
+        .header(reel_server::single::KEY_HEADER, local.key())
+        .map_err(|e| e.to_string())
+}
+
+/// The release's installer comes from GitHub: the key of reel on this PC stays on the PC.
+pub fn off_the_pc(mut update: tauri_plugin_updater::Update) -> tauri_plugin_updater::Update {
+    update.headers.remove(reel_server::single::KEY_HEADER);
+    update
+}
+
+fn updater(rt: &Runtime, b: UpdaterBuilder) -> Result<Updater, String> {
     // Windows' installer ends the app at once: the log's last lines go first
     let out = rt.clone();
     b.on_before_exit(move || {
@@ -348,7 +359,12 @@ pub async fn check(rt: &Runtime, by_hand: bool) -> Result<(), String> {
     }
     let with_obs = rt.lock().bundled.is_some();
     let url = endpoint(&s.server_url, "/api/device/update", with_obs)?;
-    let updater = updater(rt, url, Some(&token))?;
+    let updater = updater(
+        rt,
+        builder(&rt.app, url)?
+            .header("Authorization", format!("Bearer {token}"))
+            .map_err(|e| e.to_string())?,
+    )?;
     match updater.check().await {
         Ok(Some(update)) => ready(rt, &s, update, Source::Server).await,
         Ok(None) => {
@@ -522,10 +538,9 @@ async fn check_release(rt: &Runtime, by_hand: bool, s: &Settings) -> Result<(), 
         );
         return Ok(());
     }
-    let url = endpoint(&local.url, RELEASE_PATH, with_obs)?;
-    let updater = updater(rt, url, None)?;
+    let updater = updater(rt, local_builder(&rt.app, &local, with_obs)?)?;
     match updater.check().await {
-        Ok(Some(update)) => ready(rt, s, update, Source::Release).await,
+        Ok(Some(update)) => ready(rt, s, off_the_pc(update), Source::Release).await,
         Ok(None) => {
             rt.lock().update = None;
             set_line(rt, "");
@@ -1259,10 +1274,9 @@ mod tests {
                     .and_then(|v| v.to_str().ok())
                     .unwrap_or("")
                     .to_string();
-                asked
-                    .lock()
-                    .unwrap()
-                    .push((path, ua, h.contains_key("authorization")));
+                let carried = h.contains_key("authorization")
+                    || h.contains_key(reel_server::single::KEY_HEADER);
+                asked.lock().unwrap().push((path, ua, carried));
             }
             let app = axum::Router::new()
                 .route(
@@ -1383,16 +1397,17 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let local = standalone_read(&api, dir.path()).await;
         let app = mock_app(&pubkey);
-        let url = super::endpoint(&local.url, super::RELEASE_PATH, false).unwrap();
-        let updater = super::builder(app.app_handle(), url)
+        let updater = super::local_builder(app.app_handle(), &local, false)
             .unwrap()
             .build()
             .unwrap();
-        let update = updater
-            .check()
-            .await
-            .unwrap()
-            .expect("the newer release is offered");
+        let update = super::off_the_pc(
+            updater
+                .check()
+                .await
+                .unwrap()
+                .expect("the newer release is offered"),
+        );
         let name = installer_name(&update.version, Flavour::Plain);
         assert!(
             update.download_url.as_str().ends_with(&name),
@@ -1451,8 +1466,7 @@ mod tests {
         let running = dir.path().join("reel.AppImage");
         std::fs::write(&running, b"the AppImage that runs").unwrap();
         let updater = |pubkey: Option<String>| {
-            let url = super::endpoint(&local.url, super::RELEASE_PATH, false).unwrap();
-            let mut b = super::builder(app.app_handle(), url)
+            let mut b = super::local_builder(app.app_handle(), &local, false)
                 .unwrap()
                 .executable_path(&running);
             if let Some(key) = pubkey {
@@ -1461,11 +1475,25 @@ mod tests {
             b.build().unwrap()
         };
 
-        let update = updater(None)
-            .check()
-            .await
+        let url = super::endpoint(&local.url, super::RELEASE_PATH, false).unwrap();
+        let without_key = super::builder(app.app_handle(), url)
             .unwrap()
-            .expect("the newer release is offered");
+            .build()
+            .unwrap()
+            .check()
+            .await;
+        assert!(
+            without_key.is_err(),
+            "reel on this PC answers the app alone: {:?}",
+            without_key.map(|u| u.map(|u| u.version))
+        );
+        let update = super::off_the_pc(
+            updater(None)
+                .check()
+                .await
+                .unwrap()
+                .expect("the newer release is offered"),
+        );
         assert_eq!(update.version, RELEASE);
         assert_eq!(
             update.download_url.as_str(),
@@ -1496,11 +1524,13 @@ mod tests {
         );
         gh.forged.store(false, Ordering::SeqCst);
 
-        let by_another = updater(Some(release_key()))
-            .check()
-            .await
-            .unwrap()
-            .expect("offered, as the key is checked on the download");
+        let by_another = super::off_the_pc(
+            updater(Some(release_key()))
+                .check()
+                .await
+                .unwrap()
+                .expect("offered, as the key is checked on the download"),
+        );
         let refused = by_another.download(|_, _| {}, || {}).await.unwrap_err();
         assert!(
             super::not_downloaded(RELEASE, &refused, "").contains("was refused"),
@@ -1527,7 +1557,7 @@ mod tests {
         );
         for (path, ua, auth) in &asked {
             assert!(ua.starts_with("reel/"), "{path}: {ua}");
-            assert!(!auth, "{path} carried an authorisation");
+            assert!(!auth, "{path} carried an authorisation or the key");
         }
         assert_eq!(
             asked.iter().filter(|(p, _, _)| p.ends_with(".sig")).count(),

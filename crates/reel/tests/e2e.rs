@@ -35,6 +35,8 @@ struct Env {
     provider: Option<Arc<reel_server::accounts::Provider>>,
     base: String,
     client: reqwest::Client,
+    /// The key the app is handed, in standalone.
+    app_key: Option<reel_server::single::AppKey>,
     _dir: tempfile::TempDir,
     _server: tokio::task::JoinHandle<()>,
 }
@@ -235,6 +237,15 @@ async fn start_in(
     }
     let state = reel_server::AppState::new(ctx.clone()).await.unwrap();
     let provider = state.provider.clone();
+    // the client is the app's window: in standalone it shows the key the app is handed
+    let app_key = state.app_key.clone();
+    let mut headers = reqwest::header::HeaderMap::new();
+    if let Some(key) = &state.app_key {
+        headers.insert(
+            reel_server::single::KEY_HEADER,
+            key.secret().parse().unwrap(),
+        );
+    }
     held.set_nonblocking(true).unwrap();
     let listener = tokio::net::TcpListener::from_std(held).unwrap();
     let _ = listen;
@@ -247,8 +258,10 @@ async fn start_in(
         base,
         client: reqwest::Client::builder()
             .redirect(reqwest::redirect::Policy::none())
+            .default_headers(headers)
             .build()
             .unwrap(),
+        app_key,
         _dir: dir,
         _server: server,
     })
@@ -3283,6 +3296,11 @@ async fn the_standalone_library_offers_nothing_of_a_servers() {
             env.ctx.config().library_dir().display()
         )));
     }
+    let (_, front) = ask(&env, "GET", "/", None).await;
+    assert!(
+        front.contains(r#"id="app-save" type="button" aria-label="Save clip" hidden"#),
+        "the header has a slot for the app's Save clip"
+    );
     let (_, sharing) = ask(&env, "GET", "/settings/sharing", None).await;
     assert!(sharing.contains("Copies under a size") && sharing.contains("Limit list"));
     assert_eq!(
@@ -16928,4 +16946,111 @@ async fn the_desktop_library_lets_in_the_app_and_not_every_program_on_the_pc() {
         if file.exists() { "still there" } else { "gone into the library" },
         r.text().await.unwrap_or_default()
     );
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn the_apps_window_comes_into_the_desktop_library_by_a_ticket_of_this_start() {
+    let Some(env) = start_with(AuthMode::Single, vec![], |c| c.make_standalone()).await else {
+        return;
+    };
+    let app = env.app_key.clone().expect("a key in standalone");
+    let key = app.secret().to_string();
+    let window = reqwest::Client::builder()
+        .redirect(reqwest::redirect::Policy::none())
+        .build()
+        .unwrap();
+    let open = |ticket: &str, to: &str| {
+        let mut u = reqwest::Url::parse(&format!("{}/app/open", env.base)).unwrap();
+        u.query_pairs_mut()
+            .append_pair("ticket", ticket)
+            .append_pair("to", to);
+        window.get(u).send()
+    };
+    for (ticket, what) in [
+        ("not a ticket".to_string(), "a made-up ticket"),
+        (key.clone(), "the key itself, which no address carries"),
+    ] {
+        let r = open(&ticket, "/collections").await.unwrap();
+        assert_eq!(r.status(), 401, "{what}");
+        assert!(r.headers().get("set-cookie").is_none(), "{what}");
+    }
+
+    let ticket = app.ticket();
+    let r = open(&ticket, "/collections").await.unwrap();
+    assert_eq!(r.status(), 303);
+    assert_eq!(r.headers()["location"], "/collections");
+    assert_eq!(r.headers()["cache-control"], "no-store");
+    let policy = r.headers()["content-security-policy"].to_str().unwrap();
+    assert!(
+        policy.contains("connect-src 'self' ipc: http://ipc.localhost"),
+        "the way in carries the pages' policy, which lets the window call the app: {policy}"
+    );
+    let set = r.headers()["set-cookie"].to_str().unwrap().to_string();
+    for part in [
+        format!("reel_app_key={key}").as_str(),
+        "HttpOnly",
+        "SameSite=Lax",
+        "Path=/",
+    ] {
+        assert!(set.contains(part), "{set}");
+    }
+    let cookie = set.split(';').next().unwrap().to_string();
+    assert_eq!(
+        open(&ticket, "/collections").await.unwrap().status(),
+        401,
+        "a ticket is good once"
+    );
+    for to in [
+        "//elsewhere.example/",
+        "/\\elsewhere.example",
+        "https://elsewhere.example/",
+    ] {
+        let r = open(&app.ticket(), to).await.unwrap();
+        assert_eq!(r.headers()["location"], "/", "{to}");
+    }
+
+    let r = window
+        .get(format!("{}/api/collections", env.base))
+        .header("cookie", &cookie)
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(r.status(), 200, "the window with its cookie");
+    let r = window
+        .get(format!("{}/collections", env.base))
+        .header("cookie", "reel_app_key=a-key-of-an-earlier-start")
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(r.status(), 401, "a key of another start");
+    assert!(r.text().await.unwrap().contains("opens in its app"));
+    let stranger: serde_json::Value = window
+        .get(format!("{}/healthz", env.base))
+        .send()
+        .await
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+    assert_eq!(
+        stranger,
+        serde_json::json!({ "ok": true }),
+        "another program on the PC: ok alone"
+    );
+    assert!(
+        health(&env, "/healthz", None, false).await["version"].is_string(),
+        "the app, with its key, gets the details"
+    );
+
+    let Some(server) = start(AuthMode::Single, vec![]).await else {
+        return;
+    };
+    assert!(server.app_key.is_none());
+    let r = server
+        .client
+        .get(format!("{}/app/open?key=x&to=/", server.base))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(r.status(), 404, "a server has no way in of the app's");
 }

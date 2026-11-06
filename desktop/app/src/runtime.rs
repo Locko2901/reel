@@ -3675,6 +3675,23 @@ impl Runtime {
         }
     }
 
+    /// The address of a page of the library: on the server, or through the way in of reel on
+    /// this PC, which takes the window alone.
+    pub fn library_page(&self, path: &str) -> String {
+        let local = {
+            let g = self.lock();
+            if g.settings.mode == Mode::Standalone {
+                g.local.clone()
+            } else {
+                None
+            }
+        };
+        match local {
+            Some(local) => local.page(path),
+            None => shell::library_url(&self.library_base(), path).to_string(),
+        }
+    }
+
     /// Takes the webview to a page of the server and watches for its first `app_status` call;
     /// without one the app probes the server and shows its own page.
     pub fn go_library(&self, path: &str) {
@@ -3689,14 +3706,15 @@ impl Runtime {
         if self.app.get_webview(shell::LIBRARY).is_none() {
             return;
         }
+        let page = self.library_page(path);
         let nonce = {
             let mut g = self.lock();
             g.nav_nonce += 1;
             g.page_alive = false;
-            g.asked = Some(shell::library_url(&base, path).to_string());
+            g.asked = Some(page.clone());
             g.nav_nonce
         };
-        shell::navigate(&self.app, &base, path);
+        shell::navigate(&self.app, &base, &page);
         self.watch(nonce, base);
     }
 

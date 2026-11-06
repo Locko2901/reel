@@ -134,6 +134,35 @@ impl Local {
         })
     }
 
+    /// This run's key, for the app's own requests that are not its window's.
+    pub fn key(&self) -> &str {
+        self.state
+            .app_key
+            .as_ref()
+            .map(|k| k.secret())
+            .unwrap_or_default()
+    }
+
+    /// Where the window opens a page of the library: the way in with a ticket of this run, which
+    /// the library trades for the key as the window's cookie before it goes on to the page.
+    pub fn page(&self, path: &str) -> String {
+        let ticket = self
+            .state
+            .app_key
+            .as_ref()
+            .map(|k| k.ticket())
+            .unwrap_or_default();
+        match url::Url::parse(&format!("{}/app/open", self.url)) {
+            Ok(mut u) => {
+                u.query_pairs_mut()
+                    .append_pair("ticket", &ticket)
+                    .append_pair("to", path);
+                u.to_string()
+            }
+            Err(_) => format!("{}{path}", self.url),
+        }
+    }
+
     /// Hands a clip OBS saved to the local pipeline; the file is taken into the library.
     pub async fn ingest(
         &self,
