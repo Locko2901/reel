@@ -30,6 +30,8 @@ pub struct SigninPage {
     pub error: String,
     pub next: String,
     pub mode_line: String,
+    /// The provider has not answered yet: the page asks again by itself.
+    pub retry: bool,
 }
 
 #[derive(Deserialize)]
@@ -45,10 +47,16 @@ fn safe_next(next: Option<&str>) -> String {
     }
 }
 
+pub const RETRY_SECONDS: u32 = 20;
+
 async fn signin_view(st: &AppState, next: &str, error: &str) -> SigninPage {
     let cfg = st.ctx.config();
     let local = cfg.auth.mode == AuthMode::Local;
     let first = local && st.ctx.store.user_count().await.unwrap_or(1) == 0;
+    let waiting = match &st.provider {
+        Some(p) if cfg.auth.mode == AuthMode::Oidc => p.for_sign_in().await.is_none(),
+        _ => false,
+    };
     SigninPage {
         site: cfg.site_name.clone(),
         local,
@@ -63,11 +71,13 @@ async fn signin_view(st: &AppState, next: &str, error: &str) -> SigninPage {
             AuthMode::Single => {
                 "This reel runs for a single user; there is nothing to sign in to.".into()
             }
-            AuthMode::Oidc if st.oidc.is_none() => {
-                "The identity provider could not be reached at start; the log says why.".into()
-            }
+            AuthMode::Oidc if waiting => format!(
+                "{} is not reachable yet. reel keeps trying, and this page asks again every {RETRY_SECONDS} seconds.",
+                st.provider_name()
+            ),
             AuthMode::Local | AuthMode::Oidc => String::new(),
         },
+        retry: waiting,
     }
 }
 
@@ -294,9 +304,15 @@ async fn to_provider(
     auth: &AuthSession<Backend>,
     link: Option<String>,
 ) -> AppResult<Response> {
-    let Some(oidc) = st.oidc.as_ref() else {
-        return Err(AppError::Busy(
-            "the identity provider is not reachable; the log says why".into(),
+    let oidc = match &st.provider {
+        Some(p) => p.for_sign_in().await,
+        None => None,
+    };
+    let Some(oidc) = oidc else {
+        return Ok(error_page(
+            StatusCode::SERVICE_UNAVAILABLE,
+            &format!("{} is not reachable yet.", st.provider_name()),
+            "reel keeps trying by itself; open this page again in a minute.",
         ));
     };
     let (url, mut pending) = oidc.start();
@@ -325,7 +341,7 @@ pub async fn oidc_callback(
     mut auth: AuthSession<Backend>,
     Query(q): Query<OidcCallback>,
 ) -> AppResult<Response> {
-    let Some(oidc) = st.oidc.as_ref() else {
+    let Some((provider, oidc)) = st.provider.as_ref().and_then(|p| Some((p, p.current()?))) else {
         return Err(AppError::Busy(
             "the identity provider is not reachable".into(),
         ));
@@ -360,10 +376,24 @@ pub async fn oidc_callback(
             "the state does not match this browser's sign-in".into(),
         ));
     }
-    let identity = oidc.finish(&code, &pending).await.map_err(|e| {
+    let refused = |e: &dyn std::fmt::Display| {
         tracing::warn!(error = %e, "oidc sign-in failed");
         AppError::Forbidden(format!("the sign-in did not verify: {e}"))
-    })?;
+    };
+    let tokens = oidc
+        .tokens(&code, &pending)
+        .await
+        .map_err(|e| refused(&e))?;
+    let mut verified = oidc.identity(&tokens, &pending);
+    if verified.as_ref().is_err_and(|e| e.by_its_signature()) {
+        tracing::info!("the id token does not verify with the keys reel has; asking the identity provider for its keys again");
+        if provider.refresh().await {
+            if let Some(fresh) = provider.current() {
+                verified = fresh.identity(&tokens, &pending);
+            }
+        }
+    }
+    let identity = verified.map_err(|e| refused(&e))?;
     if let Some(token) = &pending.link {
         if let Err(why) = accounts::redeem_link(&st.ctx.store, token, &identity).await? {
             tracing::warn!(subject = %identity.subject, why = %why, "link refused");

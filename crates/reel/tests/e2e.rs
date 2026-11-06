@@ -31,6 +31,8 @@ fn ffmpeg_paths() -> Option<(String, String)> {
 
 struct Env {
     ctx: Ctx,
+    /// The identity provider's client, in oidc mode.
+    provider: Option<Arc<reel_server::accounts::Provider>>,
     base: String,
     client: reqwest::Client,
     _dir: tempfile::TempDir,
@@ -232,6 +234,7 @@ async fn start_in(
             .unwrap();
     }
     let state = reel_server::AppState::new(ctx.clone()).await.unwrap();
+    let provider = state.provider.clone();
     held.set_nonblocking(true).unwrap();
     let listener = tokio::net::TcpListener::from_std(held).unwrap();
     let _ = listen;
@@ -240,6 +243,7 @@ async fn start_in(
     let base = format!("http://{addr}");
     Some(Env {
         ctx,
+        provider,
         base,
         client: reqwest::Client::builder()
             .redirect(reqwest::redirect::Policy::none())
@@ -6768,22 +6772,66 @@ async fn mock_issuer(persona: Personas) -> String {
     mock_issuer_as(persona, "").await
 }
 
+async fn mock_issuer_as(persona: Personas, tail: &str) -> String {
+    stand_in_provider(persona, tail).await.0
+}
+
+/// What the stand-in provider's discovery answers.
+#[derive(Clone, Copy, PartialEq)]
+enum Discovery {
+    Metadata,
+    /// The proxy in front, while the provider behind it restarts.
+    BadGateway,
+    /// A page where the metadata should be: "Failed to parse server response".
+    Page,
+}
+
+/// A hand on the stand-in provider while it runs.
+#[derive(Clone)]
+struct Stand {
+    discovery: Arc<std::sync::Mutex<Discovery>>,
+    asked: Arc<std::sync::atomic::AtomicUsize>,
+    key: Arc<std::sync::Mutex<Arc<openidconnect::core::CoreRsaPrivateSigningKey>>>,
+}
+
+impl Stand {
+    fn answer(&self, d: Discovery) {
+        *self.discovery.lock().unwrap() = d;
+    }
+    /// How many times its discovery was asked.
+    fn asked(&self) -> usize {
+        self.asked.load(std::sync::atomic::Ordering::SeqCst)
+    }
+    /// Signs from now on with a key of this id, the only one its key set shows.
+    fn sign_with(&self, kid: &str) {
+        *self.key.lock().unwrap() = Arc::new(signing_key(kid));
+    }
+}
+
+fn signing_key(kid: &str) -> openidconnect::core::CoreRsaPrivateSigningKey {
+    openidconnect::core::CoreRsaPrivateSigningKey::from_pem(
+        throwaway_signing_pem(),
+        Some(openidconnect::JsonWebKeyId::new(kid.into())),
+    )
+    .expect("the test key")
+}
+
 /// A stand-in provider whose issuer is its address followed by `tail`: Authentik's ends in a
 /// slash.
-async fn mock_issuer_as(persona: Personas, tail: &str) -> String {
+async fn stand_in_provider(persona: Personas, tail: &str) -> (String, Stand) {
     use axum::extract::{Form, Query, State};
     use axum::response::{IntoResponse, Redirect};
     use axum::routing::{get, post};
     use axum::{Json, Router};
     use openidconnect::core::{
         CoreGenderClaim, CoreJsonWebKeySet, CoreJweContentEncryptionAlgorithm,
-        CoreJwsSigningAlgorithm, CoreProviderMetadata, CoreResponseType, CoreRsaPrivateSigningKey,
-        CoreSubjectIdentifierType, CoreTokenType,
+        CoreJwsSigningAlgorithm, CoreProviderMetadata, CoreResponseType, CoreSubjectIdentifierType,
+        CoreTokenType,
     };
     use openidconnect::{
         AccessToken, Audience, AuthUrl, EmptyAdditionalProviderMetadata, EmptyExtraTokenFields,
         EndUserEmail, EndUserUsername, IdToken, IdTokenClaims, IdTokenFields, IssuerUrl,
-        JsonWebKeyId, JsonWebKeySetUrl, Nonce, PrivateSigningKey, ResponseTypes, StandardClaims,
+        JsonWebKeySetUrl, Nonce, PrivateSigningKey, ResponseTypes, StandardClaims,
         StandardTokenResponse, SubjectIdentifier, TokenUrl,
     };
     use reel_server::accounts::ExtraClaims;
@@ -6793,7 +6841,7 @@ async fn mock_issuer_as(persona: Personas, tail: &str) -> String {
     struct Issuer {
         base: String,
         issuer: String,
-        key: Arc<CoreRsaPrivateSigningKey>,
+        stand: Stand,
         nonce: Arc<tokio::sync::Mutex<Option<String>>>,
         persona: Personas,
     }
@@ -6802,20 +6850,34 @@ async fn mock_issuer_as(persona: Personas, tail: &str) -> String {
     let issuer = Issuer {
         base: base.clone(),
         issuer: format!("{base}{tail}"),
-        key: Arc::new(
-            CoreRsaPrivateSigningKey::from_pem(
-                throwaway_signing_pem(),
-                Some(JsonWebKeyId::new("test".into())),
-            )
-            .expect("the test key"),
-        ),
+        stand: Stand {
+            discovery: Arc::new(std::sync::Mutex::new(Discovery::Metadata)),
+            asked: Default::default(),
+            key: Arc::new(std::sync::Mutex::new(Arc::new(signing_key("test")))),
+        },
         nonce: Arc::new(tokio::sync::Mutex::new(None)),
         persona,
     };
+    let stand = issuer.stand.clone();
     let app = Router::new()
         .route(
             "/.well-known/openid-configuration",
             get(|State(s): State<Issuer>| async move {
+                s.stand
+                    .asked
+                    .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                let answer = *s.stand.discovery.lock().unwrap();
+                match answer {
+                    Discovery::BadGateway => {
+                        return (axum::http::StatusCode::BAD_GATEWAY, "502 Bad Gateway")
+                            .into_response()
+                    }
+                    Discovery::Page => {
+                        return axum::response::Html("<html><body>Starting</body></html>")
+                            .into_response()
+                    }
+                    Discovery::Metadata => {}
+                }
                 let md = CoreProviderMetadata::new(
                     IssuerUrl::new(s.issuer.clone()).unwrap(),
                     AuthUrl::new(format!("{}/authorize", s.base)).unwrap(),
@@ -6826,14 +6888,15 @@ async fn mock_issuer_as(persona: Personas, tail: &str) -> String {
                     EmptyAdditionalProviderMetadata {},
                 )
                 .set_token_endpoint(Some(TokenUrl::new(format!("{}/token", s.base)).unwrap()));
-                Json(serde_json::to_value(md).unwrap())
+                Json(serde_json::to_value(md).unwrap()).into_response()
             }),
         )
         .route(
             "/jwks",
             get(|State(s): State<Issuer>| async move {
+                let key = s.stand.key.lock().unwrap().clone();
                 Json(
-                    serde_json::to_value(CoreJsonWebKeySet::new(vec![s.key.as_verification_key()]))
+                    serde_json::to_value(CoreJsonWebKeySet::new(vec![key.as_verification_key()]))
                         .unwrap(),
                 )
             }),
@@ -6877,6 +6940,7 @@ async fn mock_issuer_as(persona: Personas, tail: &str) -> String {
                     )
                     .set_nonce(Some(Nonce::new(nonce)));
                     let access = AccessToken::new("access-1".into());
+                    let key = s.stand.key.lock().unwrap().clone();
                     let id_token = IdToken::<
                         ExtraClaims,
                         CoreGenderClaim,
@@ -6884,7 +6948,7 @@ async fn mock_issuer_as(persona: Personas, tail: &str) -> String {
                         CoreJwsSigningAlgorithm,
                     >::new(
                         claims,
-                        &*s.key,
+                        &*key,
                         CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha256,
                         Some(&access),
                         None,
@@ -6903,7 +6967,7 @@ async fn mock_issuer_as(persona: Personas, tail: &str) -> String {
     tokio::spawn(async move {
         axum::serve(listener, app).await.unwrap();
     });
-    format!("{base}{tail}")
+    (format!("{base}{tail}"), stand)
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -7028,6 +7092,120 @@ async fn an_identity_provider_signs_in_and_its_claim_makes_the_admin() {
             .status(),
         303
     );
+}
+
+async fn stand_in_env(answer: Discovery) -> Option<(Env, Stand)> {
+    std::env::set_var("REEL_OIDC_CLIENT_SECRET", "secret-1");
+    let (issuer, stand) = stand_in_provider(persona(Persona::mira()), "").await;
+    stand.answer(answer);
+    let env = start_with(AuthMode::Oidc, vec!["127.0.0.1/32"], move |c| {
+        c.auth.oidc_issuer = issuer;
+        c.auth.oidc_client_id = "reel".into();
+    })
+    .await?;
+    Some((env, stand))
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_provider_down_at_start_signs_in_once_it_answers_without_a_restart() {
+    let Some((env, stand)) = stand_in_env(Discovery::BadGateway).await else {
+        return;
+    };
+    assert!(env.provider.as_ref().unwrap().current().is_none());
+    let page = page_text(&env, "/signin").await.1;
+    assert!(
+        page.contains("127.0.0.1 is not reachable yet. reel keeps trying")
+            && page.contains(r#"<meta http-equiv="refresh" content="20">"#),
+        "{page}"
+    );
+    assert!(!page.contains("/oidc/start"), "no button while it waits");
+    let r = env
+        .client
+        .get(format!("{}/oidc/start", env.base))
+        .header("x-forwarded-for", "198.51.100.7")
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(r.status(), 503);
+    assert!(r.text().await.unwrap().contains("not reachable yet"));
+
+    let start = Instant::now();
+    while stand.asked() < 3 {
+        assert!(
+            start.elapsed() < Duration::from_secs(15) * SLOW,
+            "asked again by itself, 2 s and then 4 s later"
+        );
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    }
+    // past the few seconds a sign-in leaves after a try, and well before the next 8 s pause ends
+    tokio::time::sleep(Duration::from_millis(3500)).await;
+    stand.answer(Discovery::Metadata);
+    let before = stand.asked();
+    let page = page_text(&env, "/signin").await.1;
+    assert!(
+        page.contains("Sign in with 127.0.0.1</a>"),
+        "the sign-in page asked at once: {page}"
+    );
+    assert!(stand.asked() > before);
+    assert!(!page.contains("http-equiv"), "{page}");
+    assert_eq!(oidc_sign_in(&env).await.0, 303, "without a restart");
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_provider_answering_a_page_for_its_metadata_at_start_is_asked_again_by_itself() {
+    let Some((env, stand)) = stand_in_env(Discovery::Page).await else {
+        return;
+    };
+    let provider = env.provider.clone().unwrap();
+    assert!(provider.current().is_none());
+    let start = Instant::now();
+    while stand.asked() < 2 {
+        assert!(
+            start.elapsed() < Duration::from_secs(10) * SLOW,
+            "asked again by itself"
+        );
+        tokio::time::sleep(Duration::from_millis(200)).await;
+    }
+    stand.answer(Discovery::Metadata);
+    while provider.current().is_none() {
+        assert!(
+            start.elapsed() < Duration::from_secs(20) * SLOW,
+            "a later try finds it, with nobody at the sign-in page"
+        );
+        tokio::time::sleep(Duration::from_millis(200)).await;
+    }
+    assert_eq!(oidc_sign_in(&env).await.0, 303);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_provider_that_answered_keeps_its_last_answer_and_its_new_keys_are_fetched() {
+    let Some((env, stand)) = stand_in_env(Discovery::Metadata).await else {
+        return;
+    };
+    let provider = env.provider.clone().unwrap();
+    assert_eq!(oidc_sign_in(&env).await.0, 303);
+
+    stand.answer(Discovery::Page);
+    assert!(!provider.refresh().await, "the hourly renewal fails");
+    assert!(provider.current().is_some(), "the last good answer stays");
+    let page = page_text(&env, "/signin").await.1;
+    assert!(page.contains("Sign in with 127.0.0.1</a>"), "{page}");
+    assert_eq!(oidc_sign_in(&env).await.0, 303, "sign-ins go on with it");
+
+    stand.sign_with("test-2");
+    let (status, _, page) = oidc_sign_in_by(&env, "/oidc/start").await;
+    assert_eq!(
+        status, 403,
+        "a new key, and no discovery to show it: {page}"
+    );
+    stand.answer(Discovery::Metadata);
+    let asked = stand.asked();
+    assert_eq!(
+        oidc_sign_in(&env).await.0,
+        303,
+        "a token signed with a new key fetches the keys again"
+    );
+    assert_eq!(stand.asked(), asked + 1);
 }
 
 async fn oidc_sign_in(env: &Env) -> (u16, String) {

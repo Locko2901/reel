@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Sign in · {{ site }}</title>
 <meta name="robots" content="noindex">
+{% if retry %}<meta http-equiv="refresh" content="{{ crate::routes::users::RETRY_SECONDS }}">{% endif %}
 <link rel="stylesheet" href="/assets/{{ crate::routes::asset_v() }}/reel.css">
 <link rel="icon" href="/assets/icon.svg" type="image/svg+xml">
 </head>
