@@ -14,6 +14,7 @@ session_days = 30              # built-in accounts: a session ends this long aft
 session_max_days = 90          # a session ends this long after the sign-in, however active; 0 is no limit
 # mode = "oidc": an identity provider (Authentik, Keycloak) does the sign-in
 # oidc_issuer = "https://auth.example.org/application/o/reel/"
+# oidc_name = "Authentik"     # what the sign-in button calls the provider; empty: the issuer's host
 # oidc_client_id = "reel"      # the secret: REEL_OIDC_CLIENT_SECRET, or the file REEL_OIDC_CLIENT_SECRET_FILE names
 # oidc_scopes = "openid profile email"
 # oidc_username_claim = "preferred_username"   # the name shown, email only when verified; the user is the issuer and subject

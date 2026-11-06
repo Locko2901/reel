@@ -52,6 +52,7 @@ mode, and `docker exec reel reel doctor` prints the same line.
 2. In the compose file, set `REEL_AUTH_MODE: oidc` and add
    `REEL_OIDC_ISSUER`, `REEL_OIDC_CLIENT_ID` and the client secret. Keep
    `REEL_TRUSTED_PROXIES`: reel still reads the visitor's address from it.
+   `REEL_OIDC_NAME: Authentik` puts the name people know on the sign-in button.
 3. In the proxy, take the sign-in (forward auth) off reel, so nobody signs
    in twice.
 4. `docker compose up -d`. The log says
@@ -125,8 +126,8 @@ no link or not the proxy's name yet; sort them out as above.
 
 ## Someone signed in before their link
 
-They got a new, empty user, such as `mira 2`, and their link says
-"Your account at the identity provider is the user mira 2 here already".
+They got a new, empty user, such as `mira 2`, and their link says that
+their account at the provider "is the user mira 2 here already".
 Under Settings, **Access**, press **Unlink** on `mira 2`, or run
 `docker exec reel reel users unlink "mira 2"`. Their link works then.
 `mira 2` stays, with whatever was uploaded to it, and nobody signs in as

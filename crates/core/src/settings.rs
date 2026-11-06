@@ -294,6 +294,7 @@ pub static DEFS: &[Def] = &[
     restart(def("auth.session_days", "REEL_SESSION_DAYS", Section::Access, "Sessions", "Idle timeout", "a session ends this long after its last use", int(1, 365, "days"))),
     def("auth.session_max_days", "REEL_SESSION_MAX_DAYS", Section::Access, "Sessions", "Session lifetime", "a session ends this long after the sign-in, however active; 0 is no limit", int(0, 3650, "days")),
     restart(def("auth.oidc_issuer", "REEL_OIDC_ISSUER", Section::Access, "Identity provider", "Issuer", "the OpenID Connect issuer URL exactly as the provider gives it, its last slash included, such as https://auth.example.org/application/o/reel/; discovery runs at start", Kind::Url)),
+    def("auth.oidc_name", "REEL_OIDC_NAME", Section::Access, "Identity provider", "Provider name", "what the sign-in page calls the provider, as in Sign in with Authentik; empty shows the issuer's host; shown as typed, at most 40 characters", Kind::Text),
     restart(def("auth.oidc_client_id", "REEL_OIDC_CLIENT_ID", Section::Access, "Identity provider", "Client id", "the client registered at the issuer; its secret comes from REEL_OIDC_CLIENT_SECRET or the file REEL_OIDC_CLIENT_SECRET_FILE names, never from here", Kind::Text)),
     restart(def("auth.oidc_scopes", "REEL_OIDC_SCOPES", Section::Access, "Identity provider", "Scopes", "what is asked of the issuer, space separated", Kind::Text)),
     def("auth.oidc_username_claim", "REEL_OIDC_USERNAME_CLAIM", Section::Access, "Identity provider", "Name claim", "the claim shown as the user's name (email only when the provider marks it verified); the subject when it is missing; who the user is comes from the issuer and subject, never from the name", Kind::Text),
@@ -500,6 +501,20 @@ fn parse_select(raw: &str, options: &[&str]) -> Result<String, String> {
     }
 }
 
+/// A name this long still fits a phone's sign-in button in two lines.
+const PROVIDER_NAME_MAX: usize = 40;
+
+fn one_line(raw: &str, max: usize) -> Result<String, String> {
+    let v = raw.split_whitespace().collect::<Vec<_>>().join(" ");
+    if v.chars().any(char::is_control) {
+        return Err("plain text on one line".into());
+    }
+    if v.chars().count() > max {
+        return Err(format!("at most {max} characters"));
+    }
+    Ok(v)
+}
+
 /// Sets one key from its string form, checking the kind's own limits.
 pub fn set(cfg: &mut Config, key: &str, raw: &str) -> Result<(), String> {
     let d = find(key).ok_or_else(|| format!("no setting named {key}"))?;
@@ -536,6 +551,7 @@ pub fn set(cfg: &mut Config, key: &str, raw: &str) -> Result<(), String> {
             }
             items.join(", ")
         }
+        Kind::Text if key == "auth.oidc_name" => one_line(raw, PROVIDER_NAME_MAX)?,
         Kind::Text | Kind::Path | Kind::Secret => raw.trim().to_string(),
     };
     let n = |v: &str| v.parse::<i64>().unwrap_or(0);
@@ -653,6 +669,7 @@ pub fn set(cfg: &mut Config, key: &str, raw: &str) -> Result<(), String> {
         "auth.session_days" => cfg.auth.session_days = n(&value) as u64,
         "auth.session_max_days" => cfg.auth.session_max_days = n(&value) as u64,
         "auth.oidc_issuer" => cfg.auth.oidc_issuer = value,
+        "auth.oidc_name" => cfg.auth.oidc_name = value,
         "auth.oidc_client_id" => cfg.auth.oidc_client_id = value,
         "auth.oidc_scopes" => cfg.auth.oidc_scopes = value,
         "auth.oidc_username_claim" => cfg.auth.oidc_username_claim = value,
@@ -780,6 +797,7 @@ pub fn get(cfg: &Config, key: &str) -> String {
         "auth.session_days" => cfg.auth.session_days.to_string(),
         "auth.session_max_days" => cfg.auth.session_max_days.to_string(),
         "auth.oidc_issuer" => cfg.auth.oidc_issuer.clone(),
+        "auth.oidc_name" => cfg.auth.oidc_name.clone(),
         "auth.oidc_client_id" => cfg.auth.oidc_client_id.clone(),
         "auth.oidc_scopes" => cfg.auth.oidc_scopes.clone(),
         "auth.oidc_username_claim" => cfg.auth.oidc_username_claim.clone(),
@@ -1340,5 +1358,22 @@ mod tests {
         );
         set(&mut c, "public_url", "https://clips.example.org/").unwrap();
         assert_eq!(c.public_url, "https://clips.example.org");
+    }
+
+    #[test]
+    fn a_provider_name_is_one_line_of_plain_text_and_short() {
+        let mut c = Config::default();
+        set(&mut c, "auth.oidc_name", "  Home\n  login\t ").unwrap();
+        assert_eq!(c.auth.oidc_name, "Home login");
+        let most = "é".repeat(PROVIDER_NAME_MAX);
+        set(&mut c, "auth.oidc_name", &most).unwrap();
+        assert_eq!(c.auth.oidc_name, most);
+        let err = set(&mut c, "auth.oidc_name", &format!("{most}x")).unwrap_err();
+        assert_eq!(err, format!("at most {PROVIDER_NAME_MAX} characters"));
+        assert!(find("auth.oidc_name").unwrap().help.contains(&err));
+        assert!(set(&mut c, "auth.oidc_name", "Auth\u{7}entik").is_err());
+        assert_eq!(c.auth.oidc_name, most, "a refused value changes nothing");
+        set(&mut c, "auth.oidc_name", "").unwrap();
+        assert_eq!(c.auth.oidc_name, "");
     }
 }

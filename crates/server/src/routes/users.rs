@@ -52,15 +52,7 @@ async fn signin_view(st: &AppState, next: &str, error: &str) -> SigninPage {
     SigninPage {
         site: cfg.site_name.clone(),
         local,
-        oidc: match cfg.auth.mode {
-            AuthMode::Oidc => Some(
-                st.oidc
-                    .as_ref()
-                    .map(|o| o.host())
-                    .unwrap_or_else(|| "the identity provider".into()),
-            ),
-            _ => None,
-        },
+        oidc: (cfg.auth.mode == AuthMode::Oidc).then(|| st.provider_name()),
         first,
         error: error.into(),
         next: next.into(),
@@ -354,7 +346,7 @@ pub async fn oidc_callback(
         return Ok(Redirect::to(&format!(
             "/signin?error={}",
             percent_encoding::utf8_percent_encode(
-                &format!("The provider said: {why}"),
+                &format!("{} said: {why}", st.provider_name()),
                 percent_encoding::NON_ALPHANUMERIC
             )
         ))
@@ -377,7 +369,7 @@ pub async fn oidc_callback(
             tracing::warn!(subject = %identity.subject, why = %why, "link refused");
             return Ok(error_page(
                 StatusCode::CONFLICT,
-                &why.to_string(),
+                &why.words(&st.provider_name()),
                 why.what_now(),
             ));
         }
@@ -415,7 +407,7 @@ pub async fn oidc_link(
     };
     Ok(error_page(
         StatusCode::GONE,
-        &why.to_string(),
+        &why.words(&st.provider_name()),
         why.what_now(),
     ))
 }

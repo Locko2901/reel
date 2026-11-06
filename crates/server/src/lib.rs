@@ -85,6 +85,16 @@ impl AppState {
             zips: Default::default(),
         })
     }
+
+    /// The identity provider as a person reads of it: the admin's name for it, else its host.
+    pub fn provider_name(&self) -> String {
+        let cfg = self.ctx.config();
+        match &self.oidc {
+            _ if !cfg.auth.oidc_name.is_empty() => cfg.auth.oidc_name.clone(),
+            Some(o) => o.host(),
+            None => "the identity provider".into(),
+        }
+    }
 }
 
 pub async fn expire_sessions(
