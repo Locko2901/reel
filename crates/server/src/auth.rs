@@ -1,5 +1,5 @@
 //! Who a request is for, the sign-in gate, the same-site check, the client address and admins.
-use crate::accounts::{Backend, SIGNED_IN_AT};
+use crate::accounts::{Backend, SEEN_AT, SIGNED_IN_AT};
 use crate::AppState;
 use askama::Template;
 use axum::extract::{ConnectInfo, Request, State};
@@ -284,17 +284,19 @@ pub async fn require_user(State(st): State<AppState>, mut req: Request, next: Ne
             let Some(session_user) = auth.user.clone() else {
                 return to_signin(&req);
             };
+            let now = jiff::Timestamp::now().as_second();
             let signed_in_at: Option<i64> = auth.session.get(SIGNED_IN_AT).await.ok().flatten();
             if let Some(at) = signed_in_at {
-                if lifetime_over(
-                    at,
-                    jiff::Timestamp::now().as_second(),
-                    cfg.auth.session_max_days,
-                ) {
+                if lifetime_over(at, now, cfg.auth.session_max_days) {
                     tracing::info!(user = %session_user.name, "session past its lifetime");
                     let _ = auth.logout().await;
                     return to_signin(&req);
                 }
+            }
+            // a session's idle expiry moves only when it is written: once an hour is enough
+            let seen_at: Option<i64> = auth.session.get(SEEN_AT).await.ok().flatten();
+            if seen_at.is_none_or(|t| now - t >= 3600) {
+                let _ = auth.session.insert(SEEN_AT, now).await;
             }
             match st.ctx.store.user(&session_user.id).await {
                 Ok(Some(row)) if row.disabled_at.is_none() => {

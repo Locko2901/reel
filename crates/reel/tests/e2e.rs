@@ -8067,8 +8067,8 @@ async fn a_pending_sign_in_expires_in_minutes_and_start_is_limited() {
     assert_eq!(r.status(), 303);
     let signed = minutes_left().await;
     assert!(
-        signed > 29.0 * 1440.0,
-        "signed in, the session gets its full expiry back: {signed}"
+        (6.9 * 1440.0..7.1 * 1440.0).contains(&signed),
+        "signed in, the session gets its full expiry back, 7 days behind a provider: {signed}"
     );
     let mut last = 0;
     for _ in 0..6 {
@@ -15920,7 +15920,7 @@ async fn starting_a_sign_in_leaves_a_signed_in_session_its_expiry() {
         .await
         .unwrap()
     };
-    assert!(longest_left().await > 29.0 * 1440.0);
+    assert!(longest_left().await > 6.9 * 1440.0);
     let r = env
         .client
         .get(format!("{}/oidc/start", env.base))
@@ -15932,7 +15932,7 @@ async fn starting_a_sign_in_leaves_a_signed_in_session_its_expiry() {
     assert_eq!(r.status(), 303);
     let left = longest_left().await;
     assert!(
-        left > 29.0 * 1440.0,
+        left > 6.9 * 1440.0,
         "a link to /oidc/start from any page leaves the signed-in session {left:.1} minutes"
     );
     let to_issuer = r.headers()["location"].to_str().unwrap().to_string();
@@ -15952,4 +15952,56 @@ async fn starting_a_sign_in_leaves_a_signed_in_session_its_expiry() {
         303,
         "and the sign-in it started still ends well"
     );
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_session_behind_a_provider_lasts_seven_days_from_its_last_use() {
+    let Some((env, _)) = oidc_env(persona(Persona::mira()), |_| {}).await else {
+        return;
+    };
+    assert_eq!(
+        (
+            env.ctx.config().auth.session_days,
+            env.ctx.config().auth.session_max_days
+        ),
+        (7, 30)
+    );
+    let (status, signed) = oidc_sign_in(&env).await;
+    assert_eq!(status, 303);
+    let days_left = || async {
+        sqlx::query_scalar::<_, f64>(
+            "SELECT MAX(julianday(expiry_date) - julianday('now')) FROM tower_sessions",
+        )
+        .fetch_one(env.store().pool())
+        .await
+        .unwrap()
+    };
+    let six_days_pass = || async {
+        sqlx::query("UPDATE tower_sessions SET expiry_date = datetime(expiry_date, '-6 days')")
+            .execute(env.store().pool())
+            .await
+            .unwrap();
+    };
+    let open = || async {
+        env.client
+            .get(format!("{}/", env.base))
+            .header("cookie", &signed)
+            .send()
+            .await
+            .unwrap()
+            .status()
+    };
+    let left = days_left().await;
+    assert!((6.9..7.1).contains(&left), "{left}");
+    six_days_pass().await;
+    assert_eq!(open().await, 200);
+    let left = days_left().await;
+    assert!(
+        (6.9..7.1).contains(&left),
+        "a session in use gets its 7 days again: {left}"
+    );
+    six_days_pass().await;
+    assert_eq!(open().await, 200);
+    let left = days_left().await;
+    assert!(left < 1.1, "and is written at most once an hour: {left}");
 }

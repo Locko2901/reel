@@ -107,8 +107,10 @@ You set the mode when the container starts (see
   database keeps only a hash of each session's id, so a copy of the
   database signs nobody in.
 - A session ends after [Idle timeout](configuration.md#idle-timeout)
-  without use (30 days by default) and, however active, after
-  [Session lifetime](configuration.md#session-lifetime) (90 days).
+  without use (30 days by default, 7 behind an identity provider) and,
+  however active, after
+  [Session lifetime](configuration.md#session-lifetime) (90 days, 30
+  behind an identity provider).
 - **Sign out everywhere** (Settings, **Access**, with reel's own
   accounts) ends every session of your account. A changed password does
   the same, and so does `reel passwd` from the server's shell.
