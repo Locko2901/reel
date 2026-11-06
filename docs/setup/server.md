@@ -97,6 +97,11 @@ talks to: point your domain at it and forward everything to reel's port
   as the exact address (`10.0.0.2/32`), never a whole network. Then reel's
   limit on sign-in attempts counts each visitor, not the proxy.
 
+reel sends its own security headers: a Content-Security-Policy that runs
+only reel's scripts and allows no framing, `X-Frame-Options`,
+`X-Content-Type-Options` and `Referrer-Policy`. Leave them to reel; a
+stricter policy added by the proxy can break the pages.
+
 ### nginx
 
 This is the whole server block. Use your own name and certificate paths:

@@ -63,6 +63,6 @@
   {% endif %}
 </main>
 <footer class="share-foot"><svg class="mark" viewBox="8.6 3 16.2 26" aria-hidden="true"><path d="M8.6 3L16 10.4V29H8.6Z"/><path class="arm" d="M8.6 3H24.8V10.4H16Z"/></svg>{{ site }}</footer>
-<script type="module">import { appShell } from '/assets/js/app-shell.js'; import { switches } from '/assets/js/switch.js'; switches(); appShell();</script>
+<script type="module" src="/assets/{{ crate::routes::asset_v() }}/signin.js"></script>
 </body>
 </html>

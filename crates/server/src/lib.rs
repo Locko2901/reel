@@ -4,6 +4,7 @@ pub mod back;
 pub mod device;
 pub mod disk;
 pub mod error;
+pub mod headers;
 pub mod routes;
 pub mod serve_file;
 pub mod settings;
@@ -550,6 +551,10 @@ pub fn router(state: AppState) -> Router {
         .layer(auth_layer)
         .layer(DefaultBodyLimit::max(64 * 1024 * 1024 * 1024))
         .layer(TraceLayer::new_for_http())
+        .layer(axum::middleware::from_fn_with_state(
+            state.clone(),
+            headers::add,
+        ))
         .with_state(state)
 }
 

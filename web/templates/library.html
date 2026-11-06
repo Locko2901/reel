@@ -32,7 +32,7 @@
     <form method="get" action="/" class="row small muted">
       <input type="hidden" name="q" value="{{ q }}" id="sort-q">
       <label class="row">Sort
-        <select name="sort" aria-label="Sort" onchange="this.form.submit()">
+        <select name="sort" aria-label="Sort">
           <option value="newest" {% if sort == "newest" %}selected{% endif %}>Newest</option>
           <option value="oldest" {% if sort == "oldest" %}selected{% endif %}>Oldest</option>
           <option value="longest" {% if sort == "longest" %}selected{% endif %}>Longest</option>

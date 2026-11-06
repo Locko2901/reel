@@ -313,6 +313,7 @@ function liveSearch(grid) {
 
 export function library() {
   if (document.body.dataset.page !== 'library' || $('#clip')) return;
+  $('select[name="sort"]')?.addEventListener('change', (e) => e.currentTarget.form.submit());
   const grid = $('#grid');
   if (grid) {
     $$('.card', grid).forEach(hoverLoop);
