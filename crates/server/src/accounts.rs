@@ -18,6 +18,7 @@ use openidconnect::{
     StandardTokenResponse, TokenResponse,
 };
 use reel_core::Config;
+use reel_pipeline::Ctx;
 use reel_store::models::User as UserRow;
 use reel_store::Store;
 use serde::{Deserialize, Serialize};
@@ -106,16 +107,14 @@ pub enum BackendError {
 
 #[derive(Clone)]
 pub struct Backend {
-    pub store: Store,
-    pub cfg: Arc<Config>,
+    pub ctx: Ctx,
     dummy: Arc<String>,
 }
 
 impl Backend {
-    pub fn new(store: Store, cfg: Arc<Config>) -> Self {
+    pub fn new(ctx: Ctx) -> Self {
         Self {
-            store,
-            cfg,
+            ctx,
             dummy: Arc::new(password_auth::generate_hash("nobody has this password")),
         }
     }
@@ -419,7 +418,7 @@ impl AuthnBackend for Backend {
     async fn authenticate(&self, creds: Credentials) -> Result<Option<SessionUser>, BackendError> {
         match creds {
             Credentials::Password { name, password, ip } => {
-                let row = self.store.user_by_name(&name).await?;
+                let row = self.ctx.store.user_by_name(&name).await?;
                 let hash = row
                     .as_ref()
                     .filter(|u| u.disabled_at.is_none())
@@ -434,7 +433,7 @@ impl AuthnBackend for Backend {
                 })
                 .await
                 .map_err(|e| BackendError::Hash(e.to_string()))?;
-                self.store.add_signin_attempt(&ip, &name, ok).await?;
+                self.ctx.store.add_signin_attempt(&ip, &name, ok).await?;
                 if !ok {
                     tracing::warn!(ip, name, "sign-in refused");
                 }
@@ -445,7 +444,7 @@ impl AuthnBackend for Backend {
                 })
             }
             Credentials::Identity(identity) => {
-                let row = user_for_identity(&self.store, &self.cfg, &identity).await?;
+                let row = user_for_identity(&self.ctx.store, &self.ctx.config(), &identity).await?;
                 Ok(if row.disabled_at.is_some() {
                     None
                 } else {
@@ -457,6 +456,7 @@ impl AuthnBackend for Backend {
 
     async fn get_user(&self, id: &UserId<Self>) -> Result<Option<SessionUser>, BackendError> {
         Ok(self
+            .ctx
             .store
             .user(id)
             .await?

@@ -525,7 +525,7 @@ pub fn router(state: AppState) -> Router {
         .with_expiry(tower_sessions::Expiry::OnInactivity(time::Duration::days(
             cfg.auth.session_days.max(1) as i64,
         )));
-    let backend = accounts::Backend::new(state.ctx.store.clone(), cfg.clone());
+    let backend = accounts::Backend::new(state.ctx.clone());
     let auth_layer = axum_login::AuthManagerLayerBuilder::new(backend, session_layer).build();
 
     Router::new()
