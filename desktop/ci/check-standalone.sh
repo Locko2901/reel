@@ -138,6 +138,16 @@ xdotool mousemove ${REEL_CHIP:-1190 24} click 1
 sleep 1
 shot "5-chip"
 xdotool key Escape
+python3 /work/desktop/ci/fake-sni.py click "Pause recording" > /dev/null || fail "the tray has no Pause recording"
+waitlog "recording paused by the user paused=true" 10 "Pause recording did not pause"
+sleep 3
+# shellcheck disable=SC2086
+xdotool mousemove ${REEL_CHIP:-1190 24} click 1
+sleep 1
+shot "5-chip-recording-paused"
+xdotool key Escape
+python3 /work/desktop/ci/fake-sni.py click "Resume recording" > /dev/null || fail "the tray has no Resume recording"
+waitlog "recording paused by the user paused=false" 10 "Resume recording did not resume"
 "$APP" "reel-desktop://open/$LOCAL" > /dev/null 2>&1 || true
 waitlog "library loaded at=127.0.0.1/clips/$LOCAL" 20 "Open did not open the clip"
 sleep 3

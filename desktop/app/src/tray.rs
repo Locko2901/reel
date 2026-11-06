@@ -331,7 +331,7 @@ mod tests {
 
             st.recording_paused = true;
             st.state_word = "recording paused".into();
-            st.state_line = "the replay buffer is stopped until you resume recording".into();
+            st.state_line = "the replay buffer is stopped".into();
             let (save, share) =
                 crate::status::save_actions(true, true, true, None, true, mode == "standalone");
             st.save = save;
@@ -344,13 +344,10 @@ mod tests {
                 assert!(!on(&st, "save-share"), "and Save and share");
             }
             assert_eq!(got[at(&got, "save-why")].1, "Recording is paused");
-            assert_eq!(
-                got[0].1,
-                "recording paused: the replay buffer is stopped until you resume recording"
-            );
+            assert_eq!(got[0].1, "recording paused: the replay buffer is stopped");
             assert_eq!(
                 st.tooltip(),
-                "reel: recording paused, the replay buffer is stopped until you resume recording"
+                "reel: recording paused, the replay buffer is stopped"
             );
         }
     }

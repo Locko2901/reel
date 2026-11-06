@@ -567,7 +567,7 @@ impl Runtime {
             (
                 "paused",
                 "recording paused".to_string(),
-                "the replay buffer is stopped until you resume recording".to_string(),
+                "the replay buffer is stopped".to_string(),
             )
         } else if let Some(o) = &g.offline {
             (
