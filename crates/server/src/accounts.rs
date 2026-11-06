@@ -656,7 +656,9 @@ impl Oidc {
         let issuer = IssuerUrl::new(cfg.auth.oidc_issuer.clone())?;
         let metadata = CoreProviderMetadata::discover_async(issuer.clone(), &http)
             .await
-            .map_err(|e| anyhow::anyhow!("discovery at {}: {e}", cfg.auth.oidc_issuer))?;
+            .map_err(|e| {
+                anyhow::Error::new(e).context(format!("discovery at {}", cfg.auth.oidc_issuer))
+            })?;
         let secret = oidc_secret()?.map(ClientSecret::new);
         let client = ReelClient::from_provider_metadata(
             metadata,
@@ -681,13 +683,6 @@ impl Oidc {
             role_claim: cfg.auth.oidc_role_claim.clone(),
             admin_value: cfg.auth.oidc_admin_value.clone(),
         })
-    }
-
-    pub fn host(&self) -> String {
-        url::Url::parse(&self.issuer)
-            .ok()
-            .and_then(|u| u.host_str().map(String::from))
-            .unwrap_or_else(|| self.issuer.clone())
     }
 
     /// Where to send the browser, and what to remember until it comes back.
@@ -715,22 +710,30 @@ impl Oidc {
         )
     }
 
-    /// The callback's code becomes a verified identity; an email names it only when verified.
-    pub async fn finish(&self, code: &str, pending: &OidcPending) -> anyhow::Result<OidcIdentity> {
-        let tokens = self
-            .client
+    /// The callback's code exchanged for the provider's tokens.
+    pub async fn tokens(
+        &self,
+        code: &str,
+        pending: &OidcPending,
+    ) -> anyhow::Result<ReelTokenResponse> {
+        self.client
             .exchange_code(AuthorizationCode::new(code.to_string()))?
             .set_pkce_verifier(PkceCodeVerifier::new(pending.pkce.clone()))
             .request_async(&self.http)
             .await
-            .map_err(|e| anyhow::anyhow!("the token exchange failed: {e}"))?;
-        let id_token = tokens
-            .id_token()
-            .ok_or_else(|| anyhow::anyhow!("the provider returned no id token"))?;
+            .map_err(|e| anyhow::anyhow!("the token exchange failed: {e}"))
+    }
+
+    /// The identity the tokens carry, checked with the keys of the last discovery; an email
+    /// names it only when verified.
+    pub fn identity(
+        &self,
+        tokens: &ReelTokenResponse,
+        pending: &OidcPending,
+    ) -> Result<OidcIdentity, Unverified> {
+        let id_token = tokens.id_token().ok_or(Unverified::NoIdToken)?;
         let verifier = self.client.id_token_verifier();
-        let claims = id_token
-            .claims(&verifier, &Nonce::new(pending.nonce.clone()))
-            .map_err(|e| anyhow::anyhow!("the id token did not verify: {e}"))?;
+        let claims = id_token.claims(&verifier, &Nonce::new(pending.nonce.clone()))?;
         let extra = &claims.additional_claims().0;
         let name = match self.username_claim.as_str() {
             "preferred_username" | "" => claims.preferred_username().map(|u| u.to_string()),
@@ -764,6 +767,176 @@ impl Oidc {
             name: name.chars().take(40).collect::<String>().trim().to_string(),
             admin_claim,
         })
+    }
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum Unverified {
+    #[error("the provider returned no id token")]
+    NoIdToken,
+    #[error("the id token did not verify: {0}")]
+    Claims(#[from] openidconnect::ClaimsVerificationError),
+}
+
+impl Unverified {
+    /// Whether the signature failed, as it does with a key the provider made after the last
+    /// discovery.
+    pub fn by_its_signature(&self) -> bool {
+        matches!(
+            self,
+            Unverified::Claims(openidconnect::ClaimsVerificationError::SignatureVerification(_))
+        )
+    }
+}
+
+const FIRST_PAUSE: Duration = Duration::from_secs(2);
+const LONGEST_PAUSE: Duration = Duration::from_secs(300);
+const REFRESH_EVERY: Duration = Duration::from_secs(3600);
+/// A sign-in asks the provider again no sooner than this after the last try: the page is open
+/// to anyone.
+const SIGN_IN_GAP: Duration = Duration::from_secs(3);
+const SIGN_IN_WAIT: Duration = Duration::from_secs(5);
+
+fn next_pause(pause: Duration) -> Duration {
+    (pause * 2).min(LONGEST_PAUSE)
+}
+
+/// The identity provider's client, from its discovery. A failed discovery is tried again by
+/// itself with a growing pause, and at once by a sign-in; a working one is renewed every hour.
+/// A failure never drops the last good answer: sign-ins go on with it.
+pub struct Provider {
+    /// The config at start: the issuer, the client and the scopes take effect at a restart.
+    cfg: Arc<Config>,
+    oidc: std::sync::RwLock<Option<Arc<Oidc>>>,
+    tries: std::sync::Mutex<Tries>,
+    one_at_a_time: tokio::sync::Mutex<()>,
+}
+
+#[derive(Default)]
+struct Tries {
+    done: u64,
+    last: Option<std::time::Instant>,
+    ok: bool,
+    failing: Option<String>,
+}
+
+impl Tries {
+    /// True when the failure is new, so the log says it once.
+    fn failed(&mut self, why: &str) -> bool {
+        self.ok = false;
+        let new = self.failing.as_deref() != Some(why);
+        self.failing = Some(why.to_string());
+        new
+    }
+
+    /// True when it ends a failure.
+    fn worked(&mut self) -> bool {
+        self.ok = true;
+        self.failing.take().is_some()
+    }
+}
+
+impl Provider {
+    pub fn new(cfg: Arc<Config>) -> Self {
+        Provider {
+            cfg,
+            oidc: Default::default(),
+            tries: Default::default(),
+            one_at_a_time: Default::default(),
+        }
+    }
+
+    pub fn current(&self) -> Option<Arc<Oidc>> {
+        self.oidc.read().unwrap_or_else(|e| e.into_inner()).clone()
+    }
+
+    pub fn host(&self) -> String {
+        let issuer = &self.cfg.auth.oidc_issuer;
+        url::Url::parse(issuer)
+            .ok()
+            .and_then(|u| u.host_str().map(String::from))
+            .unwrap_or_else(|| issuer.clone())
+    }
+
+    fn tries(&self) -> std::sync::MutexGuard<'_, Tries> {
+        self.tries.lock().unwrap_or_else(|e| e.into_inner())
+    }
+
+    /// Asks the provider for its metadata and keys. A try that another one ended while this
+    /// waited for it takes that one's outcome.
+    pub async fn refresh(&self) -> bool {
+        let seen = self.tries().done;
+        let _one = self.one_at_a_time.lock().await;
+        {
+            let t = self.tries();
+            if t.done != seen {
+                return t.ok;
+            }
+        }
+        let result = Oidc::from_config(&self.cfg).await;
+        let had = self.current().is_some();
+        let mut t = self.tries();
+        t.done += 1;
+        t.last = Some(std::time::Instant::now());
+        match result {
+            Ok(oidc) => {
+                *self.oidc.write().unwrap_or_else(|e| e.into_inner()) = Some(Arc::new(oidc));
+                if t.worked() || !had {
+                    tracing::info!(issuer = %self.cfg.auth.oidc_issuer, "identity provider ready");
+                }
+                true
+            }
+            Err(e) => {
+                let why = format!("{e:#}");
+                if t.failed(&why) {
+                    if had {
+                        tracing::warn!(error = %why, "the identity provider's discovery failed; sign-ins go on with its last answer, and reel tries again by itself");
+                    } else {
+                        tracing::error!(error = %why, "the identity provider is not reachable; nobody can sign in until it is, and reel tries again by itself");
+                    }
+                }
+                false
+            }
+        }
+    }
+
+    /// The client for a sign-in. Without one yet, the provider is asked at once, unless a try
+    /// ended a moment ago, and the sign-in waits a few seconds for the answer.
+    pub async fn for_sign_in(self: &Arc<Self>) -> Option<Arc<Oidc>> {
+        if let Some(oidc) = self.current() {
+            return Some(oidc);
+        }
+        let recent = self
+            .tries()
+            .last
+            .is_some_and(|at| at.elapsed() < SIGN_IN_GAP);
+        if !recent {
+            let me = self.clone();
+            let ask = tokio::spawn(async move { me.refresh().await });
+            let _ = tokio::time::timeout(SIGN_IN_WAIT, ask).await;
+        }
+        self.current()
+    }
+
+    /// Asks again with a growing pause until discovery works, then every hour, until `stop`.
+    pub async fn keep(self: Arc<Self>, stop: tokio_util::sync::CancellationToken) {
+        let mut pause = FIRST_PAUSE;
+        loop {
+            let wait = if self.tries().ok {
+                REFRESH_EVERY
+            } else {
+                pause
+            };
+            tokio::select! {
+                _ = tokio::time::sleep(wait) => {}
+                _ = stop.cancelled() => return,
+            }
+            pause = if self.refresh().await {
+                FIRST_PAUSE
+            } else {
+                next_pause(pause)
+            };
+        }
     }
 }
 
@@ -808,5 +981,27 @@ mod tests {
             l.check("someone else").is_ok(),
             "another name has its own count"
         );
+    }
+
+    #[test]
+    fn a_discovery_failure_is_logged_once_until_it_changes_or_ends() {
+        let mut t = Tries::default();
+        assert!(t.failed("connection refused"));
+        assert!(!t.failed("connection refused"), "the same failure again");
+        assert!(t.failed("not JSON"), "another failure is new");
+        assert!(t.worked(), "a success ends the failure");
+        assert!(!t.worked());
+        assert!(t.failed("not JSON"), "after a success it is new again");
+    }
+
+    #[test]
+    fn the_pause_grows_from_seconds_to_five_minutes() {
+        let mut pause = FIRST_PAUSE;
+        let mut seen = vec![pause.as_secs()];
+        for _ in 0..9 {
+            pause = next_pause(pause);
+            seen.push(pause.as_secs());
+        }
+        assert_eq!(seen, [2, 4, 8, 16, 32, 64, 128, 256, 300, 300]);
     }
 }

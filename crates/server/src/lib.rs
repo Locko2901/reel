@@ -32,7 +32,7 @@ pub struct AppState {
     pub disk: disk::DiskCache,
     pub sessions: accounts::HashedIdStore<tower_sessions_sqlx_store::SqliteStore>,
     pub limiter: std::sync::Arc<accounts::NameLimiter>,
-    pub oidc: Option<std::sync::Arc<accounts::Oidc>>,
+    pub provider: Option<std::sync::Arc<accounts::Provider>>,
     pub setup_done: std::sync::Arc<std::sync::atomic::AtomicBool>,
     pub uploads_busy: std::sync::Arc<tokio::sync::Mutex<std::collections::HashSet<String>>>,
     pub links_making: std::sync::Arc<routes::api::LinksMaking>,
@@ -54,17 +54,11 @@ impl AppState {
                 "no user yet: the first admin needs this setup code at /signin"
             );
         }
-        let oidc = if cfg.auth.mode == AuthMode::Oidc {
-            match accounts::Oidc::from_config(&cfg).await {
-                Ok(o) => {
-                    tracing::info!(issuer = %o.issuer, "identity provider ready");
-                    Some(std::sync::Arc::new(o))
-                }
-                Err(e) => {
-                    tracing::error!(error = %e, "the identity provider is not reachable; nobody can sign in until it is");
-                    None
-                }
-            }
+        let provider = if cfg.auth.mode == AuthMode::Oidc {
+            let p = std::sync::Arc::new(accounts::Provider::new(cfg.clone()));
+            p.refresh().await;
+            tokio::spawn(p.clone().keep(ctx.shutdown.clone()));
+            Some(p)
         } else {
             None
         };
@@ -76,7 +70,7 @@ impl AppState {
             disk: disk::DiskCache::default(),
             sessions,
             limiter: std::sync::Arc::new(accounts::NameLimiter::new()),
-            oidc,
+            provider,
             setup_done: std::sync::Arc::new(std::sync::atomic::AtomicBool::new(done)),
             uploads_busy: std::sync::Arc::new(tokio::sync::Mutex::new(
                 std::collections::HashSet::new(),
@@ -89,9 +83,9 @@ impl AppState {
     /// The identity provider as a person reads of it: the admin's name for it, else its host.
     pub fn provider_name(&self) -> String {
         let cfg = self.ctx.config();
-        match &self.oidc {
+        match &self.provider {
             _ if !cfg.auth.oidc_name.is_empty() => cfg.auth.oidc_name.clone(),
-            Some(o) => o.host(),
+            Some(p) => p.host(),
             None => "the identity provider".into(),
         }
     }

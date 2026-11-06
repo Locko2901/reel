@@ -768,7 +768,7 @@ A session ends this long after the sign-in, however active; 0 is no limit.
 
 ### Issuer
 
-The OpenID Connect issuer URL exactly as the provider gives it, its last slash included, such as https://auth.example.org/application/o/reel/; discovery runs at start.
+The OpenID Connect issuer URL exactly as the provider gives it, its last slash included, such as https://auth.example.org/application/o/reel/; reel asks it for its metadata at start, again by itself until it answers, and every hour.
 
 - Under Settings: Access, Identity provider
 - In `config.toml`: `oidc_issuer` under `[auth]`
