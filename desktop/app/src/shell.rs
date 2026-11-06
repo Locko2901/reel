@@ -152,7 +152,11 @@ pub fn allow_origin(app: &AppHandle, base_url: &str) {
         cap = cap.permission(p);
     }
     match app.add_capability(cap) {
-        Ok(()) => tracing::info!(%origin, "the server's pages may call the app's seven commands"),
+        Ok(()) => tracing::info!(
+            %origin,
+            "the server's pages may call the app's {} commands",
+            REMOTE_PERMISSIONS.len()
+        ),
         Err(e) => tracing::warn!(%origin, error = %e, "the server's pages got no capability"),
     }
 }
