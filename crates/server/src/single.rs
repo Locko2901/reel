@@ -1,10 +1,98 @@
-//! Single mode signs nobody in: reel answers only to the names of its own address.
+//! Single mode signs nobody in: reel answers only to the names of its own address, and the
+//! app's standalone library only to the app, by a key made at each start.
 use crate::AppState;
-use axum::extract::{Request, State};
-use axum::http::{header, StatusCode};
+use axum::extract::{Query, Request, State};
+use axum::http::{header, HeaderMap, StatusCode};
 use axum::middleware::Next;
-use axum::response::Response;
+use axum::response::{IntoResponse, Redirect, Response};
+use serde::Deserialize;
 use std::net::SocketAddr;
+
+pub const KEY_COOKIE: &str = "reel_app_key";
+/// The key as a header, for the app's own requests that are not its window's.
+pub const KEY_HEADER: &str = "x-reel-app-key";
+
+/// How long a ticket into the window's way in lasts.
+const TICKET_LIFE: std::time::Duration = std::time::Duration::from_secs(60);
+
+/// The key the app shows the standalone library: the window by a cookie, the updater by a header.
+#[derive(Clone)]
+pub struct AppKey {
+    secret: std::sync::Arc<str>,
+    tickets: std::sync::Arc<std::sync::Mutex<Vec<(String, std::time::Instant)>>>,
+}
+
+fn same(a: &str, b: &str) -> bool {
+    let (a, b) = (a.as_bytes(), b.as_bytes());
+    a.len() == b.len() && a.iter().zip(b).fold(0u8, |acc, (x, y)| acc | (x ^ y)) == 0
+}
+
+impl AppKey {
+    pub fn new() -> AppKey {
+        AppKey {
+            secret: reel_core::ids::new_device_token().into(),
+            tickets: Default::default(),
+        }
+    }
+
+    pub fn secret(&self) -> &str {
+        &self.secret
+    }
+
+    fn matches(&self, given: &str) -> bool {
+        same(&self.secret, given)
+    }
+
+    /// A ticket for the window's way in, good once and for a minute, so the key itself is in
+    /// no address, no history and no log.
+    pub fn ticket(&self) -> String {
+        let ticket = reel_core::ids::new_device_token();
+        let mut t = self.tickets.lock().unwrap_or_else(|e| e.into_inner());
+        t.retain(|(_, made)| made.elapsed() < TICKET_LIFE);
+        t.push((ticket.clone(), std::time::Instant::now()));
+        ticket
+    }
+
+    fn spend(&self, given: &str) -> bool {
+        let mut t = self.tickets.lock().unwrap_or_else(|e| e.into_inner());
+        t.retain(|(_, made)| made.elapsed() < TICKET_LIFE);
+        match t.iter().position(|(ticket, _)| same(ticket, given)) {
+            Some(i) => {
+                t.remove(i);
+                true
+            }
+            None => false,
+        }
+    }
+
+    /// Whether a request carries the key, in the header or the window's cookie.
+    pub fn shown_by(&self, headers: &HeaderMap) -> bool {
+        let by_header = headers
+            .get(KEY_HEADER)
+            .and_then(|v| v.to_str().ok())
+            .is_some_and(|k| self.matches(k));
+        by_header
+            || headers
+                .get_all(header::COOKIE)
+                .iter()
+                .filter_map(|v| v.to_str().ok())
+                .flat_map(|line| line.split(';'))
+                .filter_map(|c| c.trim().split_once('='))
+                .any(|(name, value)| name == KEY_COOKIE && self.matches(value))
+    }
+}
+
+impl Default for AppKey {
+    fn default() -> Self {
+        AppKey::new()
+    }
+}
+
+impl std::fmt::Debug for AppKey {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("AppKey(..)")
+    }
+}
 
 /// The names reel may be called by without sign-in: the loopback names of the address it
 /// listens on, and the public URL's.
@@ -117,6 +205,56 @@ pub async fn own_address(State(b): State<Bound>, req: Request, next: Next) -> Re
     )
 }
 
+/// The app's window in standalone; anyone else gets this.
+pub fn not_the_app(req: &Request) -> Response {
+    crate::auth::refuse(
+        req,
+        StatusCode::UNAUTHORIZED,
+        "reel on this PC opens in its app.",
+        "Its library opens in the app's window alone: open it from the tray icon.",
+    )
+}
+
+#[derive(Deserialize)]
+pub struct Open {
+    ticket: Option<String>,
+    to: Option<String>,
+}
+
+/// A path on this site: one slash, no backslash, nothing a browser reads as another host.
+fn here(path: &str) -> bool {
+    path.starts_with('/')
+        && !path.starts_with("//")
+        && !path.contains('\\')
+        && !path.chars().any(|c| c.is_control() || c.is_whitespace())
+}
+
+/// The app's window comes in here with a ticket from the app: the key becomes its cookie, and
+/// the window goes on to the page it asked for.
+pub async fn open(State(st): State<AppState>, Query(q): Query<Open>, req: Request) -> Response {
+    let Some(key) = st.app_key.as_ref() else {
+        return crate::error::AppError::NotFound.into_response();
+    };
+    if !q.ticket.as_deref().is_some_and(|t| key.spend(t)) {
+        tracing::warn!("standalone: the app's way in was asked without a ticket of the app's");
+        return not_the_app(&req);
+    }
+    let to = q.to.as_deref().filter(|p| here(p)).unwrap_or("/");
+    let cookie = tower_sessions::cookie::Cookie::build((KEY_COOKIE, key.secret()))
+        .http_only(true)
+        .same_site(tower_sessions::cookie::SameSite::Lax)
+        .path("/")
+        .build();
+    (
+        [
+            (header::SET_COOKIE, cookie.to_string()),
+            (header::CACHE_CONTROL, "no-store".to_string()),
+        ],
+        Redirect::to(to),
+    )
+        .into_response()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -177,5 +315,63 @@ mod tests {
         let port80 = Names::of("127.0.0.1:80".parse().unwrap(), "http://localhost");
         assert!(port80.host("localhost") && port80.host("127.0.0.1"));
         assert!(port80.origin("http://localhost"));
+    }
+
+    #[test]
+    fn the_key_in_a_header_or_the_windows_cookie() {
+        let key = AppKey::new();
+        let mut h = HeaderMap::new();
+        assert!(!key.shown_by(&h));
+        h.insert(
+            header::COOKIE,
+            "reel_session=x; reel_app_key=wrong".parse().unwrap(),
+        );
+        assert!(!key.shown_by(&h));
+        h.insert(
+            header::COOKIE,
+            format!("reel_session=x; {KEY_COOKIE}={}", key.secret())
+                .parse()
+                .unwrap(),
+        );
+        assert!(key.shown_by(&h));
+        let mut h = HeaderMap::new();
+        h.insert(KEY_HEADER, key.secret().parse().unwrap());
+        assert!(key.shown_by(&h));
+        assert!(!key.matches(&key.secret()[1..]));
+        assert_ne!(
+            key.secret(),
+            AppKey::new().secret(),
+            "a new key at each start"
+        );
+        assert_eq!(format!("{key:?}"), "AppKey(..)");
+    }
+
+    #[test]
+    fn a_ticket_is_good_once() {
+        let key = AppKey::new();
+        let (a, b) = (key.ticket(), key.ticket());
+        assert_ne!(a, b);
+        assert_ne!(a, key.secret());
+        assert!(!key.spend(key.secret()), "the key is no ticket");
+        assert!(key.spend(&b) && key.spend(&a));
+        assert!(!key.spend(&a), "spent");
+        assert!(!AppKey::new().spend(&key.ticket()), "another start's");
+    }
+
+    #[test]
+    fn the_way_in_goes_on_to_a_page_of_this_site_alone() {
+        for ok in ["/", "/clips/01J?t=2", "/settings/library#x"] {
+            assert!(here(ok), "{ok}");
+        }
+        for refused in [
+            "",
+            "//evil.example/",
+            "/\\evil.example",
+            "/\t/evil.example",
+            "https://evil.example/",
+            "clips",
+        ] {
+            assert!(!here(refused), "{refused}");
+        }
     }
 }

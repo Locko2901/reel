@@ -34,6 +34,9 @@ Linux, until you [move it to another drive](#the-library-on-another-drive). The 
 top of the window has a **Library** row: on this PC, where it lives, and whether reel on this PC
 runs.
 
+The library opens in the app's window alone, not in a browser: reel on this PC lets in only the
+app, with a key that changes at each start ([Privacy](../privacy.md#the-library-on-this-pc)).
+
 ## 3. The first clip
 
 1. Play a game and press **Save a clip**: Alt+F10 after the setup of reel's own OBS. With your own

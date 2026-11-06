@@ -14,7 +14,7 @@ pub async fn healthz(
     State(st): State<AppState>,
     req: Request,
 ) -> (StatusCode, Json<serde_json::Value>) {
-    let asker = Asker::of(&req);
+    let asker = Asker::of(&req, &st);
     drop(req);
     let (queued, running) = st.ctx.store.job_counts().await.unwrap_or((0, 0));
     let hw = st.ctx.hw.read().await;
@@ -54,20 +54,26 @@ pub async fn healthz(
 struct Asker {
     /// Through `/api/health`, behind the sign-in.
     user_admin: Option<bool>,
-    /// A loopback peer that no proxy forwarded, as a proxy on the same machine would.
+    /// A loopback peer that no proxy forwarded, as a proxy on the same machine would; for the
+    /// app's standalone library, which every program of the PC reaches so, the app with its key.
     this_machine: bool,
     session_user: Option<String>,
 }
 
 impl Asker {
-    fn of(req: &Request) -> Asker {
+    fn of(req: &Request, st: &AppState) -> Asker {
         let peer = req
             .extensions()
             .get::<ConnectInfo<SocketAddr>>()
             .map(|c| c.0.ip());
         Asker {
             user_admin: req.extensions().get::<crate::auth::User>().map(|u| u.admin),
-            this_machine: peer.is_some_and(|ip| ip.is_loopback()) && !forwarded(req.headers()),
+            this_machine: peer.is_some_and(|ip| ip.is_loopback())
+                && !forwarded(req.headers())
+                && st
+                    .app_key
+                    .as_ref()
+                    .is_none_or(|k| k.shown_by(req.headers())),
             session_user: req
                 .extensions()
                 .get::<AuthSession<Backend>>()

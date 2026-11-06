@@ -342,7 +342,8 @@ wait_for 60 "reel on the loopback" log2_has "standalone: reel serves on the loop
 LOCAL=$(cat "$LOG2"/reel-desktop.log* | grep 'standalone: reel serves on the loopback' | grep -o 'addr=[0-9.:]*' | head -1 | cut -d= -f2)
 [ -n "$LOCAL" ] || fail "no loopback address in the log"
 echo "reel on $LOCAL"
-curl -fsS -o /dev/null -w '%{http_code}\n' "http://$LOCAL/" | grep -q 200 || fail "the local reel does not answer"
+# the library takes the app's window alone; another program gets 401
+[ "$(curl -sS -o /dev/null -w '%{http_code}' "http://$LOCAL/")" = 401 ] || fail "the local reel answers a program that is not the app"
 ffmpeg -loglevel error -y -f lavfi -i "testsrc2=size=1280x720:rate=30" -f lavfi -i "sine=frequency=440" \
   -t 3 -c:v libx264 -preset veryfast -pix_fmt yuv420p -c:a aac -shortest -f matroska "$ROOT2/clips/Replay_2026-10-09_12-00-00.mkv.part"
 mv "$ROOT2/clips/Replay_2026-10-09_12-00-00.mkv.part" "$ROOT2/clips/Replay_2026-10-09_12-00-00.mkv"
@@ -350,9 +351,8 @@ wait_for 20 "the clip to be found" log2_has "clip found"
 wait_for 120 "the clip in the library" log2_has "standalone: the clip is published"
 wait_for 10 "the uploaded cue" log2_has "cue uploaded played"
 [ ! -e "$ROOT2/clips/Replay_2026-10-09_12-00-00.mkv" ] || fail "the raw file was not taken into the library"
-curl -fsS "http://$LOCAL/" | grep -q 'card-title' || fail "the local library shows no clip"
-curl -fsS "http://$LOCAL/" | grep -q 'id="app-save" type="button" aria-label="Save clip" hidden' || fail "the header has no slot for the app's parts"
-! curl -fsS "http://$LOCAL/" | grep -q 'id="app-share"' || fail "standalone's header has Share the last clip"
+n=$(python3 -c 'import sqlite3, sys; print(sqlite3.connect(f"file:{sys.argv[1]}?mode=ro", uri=True).execute("SELECT count(*) FROM clip WHERE deleted_at IS NULL").fetchone()[0])' "$ROOT2/data/library/reel.db")
+[ "$n" -ge 1 ] || fail "the local library holds no clip"
 grep -q '"state": "local"' "$ROOT2/data/ledger.json" || fail "the ledger does not say local"
 find "$ROOT2/data/library/library" -maxdepth 1 -mindepth 1 | head -3
 say "standalone screenshot"

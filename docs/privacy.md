@@ -148,6 +148,23 @@ pairing tries are limited per address.
 out at once, and it asks to be paired again. The list shows each device's
 name, whose it is, when it was last seen and how many clips it sent.
 
+## The library on this PC
+
+In standalone, reel runs inside the app and listens on `127.0.0.1`, on a
+port that changes at each start. It signs nobody in, so it lets in only
+the app:
+
+- Each start makes a new random key of 256 bits, which the app keeps in
+  memory and writes to no file and no log. The app's window gets it as a
+  cookie (`HttpOnly`, so no page script reads it) in exchange for a ticket
+  that works once, and the app's own update check sends it with its
+  question to reel on this PC, never to GitHub.
+- Any other program, another user of the PC, or a browser that finds the
+  port gets 401, and from the health check only whether reel is ok.
+- It answers only requests addressed to `127.0.0.1`, `localhost` or
+  `[::1]` with its port, so a web page that points its own name at your
+  PC gets 421.
+
 ## What leaves your PC
 
 A new install of the desktop app is standalone: the library lives on your

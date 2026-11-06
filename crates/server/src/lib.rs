@@ -43,6 +43,8 @@ pub struct AppState {
     pub uploads_busy: std::sync::Arc<tokio::sync::Mutex<std::collections::HashSet<String>>>,
     pub links_making: std::sync::Arc<routes::api::LinksMaking>,
     pub zips: std::sync::Arc<routes::zips::Pending>,
+    /// The standalone library's key, which only the app is handed.
+    pub app_key: Option<single::AppKey>,
 }
 
 impl AppState {
@@ -94,6 +96,7 @@ impl AppState {
         ));
         // the app's standalone library has no first run
         let done = ctx.config().standalone() || routes::setup::is_done(&ctx).await;
+        let app_key = ctx.config().standalone().then(single::AppKey::new);
         Ok(Self {
             ctx,
             started_at: jiff::Timestamp::now(),
@@ -109,6 +112,7 @@ impl AppState {
             )),
             links_making: Default::default(),
             zips: Default::default(),
+            app_key,
         })
     }
 
@@ -175,6 +179,7 @@ pub fn router(state: AppState, bound: SocketAddr) -> Router {
         .route("/healthz", get(routes::health::healthz))
         .route("/signin", get(routes::users::signin_page))
         .route("/assets/{*path}", get(routes::assets::asset))
+        .route("/app/open", get(single::open))
         .merge(shared)
         .merge(
             Router::new()

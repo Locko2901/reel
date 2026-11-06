@@ -218,6 +218,13 @@ pub async fn require_user(State(st): State<AppState>, mut req: Request, next: Ne
     }
     match cfg.auth.mode {
         AuthMode::Single => {
+            if st
+                .app_key
+                .as_ref()
+                .is_some_and(|k| !k.shown_by(req.headers()))
+            {
+                return crate::single::not_the_app(&req);
+            }
             match crate::accounts::user_on_sight(&st.ctx.store, &cfg, &cfg.auth.dev_user, None)
                 .await
             {
