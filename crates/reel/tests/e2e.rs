@@ -16834,3 +16834,69 @@ async fn a_member_reads_no_server_folder_in_the_jobs_api() {
         "the folder by its name: {payload}"
     );
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn the_desktop_library_answers_no_page_that_points_its_own_name_at_the_loopback() {
+    let Some(env) = start_with(AuthMode::Single, vec![], |c| c.make_standalone()).await else {
+        return;
+    };
+    let port = reqwest::Url::parse(&env.base).unwrap().port().unwrap();
+    let site = format!("rebound.example:{port}");
+    let (status, _) = post_json_body(
+        &env,
+        "/api/collections",
+        serde_json::json!({ "name": "The app's own" }),
+    )
+    .await;
+    assert_eq!(status, 200, "the app's own page, on the loopback address");
+    let r = env
+        .client
+        .post(format!("{}/api/collections", env.base))
+        .header("host", &site)
+        .header("origin", format!("http://{site}"))
+        .header("sec-fetch-site", "same-origin")
+        .json(&serde_json::json!({ "name": "A web page's" }))
+        .send()
+        .await
+        .unwrap();
+    let status = r.status().as_u16();
+    let lists = env
+        .client
+        .get(format!("{}/api/collections", env.base))
+        .header("host", &site)
+        .header("sec-fetch-site", "same-origin")
+        .send()
+        .await
+        .unwrap();
+    assert!(
+        status >= 400 && lists.status().as_u16() >= 400,
+        "a page of {site}, its name pointed at 127.0.0.1, wrote ({status}) and read ({}): {}",
+        lists.status(),
+        lists.text().await.unwrap_or_default()
+    );
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_server_without_sign_in_answers_only_its_own_address() {
+    let Some(env) = start(AuthMode::Single, vec![]).await else {
+        return;
+    };
+    let port = env.base.rsplit(':').next().unwrap().to_string();
+    let elsewhere = format!("rebound.example:{port}");
+    let r = env
+        .client
+        .patch(format!("{}/api/settings", env.base))
+        .header("host", &elsewhere)
+        .header("origin", format!("http://{elsewhere}"))
+        .header("sec-fetch-site", "same-origin")
+        .json(&serde_json::json!({ "site_name": "taken" }))
+        .send()
+        .await
+        .unwrap();
+    assert_ne!(
+        r.status(),
+        200,
+        "a page whose name now points at the loopback is same-origin with itself and changes the settings"
+    );
+    assert_ne!(env.ctx.config().site_name, "taken");
+}
