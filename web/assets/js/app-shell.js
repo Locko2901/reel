@@ -49,7 +49,7 @@ export function appShell() {
   if (!document.body.hasAttribute('data-standalone')) $$('#sections-body .section-line').forEach(l => l.append(' Kept on the server: the same for every PC and browser.'));
   const chipDot = $('#chip-dot'), chipWord = $('#chip-word');
   const serverState = ['ok', 'warn', 'err'].find(c => chipDot?.classList.contains(c)) || 'ok';
-  const pause = $('#app-pause'), share = $('#app-share');
+  const pause = $('#app-pause'), recording = $('#app-recording'), share = $('#app-share');
   const render = (st) => {
     if (!st) return;
     const app = APP_DOT[st.state] || 'ok';
@@ -62,6 +62,7 @@ export function appShell() {
     renderVersions(st.versions, st.update_line);
     $$('.app-paired').forEach(el => el.hidden = !(st.panel ? st.panel.pause : st.paired));
     if (pause) setOn(pause, !!st.paused);
+    if (recording) setOn(recording, !!st.recording_paused);
     if (share) share.disabled = !st.can_share;
     const here = document.body.hasAttribute('data-standalone');
     [['#app-save', '#menu-save', st.save, here ? 'OBS saves the replay, and it goes into the library on this PC' : 'OBS saves the replay and it goes up as any clip does'],
@@ -96,6 +97,9 @@ export function appShell() {
   }
   if (pause) pause.addEventListener('change', async () => {
     try { render(await call('app_pause_set', { paused: isOn(pause) })); } catch (e) { /* as above */ }
+  });
+  if (recording) recording.addEventListener('change', async () => {
+    try { render(await call('app_recording_pause_set', { paused: isOn(recording) })); } catch (e) { /* as above */ }
   });
   $$('.sections a[data-app-section]').forEach(a => a.addEventListener('click', (e) => {
     e.preventDefault();

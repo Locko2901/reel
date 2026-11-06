@@ -74,14 +74,21 @@ how to add a server later.
   a window (Settings, Startup, **Start at logon**, on by default). On Windows that is a Run entry
   for your user; on Linux an entry in your desktop's autostart.
 - **In the tray.** Double-click reel's icon to open the library. Its menu has the app's state,
-  **Last clips** (each with **Open** and **Copy link**), **Save clip**, **Save and share**, **Share
-  the last clip**, **Pause uploads**, **Open library**, **Open settings**, on Windows with the OBS
-  that came with reel **Open OBS** or **Hide OBS**, and **Quit**. When an update is ready,
-  **Install reel** with the new version is there too. In standalone the menu keeps what makes sense
-  on one PC: the state, **Last clips** (each with **Open**), **Save clip**, **Open library**,
-  **Open settings**, OBS's entry and **Quit**, with **Pause uploads** once a server is paired. For
-  a tray whose icons are all one colour, Settings, Startup, **Tray icon** shows reel's mark alone
-  in white or in black. On Linux, reel's own OBS has a tray icon of its own, which opens its window.
+  **Last clips** (each with **Open** and **Copy link**), **Save clip**, **Save and share**,
+  **Pause recording**, **Share the last clip**, **Pause uploads**, **Open library**, **Open
+  settings**, on Windows with the OBS that came with reel **Open OBS** or **Hide OBS**, and
+  **Quit**. When an update is ready, **Install reel** with the new version is there too. In
+  standalone the menu keeps what makes sense on one PC: the state, **Last clips** (each with
+  **Open**), **Save clip**, **Pause recording**, **Open library**, **Open settings**, OBS's entry
+  and **Quit**, with **Pause uploads** once a server is paired. For a tray whose icons are all one
+  colour, Settings, Startup, **Tray icon** shows reel's mark alone in white or in black. On Linux,
+  reel's own OBS has a tray icon of its own, which opens its window.
+- **Pause recording**, in the tray and in the status chip of the window, stops OBS's replay
+  buffer: OBS no longer encodes, and the buffer gives back its memory. OBS stays open, so **Resume
+  recording** starts the buffer again at once. While paused, the tray, its icon's tooltip and the
+  chip say **recording paused**, **Save clip** and **Save and share** are off and say why, and the
+  Save hotkey saves nothing but says so. The pause lasts until you resume, or until the app starts
+  again: a new start always records.
 - **The window.** Closing it (the X) ends the window and the WebView that draws it; the app goes
   on in the tray, and opening the window again builds a new one in about a second. Started at
   sign-in, the app makes no window at all until you ask for one. [How light it is](light.md) has
@@ -111,10 +118,10 @@ parts to the header:
 - **Share the last clip** (connected), next to them, copies the link of the newest clip, as the
   hotkey does.
 - **The status chip** is a dot and a word for what the app is doing: **idle**, **uploading**,
-  **paused**, **preparing the link**, **not paired**, **cannot reach the server**, **no replay
+  **paused**, **recording paused**, **preparing the link**, **not paired**, **cannot reach the server**, **no replay
   saved**, **error**, or the step of the work on a clip. Click it for a line each about the
-  **App**, **OBS** and the **Server**, the **Versions**, the **Pause uploads** switch, **Status
-  page** and **Updates**. In standalone the third line is the **Library**: on this PC, where it
+  **App**, **OBS** and the **Server**, the **Versions**, the **Pause recording** and **Pause
+  uploads** switches, **Status page** and **Updates**. In standalone the third line is the **Library**: on this PC, where it
   lives, and whether reel on this PC runs. Its dot turns red only for a check of the PC's own (its
   room, ffmpeg, the database), and **Pause uploads** shows once a server is paired.
 - **Settings** holds the app's own pages and the server's in one nav, grouped by what you do:
@@ -195,7 +202,7 @@ One exception: a game that runs as administrator does not pass its keys to the a
 
 **On Linux** global hotkeys depend on your desktop: they may not work, or may need to be set up in
 the desktop's own keyboard settings. There you can bind a key to `reel-desktop --save-and-share`
-(or `--save`, `--share-last`). With the AppImage the command is the AppImage's path, which the
+(or `--save`, `--share-last`, `--pause-recording`, `--resume-recording`). With the AppImage the command is the AppImage's path, which the
 Hotkeys page shows.
 
 ## Updates

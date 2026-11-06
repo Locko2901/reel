@@ -276,6 +276,12 @@ pub fn app_pause_set(rt: State<'_, Runtime>, paused: bool) -> R<Value> {
     Ok(rt.app_status())
 }
 
+#[tauri::command]
+pub fn app_recording_pause_set(rt: State<'_, Runtime>, paused: bool) -> R<Value> {
+    rt.set_recording_paused(paused);
+    Ok(rt.app_status())
+}
+
 /// Show in folder and Open on a download's toast: only a file this run downloaded, and Open
 /// only for a video or a picture, so no page can start a program it downloaded.
 #[tauri::command]
@@ -372,6 +378,12 @@ pub fn open_folder(app: AppHandle, path: String) -> R<()> {
 #[tauri::command]
 pub fn pause_set(rt: State<'_, Runtime>, paused: bool) -> Status {
     rt.set_paused(paused);
+    rt.status()
+}
+
+#[tauri::command]
+pub fn recording_pause_set(rt: State<'_, Runtime>, paused: bool) -> Status {
+    rt.set_recording_paused(paused);
     rt.status()
 }
 

@@ -89,6 +89,7 @@ pub struct Version {
 pub enum ObsCommand {
     SaveReplay(oneshot::Sender<Result<(), ObsError>>),
     StartReplayBuffer(oneshot::Sender<Result<(), ObsError>>),
+    StopReplayBuffer(oneshot::Sender<Result<(), ObsError>>),
     RecordDirectory(oneshot::Sender<Result<String, ObsError>>),
     ReplayBufferActive(oneshot::Sender<Result<bool, ObsError>>),
     State(oneshot::Sender<Result<ObsState, ObsError>>),
@@ -875,6 +876,7 @@ pub async fn run(
                             None => return,
                             Some(ObsCommand::SaveReplay(reply)) => { let _ = reply.send(session.save_replay().await); }
                             Some(ObsCommand::StartReplayBuffer(reply)) => { let _ = reply.send(session.start_replay_buffer().await); }
+                            Some(ObsCommand::StopReplayBuffer(reply)) => { let _ = reply.send(session.stop_replay_buffer().await); }
                             Some(ObsCommand::RecordDirectory(reply)) => { let _ = reply.send(session.record_directory().await); }
                             Some(ObsCommand::ReplayBufferActive(reply)) => { let _ = reply.send(session.replay_buffer_active().await); }
                             Some(ObsCommand::State(reply)) => { let _ = reply.send(session.state().await); }

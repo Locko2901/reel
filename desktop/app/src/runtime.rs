@@ -1,7 +1,9 @@
 //! The app's running state and its flows; the tray, the window and the notifications read
 //! the one Status snapshot built here.
 use crate::standalone::{self, Local, LocalSettings};
-use crate::status::{LocalLine, ObsLine, OfflineLine, QueueItem, RecentItem, Status, WatcherLine};
+use crate::status::{
+    BufferStep, LocalLine, ObsLine, OfflineLine, QueueItem, RecentItem, Status, WatcherLine,
+};
 use crate::{hotkey, notify, shell, startup, tray};
 use reel_desktop_core::api::{Api, ShareAnswer, WhoAmI};
 use reel_desktop_core::cues::{Cue, Player};
@@ -70,6 +72,8 @@ pub struct Inner {
     pub waited_running: HashMap<PathBuf, watch::Sender<bool>>,
     pub paused_by_user: bool,
     pub paused_fullscreen: bool,
+    /// Pause recording, for this run only: a start of the app records again.
+    pub recording_paused: bool,
     pub preparing: Option<String>,
     pub processing: Vec<Processing>,
     pub last_error: Option<String>,
@@ -388,6 +392,7 @@ impl Runtime {
             uploading: None,
             paused_by_user: false,
             paused_fullscreen: false,
+            recording_paused: false,
             preparing: None,
             processing: Vec::new(),
             last_error: None,
@@ -558,7 +563,13 @@ impl Runtime {
                 }
             },
         });
-        let (state, word, line) = if let Some(o) = &g.offline {
+        let (state, word, line) = if g.recording_paused {
+            (
+                "paused",
+                "recording paused".to_string(),
+                "the replay buffer is stopped until you resume recording".to_string(),
+            )
+        } else if let Some(o) = &g.offline {
             (
                 "error",
                 if standalone {
@@ -711,6 +722,7 @@ impl Runtime {
         // last step ended with.
         let left = g.copy_left && self.lane.idle();
         let (save, save_share) = crate::status::save_actions(
+            g.recording_paused,
             g.settings.obs.enabled || (g.bundled.is_some() && g.settings.obs.bundled),
             g.obs.connected,
             g.obs_state.as_ref(),
@@ -752,6 +764,7 @@ impl Runtime {
             state_line: line,
             paused_by_user: g.paused_by_user,
             paused_fullscreen: g.paused_fullscreen,
+            recording_paused: g.recording_paused,
             obs: g.obs.clone(),
             bundled: g.bundled.is_some(),
             obs_box: g.obs_box.as_ref().map(|b| b.line()),
@@ -902,6 +915,7 @@ impl Runtime {
             "state_word": st.state_word,
             "state_line": st.state_line,
             "paused": st.paused_by_user,
+            "recording_paused": st.recording_paused,
             "obs_connected": st.obs.connected,
             "obs_line": st.obs.line,
             "can_share": can_share,
@@ -1366,6 +1380,8 @@ impl Runtime {
             "save-and-share" => self.save_and_share(),
             "upload-last" => self.upload_last(),
             "save" => self.save_clip(),
+            "pause-recording" => self.set_recording_paused(true),
+            "resume-recording" => self.set_recording_paused(false),
             other => tracing::warn!(action = other, "no such action"),
         }
     }
@@ -2300,11 +2316,21 @@ impl Runtime {
                     }
                     ObsEvent::SceneChanged => {}
                     ObsEvent::ReplayBufferState { active } => {
-                        if let Some(st) = rt.lock().obs_state.as_mut() {
-                            st.replay_active = active;
-                        }
+                        let st = {
+                            let mut g = rt.lock();
+                            if let Some(st) = g.obs_state.as_mut() {
+                                st.replay_active = active;
+                            }
+                            g.obs_state.clone()
+                        };
                         tracing::info!(active, "obs replay buffer");
                         rt.push_status();
+                        if let Some(st) = st.filter(|_| active && rt.lock().recording_paused) {
+                            let rt = rt.clone();
+                            tauri::async_runtime::spawn(async move {
+                                rt.ensure_replay_buffer(&st).await;
+                            });
+                        }
                     }
                     ObsEvent::RecordState { active, saved } => {
                         if let Some(st) = rt.lock().obs_state.as_mut() {
@@ -2465,12 +2491,27 @@ impl Runtime {
         Ok(lines)
     }
 
-    /// The setting "start the replay buffer": when OBS is open and the buffer is off, the
-    /// app enables it in the profile if needed and starts it, unless OBS is recording.
+    /// The replay buffer as Pause recording and the setting "start the replay buffer" want it:
+    /// stopped while recording is paused, else started when it is off and OBS is not recording.
     pub async fn ensure_replay_buffer(&self, st: &ObsState) {
-        if !self.settings().obs.start_replay || st.replay_active || st.recording {
-            return;
+        let paused = self.lock().recording_paused;
+        match crate::status::buffer_step(paused, self.settings().obs.start_replay, st) {
+            BufferStep::Start => self.start_replay_buffer(st).await,
+            BufferStep::Stop => self.stop_replay_buffer().await,
+            BufferStep::Leave => {}
         }
+    }
+
+    async fn stop_replay_buffer(&self) {
+        match self.obs_command(ObsCommand::StopReplayBuffer).await {
+            Ok(()) => tracing::info!("the replay buffer was stopped: recording is paused"),
+            Err(e) => tracing::warn!(error = %e, "the replay buffer did not stop"),
+        }
+        let _ = self.obs_state(true).await;
+    }
+
+    /// Enables the replay buffer in OBS's profile if needed, and starts it.
+    async fn start_replay_buffer(&self, st: &ObsState) {
         if !st.replay_enabled {
             let change = ObsChange {
                 replay_enabled: Some(true),
@@ -3142,7 +3183,7 @@ impl Runtime {
 
     /// The Save hotkey: OBS saves the replay, and it goes up as every clip OBS saves does.
     pub fn save_clip(&self) {
-        if self.double_tap() {
+        if self.double_tap() || self.recording_is_paused() {
             return;
         }
         let rt = self.clone();
@@ -3164,6 +3205,20 @@ impl Runtime {
                 _ => rt.save_failed(&rt.no_file_words()),
             }
         });
+    }
+
+    /// A save while recording is paused saves nothing and says so.
+    fn recording_is_paused(&self) -> bool {
+        if !self.lock().recording_paused {
+            return false;
+        }
+        tracing::info!("no replay saved: recording is paused");
+        notify::show(
+            &self.app,
+            "No replay saved",
+            "Recording is paused; Resume recording in the tray or in the app's window records again.",
+        );
+        true
     }
 
     fn save_failed(&self, why: &str) {
@@ -3192,7 +3247,7 @@ impl Runtime {
     /// A press while one runs is a Save and share too, with its own sound: each saves its
     /// replay, and the newest's link is the one copied.
     pub fn save_and_share(&self) {
-        if self.not_here("Save and share") || self.double_tap() {
+        if self.not_here("Save and share") || self.double_tap() || self.recording_is_paused() {
             return;
         }
         let token = CancellationToken::new();
@@ -3476,6 +3531,23 @@ impl Runtime {
             }
         }
         self.push_status();
+    }
+
+    /// Pause recording stops OBS's replay buffer and keeps it stopped, which gives back its
+    /// encoder and its memory; Resume recording starts it again.
+    pub fn set_recording_paused(&self, paused: bool) {
+        tracing::info!(paused, "recording paused by the user");
+        self.lock().recording_paused = paused;
+        self.push_status();
+        let rt = self.clone();
+        tauri::async_runtime::spawn(async move {
+            match rt.obs_state(true).await {
+                Ok(Some(st)) if paused => rt.ensure_replay_buffer(&st).await,
+                Ok(Some(st)) if !st.replay_active => rt.start_replay_buffer(&st).await,
+                Ok(_) => {}
+                Err(e) => tracing::warn!(error = %e, "OBS state not read"),
+            }
+        });
     }
 
     pub fn set_paused(&self, paused: bool) {
