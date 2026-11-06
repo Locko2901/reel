@@ -831,7 +831,7 @@ A claim (a string or a list) that makes an admin when it holds the admin value, 
 
 ### Admin value
 
-The value in the role claim that means admin.
+The value in the role claim that means admin; it cannot be empty while a role claim is set.
 
 - Under Settings: Access, Identity provider
 - In `config.toml`: `oidc_admin_value` under `[auth]`
