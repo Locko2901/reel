@@ -124,24 +124,39 @@ impl Backend {
     }
 }
 
+/// The row a name stands for, made on first sight. Behind a proxy the name is who a person
+/// is, so it is matched exactly, and None means another user has it in another case.
 pub async fn user_on_sight(
     store: &Store,
     cfg: &Config,
     name: &str,
     admin_claim: Option<bool>,
-) -> Result<UserRow, sqlx::Error> {
+) -> Result<Option<UserRow>, sqlx::Error> {
     let listed = listed(cfg, name);
-    match store.user_by_name(name).await? {
+    let exact = cfg.auth.mode == reel_core::config::AuthMode::Proxy;
+    let found = if exact {
+        store.user_by_exact_name(name).await?
+    } else {
+        store.user_by_name(name).await?
+    };
+    if found.is_none() && exact {
+        if let Some(other) = store.user_by_name(name).await? {
+            tracing::warn!(name, user = %other.name, "the proxy sent a name that differs from a user's only in case; refused");
+            return Ok(None);
+        }
+    }
+    Ok(Some(match found {
         Some(u) => {
             let wants_admin = listed || admin_claim == Some(true);
             if wants_admin && !u.is_admin() {
                 store.set_role(&u.id, "admin").await?;
-                return Ok(UserRow {
+                UserRow {
                     role: "admin".into(),
                     ..u
-                });
+                }
+            } else {
+                u
             }
-            Ok(u)
         }
         None => {
             let first = store.user_count().await? == 0;
@@ -153,9 +168,9 @@ pub async fn user_on_sight(
             let u = UserRow::new(name, role, None);
             store.insert_user(&u).await?;
             tracing::info!(user = %u.name, role, "user made on first sight");
-            Ok(u)
+            u
         }
-    }
+    }))
 }
 
 /// Whether Admins names this exactly, case included: a name that only looks the same is

@@ -15603,3 +15603,32 @@ async fn a_name_in_the_admins_makes_no_admin_of_a_stranger_whose_name_differs_in
         .unwrap();
     assert!(pat.is_admin(), "the subject pat, as Admins lists it");
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_name_from_the_proxy_that_differs_from_a_user_only_in_case_is_refused() {
+    let Some(env) = start(AuthMode::Proxy, vec!["127.0.0.1/32"]).await else {
+        return;
+    };
+    let as_name = |name: &'static str| {
+        env.client
+            .get(format!("{}/api/users", env.base))
+            .header("x-authentik-username", name)
+            .send()
+    };
+    assert_eq!(
+        as_name("mira").await.unwrap().status(),
+        200,
+        "mira, the first user and the only admin"
+    );
+    let r = as_name("MIRA").await.unwrap();
+    let users = env.store().users().await.unwrap();
+    assert_ne!(
+        r.status(),
+        200,
+        "the proxy named MIRA, and reel let them in as the admin among {:?}",
+        users.iter().map(|u| &u.name).collect::<Vec<_>>()
+    );
+    assert_eq!(r.status(), 403);
+    assert!(r.text().await.unwrap().contains("another case"));
+    assert_eq!(users.len(), 1, "and made nobody of them");
+}

@@ -106,9 +106,10 @@ From a provider, you can set the passwords before the switch:
 
 ## To a proxy
 
-The proxy names each person, so reel's names have to be the proxy's.
-Before the switch, under Settings, **Access**, press **Rename** on each
-user whose name the proxy spells differently, and put yours in
+The proxy names each person, so reel's names have to be the proxy's,
+exactly, case included: a name that differs from a user's only in case is
+refused. Before the switch, under Settings, **Access**, press **Rename** on
+each user whose name the proxy spells differently, and put yours in
 [Admins](configuration.md#admins) to be safe. Then set the proxy up as in
 [A sign-in in front](setup/server.md#a-sign-in-in-front-authentik-authelia-oauth2-proxy),
 the five open paths included: the paired apps need `/api/device/`.
