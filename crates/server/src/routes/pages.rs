@@ -839,8 +839,8 @@ pub async fn clip(
         duration: master.as_ref().and_then(|m| m.duration).unwrap_or(0.0),
         fps: master.as_ref().and_then(|m| m.fps).unwrap_or(60.0),
         has_audio: master.as_ref().map(|m| m.acodec.is_some()).unwrap_or(false),
-        keyframes_json,
-        level_json,
+        keyframes_json: script_json(&keyframes_json),
+        level_json: script_json(&level_json),
         tracks,
         loudness_target: st.ctx.config().media.loudness_target,
         quick_trims: st.ctx.config().edit.quick_trims.clone(),
@@ -865,16 +865,18 @@ pub async fn clip(
             .as_ref()
             .map(|(l, _)| l.clone())
             .unwrap_or_default(),
-        edit_from_json: edit_from
-            .map(|(_, j)| j.to_string())
-            .unwrap_or_else(|| "null".into()),
+        edit_from_json: script_json(
+            &edit_from
+                .map(|(_, j)| j.to_string())
+                .unwrap_or_else(|| "null".into()),
+        ),
         can_edit: me.may_edit(clip.owner_id.as_deref()),
         sets,
         game_set,
         back,
         starred: st.ctx.store.is_starred(&me.id, &clip.id).await?,
         anim_webp: st.ctx.hw.read().await.anim_webp,
-        anim_json: anim_json(current.as_ref()),
+        anim_json: script_json(&anim_json(current.as_ref())),
         anims: crate::routes::anims::views(&st, clip.current_id.as_deref(), &renditions).await?,
         poster_image: clip.poster_image.is_some(),
         poster_aspect: current
@@ -912,7 +914,10 @@ async fn tracks_cached(
     let cache = master.with_extension("tracks.json");
     if let Ok(text) = tokio::fs::read_to_string(&cache).await {
         if let Ok(names) = serde_json::from_str::<Vec<String>>(&text) {
-            return names;
+            return names
+                .iter()
+                .map(|n| reel_core::probe::track_title(n))
+                .collect();
         }
     }
     let Ok(n) = st.ctx.ff.audio_streams(master).await else {
@@ -926,10 +931,12 @@ async fn tracks_cached(
         .filter(|t| t.len() == n)
         .unwrap_or_default();
     let names: Vec<String> = (0..n)
-        .map(|i| match titles.get(i) {
-            Some(t) if !t.is_empty() => t.clone(),
-            _ => format!("Track {}", i + 1),
-        })
+        .map(
+            |i| match titles.get(i).map(|t| reel_core::probe::track_title(t)) {
+                Some(t) if !t.is_empty() => t,
+                _ => format!("Track {}", i + 1),
+            },
+        )
         .collect();
     let _ = tokio::fs::write(&cache, serde_json::to_string(&names).unwrap_or_default()).await;
     names

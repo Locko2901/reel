@@ -363,6 +363,18 @@ function audioEditor(id, video, root, toMaster, onChange) {
   };
 }
 
+// Text, or [tag, class, text] for a marked word: a track's name stays text, never markup.
+function writeLine(el, ...parts) {
+  el.replaceChildren(...parts.map((p) => {
+    if (typeof p === 'string') return document.createTextNode(p);
+    const [tag, cls, text] = p;
+    const e = document.createElement(tag);
+    if (cls) e.className = cls;
+    e.textContent = text;
+    return e;
+  }));
+}
+
 function trimEditor(id, video, duration, fps, titleField) {
   const strip = $('#filmstrip'), hs = $('#h-start'), he = $('#h-end'), range = $('#range'), shadeL = $('#shade-l'), shadeR = $('#shade-r'), head = $('#head');
   const tStart = $('#t-start'), tEnd = $('#t-end'), tLen = $('#t-len'), plan = $('#plan'), snap = $('#snap'), mute = $('#mute');
@@ -465,14 +477,15 @@ function trimEditor(id, video, duration, fps, titleField) {
     const btn = $('#render');
     const asFrom = from && fromBody !== null && Math.abs(st.start - from.start) < 0.001 && Math.abs(st.end - Math.min(duration, from.end)) < 0.001 && JSON.stringify(audio.body()) === fromBody && JSON.stringify(picture()) === fromPicture;
     if (btn && !btn.dataset.rendering) btn.disabled = !!asFrom;
-    if (asFrom) { plan.innerHTML = `this is ${from.label} as it is: move a handle or change the sound or picture to make a new version from it`; return; }
-    if (!trimmed && !isOn(mute) && !sound && !pictured()) { plan.innerHTML = 'nothing selected yet: drag the handles, or press <kbd>i</kbd> and <kbd>o</kbd> while the video plays'; return; }
-    if (pictured()) { plan.innerHTML = `<span class="st-warn">re-encode</span>, ${pictureWords()}: the whole cut is encoded again, which takes a while.${sound}`; return; }
-    if (!trimmed && isOn(mute)) { plan.innerHTML = '<span class="st-ok">stream copy</span>, the audio track is dropped and the video is untouched.'; return; }
-    if (!trimmed) { plan.innerHTML = `<span class="st-ok">video copied</span>, the whole clip as a new version with the video untouched.${sound}`; return; }
-    if (onKeyframe(st.start) && sound) plan.innerHTML = `<span class="st-ok">video copied</span>, the start sits on a keyframe, so the video is cut without encoding it again.${sound}`;
-    else if (onKeyframe(st.start)) plan.innerHTML = '<span class="st-ok">stream copy</span>, the start sits on a keyframe, so this cut takes about a second and loses nothing.';
-    else { const k = nearestKf(st.start); plan.innerHTML = `<span class="st-warn">re-encode</span>, the start is between keyframes${k !== null ? ` (nearest at ${fmt(k)})` : ''}; the whole cut is encoded again, which takes a while but cuts exactly here.${sound}`; }
+    const ok = (t) => ['span', 'st-ok', t], warn = (t) => ['span', 'st-warn', t], key = (t) => ['kbd', '', t];
+    if (asFrom) { writeLine(plan, `this is ${from.label} as it is: move a handle or change the sound or picture to make a new version from it`); return; }
+    if (!trimmed && !isOn(mute) && !sound && !pictured()) { writeLine(plan, 'nothing selected yet: drag the handles, or press ', key('i'), ' and ', key('o'), ' while the video plays'); return; }
+    if (pictured()) { writeLine(plan, warn('re-encode'), `, ${pictureWords()}: the whole cut is encoded again, which takes a while.${sound}`); return; }
+    if (!trimmed && isOn(mute)) { writeLine(plan, ok('stream copy'), ', the audio track is dropped and the video is untouched.'); return; }
+    if (!trimmed) { writeLine(plan, ok('video copied'), `, the whole clip as a new version with the video untouched.${sound}`); return; }
+    if (onKeyframe(st.start) && sound) writeLine(plan, ok('video copied'), `, the start sits on a keyframe, so the video is cut without encoding it again.${sound}`);
+    else if (onKeyframe(st.start)) writeLine(plan, ok('stream copy'), ', the start sits on a keyframe, so this cut takes about a second and loses nothing.');
+    else { const k = nearestKf(st.start); writeLine(plan, warn('re-encode'), `, the start is between keyframes${k !== null ? ` (nearest at ${fmt(k)})` : ''}; the whole cut is encoded again, which takes a while but cuts exactly here.${sound}`); }
   }
   function setStart(t) { pristine = false; st.start = Math.min(Math.max(0, t), st.end - 0.2); render(); }
   function setEnd(t) { pristine = false; st.end = Math.max(Math.min(duration, t), st.start + 0.2); render(); }
