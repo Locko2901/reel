@@ -28,6 +28,8 @@ pub const NOT_YOURS: &str = "not yours: only who uploaded a clip, or an admin, c
 pub const GONE: &str = "not there any more";
 pub const NOT_READY: &str = "not ready yet";
 pub const NO_LINK: &str = "no link, and not yours to make one";
+pub const OTHERS_FOOTAGE: &str =
+    "no link: it holds another user's footage, and only an admin makes one";
 
 pub fn picked(body: &Picked) -> AppResult<Vec<String>> {
     if body.ids.len() > MOST {
@@ -250,7 +252,7 @@ pub async fn links(
             .find(|s| s.state() == "active");
         let share = match live {
             Some(s) => s,
-            None if me.may_edit(clip.owner_id.as_deref()) => {
+            None if crate::rights::Sharer::of(&me).may_share(&clip) => {
                 let share = Share::new(
                     clip.id.clone(),
                     String::new(),
@@ -273,7 +275,12 @@ pub async fn links(
                 share
             }
             None => {
-                skipped.push(Skipped { id, why: NO_LINK });
+                let why = if me.may_edit(clip.owner_id.as_deref()) {
+                    OTHERS_FOOTAGE
+                } else {
+                    NO_LINK
+                };
+                skipped.push(Skipped { id, why });
                 continue;
             }
         };

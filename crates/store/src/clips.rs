@@ -12,11 +12,12 @@ fn like_literal(q: &str) -> String {
 
 impl Store {
     pub async fn insert_clip(&self, c: &Clip) -> Result<()> {
-        sqlx::query("INSERT INTO clip (id, title, description, state, source, source_name, recorded_at, created_at, published_at, master_id, current_id, poster_time, original_path, original_probe, plan_reason, error, deleted_at, source_clip_id, recorded_source, owner_id, source_hash, device_id, game, uploaded_at, uploaded_to) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
+        sqlx::query("INSERT INTO clip (id, title, description, state, source, source_name, recorded_at, created_at, published_at, master_id, current_id, poster_time, original_path, original_probe, plan_reason, error, deleted_at, source_clip_id, recorded_source, owner_id, source_hash, device_id, game, uploaded_at, uploaded_to, others_footage) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
             .bind(&c.id).bind(&c.title).bind(&c.description).bind(&c.state).bind(&c.source).bind(&c.source_name)
             .bind(&c.recorded_at).bind(&c.created_at).bind(&c.published_at).bind(&c.master_id).bind(&c.current_id)
             .bind(c.poster_time).bind(&c.original_path).bind(&c.original_probe).bind(&c.plan_reason).bind(&c.error).bind(&c.deleted_at).bind(&c.source_clip_id).bind(&c.recorded_source).bind(&c.owner_id)
             .bind(&c.source_hash).bind(&c.device_id).bind(&c.game).bind(&c.uploaded_at).bind(&c.uploaded_to)
+            .bind(c.others_footage)
             .execute(&self.pool).await?;
         Ok(())
     }
@@ -108,6 +109,22 @@ impl Store {
                 .execute(&self.pool)
                 .await?;
         }
+        Ok(())
+    }
+
+    /// The clips made of other clips (montages, cuts saved as their own clip), oldest first.
+    pub async fn clips_made_of_clips(&self) -> Result<Vec<Clip>> {
+        sqlx::query_as::<_, Clip>("SELECT * FROM clip WHERE source = 'montage' OR source_clip_id IS NOT NULL ORDER BY created_at, id")
+            .fetch_all(&self.pool)
+            .await
+    }
+
+    pub async fn set_others_footage(&self, id: &str, on: bool) -> Result<()> {
+        sqlx::query("UPDATE clip SET others_footage = ? WHERE id = ?")
+            .bind(on)
+            .bind(id)
+            .execute(&self.pool)
+            .await?;
         Ok(())
     }
 

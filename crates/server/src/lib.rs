@@ -5,6 +5,7 @@ pub mod device;
 pub mod disk;
 pub mod error;
 pub mod headers;
+pub mod rights;
 pub mod routes;
 pub mod serve_file;
 pub mod settings;
@@ -52,6 +53,7 @@ impl AppState {
         reel_pipeline::housekeeping::clear_not_games_once(&ctx).await?;
         reel_pipeline::housekeeping::remake_utc_titles_once(&ctx).await?;
         reel_pipeline::housekeeping::remake_not_game_titles_once(&ctx).await?;
+        reel_pipeline::housekeeping::mark_others_footage_once(&ctx).await?;
         {
             let ctx = ctx.clone();
             tokio::spawn(async move {

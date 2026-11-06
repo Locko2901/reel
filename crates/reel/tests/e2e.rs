@@ -16300,3 +16300,223 @@ async fn a_file_made_before_loses_its_place_once_and_the_others_stay_as_they_are
         .unwrap();
     assert_eq!(r.status(), 200, "the clip plays from its file copied again");
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_member_cannot_publish_another_members_clip_through_a_collection() {
+    let Some(env) = start(AuthMode::Local, vec![]).await else {
+        return;
+    };
+    let (admin, members) = admin_and_members(&env, &["mira", "sam"]).await;
+    let (mira, sam) = (&members[0], &members[1]);
+    let theirs = upload_as(&env, mira, "miras.mp4", Synth::small(2.0, "miras")).await;
+    let own = upload_as(&env, sam, "sams.mp4", Synth::small(2.0, "sams")).await;
+    let call = |who: &str, method: reqwest::Method, path: String, body: serde_json::Value| {
+        env.client
+            .request(method, format!("{}{path}", env.base))
+            .header("cookie", who.to_string())
+            .json(&body)
+            .send()
+    };
+    let r = call(
+        sam,
+        reqwest::Method::POST,
+        format!("/api/clips/{}/shares", theirs.id),
+        serde_json::json!({ "allow_download": true }),
+    )
+    .await
+    .unwrap();
+    assert_eq!(
+        r.status(),
+        403,
+        "a link of mira's clip is not sam's to make"
+    );
+    let set: serde_json::Value = call(
+        sam,
+        reqwest::Method::POST,
+        "/api/collections".into(),
+        serde_json::json!({ "name": "sam's" }),
+    )
+    .await
+    .unwrap()
+    .json()
+    .await
+    .unwrap();
+    let set = set["id"].as_str().unwrap().to_string();
+    for clip in [&theirs, &own] {
+        let r = call(
+            sam,
+            reqwest::Method::PUT,
+            format!("/api/collections/{set}/clips/{}", clip.id),
+            serde_json::json!({}),
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            r.status(),
+            200,
+            "anyone's clip goes in one's own collection"
+        );
+    }
+    let link: serde_json::Value = call(
+        sam,
+        reqwest::Method::POST,
+        format!("/api/collections/{set}/link"),
+        serde_json::json!({ "allow_download": true }),
+    )
+    .await
+    .unwrap()
+    .json()
+    .await
+    .unwrap();
+    assert_eq!(
+        link["left_out"], 1,
+        "the answer says what the link leaves out"
+    );
+    let url = link["url"].as_str().unwrap().to_string();
+    let status = |path: String| {
+        let c = env.client.clone();
+        async move { c.get(path).send().await.unwrap().status().as_u16() }
+    };
+    assert_ne!(
+        status(format!("{url}/{}/download", theirs.id)).await,
+        200,
+        "sam's collection link hands mira's file to anyone"
+    );
+    assert_ne!(status(format!("{url}/{}", theirs.id)).await, 200);
+    assert_eq!(
+        status(format!("{url}/{}/download", own.id)).await,
+        200,
+        "sam's own clip is on the link"
+    );
+    let page = env
+        .client
+        .get(&url)
+        .send()
+        .await
+        .unwrap()
+        .text()
+        .await
+        .unwrap();
+    assert!(
+        page.contains(&own.title) && !page.contains(&theirs.title),
+        "the link's page lists sam's clip alone"
+    );
+    let (_, set_page) = as_user(
+        &env,
+        reqwest::Method::GET,
+        &format!("/collections/{set}"),
+        sam,
+    )
+    .await;
+    assert!(
+        set_page.contains("1 clip here is not on the link"),
+        "the collection's page says so"
+    );
+
+    let made: serde_json::Value = call(
+        sam,
+        reqwest::Method::POST,
+        "/api/montage".into(),
+        serde_json::json!({ "clips": [own.id, theirs.id] }),
+    )
+    .await
+    .unwrap()
+    .json()
+    .await
+    .unwrap();
+    let montage = made["clip_id"].as_str().unwrap().to_string();
+    env.wait_clip(
+        |c| c.id == montage && c.state == "ready",
+        Duration::from_secs(120),
+    )
+    .await;
+    let r = call(
+        sam,
+        reqwest::Method::POST,
+        format!("/api/clips/{montage}/shares"),
+        serde_json::json!({}),
+    )
+    .await
+    .unwrap();
+    assert_eq!(
+        r.status(),
+        403,
+        "a montage holding mira's footage gets no link from sam"
+    );
+    let r = call(
+        &admin,
+        reqwest::Method::POST,
+        format!("/api/clips/{montage}/shares"),
+        serde_json::json!({}),
+    )
+    .await
+    .unwrap();
+    assert_eq!(r.status(), 200, "an admin may link it");
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_montage_made_before_of_another_members_clip_is_marked_once() {
+    let Some(env) = start(AuthMode::Local, vec![]).await else {
+        return;
+    };
+    let (_, members) = admin_and_members(&env, &["mira", "sam"]).await;
+    let (mira, sam) = (&members[0], &members[1]);
+    let theirs = upload_as(&env, mira, "miras.mp4", Synth::small(2.0, "miras")).await;
+    let own = upload_as(&env, sam, "sams.mp4", Synth::small(2.0, "sams")).await;
+    let other_own = upload_as(&env, sam, "sams 2.mp4", Synth::small(2.0, "sams 2")).await;
+    let mut made = Vec::new();
+    for parts in [[&own.id, &theirs.id], [&own.id, &other_own.id]] {
+        let (status, body) = {
+            let r = env
+                .client
+                .post(format!("{}/api/montage", env.base))
+                .header("cookie", sam.as_str())
+                .json(&serde_json::json!({ "clips": parts }))
+                .send()
+                .await
+                .unwrap();
+            (r.status().as_u16(), r.text().await.unwrap())
+        };
+        assert_eq!(status, 200, "{body}");
+        let v: serde_json::Value = serde_json::from_str(&body).unwrap();
+        made.push(v["clip_id"].as_str().unwrap().to_string());
+    }
+    for id in &made {
+        env.wait_clip(
+            |c| &c.id == id && c.state == "ready",
+            Duration::from_secs(120),
+        )
+        .await;
+    }
+    let flag = |id: &str| {
+        let store = env.store().clone();
+        let id = id.to_string();
+        async move { store.clip(&id).await.unwrap().unwrap().others_footage }
+    };
+    assert!(
+        flag(&made[0]).await && !flag(&made[1]).await,
+        "marked when made"
+    );
+    env.store()
+        .set_others_footage(&made[0], false)
+        .await
+        .unwrap();
+    env.store()
+        .delete_setting(reel_pipeline::housekeeping::OTHERS_FOOTAGE_PASS)
+        .await
+        .unwrap();
+    let env = restart(env, |_| {}).await;
+    let marked = |id: &str| {
+        let store = env.store().clone();
+        let id = id.to_string();
+        async move { store.clip(&id).await.unwrap().unwrap().others_footage }
+    };
+    assert!(
+        marked(&made[0]).await,
+        "a montage made before reel kept the mark is marked at the next start"
+    );
+    assert!(
+        !marked(&made[1]).await,
+        "a montage of one's own clips is not"
+    );
+}

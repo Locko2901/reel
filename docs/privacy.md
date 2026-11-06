@@ -24,7 +24,9 @@ Only what you share. Two kinds of address work without an account:
   collection's name and its clips, each with its title, poster and
   length, each playable on a page like a share link's. A clip you add to
   the collection later shows there too; a clip you take out is gone from
-  it.
+  it. The link serves only clips its maker may share: their own, or any
+  clip when an admin made it, so a member cannot publish someone else's
+  clip by putting it in a collection or a montage.
 
 Each link's address holds a random part of 128 bits (22 characters), made
 from the operating system's randomness. It cannot be guessed, and links
