@@ -256,6 +256,23 @@ provider to sign in, with no proxy asking first.
 1. At the provider, make an application (a client) for reel of the
    confidential kind, with the redirect URI
    `https://clips.example.com/oidc/callback`.
+
+    !!! warning "Choose who may use the application"
+        reel lets in every account the provider lets use its application,
+        as a member, and keeps no list of its own. In Authentik, bind a
+        policy or a group to the application, so that only your people
+        pass; with open enrolment, anyone who signs up there would.
+
+    The subject is who a user is to reel, so it has to stay the same for a
+    person and never pass to someone else. For a new setup in Authentik,
+    choose **Based on the User's hashed ID** as the client's subject mode:
+    a username can change or be taken again after its owner is gone, and
+    the next person with that name would be the reel user it belonged to.
+    On a setup that runs already, leave the mode as it is, since every
+    subject would change and every user would be new to reel. With hashed
+    IDs, make admins by the role claim or the setup code, as Admins then
+    lists those IDs.
+
 2. In the compose file, add:
 
     ```yaml
@@ -288,6 +305,13 @@ code: reel's log has it from the start (`docker logs reel`), and so has
 `docker exec reel reel doctor`. Type it there and you are the admin; the
 code then works no more. reel binds each user to the provider's issuer
 and subject, never to a name, so a renamed account stays the same user.
+
+reel asks the provider only at a sign-in. Someone you disable there, or
+take out of the admin group, keeps a session they have, and its role,
+until it ends: 7 days without use, 30 at most, unless
+[Idle timeout](../configuration.md#idle-timeout) and
+[Session lifetime](../configuration.md#session-lifetime) say otherwise.
+To end it at once, disable the user under Settings, **Access** too.
 
 ### No sign-in (single)
 
