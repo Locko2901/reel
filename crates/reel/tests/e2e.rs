@@ -16744,3 +16744,49 @@ ntfy_token = "tk_from_the_file"
     );
     assert!(got.lock().await.is_empty());
 }
+
+/// The health check's answer to a request with that cookie, directly or through a proxy.
+async fn health(
+    env: &Env,
+    path: &str,
+    cookie: Option<&str>,
+    through_a_proxy: bool,
+) -> serde_json::Value {
+    let mut r = env.client.get(format!("{}{path}", env.base));
+    if let Some(c) = cookie {
+        r = r.header("cookie", c);
+    }
+    if through_a_proxy {
+        r = r.header("x-forwarded-for", "203.0.113.9");
+    }
+    let r = r.send().await.unwrap();
+    assert_eq!(r.status(), 200, "{path}");
+    r.json().await.unwrap()
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn the_health_check_tells_a_stranger_no_version_and_no_counts() {
+    let Some(env) = start(AuthMode::Local, vec![]).await else {
+        return;
+    };
+    let (admin, members) = admin_and_members(&env, &["mira"]).await;
+    let stranger = health(&env, "/healthz", None, true).await;
+    assert_eq!(
+        stranger,
+        serde_json::json!({ "ok": true }),
+        "signed out, through the proxy, the health check says ok alone"
+    );
+    assert!(
+        health(&env, "/healthz", None, false).await["version"].is_string(),
+        "the machine itself, a container's health check, gets the details"
+    );
+    assert!(
+        health(&env, "/healthz", Some(&admin), true).await["clips"].is_number(),
+        "an admin gets them through the proxy"
+    );
+    assert_eq!(
+        health(&env, "/api/health", Some(&members[0]), true).await,
+        serde_json::json!({ "ok": true }),
+        "a member gets ok alone"
+    );
+}

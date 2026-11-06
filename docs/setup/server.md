@@ -155,8 +155,8 @@ clips.example.com {
 ### Check it
 
 Open `https://clips.example.com/healthz` from anywhere, your phone on
-mobile data included. When it worked, it answers the same JSON with
-`"ok":true`.
+mobile data included. When it worked, it answers `{"ok":true}`; the
+details the machine itself gets stay off the internet.
 
 ### Behind Cloudflare
 
