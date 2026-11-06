@@ -16900,3 +16900,32 @@ async fn a_server_without_sign_in_answers_only_its_own_address() {
     );
     assert_ne!(env.ctx.config().site_name, "taken");
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn the_desktop_library_lets_in_the_app_and_not_every_program_on_the_pc() {
+    let Some(env) = start_with(AuthMode::Single, vec![], |c| c.make_standalone()).await else {
+        return;
+    };
+    let videos = tempfile::tempdir().unwrap();
+    let file = env
+        .synth_at(videos.path(), "Holiday.mp4", Synth::small(2.0, "private"))
+        .await;
+    let r = reqwest::Client::new()
+        .post(format!("{}/api/imports/scan", env.base))
+        .json(&serde_json::json!({ "path": videos.path(), "mode": "move" }))
+        .send()
+        .await
+        .unwrap();
+    let status = r.status().as_u16();
+    let since = Instant::now();
+    while status != 401 && file.exists() && since.elapsed() < Duration::from_secs(60) {
+        tokio::time::sleep(Duration::from_millis(300)).await;
+    }
+    assert!(
+        status == 401 && file.exists(),
+        "a program that knows nothing but the port asked for a folder of the PC's user ({status}), and {} is {}: {}",
+        file.display(),
+        if file.exists() { "still there" } else { "gone into the library" },
+        r.text().await.unwrap_or_default()
+    );
+}
