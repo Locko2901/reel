@@ -9,6 +9,7 @@ pub mod rights;
 pub mod routes;
 pub mod serve_file;
 pub mod settings;
+pub mod single;
 pub mod standalone;
 pub mod stats;
 pub mod views;
@@ -131,7 +132,8 @@ pub async fn expire_sessions(
         .await;
 }
 
-pub fn router(state: AppState) -> Router {
+/// The routes, for reel listening on `bound`.
+pub fn router(state: AppState, bound: SocketAddr) -> Router {
     use standalone::Part;
     let guard = |part: Part| {
         axum::middleware::from_fn_with_state(
@@ -552,14 +554,25 @@ pub fn router(state: AppState) -> Router {
     let backend = accounts::Backend::new(state.ctx.clone());
     let auth_layer = axum_login::AuthManagerLayerBuilder::new(backend, session_layer).build();
 
-    Router::new()
+    let app = Router::new()
         .merge(public)
         .merge(limited)
         .merge(private)
         .merge(pair)
         .merge(device)
-        .layer(auth_layer)
-        .layer(DefaultBodyLimit::max(64 * 1024 * 1024 * 1024))
+        .layer(auth_layer);
+    let app = if cfg.auth.mode == AuthMode::Single {
+        app.layer(axum::middleware::from_fn_with_state(
+            single::Bound {
+                st: state.clone(),
+                addr: bound,
+            },
+            single::own_address,
+        ))
+    } else {
+        app
+    };
+    app.layer(DefaultBodyLimit::max(64 * 1024 * 1024 * 1024))
         .layer(TraceLayer::new_for_http())
         .layer(axum::middleware::from_fn_with_state(
             state.clone(),
@@ -574,10 +587,11 @@ pub async fn serve(
     shutdown: CancellationToken,
 ) -> anyhow::Result<()> {
     let listener = tokio::net::TcpListener::bind(listen).await?;
-    tracing::info!(listen = %listener.local_addr()?, "reel listening");
+    let bound = listener.local_addr()?;
+    tracing::info!(listen = %bound, "reel listening");
     axum::serve(
         listener,
-        router(state).into_make_service_with_connect_info::<SocketAddr>(),
+        router(state, bound).into_make_service_with_connect_info::<SocketAddr>(),
     )
     .with_graceful_shutdown(async move { shutdown.cancelled().await })
     .await?;
@@ -600,7 +614,7 @@ pub fn serve_listener(
     shutdown: CancellationToken,
 ) -> anyhow::Result<(SocketAddr, tokio::task::JoinHandle<()>)> {
     let addr = listener.local_addr()?;
-    let app = router(state).into_make_service_with_connect_info::<SocketAddr>();
+    let app = router(state, addr).into_make_service_with_connect_info::<SocketAddr>();
     let handle = tokio::spawn(async move {
         let _ = axum::serve(listener, app)
             .with_graceful_shutdown(async move { shutdown.cancelled().await })
