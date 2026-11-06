@@ -15444,3 +15444,64 @@ async fn a_visit_to_the_sign_in_page_keeps_nothing_on_the_server() {
         "twenty visits to the sign-in page by nobody in particular, each kept for 30 days"
     );
 }
+
+/// The host a browser goes to when it follows `location` from this server, read as a browser
+/// reads it: a backslash is a slash and a tab is dropped.
+fn host_after(env: &Env, location: &[u8]) -> String {
+    let location = String::from_utf8_lossy(location);
+    reqwest::Url::parse(&env.base)
+        .unwrap()
+        .join(&location)
+        .ok()
+        .and_then(|u| u.host_str().map(String::from))
+        .unwrap_or_default()
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn the_way_back_after_a_sign_in_stays_on_this_site() {
+    let Some(env) = start(AuthMode::Local, vec![]).await else {
+        return;
+    };
+    let code = setup_code(&env).await;
+    assert_eq!(first_admin(&env, "robin", &code).await.status(), 303);
+    for next in ["/clips/x", "/\\evil.example/", "/\t/evil.example/"] {
+        let r = env
+            .client
+            .post(format!("{}/signin", env.base))
+            .form(&[
+                ("name", "robin"),
+                ("password", "correct horse battery"),
+                ("next", next),
+            ])
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(r.status(), 303, "{next:?}");
+        let location = r.headers()["location"].as_bytes();
+        assert_eq!(
+            host_after(&env, location),
+            "127.0.0.1",
+            "signed in with the next address {next:?}, the browser goes to {:?}",
+            String::from_utf8_lossy(location)
+        );
+    }
+
+    let Some(proxy) = start(AuthMode::Proxy, vec!["127.0.0.1/32"]).await else {
+        return;
+    };
+    let r = proxy
+        .client
+        .post(format!("{}/signin", proxy.base))
+        .form(&[("name", ""), ("password", ""), ("next", "/\\evil.example/")])
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(r.status(), 303);
+    let location = r.headers()["location"].as_bytes();
+    assert_eq!(
+        host_after(&proxy, location),
+        "127.0.0.1",
+        "with no sign-in at all the form sends the browser to {:?}",
+        String::from_utf8_lossy(location)
+    );
+}

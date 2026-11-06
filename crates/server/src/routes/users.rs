@@ -40,10 +40,21 @@ pub struct SigninQuery {
     pub error: Option<String>,
 }
 
-fn safe_next(next: Option<&str>) -> String {
-    match next {
-        Some(n) if n.starts_with('/') && !n.starts_with("//") => n.to_string(),
-        _ => "/".to_string(),
+/// Where a sign-in goes on to: a path that a browser reads as one on this site, else the library.
+/// A browser takes a backslash for a slash and drops tabs and line breaks, so none may pass.
+fn safe_next(next: Option<&str>, public_url: &str) -> String {
+    let Some(n) = next else {
+        return "/".into();
+    };
+    if !n.starts_with('/') || n.contains('\\') || n.chars().any(char::is_control) {
+        return "/".into();
+    }
+    let Ok(base) = url::Url::parse(public_url) else {
+        return "/".into();
+    };
+    match base.join(n) {
+        Ok(to) if to.origin() == base.origin() => n.to_string(),
+        _ => "/".into(),
     }
 }
 
@@ -85,7 +96,7 @@ pub async fn signin_page(
     State(st): State<AppState>,
     Query(q): Query<SigninQuery>,
 ) -> AppResult<Response> {
-    let next = safe_next(q.next.as_deref());
+    let next = safe_next(q.next.as_deref(), &st.ctx.config().public_url);
     Ok(html(
         signin_view(&st, &next, q.error.as_deref().unwrap_or("")).await,
     ))
@@ -146,7 +157,7 @@ pub async fn signin(
     Form(f): Form<SigninForm>,
 ) -> AppResult<Response> {
     let cfg = st.ctx.config();
-    let next = safe_next(f.next.as_deref());
+    let next = safe_next(f.next.as_deref(), &cfg.public_url);
     if cfg.auth.mode != AuthMode::Local {
         return Ok(Redirect::to(&next).into_response());
     }
@@ -612,4 +623,32 @@ pub async fn signin_attempts(State(st): State<AppState>) -> AppResult<Json<Value
         .map(|a| json!({ "ip": a.ip, "name": a.name, "when": format::when(&a.at) }))
         .collect();
     Ok(Json(json!({ "attempts": rows })))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::safe_next;
+
+    #[test]
+    fn the_way_back_is_a_path_on_this_site_as_a_browser_reads_it() {
+        let site = "https://clips.example.org";
+        for (next, to) in [
+            ("/clips/01J?from=%2F", "/clips/01J?from=%2F"),
+            ("/%5Cevil.example/", "/%5Cevil.example/"),
+            ("//evil.example/", "/"),
+            ("/\\evil.example/", "/"),
+            ("/\t/evil.example/", "/"),
+            ("/\n/evil.example/", "/"),
+            ("https://evil.example/", "/"),
+            ("clips", "/"),
+        ] {
+            assert_eq!(safe_next(Some(next), site), to, "{next:?}");
+        }
+        assert_eq!(safe_next(None, site), "/");
+        assert_eq!(
+            safe_next(Some("/clips/x"), ""),
+            "/",
+            "no public URL, no way back"
+        );
+    }
 }
