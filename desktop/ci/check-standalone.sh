@@ -22,6 +22,10 @@ waitlog() { # waitlog <words> <seconds> <what>
   for _ in $(seq 1 $(($2 * 2))); do [ "$(logged "$1")" -gt 0 ] && return 0; sleep 0.5; done
   fail "$3"
 }
+waitmore() { # waitmore <words> <seconds> <what> <count before>
+  for _ in $(seq 1 $(($2 * 2))); do [ "$(logged "$1")" -gt "$4" ] && return 0; sleep 0.5; done
+  fail "$3"
+}
 said() { grep -c -- "$1" "$W/notifications.txt" || true; }
 wait_said() { # wait_said <words> <seconds> <what> <count before>
   for _ in $(seq 1 $(($2 * 2))); do [ "$(said "$1")" -gt "$4" ] && return 0; sleep 0.5; done
@@ -170,6 +174,24 @@ for _ in $(seq 1 20); do [ "$(logged 'save: OBS saves the replay')" -gt "$asked"
 for _ in $(seq 1 180); do [ "$(logged 'standalone: the clip is published')" -gt "$b" ] && break; sleep 0.5; done
 [ "$(logged 'standalone: the clip is published')" -gt "$b" ] || fail "Alt+F9 did not save a clip"
 ok "Save a clip's hotkey changed on the Hotkeys page, from the setup's Alt+F10 to Alt+F9: saved, and it saves a clip"
+CLIP_AT="library loaded at=127.0.0.1/clips/$LOCAL"
+b=$(logged "$CLIP_AT")
+"$APP" "reel-desktop://open/$LOCAL" > /dev/null 2>&1 || true
+waitmore "$CLIP_AT" 20 "Open did not open the clip again" "$b"
+sleep 3
+b=$(logged "app page section=status")
+"$APP" --section=status > /dev/null 2>&1 || true
+waitmore "app page section=status" 20 "Status did not open" "$b"
+sleep 2
+b=$(logged "$CLIP_AT")
+stalls=$(logged "the page stopped answering")
+lifeless=$(logged "no sign of life from the page")
+xdotool mousemove 640 500 click 8
+waitmore "$CLIP_AT" 15 "the mouse's back button did not go from Status to the clip" "$b"
+sleep 16
+[ "$(logged 'the page stopped answering')" -eq "$stalls" ] || fail "the clip page, back from Status, stopped calling the app and was taken for stalled"
+[ "$(logged 'no sign of life from the page')" -eq "$lifeless" ] || fail "the clip page, back from Status, never called the app"
+ok "back from Status to the clip page WebKit kept: it calls the app again, no stall in 16 s"
 kill "$SNI" 2>/dev/null || true
 stop
 
