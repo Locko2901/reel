@@ -94,9 +94,12 @@ You set the mode when the container starts (see
 
 - A password has at least 12 characters, and reel stores only its
   argon2id hash.
-- Sign-in tries are limited per address and per name: five, then one more
-  every two minutes. Admins see the failed tries (the address, the name
-  and when), and reel removes them after a week.
+- Sign-in tries are limited per address, and per name from one network:
+  five, then one more every two minutes. A name also has a ceiling from
+  anywhere: thirty, then one more a minute. So tries from many places stay
+  slow, and a stranger's wrong tries do not hold the person whose name it
+  is out from their own network. Admins see the failed tries (the address, the
+  name and when), and reel removes them after a week.
 - The session cookie is `HttpOnly`, `SameSite=Lax`, and `Secure` when the
   public URL is https. The database keeps only a hash of each session's
   id, so a copy of the database signs nobody in.

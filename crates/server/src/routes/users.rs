@@ -169,10 +169,11 @@ pub async fn signin(
         let page = signin_view(&st, &next, "That name and password do not go together.").await;
         return Ok(html_status(StatusCode::UNAUTHORIZED, page));
     }
-    if let Err(secs) = st.limiter.check(&name) {
+    let client = client_ip(&headers, peer.ip(), &cfg);
+    if let Err(secs) = st.limiter.check(&name, client) {
         return Ok(wait_page(&st, &next, secs).await);
     }
-    let ip = client_ip(&headers, peer.ip(), &cfg).to_string();
+    let ip = client.to_string();
     let user = auth
         .authenticate(Credentials::Password {
             name: name.clone(),

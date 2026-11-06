@@ -542,9 +542,19 @@ impl KeyExtractor for ClientKey {
     }
 }
 
-/// The per-account limit: `SIGNIN_BURST` tries on one name, then one more every `SIGNIN_PERIOD`.
+/// Tries on one name across every address: a stranger's tries from many places stay slow
+/// without holding the person whose name it is out from their own network.
+pub const NAME_CEILING_BURST: u32 = 30;
+pub const NAME_CEILING_PERIOD: Duration = Duration::from_secs(60);
+
+type Keyed = RateLimiter<String, DefaultKeyedStateStore<String>, DefaultClock>;
+
+/// The per-account limits: `SIGNIN_BURST` tries on one name from one network (a /24, a /64),
+/// then one more every `SIGNIN_PERIOD`; and `NAME_CEILING_BURST` on that name from anywhere,
+/// then one more every `NAME_CEILING_PERIOD`.
 pub struct NameLimiter {
-    limiter: RateLimiter<String, DefaultKeyedStateStore<String>, DefaultClock>,
+    near: Keyed,
+    anywhere: Keyed,
     clock: DefaultClock,
 }
 
@@ -554,29 +564,52 @@ impl Default for NameLimiter {
     }
 }
 
+/// The network a client's address belongs to, as one person's line or home has it.
+fn network(ip: IpAddr) -> String {
+    match ip.to_canonical() {
+        IpAddr::V4(v4) => {
+            let [a, b, c, _] = v4.octets();
+            format!("{a}.{b}.{c}.0/24")
+        }
+        IpAddr::V6(v6) => {
+            let s = v6.segments();
+            format!("{:x}:{:x}:{:x}:{:x}::/64", s[0], s[1], s[2], s[3])
+        }
+    }
+}
+
 impl NameLimiter {
     pub fn new() -> Self {
-        let quota = Quota::with_period(SIGNIN_PERIOD)
-            .expect("a period")
-            .allow_burst(NonZeroU32::new(SIGNIN_BURST).expect("a burst"));
+        let quota = |period: Duration, burst: u32| {
+            Quota::with_period(period)
+                .expect("a period")
+                .allow_burst(NonZeroU32::new(burst).expect("a burst"))
+        };
         Self {
-            limiter: RateLimiter::keyed(quota),
+            near: RateLimiter::keyed(quota(SIGNIN_PERIOD, SIGNIN_BURST)),
+            anywhere: RateLimiter::keyed(quota(NAME_CEILING_PERIOD, NAME_CEILING_BURST)),
             clock: DefaultClock::default(),
         }
     }
 
-    /// Ok to try, or how many seconds until the next try on that name.
-    pub fn check(&self, name: &str) -> Result<(), u64> {
-        let key = name.trim().to_lowercase();
-        self.limiter
-            .check_key(&key)
-            .map_err(|not_until| not_until.wait_time_from(self.clock.now()).as_secs().max(1))
+    /// Ok to try, or how many seconds until the next try on that name from that client. A try
+    /// held back on its own network does not count against the name everywhere.
+    pub fn check(&self, name: &str, client: IpAddr) -> Result<(), u64> {
+        let name = name.trim().to_lowercase();
+        let now = self.clock.now();
+        let wait = |n: governor::NotUntil<_>| n.wait_time_from(now).as_secs().max(1);
+        self.near
+            .check_key(&format!("{name} {}", network(client)))
+            .map_err(wait)?;
+        self.anywhere.check_key(&name).map_err(wait)
     }
 
     /// Forgets the names whose tries are all spent and refilled.
     pub fn prune(&self) {
-        self.limiter.retain_recent();
-        self.limiter.shrink_to_fit();
+        for l in [&self.near, &self.anywhere] {
+            l.retain_recent();
+            l.shrink_to_fit();
+        }
     }
 }
 
@@ -1015,17 +1048,37 @@ mod tests {
     }
 
     #[test]
-    fn the_name_limiter_allows_the_burst_then_waits() {
+    fn the_name_limiter_holds_a_network_back_and_the_name_only_past_its_ceiling() {
         let l = NameLimiter::new();
-        for _ in 0..SIGNIN_BURST {
-            assert!(l.check("Mira").is_ok());
+        let at = |s: &str| s.parse::<IpAddr>().unwrap();
+        for n in 0..SIGNIN_BURST {
+            assert!(l.check("Mira", at(&format!("198.51.100.{n}"))).is_ok());
         }
-        let wait = l.check("mira").unwrap_err();
+        let wait = l.check("mira", at("198.51.100.99")).unwrap_err();
         assert!(wait >= 1, "{wait}");
         assert!(
-            l.check("someone else").is_ok(),
+            l.check("mira", at("203.0.113.7")).is_ok(),
+            "another network is not held back"
+        );
+        assert!(
+            l.check("mira", at("::ffff:198.51.100.7")).is_err(),
+            "an IPv4 address written as IPv6 is the same network"
+        );
+        assert!(
+            l.check("someone else", at("198.51.100.1")).is_ok(),
             "another name has its own count"
         );
+        let mut networks = 0;
+        while l.check("mira", at(&format!("10.{networks}.0.1"))).is_ok() {
+            networks += 1;
+            assert!(networks < 100, "the name has a ceiling");
+        }
+        assert_eq!(
+            SIGNIN_BURST + 1 + networks,
+            NAME_CEILING_BURST,
+            "the ceiling counts every network's tries"
+        );
+        assert_eq!(network(at("2001:db8:1:2:3:4:5:6")), "2001:db8:1:2::/64");
     }
 
     #[test]
