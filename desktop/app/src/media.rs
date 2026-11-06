@@ -117,9 +117,11 @@ fn stalled(view: &webkit2gtk::WebView, app: &AppHandle, why: &str) {
     );
     OFF.store(true, Ordering::Relaxed);
     turn_off(view);
+    // read first: the webview has no address once its web process is ended
+    let at = view.uri().and_then(|u| u.parse().ok());
     view.terminate_web_process();
     if let Some(rt) = app.try_state::<Runtime>() {
-        rt.reload_page();
+        rt.reload_page(at);
     }
 }
 

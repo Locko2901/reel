@@ -3799,15 +3799,12 @@ impl Runtime {
         }
     }
 
-    /// The page's web process was ended: the page it showed loads again, or the library's
-    /// front page when it was not one of the library's own.
+    /// The page's web process was ended: the page it showed, `at`, loads again, or the
+    /// library's front page when it was not one of the library's own.
     #[cfg(target_os = "linux")]
-    pub fn reload_page(&self) {
+    pub fn reload_page(&self, at: Option<url::Url>) {
         let base = self.library_base();
-        let path = self
-            .app
-            .get_webview(shell::LIBRARY)
-            .and_then(|w| w.url().ok())
+        let path = at
             .filter(|u| {
                 matches!(u.scheme(), "http" | "https")
                     && shell::origin_of(u.as_str()) == shell::origin_of(&base)
