@@ -56,7 +56,11 @@ pub async fn test_encoders() -> Vec<EncoderTest> {
             (false, format!("ffmpeg has no {enc}"))
         } else {
             match ff
-                .run(&reel_media::args::hw_self_test(*backend, device), 1.0, None)
+                .run(
+                    &reel_media::args::hw_self_test(*backend, device, cfg!(windows)),
+                    1.0,
+                    None,
+                )
                 .await
             {
                 Ok(()) => (true, "a test encode worked".to_string()),

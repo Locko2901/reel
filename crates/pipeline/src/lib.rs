@@ -189,6 +189,7 @@ impl Ctx {
         reel_media::args::Encoder {
             hw: hw.backend,
             device: cfg.media.render_device.clone(),
+            windows: cfg!(windows),
             mbit: cfg.media.encode_mbit,
             fps,
             hw_decoder: hw.decoder_for(vcodec),
