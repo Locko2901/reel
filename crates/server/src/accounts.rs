@@ -623,9 +623,6 @@ pub struct Oidc {
     pub http: openidconnect::reqwest::Client,
     pub issuer: String,
     pub scopes: Vec<String>,
-    pub username_claim: String,
-    pub role_claim: String,
-    pub admin_value: String,
 }
 
 pub const OIDC_SECRET_ENV: &str = "REEL_OIDC_CLIENT_SECRET";
@@ -679,9 +676,6 @@ impl Oidc {
                 .split_whitespace()
                 .map(String::from)
                 .collect(),
-            username_claim: cfg.auth.oidc_username_claim.clone(),
-            role_claim: cfg.auth.oidc_role_claim.clone(),
-            admin_value: cfg.auth.oidc_admin_value.clone(),
         })
     }
 
@@ -724,18 +718,20 @@ impl Oidc {
             .map_err(|e| anyhow::anyhow!("the token exchange failed: {e}"))
     }
 
-    /// The identity the tokens carry, checked with the keys of the last discovery; an email
-    /// names it only when verified.
+    /// The identity the tokens carry, checked with the keys of the last discovery and read by
+    /// the claim settings of `cfg`; an email names it only when verified.
     pub fn identity(
         &self,
         tokens: &ReelTokenResponse,
         pending: &OidcPending,
+        cfg: &Config,
     ) -> Result<OidcIdentity, Unverified> {
         let id_token = tokens.id_token().ok_or(Unverified::NoIdToken)?;
         let verifier = self.client.id_token_verifier();
         let claims = id_token.claims(&verifier, &Nonce::new(pending.nonce.clone()))?;
         let extra = &claims.additional_claims().0;
-        let name = match self.username_claim.as_str() {
+        let auth = &cfg.auth;
+        let name = match auth.oidc_username_claim.as_str() {
             "preferred_username" | "" => claims.preferred_username().map(|u| u.to_string()),
             "email" => claims
                 .email()
@@ -749,15 +745,15 @@ impl Oidc {
         }
         .filter(|n| !n.trim().is_empty())
         .unwrap_or_else(|| claims.subject().to_string());
-        let admin_claim = if self.role_claim.is_empty() {
+        let admin_claim = if auth.oidc_role_claim.is_empty() {
             None
         } else {
-            let value = extra.get(&self.role_claim);
+            let value = extra.get(&auth.oidc_role_claim);
             Some(match value {
-                Some(serde_json::Value::String(s)) => s == &self.admin_value,
-                Some(serde_json::Value::Array(items)) => {
-                    items.iter().any(|i| i.as_str() == Some(&self.admin_value))
-                }
+                Some(serde_json::Value::String(s)) => s == &auth.oidc_admin_value,
+                Some(serde_json::Value::Array(items)) => items
+                    .iter()
+                    .any(|i| i.as_str() == Some(&auth.oidc_admin_value)),
                 _ => false,
             })
         };

@@ -6748,6 +6748,7 @@ struct Persona {
     email: Option<String>,
     email_verified: Option<bool>,
     groups: Vec<String>,
+    roles: Vec<String>,
 }
 
 impl Persona {
@@ -6758,6 +6759,7 @@ impl Persona {
             email: None,
             email_verified: None,
             groups: vec!["players".into(), "reel-admins".into()],
+            roles: vec![],
         }
     }
 }
@@ -6923,6 +6925,7 @@ async fn stand_in_provider(persona: Personas, tail: &str) -> (String, Stand) {
                     let who = s.persona.lock().await.clone();
                     let mut extra = serde_json::Map::new();
                     extra.insert("groups".into(), serde_json::json!(who.groups));
+                    extra.insert("roles".into(), serde_json::json!(who.roles));
                     let mut standard = StandardClaims::new(SubjectIdentifier::new(who.sub.clone()))
                         .set_preferred_username(Some(EndUserUsername::new(who.username.clone())));
                     if let Some(email) = &who.email {
@@ -7800,6 +7803,7 @@ async fn an_unverified_email_is_not_a_name() {
         email: Some("nine@example.org".into()),
         email_verified: Some(false),
         groups: vec![],
+        roles: vec![],
     });
     let Some((env, issuer)) = oidc_env(who.clone(), |c| {
         c.auth.oidc_username_claim = "email".into();
@@ -7849,6 +7853,98 @@ async fn an_unverified_email_is_not_a_name() {
             .unwrap()
             .name,
         "nine@example.org"
+    );
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn the_claim_settings_count_at_the_next_sign_in_without_a_restart() {
+    std::env::set_var("REEL_OIDC_CLIENT_SECRET", "secret-1");
+    let who = persona(Persona::mira());
+    let (issuer, stand) = stand_in_provider(who.clone(), "").await;
+    let i = issuer.clone();
+    let Some(env) = start_with(AuthMode::Oidc, vec!["127.0.0.1/32"], move |c| {
+        c.auth.oidc_issuer = i;
+        c.auth.oidc_client_id = "reel".into();
+    })
+    .await
+    else {
+        return;
+    };
+    let (status, admin, _) = oidc_sign_in_by(&env, "/oidc/start").await;
+    assert_eq!(status, 303, "mira, the first user and so an admin");
+    let asked = stand.asked();
+    let set = |key: &'static str, value: &'static str| {
+        let admin = admin.clone();
+        let env = &env;
+        async move {
+            let r = env
+                .client
+                .patch(format!("{}/api/settings", env.base))
+                .header("cookie", &admin)
+                .header("sec-fetch-site", "same-origin")
+                .json(&serde_json::json!({ key: value }))
+                .send()
+                .await
+                .unwrap();
+            assert_eq!(r.status(), 200, "{key}");
+            let answer: serde_json::Value = r.json().await.unwrap();
+            assert_eq!(answer["restart"], false, "{key} waits for no restart");
+        }
+    };
+    set("auth.oidc_username_claim", "email").await;
+    set("auth.oidc_role_claim", "roles").await;
+    set("auth.oidc_admin_value", "reel-crew").await;
+
+    *who.lock().await = Persona {
+        sub: "sub-pat".into(),
+        username: "pat".into(),
+        email: Some("pat@example.org".into()),
+        email_verified: Some(true),
+        groups: vec![],
+        roles: vec!["reel-crew".into()],
+    };
+    assert_eq!(oidc_sign_in(&env).await.0, 303);
+    let pat = env
+        .store()
+        .user_by_oidc(&issuer, "sub-pat")
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(pat.name, "pat@example.org", "named by the new claim");
+    assert!(pat.is_admin(), "made an admin by the new claim and value");
+
+    {
+        let mut p = who.lock().await;
+        p.sub = "sub-robin".into();
+        p.username = "robin".into();
+        p.email = Some("robin@example.org".into());
+        p.roles = vec!["admin".into()];
+    }
+    assert_eq!(oidc_sign_in(&env).await.0, 303);
+    let robin = env
+        .store()
+        .user_by_oidc(&issuer, "sub-robin")
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(robin.name, "robin@example.org");
+    assert!(!robin.is_admin(), "the old admin value makes no admin");
+
+    set("auth.oidc_admin_value", "admin").await;
+    assert_eq!(oidc_sign_in(&env).await.0, 303);
+    assert!(
+        env.store()
+            .user(&robin.id)
+            .await
+            .unwrap()
+            .unwrap()
+            .is_admin(),
+        "a second change counts at the next sign-in too"
+    );
+    assert_eq!(
+        stand.asked(),
+        asked,
+        "the provider was not asked for its metadata again"
     );
 }
 
