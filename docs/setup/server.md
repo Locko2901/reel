@@ -273,11 +273,14 @@ provider to sign in, with no proxy asking first.
 3. Optional: set a [Role claim](../configuration.md#role-claim) such as
    `groups`, and the [Admin value](../configuration.md#admin-value) in it
    that makes an admin. reel follows it at every sign-in.
+4. Optional: name the provider on the sign-in button with
+   `REEL_OIDC_NAME: Authentik` ([Provider name](../configuration.md#provider-name)).
 
 When it worked, the sign-in page has a button **Sign in with** followed
-by your provider's address, and the first user to come back from it is
-an admin. reel binds each user to the provider's issuer and subject,
-never to a name, so a renamed account stays the same user.
+by that name, or by your provider's address without one, and the first
+user to come back from it is an admin. reel binds each user to the
+provider's issuer and subject, never to a name, so a renamed account
+stays the same user.
 
 ### No sign-in (single)
 

@@ -308,19 +308,34 @@ pub async fn user_by_link(store: &Store, token: &str) -> Result<Option<UserRow>,
 }
 
 /// Why a link did not bind, for the person who opened it.
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug)]
 pub enum LinkRefused {
-    #[error("This link is used or past its time.")]
     Gone,
-    #[error("{0} is linked to the identity provider already.")]
     Linked(String),
-    #[error("{0} is disabled.")]
     Disabled(String),
-    #[error("Your account at the identity provider is the user {0} here already.")]
     Taken(String),
 }
 
+/// For the log, whose lines read the same on every server.
+impl std::fmt::Display for LinkRefused {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.words("the identity provider"))
+    }
+}
+
 impl LinkRefused {
+    /// The refusal for the person, with the provider called `provider`.
+    pub fn words(&self, provider: &str) -> String {
+        match self {
+            LinkRefused::Gone => "This link is used or past its time.".into(),
+            LinkRefused::Linked(u) => format!("{u} is linked to {provider} already."),
+            LinkRefused::Disabled(u) => format!("{u} is disabled."),
+            LinkRefused::Taken(u) => {
+                format!("Your account at {provider} is the user {u} here already.")
+            }
+        }
+    }
+
     pub fn what_now(&self) -> &'static str {
         match self {
             LinkRefused::Gone => "An admin can make a new link under Settings, Access.",

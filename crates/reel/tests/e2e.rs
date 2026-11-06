@@ -7084,6 +7084,79 @@ async fn oidc_env(persona: Personas, tweak: impl FnOnce(&mut Config)) -> Option<
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn the_sign_in_button_names_the_provider_as_the_admin_calls_it() {
+    let Some((env, _)) = oidc_env(persona(Persona::mira()), |_| {}).await else {
+        return;
+    };
+    let page = page_text(&env, "/signin").await.1;
+    assert!(
+        page.contains("leaves the sign-in to 127.0.0.1;")
+            && page.contains("Sign in with 127.0.0.1</a>"),
+        "without a name, the issuer's host: {page}"
+    );
+
+    let (status, admin, _) = oidc_sign_in_by(&env, "/oidc/start").await;
+    assert_eq!(status, 303);
+    let name_it = |name: String| {
+        env.client
+            .patch(format!("{}/api/settings", env.base))
+            .header("cookie", &admin)
+            .header("sec-fetch-site", "same-origin")
+            .json(&serde_json::json!({ "auth.oidc_name": name }))
+            .send()
+    };
+    let r = name_it("x".repeat(41)).await.unwrap();
+    assert_eq!(r.status(), 400);
+    assert!(
+        r.text().await.unwrap().contains("at most 40 characters"),
+        "a name fits on a phone's button"
+    );
+
+    let r = name_it(r#"<b>Home</b> & "Co""#.into()).await.unwrap();
+    assert_eq!(r.status(), 200, "{}", r.text().await.unwrap());
+    let shown = "&#60;b&#62;Home&#60;/b&#62; &#38; &#34;Co&#34;";
+    let page = page_text(&env, "/signin").await.1;
+    assert!(
+        page.contains(&format!("leaves the sign-in to {shown};"))
+            && page.contains(&format!("Sign in with {shown}</a>")),
+        "the name, at once and escaped: {page}"
+    );
+    assert!(
+        !page.contains("<b>Home") && !page.contains("127.0.0.1"),
+        "{page}"
+    );
+
+    let r = env
+        .client
+        .get(format!("{}/oidc/start", env.base))
+        .send()
+        .await
+        .unwrap();
+    let pending = cookie_of(&r);
+    let r = env
+        .client
+        .get(format!(
+            "{}/oidc/callback?error=access_denied&error_description=not%20today",
+            env.base
+        ))
+        .header("cookie", &pending)
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(r.status(), 303);
+    let back = r.headers()["location"].to_str().unwrap().to_string();
+    let page = page_text(&env, &back).await.1;
+    assert!(
+        page.contains(&format!("{shown} said: not today")),
+        "the provider's refusal names it too: {page}"
+    );
+
+    assert_eq!(name_it(String::new()).await.unwrap().status(), 200);
+    let page = page_text(&env, "/signin").await.1;
+    assert!(page.contains("Sign in with 127.0.0.1</a>"), "{page}");
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn an_identity_is_bound_to_its_subject_not_its_name() {
     let who = persona(Persona {
         sub: "sub-1".into(),
@@ -7385,7 +7458,7 @@ async fn a_server_moved_from_its_own_accounts_to_a_provider_keeps_its_people_by_
     let (status, _, page) = oidc_sign_in_by(&env, &link).await;
     assert_eq!(status, 409);
     assert!(
-        page.contains("is the user mira 2 here already"),
+        page.contains("Your account at 127.0.0.1 is the user mira 2 here already"),
         "an identity is never moved off another user: {page}"
     );
     let (s, body) = as_user(

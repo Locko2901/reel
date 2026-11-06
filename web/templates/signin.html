@@ -13,13 +13,13 @@
   <a class="wordmark" href="/"><svg class="mark" viewBox="8.6 3 16.2 26" aria-hidden="true"><path d="M8.6 3L16 10.4V29H8.6Z"/><path class="arm" d="M8.6 3H24.8V10.4H16Z"/></svg>{{ site }}</a>
 </header>
 <main class="signin">
-  {% if let Some(host) = oidc %}
+  {% if let Some(provider) = oidc %}
   <div class="stack">
     <h1>Sign in</h1>
     {% if !error.is_empty() %}<p class="st-err small">{{ error }}</p>{% endif %}
     {% if !mode_line.is_empty() %}<p class="muted">{{ mode_line }}</p>{% else %}
-    <p class="muted small">{{ site }} leaves the sign-in to {{ host }}; you come back here signed in.</p>
-    <a class="btn primary big" href="/oidc/start?next={{ next }}">Sign in with {{ host }}</a>{% endif %}
+    <p class="muted small">{{ site }} leaves the sign-in to {{ provider }}; you come back here signed in.</p>
+    <a class="btn primary big" href="/oidc/start?next={{ next }}">Sign in with {{ provider }}</a>{% endif %}
     <p class="faint small">Share links need no sign-in.</p>
   </div>
   {% else if !local %}

@@ -777,6 +777,16 @@ The OpenID Connect issuer URL exactly as the provider gives it, its last slash i
 - Default: empty
 - Takes effect at the next start
 
+### Provider name
+
+What the sign-in page calls the provider, as in Sign in with Authentik; empty shows the issuer's host; shown as typed, at most 40 characters.
+
+- Under Settings: Access, Identity provider
+- In `config.toml`: `oidc_name` under `[auth]`
+- Environment: `REEL_OIDC_NAME`
+- Accepts: text
+- Default: empty
+
 ### Client id
 
 The client registered at the issuer; its secret comes from REEL_OIDC_CLIENT_SECRET or the file REEL_OIDC_CLIENT_SECRET_FILE names, never from here.
