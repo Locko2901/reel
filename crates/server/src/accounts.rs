@@ -748,6 +748,17 @@ pub struct OidcPending {
     /// The token of the link this sign-in came by, which binds the identity to its user.
     #[serde(default)]
     pub link: Option<String>,
+    /// When it began, in seconds: a signed-in session keeps its own expiry, so the pending
+    /// sign-in carries its ten minutes itself.
+    #[serde(default)]
+    pub started: i64,
+}
+
+impl OidcPending {
+    /// Past its `OIDC_PENDING_MINUTES`, or from before it carried a start.
+    pub fn too_old(&self, now: i64) -> bool {
+        now - self.started > OIDC_PENDING_MINUTES * 60
+    }
 }
 
 pub struct Oidc {
@@ -832,6 +843,7 @@ impl Oidc {
                 nonce: nonce.secret().clone(),
                 pkce: verifier.secret().clone(),
                 link: None,
+                started: jiff::Timestamp::now().as_second(),
             },
         )
     }
@@ -1129,6 +1141,25 @@ mod tests {
             "the ceiling counts every network's tries"
         );
         assert_eq!(network(at("2001:db8:1:2:3:4:5:6")), "2001:db8:1:2::/64");
+    }
+
+    #[test]
+    fn a_pending_sign_in_lasts_ten_minutes_of_its_own() {
+        let p = OidcPending {
+            csrf: "s".into(),
+            nonce: "n".into(),
+            pkce: "v".into(),
+            link: None,
+            started: 1_000,
+        };
+        assert!(!p.too_old(1_000 + OIDC_PENDING_MINUTES * 60));
+        assert!(p.too_old(1_001 + OIDC_PENDING_MINUTES * 60));
+        let old: OidcPending =
+            serde_json::from_str(r#"{"csrf":"s","nonce":"n","pkce":"v"}"#).unwrap();
+        assert!(
+            old.too_old(1_000),
+            "one kept from before has no start, and is over"
+        );
     }
 
     #[test]

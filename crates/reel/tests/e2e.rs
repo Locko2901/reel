@@ -15904,3 +15904,52 @@ async fn the_session_cookie_of_a_server_on_https_is_bound_to_its_host() {
         "{cookies:?}"
     );
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn starting_a_sign_in_leaves_a_signed_in_session_its_expiry() {
+    let Some((env, _)) = oidc_env(persona(Persona::mira()), |_| {}).await else {
+        return;
+    };
+    let (status, signed) = oidc_sign_in(&env).await;
+    assert_eq!(status, 303);
+    let longest_left = || async {
+        sqlx::query_scalar::<_, f64>(
+            "SELECT MAX((julianday(expiry_date) - julianday('now')) * 1440.0) FROM tower_sessions",
+        )
+        .fetch_one(env.store().pool())
+        .await
+        .unwrap()
+    };
+    assert!(longest_left().await > 29.0 * 1440.0);
+    let r = env
+        .client
+        .get(format!("{}/oidc/start", env.base))
+        .header("cookie", &signed)
+        .header("x-forwarded-for", "203.0.113.61")
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(r.status(), 303);
+    let left = longest_left().await;
+    assert!(
+        left > 29.0 * 1440.0,
+        "a link to /oidc/start from any page leaves the signed-in session {left:.1} minutes"
+    );
+    let to_issuer = r.headers()["location"].to_str().unwrap().to_string();
+    let back = env.client.get(&to_issuer).send().await.unwrap().headers()["location"]
+        .to_str()
+        .unwrap()
+        .to_string();
+    let r = env
+        .client
+        .get(&back)
+        .header("cookie", &signed)
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(
+        r.status(),
+        303,
+        "and the sign-in it started still ends well"
+    );
+}
