@@ -16668,3 +16668,79 @@ async fn a_member_cannot_make_reel_ask_github_while_the_check_is_off() {
         "switched on, an admin's Check now asks"
     );
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_new_ntfy_address_does_not_get_the_token_written_for_the_old_one() {
+    let (elsewhere, got) = mock_receiver().await;
+    let Some(env) = start(AuthMode::Single, vec![]).await else {
+        return;
+    };
+    for (key, value) in [
+        ("notify.ntfy_url", "http://127.0.0.1:1"),
+        ("notify.ntfy_topic", "reel"),
+        ("notify.ntfy_token", "tk_written_once_never_shown"),
+        ("notify.kind", "ntfy"),
+    ] {
+        let (status, d) = patch_setting(&env, serde_json::json!({ key: value })).await;
+        assert_eq!(status, 200, "{key}: {d}");
+    }
+    let (status, d) = patch_setting(
+        &env,
+        serde_json::json!({ "notify.ntfy_url": format!("{elsewhere}/") }),
+    )
+    .await;
+    assert_eq!(status, 200);
+    assert_eq!(
+        d["cleared"],
+        serde_json::json!(["notify.ntfy_token"]),
+        "{d}"
+    );
+    assert!(d["note"].as_str().unwrap().contains("enter it again"));
+    let (status, _) = post_json(&env, "/api/notify/test").await;
+    assert_eq!(status, 200);
+    let tokens: Vec<String> = got.lock().await.iter().map(|n| n.1.clone()).collect();
+    assert!(
+        !tokens
+            .iter()
+            .any(|t| t.contains("tk_written_once_never_shown")),
+        "the token written for one server goes to whatever address is set after it: {tokens:?}"
+    );
+    let (status, d) = patch_setting(
+        &env,
+        serde_json::json!({ "notify.ntfy_url": elsewhere.clone(), "notify.ntfy_token": "tk_for_this_one" }),
+    )
+    .await;
+    assert_eq!(status, 200, "{d}");
+    post_json(&env, "/api/notify/test").await;
+    assert!(
+        got.lock()
+            .await
+            .iter()
+            .any(|n| n.1 == "Bearer tk_for_this_one"),
+        "an address and a token saved together stay together"
+    );
+
+    let (_, got) = mock_receiver().await;
+    let file: toml::Value = toml::from_str(
+        r#"[notify]
+kind = "ntfy"
+ntfy_url = "http://127.0.0.1:1"
+ntfy_topic = "reel"
+ntfy_token = "tk_from_the_file"
+"#,
+    )
+    .unwrap();
+    let Some(env) = start_layered(AuthMode::Single, vec![], |_| {}, Some(file), true).await else {
+        return;
+    };
+    let (status, d) = patch_setting(
+        &env,
+        serde_json::json!({ "notify.ntfy_url": "http://127.0.0.1:2" }),
+    )
+    .await;
+    assert_eq!(
+        status, 409,
+        "a token from config.toml keeps its server: {d}"
+    );
+    assert!(got.lock().await.is_empty());
+}

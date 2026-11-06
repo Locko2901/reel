@@ -46,6 +46,11 @@ async function save(row, value, undoing) {
     if (undoing) toast(`${d.label} is back to ${words}.`, 'ok');
     else if (changedAtAll && row.dataset.kind !== 'secret') toast(`${d.label} saved: ${words}.`, 'ok', { label: 'Undo', run: () => save(row, back, true) });
     else toast(`${d.label} saved.`, 'ok');
+    for (const k of d.cleared || []) {
+      const r = $(`.srow[data-key="${k}"]`);
+      if (r) show(r, { value: 'not set', changed: false, default_text: 'the empty value' });
+    }
+    if (d.note) toast(d.note);
     counts();
   } catch (err) {
     row.classList.add('refused');

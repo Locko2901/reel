@@ -875,6 +875,9 @@ fn check_path(d: &Def, value: &str) -> Result<(), AppError> {
     Ok(())
 }
 
+const NTFY_URL: &str = "notify.ntfy_url";
+const NTFY_TOKEN: &str = "notify.ntfy_token";
+
 /// One key at a time: `{"ingest.poll_seconds": 5}`; `null` goes back to the value under the table.
 pub async fn patch_api(
     State(st): State<AppState>,
@@ -882,6 +885,7 @@ pub async fn patch_api(
     Json(body): Json<serde_json::Map<String, Value>>,
 ) -> AppResult<Json<Value>> {
     let mut last = json!({ "ok": true });
+    let token_too = body.contains_key(NTFY_TOKEN);
     for (key, raw) in body {
         let d = catalog::find(&key)
             .ok_or_else(|| AppError::BadRequest(format!("no setting named {key}")))?;
@@ -898,6 +902,27 @@ pub async fn patch_api(
         let old_value = catalog::get(&eff.config, &key);
         let old_table = eff.table.get(&key).cloned();
         let text = as_text(&raw)?;
+        // the token was written for one server: it never goes to the next one by itself
+        let token_goes =
+            key == NTFY_URL && !token_too && !eff.config.notify.ntfy_token.is_empty() && {
+                let would_be = match &text {
+                    Some(t) => {
+                        let mut trial = (*eff.config).clone();
+                        catalog::set(&mut trial, &key, t)
+                            .ok()
+                            .map(|_| catalog::get(&trial, &key))
+                    }
+                    None => Some(catalog::get(&under(&st.ctx), &key)),
+                };
+                would_be.is_some_and(|v| v != old_value)
+            };
+        if token_goes && eff.source(NTFY_TOKEN) != Source::Table {
+            return Err(AppError::Conflict(format!(
+                "{}: the ntfy token is set {}; change the server there too, so the token goes to no other one",
+                d.label,
+                if eff.source(NTFY_TOKEN) == Source::Env { "in the environment" } else { "in config.toml" }
+            )));
+        }
         let stored = match &text {
             Some(t) => {
                 let mut trial = (*eff.config).clone();
@@ -921,6 +946,14 @@ pub async fn patch_api(
                 None
             }
         };
+        if token_goes {
+            st.ctx.store.delete_setting(NTFY_TOKEN).await?;
+            st.ctx
+                .store
+                .add_setting_history(NTFY_TOKEN, None, None, &me.name)
+                .await?;
+            tracing::info!(user = %me.name, "the ntfy token cleared with its server's address");
+        }
         let new_eff = st.ctx.reload().await.map_err(|e| {
             AppError::Internal(anyhow::anyhow!("the settings could not be reloaded: {e}"))
         })?;
@@ -963,6 +996,10 @@ pub async fn patch_api(
             "default_text": if secret { "the empty value".to_string() } else { catalog::value_words(d, &catalog::get(&under(&st.ctx), &key)) },
             "words": if secret { Value::Null } else { Value::String(catalog::value_words(d, &catalog::get(&new_eff.config, &key))) },
         });
+        if token_goes {
+            last["cleared"] = json!([NTFY_TOKEN]);
+            last["note"] = json!("The ntfy token was cleared, so it goes to no other server: enter it again for this one.");
+        }
     }
     Ok(Json(last))
 }

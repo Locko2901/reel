@@ -282,7 +282,7 @@ pub static DEFS: &[Def] = &[
     def("share.expiry_default", "REEL_SHARE_EXPIRY_DEFAULT", Section::Sharing, "New links", "Expire", "what a new link's expiry starts on in the dialog", Kind::Select(EXPIRIES)),
     def("import.upload_max_gb", "REEL_UPLOAD_MAX_GB", Section::Imports, "Upload", "Upload size limit", "an upload bigger than this is refused; the proxy in front has a limit of its own", int(1, 64, "GB")),
     def("notify.kind", "REEL_NOTIFY_KIND", Section::Notifications, "Where", "Send to", "off, an ntfy topic, or a webhook that takes JSON", Kind::Select(&["off", "ntfy", "webhook"])),
-    def("notify.ntfy_url", "REEL_NTFY_URL", Section::Notifications, "Where", "ntfy server", "the server's address, such as https://ntfy.example.org", Kind::Url),
+    def("notify.ntfy_url", "REEL_NTFY_URL", Section::Notifications, "Where", "ntfy server", "the server's address, such as https://ntfy.example.org; a new address clears the token below, which is then entered again for that server", Kind::Url),
     def("notify.ntfy_topic", "REEL_NTFY_TOPIC", Section::Notifications, "Where", "ntfy topic", "the topic reel posts to", Kind::Text),
     def("notify.ntfy_token", "REEL_NTFY_TOKEN", Section::Notifications, "Where", "ntfy token", "an access token when the topic is protected; written, never shown again", Kind::Secret),
     def("notify.webhook_url", "REEL_WEBHOOK_URL", Section::Notifications, "Where", "Webhook URL", "receives a JSON body with the event, the clip, the reason and a link", Kind::Url),
