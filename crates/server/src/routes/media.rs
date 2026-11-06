@@ -359,6 +359,8 @@ pub async fn rendition_track(
             format!("0:a:{n}"),
             "-c".into(),
             "copy".into(),
+            "-map_metadata".into(),
+            "-1".into(),
             "-movflags".into(),
             "+faststart".into(),
             "-f".into(),

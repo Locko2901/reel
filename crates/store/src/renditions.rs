@@ -125,6 +125,25 @@ impl Store {
         .await
     }
 
+    /// Every ready file reel made of a clip in the library (not the trash), animated pictures
+    /// aside.
+    pub async fn ready_video_files(&self) -> Result<Vec<Rendition>> {
+        sqlx::query_as::<_, Rendition>(
+            "SELECT r.* FROM rendition r JOIN clip c ON c.id = r.clip_id WHERE r.state = 'ready' AND r.path IS NOT NULL AND r.kind != 'anim' AND c.deleted_at IS NULL ORDER BY r.created_at",
+        )
+        .fetch_all(&self.pool)
+        .await
+    }
+
+    pub async fn set_rendition_size(&self, id: &str, size: i64) -> Result<()> {
+        sqlx::query("UPDATE rendition SET size = ? WHERE id = ?")
+            .bind(size)
+            .bind(id)
+            .execute(&self.pool)
+            .await?;
+        Ok(())
+    }
+
     pub async fn web_renditions(&self) -> Result<Vec<Rendition>> {
         sqlx::query_as::<_, Rendition>(
             "SELECT * FROM rendition WHERE kind = 'web' ORDER BY created_at ASC",

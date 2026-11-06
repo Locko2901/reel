@@ -168,6 +168,31 @@ impl ProbeInfo {
     }
 }
 
+/// Whether a file's tag says where it was made or what made it: a place, the device's make or
+/// model, a person's name. reel's own files carry none of these.
+pub fn personal_tag(key: &str) -> bool {
+    let k = key.to_ascii_lowercase();
+    k.contains("location")
+        || k.contains("gps")
+        || k.contains("iso6709")
+        || k.starts_with("com.android.")
+        || matches!(
+            k.as_str(),
+            "make" | "model" | "artist" | "album_artist" | "author" | "composer"
+        )
+        || (k.starts_with("com.apple.quicktime.")
+            && [
+                "make",
+                "model",
+                "software",
+                "author",
+                "artist",
+                "displayname",
+            ]
+            .iter()
+            .any(|w| k.ends_with(w)))
+}
+
 /// The most characters a track's name keeps.
 pub const TRACK_TITLE_MAX: usize = 40;
 
@@ -207,6 +232,38 @@ mod tests {
             p.creation_time.as_deref(),
             Some("2026-10-06T19:14:03.000000Z")
         );
+    }
+
+    #[test]
+    fn a_place_or_a_device_is_personal_and_reels_own_tags_are_not() {
+        for k in [
+            "location",
+            "location-eng",
+            "com.apple.quicktime.location.ISO6709",
+            "com.apple.quicktime.make",
+            "com.apple.quicktime.model",
+            "com.android.version",
+            "make",
+            "Model",
+            "artist",
+        ] {
+            assert!(personal_tag(k), "{k}");
+        }
+        for k in [
+            "encoder",
+            "major_brand",
+            "minor_version",
+            "compatible_brands",
+            "handler_name",
+            "language",
+            "creation_time",
+            "title",
+            "comment",
+            "vendor_id",
+            "DURATION",
+        ] {
+            assert!(!personal_tag(k), "{k}");
+        }
     }
 
     #[test]

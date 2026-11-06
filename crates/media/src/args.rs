@@ -313,6 +313,19 @@ fn audio_args(has_audio: bool, normalize: Option<i32>, abit: u64) -> Vec<String>
     a
 }
 
+/// The end of every MP4 reel writes: none of the source's tags (a phone's place, its make and
+/// model; the rotation is side data and stays), the index first so a link plays at once.
+fn mp4_out() -> [String; 6] {
+    [
+        s("-map_metadata"),
+        s("-1"),
+        s("-movflags"),
+        s("+faststart"),
+        s("-f"),
+        s("mp4"),
+    ]
+}
+
 pub fn gop_for(fps: f64) -> u32 {
     let f = if fps > 1.0 { fps } else { 60.0 };
     (f * 2.0).round() as u32
@@ -359,7 +372,7 @@ pub fn master(plan: &Plan, enc: &Encoder, input: &Path) -> Vec<String> {
             a.extend(audio_args(true, *normalize, *kbit as u64 * 1000))
         }
     }
-    a.extend([s("-movflags"), s("+faststart"), s("-f"), s("mp4")]);
+    a.extend(mp4_out());
     a
 }
 
@@ -484,7 +497,7 @@ pub fn cut_with(
         CutAudio::None => a.push(s("-an")),
         CutAudio::Copy(_) | CutAudio::File(_) => a.extend([s("-c:a"), s("copy")]),
     }
-    a.extend([s("-movflags"), s("+faststart"), s("-f"), s("mp4")]);
+    a.extend(mp4_out());
     a
 }
 
@@ -680,7 +693,7 @@ pub fn embed(plan: &CopyPlan, enc: &Encoder, input: &Path) -> Vec<String> {
         "medium",
     ));
     a.extend(copy_audio_args(&plan.audio));
-    a.extend([s("-movflags"), s("+faststart"), s("-f"), s("mp4")]);
+    a.extend(mp4_out());
     a
 }
 
@@ -724,7 +737,7 @@ pub fn copy_pass(pass: u8, plan: &CopyPlan, input: &Path, passlog: &Path) -> Vec
         a.extend([s("-an"), s("-f"), s("null"), s("-")]);
     } else {
         a.extend(copy_audio_args(&plan.audio));
-        a.extend([s("-movflags"), s("+faststart"), s("-f"), s("mp4")]);
+        a.extend(mp4_out());
     }
     a
 }
@@ -943,16 +956,24 @@ pub fn montage(
         gop_for(f64::from(fps)),
         "medium",
     ));
-    a.extend([
-        s("-c:a"),
-        s("aac"),
-        s("-b:a"),
-        format!("{}k", style.kbit),
-        s("-movflags"),
-        s("+faststart"),
-        s("-f"),
-        s("mp4"),
-    ]);
+    a.extend([s("-c:a"), s("aac"), s("-b:a"), format!("{}k", style.kbit)]);
+    a.extend(mp4_out());
+    a
+}
+
+/// A file of reel's again, every stream copied, without the tags it carried.
+pub fn without_tags(input: &Path) -> Vec<String> {
+    let mut a = vec![
+        s("-i"),
+        p(input),
+        s("-map"),
+        s("0:v?"),
+        s("-map"),
+        s("0:a?"),
+        s("-c"),
+        s("copy"),
+    ];
+    a.extend(mp4_out());
     a
 }
 
@@ -977,6 +998,8 @@ pub fn hover_loop(input: &Path, at: f64, seconds: f64) -> Vec<String> {
         s("28"),
         s("-g"),
         s("60"),
+        s("-map_metadata"),
+        s("-1"),
         s("-movflags"),
         s("+faststart"),
         s("-f"),
@@ -1290,7 +1313,7 @@ mod tests {
         let joined = master(&plan, &enc(HwBackend::Software, None), Path::new("in.mkv")).join(" ");
         assert_eq!(
             joined,
-            "-i in.mkv -map 0:v:0 -map 0:a? -c:v copy -c:a copy -movflags +faststart -f mp4"
+            "-i in.mkv -map 0:v:0 -map 0:a? -c:v copy -c:a copy -map_metadata -1 -movflags +faststart -f mp4"
         );
         let normalized = Plan {
             video: VideoPlan::Copy,
@@ -1393,16 +1416,16 @@ mod tests {
         );
         assert_eq!(
             master(&encode_plan(), &enc(HwBackend::Qsv, None), input).join(" "),
-            "-init_hw_device qsv=hw:/dev/dri/renderD128 -filter_hw_device hw -i in.mkv -map 0:v:0 -map 0:a? -vf scale='if(gt(ih,1080),-2,iw)':'if(gt(ih,1080),1080,ih)':flags=lanczos,format=nv12,hwupload=extra_hw_frames=64 -c:v h264_qsv -preset medium -b:v 10000000 -maxrate 10000000 -bufsize 20000000 -g 120 -c:a aac -b:a 320000 -ar 48000 -ac 2 -movflags +faststart -f mp4"
+            "-init_hw_device qsv=hw:/dev/dri/renderD128 -filter_hw_device hw -i in.mkv -map 0:v:0 -map 0:a? -vf scale='if(gt(ih,1080),-2,iw)':'if(gt(ih,1080),1080,ih)':flags=lanczos,format=nv12,hwupload=extra_hw_frames=64 -c:v h264_qsv -preset medium -b:v 10000000 -maxrate 10000000 -bufsize 20000000 -g 120 -c:a aac -b:a 320000 -ar 48000 -ac 2 -map_metadata -1 -movflags +faststart -f mp4"
         );
         assert_eq!(
             master(&encode_plan(), &enc(HwBackend::Qsv, Some("hevc_qsv")), input).join(" "),
-            "-init_hw_device qsv=hw:/dev/dri/renderD128 -filter_hw_device hw -hwaccel qsv -hwaccel_output_format qsv -c:v hevc_qsv -i in.mkv -map 0:v:0 -map 0:a? -vf vpp_qsv=w=1920:h=1080:format=nv12 -c:v h264_qsv -preset medium -b:v 10000000 -maxrate 10000000 -bufsize 20000000 -g 120 -c:a aac -b:a 320000 -ar 48000 -ac 2 -movflags +faststart -f mp4"
+            "-init_hw_device qsv=hw:/dev/dri/renderD128 -filter_hw_device hw -hwaccel qsv -hwaccel_output_format qsv -c:v hevc_qsv -i in.mkv -map 0:v:0 -map 0:a? -vf vpp_qsv=w=1920:h=1080:format=nv12 -c:v h264_qsv -preset medium -b:v 10000000 -maxrate 10000000 -bufsize 20000000 -g 120 -c:a aac -b:a 320000 -ar 48000 -ac 2 -map_metadata -1 -movflags +faststart -f mp4"
         );
         let copy = plan(1080, 60.0, true, true, AudioChoice::Copy { bits: 160_000 });
         assert_eq!(
             embed(&copy, &enc(HwBackend::Qsv, None), input).join(" "),
-            "-init_hw_device qsv=hw:/dev/dri/renderD128 -filter_hw_device hw -i in.mkv -map 0:v:0 -map 0:a:0? -vf scale=-2:1080:flags=lanczos,format=nv12,hwupload=extra_hw_frames=64 -r 60 -c:v h264_qsv -preset medium -b:v 3000000 -maxrate 3000000 -bufsize 6000000 -g 120 -c:a copy -movflags +faststart -f mp4"
+            "-init_hw_device qsv=hw:/dev/dri/renderD128 -filter_hw_device hw -i in.mkv -map 0:v:0 -map 0:a:0? -vf scale=-2:1080:flags=lanczos,format=nv12,hwupload=extra_hw_frames=64 -r 60 -c:v h264_qsv -preset medium -b:v 3000000 -maxrate 3000000 -bufsize 6000000 -g 120 -c:a copy -map_metadata -1 -movflags +faststart -f mp4"
         );
         assert_eq!(
             hw_decode_test(HwBackend::Qsv, dev, "hevc_qsv", Path::new("s.mkv")).join(" "),
@@ -1419,12 +1442,12 @@ mod tests {
         );
         assert_eq!(
             master(&encode_plan(), &on_windows(HwBackend::Qsv, None), input).join(" "),
-            "-i in.mkv -map 0:v:0 -map 0:a? -vf scale='if(gt(ih,1080),-2,iw)':'if(gt(ih,1080),1080,ih)':flags=lanczos,format=nv12 -c:v h264_qsv -preset medium -b:v 10000000 -maxrate 10000000 -bufsize 20000000 -g 120 -c:a aac -b:a 320000 -ar 48000 -ac 2 -movflags +faststart -f mp4"
+            "-i in.mkv -map 0:v:0 -map 0:a? -vf scale='if(gt(ih,1080),-2,iw)':'if(gt(ih,1080),1080,ih)':flags=lanczos,format=nv12 -c:v h264_qsv -preset medium -b:v 10000000 -maxrate 10000000 -bufsize 20000000 -g 120 -c:a aac -b:a 320000 -ar 48000 -ac 2 -map_metadata -1 -movflags +faststart -f mp4"
         );
         let copy = plan(1080, 60.0, true, true, AudioChoice::Copy { bits: 160_000 });
         assert_eq!(
             embed(&copy, &on_windows(HwBackend::Qsv, None), input).join(" "),
-            "-i in.mkv -map 0:v:0 -map 0:a:0? -vf scale=-2:1080:flags=lanczos,format=nv12 -r 60 -c:v h264_qsv -preset medium -b:v 3000000 -maxrate 3000000 -bufsize 6000000 -g 120 -c:a copy -movflags +faststart -f mp4"
+            "-i in.mkv -map 0:v:0 -map 0:a:0? -vf scale=-2:1080:flags=lanczos,format=nv12 -r 60 -c:v h264_qsv -preset medium -b:v 3000000 -maxrate 3000000 -bufsize 6000000 -g 120 -c:a copy -map_metadata -1 -movflags +faststart -f mp4"
         );
         for codec in ["h264", "hevc", "av1", "vp9"] {
             assert_eq!(hw_decoder(HwBackend::Qsv, Some(codec), true), None);
@@ -1592,7 +1615,7 @@ mod tests {
         let c = cut(&r, true, &sw, Path::new("m.mp4"), CutAudio::Copy(0)).join(" ");
         assert_eq!(
             c,
-            "-ss 8.500 -i m.mp4 -t 47.500 -map 0:v:0 -map 0:a:0? -c:v copy -c:a copy -movflags +faststart -f mp4"
+            "-ss 8.500 -i m.mp4 -t 47.500 -map 0:v:0 -map 0:a:0? -c:v copy -c:a copy -map_metadata -1 -movflags +faststart -f mp4"
         );
         let e = cut(&r, false, &sw, Path::new("m.mp4"), CutAudio::Copy(0)).join(" ");
         assert!(e.contains("-c:v libx264"));
@@ -1633,7 +1656,7 @@ mod tests {
         .join(" ");
         assert_eq!(
             a,
-            "-i m.mp4 -i a.part -map 0:v:0 -map 1:a -c:v copy -c:a copy -movflags +faststart -f mp4"
+            "-i m.mp4 -i a.part -map 0:v:0 -map 1:a -c:v copy -c:a copy -map_metadata -1 -movflags +faststart -f mp4"
         );
     }
 

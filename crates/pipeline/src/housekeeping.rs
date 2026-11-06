@@ -157,6 +157,87 @@ pub async fn clear_not_games_once(ctx: &Ctx) -> anyhow::Result<u64> {
     Ok(n)
 }
 
+pub const PERSONAL_TAGS_PASS: &str = "personal_tags_removed";
+
+/// Once: every file reel made before it left out its sources' tags is read, and the ones that
+/// still carry a place, a device or a person's name (`personal_tag`) are copied again without
+/// them, the streams untouched. Their previews leave the external storage and go up again.
+/// How many files were read and how many copied again; nothing while the library is away.
+pub async fn remove_personal_tags_once(ctx: &Ctx) -> anyhow::Result<(u64, u64)> {
+    if ctx.store.setting(PERSONAL_TAGS_PASS).await?.is_some() || ctx.library.away().is_some() {
+        return Ok((0, 0));
+    }
+    let cfg = ctx.config();
+    let (mut read, mut copied) = (0u64, 0u64);
+    for r in ctx.store.ready_video_files().await? {
+        let video = cfg.abs(r.path.as_deref().unwrap_or(""));
+        let mut files = vec![video.clone()];
+        if r.is_version() {
+            files.push(crate::derived::paths(&video).hover);
+        }
+        for f in files {
+            if ctx.shutdown.is_cancelled() {
+                return Ok((read, copied));
+            }
+            if !f.is_file() {
+                continue;
+            }
+            read += 1;
+            let names = match ctx.ff.tag_names(&f).await {
+                Ok(n) => n,
+                Err(e) => {
+                    tracing::warn!(file = %f.display(), error = %e, "the tags were not read");
+                    continue;
+                }
+            };
+            if !names.iter().any(|n| reel_core::probe::personal_tag(n)) {
+                continue;
+            }
+            let args = reel_media::args::without_tags(&f);
+            if let Err(e) = ctx
+                .ff
+                .run_to(&args, &f, r.duration.unwrap_or(1.0), None)
+                .await
+            {
+                tracing::warn!(file = %f.display(), error = %e, "a file kept its tags");
+                continue;
+            }
+            copied += 1;
+            if f != video {
+                continue;
+            }
+            if let Ok(m) = tokio::fs::metadata(&f).await {
+                ctx.store.set_rendition_size(&r.id, m.len() as i64).await?;
+            }
+            for n in 0..reel_core::recipe::TRACKS_MAX {
+                let _ = tokio::fs::remove_file(f.with_extension(format!("a{n}.m4a"))).await;
+            }
+            for o in ctx.store.external_objects().await? {
+                if o.file_id == r.id && o.state == "stored" {
+                    ctx.store
+                        .set_external_object_state(&o.id, "deleting", None)
+                        .await?;
+                }
+            }
+        }
+    }
+    ctx.store
+        .set_setting(
+            PERSONAL_TAGS_PASS,
+            &format!("{copied} of {read} at {}", reel_core::format::now()),
+        )
+        .await?;
+    tracing::info!(
+        read,
+        copied,
+        "files reel made, read for a place, a device or a name in their tags; those with one copied again without"
+    );
+    if copied > 0 {
+        ctx.external.kick();
+    }
+    Ok((read, copied))
+}
+
 const UTC_TITLES_PASS: &str = "utc_titles_remade";
 
 /// Once: a title made from the recording time as UTC's wall clock is made again in the pages'

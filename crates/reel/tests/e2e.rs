@@ -16138,3 +16138,165 @@ async fn the_pages_refuse_frames_sniffing_and_scripts_from_elsewhere() {
         );
     }
 }
+
+/// The container's tags of a file, as ffprobe reads them.
+fn format_tags(path: &std::path::Path) -> serde_json::Value {
+    let (_, ffprobe) = ffmpeg_paths().unwrap();
+    let out = std::process::Command::new(ffprobe)
+        .args(["-v", "error", "-show_entries", "format_tags", "-of", "json"])
+        .arg(path)
+        .output()
+        .unwrap();
+    serde_json::from_slice::<serde_json::Value>(&out.stdout).unwrap()["format"]["tags"].clone()
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_links_files_carry_no_place_the_phone_wrote_in_the_upload() {
+    let Some(env) = start(AuthMode::Single, vec![]).await else {
+        return;
+    };
+    let dir = env._dir.path().join("made");
+    std::fs::create_dir_all(&dir).unwrap();
+    let phone = dir.join("VID_20261106.mp4");
+    let mut args = Synth::small(2.0, "phone").args(&phone);
+    let out = args.pop().unwrap();
+    args.extend([
+        "-metadata".into(),
+        "location=+52.5200+013.4050/".into(),
+        out,
+    ]);
+    env.ctx.ff.run(&args, 2.0, None).await.unwrap();
+    assert!(format_tags(&phone).to_string().contains("52.5200"));
+    let form = reqwest::multipart::Form::new().part(
+        "file",
+        reqwest::multipart::Part::bytes(std::fs::read(&phone).unwrap())
+            .file_name("VID_20261106.mp4"),
+    );
+    let r = env
+        .client
+        .post(format!("{}/upload", env.base))
+        .multipart(form)
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(r.status(), 200);
+    let clip = env.wait_ready(Duration::from_secs(90)).await;
+    let s: serde_json::Value = env
+        .client
+        .post(format!("{}/api/clips/{}/shares", env.base, clip.id))
+        .json(&serde_json::json!({ "allow_download": true }))
+        .send()
+        .await
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+    let token = s["token"].as_str().unwrap();
+    for file in ["video.mp4", "download"] {
+        let got = dir.join(format!("got-{file}"));
+        let r = env
+            .client
+            .get(format!("{}/s/{token}/{file}", env.base))
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(r.status(), 200, "{file}");
+        std::fs::write(&got, r.bytes().await.unwrap()).unwrap();
+        let tags = format_tags(&got);
+        assert!(
+            !tags.to_string().contains("52.5200"),
+            "anyone with the link reads where the phone was from {file}: {tags}"
+        );
+    }
+}
+
+/// The file of a clip's original version.
+async fn master_file(env: &Env, clip: &Clip) -> PathBuf {
+    let r = env
+        .store()
+        .rendition(clip.master_id.as_deref().unwrap())
+        .await
+        .unwrap()
+        .unwrap();
+    env.ctx.config().abs(r.path.as_deref().unwrap())
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_file_made_before_loses_its_place_once_and_the_others_stay_as_they_are() {
+    let Some(env) = start(AuthMode::Single, vec![]).await else {
+        return;
+    };
+    env.synth("one.mp4", Synth::small(2.0, "one")).await;
+    let one = env.wait_ready(Duration::from_secs(90)).await;
+    env.synth("two.mp4", Synth::small(2.0, "two")).await;
+    let two = env
+        .wait_clip(
+            |c| c.id != one.id && c.state == "ready",
+            Duration::from_secs(90),
+        )
+        .await;
+    env.wait_no_jobs(Duration::from_secs(120)).await;
+    let (tagged, other) = (master_file(&env, &one).await, master_file(&env, &two).await);
+    let args: Vec<String> = [
+        "-i",
+        &tagged.to_string_lossy(),
+        "-map",
+        "0",
+        "-c",
+        "copy",
+        "-metadata",
+        "location=+52.5200+013.4050/",
+        "-f",
+        "mp4",
+    ]
+    .iter()
+    .map(|s| s.to_string())
+    .collect();
+    env.ctx.ff.run_to(&args, &tagged, 2.0, None).await.unwrap();
+    assert!(
+        format_tags(&tagged).to_string().contains("52.5200"),
+        "a file as reel made it before"
+    );
+    let before = (
+        inode(&other),
+        std::fs::metadata(&other).unwrap().modified().unwrap(),
+    );
+    let pass = reel_pipeline::housekeeping::PERSONAL_TAGS_PASS;
+    assert!(
+        env.store().setting(pass).await.unwrap().is_some(),
+        "the first start looked once, at an empty library"
+    );
+    env.store().delete_setting(pass).await.unwrap();
+    let env = restart(env, |_| {}).await;
+    let start = Instant::now();
+    let done = loop {
+        if let Some(v) = env.store().setting(pass).await.unwrap() {
+            break v;
+        }
+        assert!(
+            start.elapsed() < Duration::from_secs(60) * SLOW,
+            "the pass ran"
+        );
+        tokio::time::sleep(Duration::from_millis(200)).await;
+    };
+    assert!(done.starts_with("1 of "), "one file copied again: {done}");
+    assert!(
+        !format_tags(&tagged).to_string().contains("52.5200"),
+        "the place is gone"
+    );
+    assert_eq!(
+        (
+            inode(&other),
+            std::fs::metadata(&other).unwrap().modified().unwrap()
+        ),
+        before,
+        "a file without such a tag is not touched"
+    );
+    let r = env
+        .client
+        .get(format!("{}/media/clips/{}/current.mp4", env.base, one.id))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(r.status(), 200, "the clip plays from its file copied again");
+}
