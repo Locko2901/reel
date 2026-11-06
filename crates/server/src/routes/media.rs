@@ -286,6 +286,7 @@ async fn anim(
 
 pub async fn rendition_file(
     State(st): State<AppState>,
+    axum::Extension(me): axum::Extension<crate::auth::User>,
     Path(file): Path<String>,
     req: Request,
 ) -> AppResult<Response> {
@@ -300,6 +301,16 @@ pub async fn rendition_file(
         .await?
         .filter(|r| r.is_ready())
         .ok_or(AppError::NotFound)?;
+    if suffix != "jpg" {
+        let clip = st.ctx.store.clip(&r.clip_id).await?;
+        // the trash page shows every member the poster; the rest stays its editors'
+        if clip
+            .as_ref()
+            .is_some_and(|c| c.deleted_at.is_some() && !me.may_edit(c.owner_id.as_deref()))
+        {
+            return Err(AppError::NotFound);
+        }
+    }
     let video = in_place_or_trash(&st, &r.clip_id, r.path.as_deref().unwrap());
     let d = reel_pipeline::derived::paths(&video);
     let (path, mime) = match suffix {

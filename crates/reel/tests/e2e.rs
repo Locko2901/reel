@@ -16520,3 +16520,54 @@ async fn a_montage_made_before_of_another_members_clip_is_marked_once() {
         "a montage of one's own clips is not"
     );
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_clip_in_the_trash_plays_for_no_other_member() {
+    let Some(env) = start(AuthMode::Local, vec![]).await else {
+        return;
+    };
+    let (_, members) = admin_and_members(&env, &["mira", "sam"]).await;
+    let (mira, sam) = (&members[0], &members[1]);
+    let clip = upload_as(&env, mira, "regret.mp4", Synth::small(2.0, "regret")).await;
+    let version = clip.current_id.clone().unwrap();
+    let (status, _) = as_user(
+        &env,
+        reqwest::Method::DELETE,
+        &format!("/api/clips/{}", clip.id),
+        mira,
+    )
+    .await;
+    assert_eq!(status, 200);
+    let (_, trash) = as_user(&env, reqwest::Method::GET, "/trash", sam).await;
+    assert!(
+        trash.contains(&format!("/media/renditions/{version}.jpg")),
+        "the trash page shows its poster to every member"
+    );
+    let (status, _) = as_user(
+        &env,
+        reqwest::Method::GET,
+        &format!("/media/renditions/{version}.mp4"),
+        sam,
+    )
+    .await;
+    assert_eq!(
+        status, 404,
+        "the poster's address with .mp4 plays the deleted clip to sam"
+    );
+    let (status, _) = as_user(
+        &env,
+        reqwest::Method::GET,
+        &format!("/media/renditions/{version}.jpg"),
+        sam,
+    )
+    .await;
+    assert_eq!(status, 200, "the poster stays every member's");
+    let (status, _) = as_user(
+        &env,
+        reqwest::Method::GET,
+        &format!("/media/renditions/{version}.mp4"),
+        mira,
+    )
+    .await;
+    assert_eq!(status, 200, "its uploader still plays it from the trash");
+}
