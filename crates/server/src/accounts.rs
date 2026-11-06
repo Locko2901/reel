@@ -130,7 +130,7 @@ pub async fn user_on_sight(
     name: &str,
     admin_claim: Option<bool>,
 ) -> Result<UserRow, sqlx::Error> {
-    let listed = cfg.auth.admins.iter().any(|a| a.eq_ignore_ascii_case(name));
+    let listed = listed(cfg, name);
     match store.user_by_name(name).await? {
         Some(u) => {
             let wants_admin = listed || admin_claim == Some(true);
@@ -158,12 +158,15 @@ pub async fn user_on_sight(
     }
 }
 
+/// Whether Admins names this exactly, case included: a name that only looks the same is
+/// someone else's.
 fn listed(cfg: &Config, name: &str) -> bool {
-    cfg.auth.admins.iter().any(|a| a.eq_ignore_ascii_case(name))
+    cfg.auth.admins.iter().any(|a| a.trim() == name)
 }
 
-/// The row for an identity, by issuer and subject, never by name. With a role claim the role
-/// follows it on every sign-in, both ways, but the last admin stays an admin.
+/// The row for an identity, by issuer and subject, never by name. Admins lists subjects here,
+/// since a name claim may be one a person picks. With a role claim the role follows it on every
+/// sign-in, both ways, but the last admin stays an admin.
 pub async fn user_for_identity(
     store: &Store,
     cfg: &Config,
@@ -174,7 +177,7 @@ pub async fn user_for_identity(
             let Some(claim) = id.admin_claim else {
                 return Ok(u);
             };
-            let wants_admin = claim || listed(cfg, &u.name);
+            let wants_admin = claim || listed(cfg, &id.subject);
             if wants_admin == u.is_admin() {
                 return Ok(u);
             }
@@ -196,7 +199,7 @@ pub async fn user_for_identity(
             row.oidc_issuer = Some(id.issuer.clone());
             row.oidc_subject = Some(id.subject.clone());
             let row = store.insert_user_freely(row).await?;
-            let admin = first || id.admin_claim == Some(true) || listed(cfg, &row.name);
+            let admin = first || id.admin_claim == Some(true) || listed(cfg, &id.subject);
             if admin {
                 store.set_role(&row.id, "admin").await?;
             }
