@@ -1577,6 +1577,97 @@ mod tests {
         local.stop();
     }
 
+    /// A paired server that offers `installer` as reel 9.9.0, with `signature`.
+    #[cfg(target_os = "linux")]
+    async fn paired_offering(installer: Vec<u8>, signature: &str) -> String {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let base = format!("http://{}", listener.local_addr().unwrap());
+        let offer = serde_json::json!({
+            "version": RELEASE,
+            "url": format!("{base}/installer"),
+            "signature": signature.trim(),
+        });
+        let app = axum::Router::new()
+            .route(
+                "/api/device/update",
+                axum::routing::get(move || async move { axum::Json(offer) }),
+            )
+            .route(
+                "/installer",
+                axum::routing::get(move || async move { installer }),
+            );
+        tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+        base
+    }
+
+    #[cfg(target_os = "linux")]
+    #[tokio::test(flavor = "multi_thread")]
+    async fn a_paired_server_cannot_pass_an_older_release_off_as_a_newer_one() {
+        use tauri::Manager;
+        let app = mock_app(include_str!("../tests/release/key.pub"));
+        let dir = tempfile::tempdir().unwrap();
+        let running = dir.path().join("reel.AppImage");
+        let check = |base: String| {
+            let url = super::endpoint(&base, "/api/device/update", false).unwrap();
+            let updater = super::builder(app.app_handle(), url)
+                .unwrap()
+                .header("Authorization", "Bearer a-device-token")
+                .unwrap()
+                .executable_path(&running)
+                .build()
+                .unwrap();
+            async move { updater.check().await.unwrap().expect("offered as 9.9.0") }
+        };
+        let older = include_bytes!("../tests/release/older.AppImage");
+        for (signature, what) in [
+            (
+                include_str!("../tests/release/older.AppImage.sig"),
+                "reel 1.0.0, signed as 1.0.0",
+            ),
+            (
+                include_str!("../tests/release/older.AppImage.unversioned.sig"),
+                "reel 1.0.0, signed before signatures named a version",
+            ),
+        ] {
+            std::fs::write(&running, b"the AppImage that runs").unwrap();
+            let update = check(paired_offering(older.to_vec(), signature).await).await;
+            assert_eq!(update.version, RELEASE, "{what}");
+            let refused = match update.download(|_, _| {}, || {}).await {
+                Ok(_) => panic!("{what}, offered as {RELEASE}: taken as the newer version"),
+                Err(e) => e,
+            };
+            let line = super::not_downloaded(RELEASE, &refused, "Install tries again");
+            assert!(
+                line.starts_with("reel 9.9.0 was refused")
+                    && line.ends_with("nothing was installed"),
+                "{what}: {line}"
+            );
+            assert!(update.install(older).is_err(), "{what}");
+            assert_eq!(
+                std::fs::read(&running).unwrap(),
+                b"the AppImage that runs",
+                "{what}"
+            );
+        }
+
+        let release = include_bytes!("../tests/release/reel.AppImage");
+        let update = check(
+            paired_offering(
+                release.to_vec(),
+                include_str!("../tests/release/reel.AppImage.sig"),
+            )
+            .await,
+        )
+        .await;
+        let bytes = update.download(|_, _| {}, || {}).await.unwrap();
+        update.install(&bytes).unwrap();
+        assert_eq!(
+            std::fs::read(&running).unwrap(),
+            release,
+            "reel 9.9.0, signed as 9.9.0, in the place of the one that ran"
+        );
+    }
+
     #[test]
     fn a_release_that_offers_nothing_says_why() {
         use reel_pipeline::app_update::NotOffered;
