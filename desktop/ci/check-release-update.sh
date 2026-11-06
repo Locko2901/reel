@@ -39,7 +39,8 @@ export UPDATE_PUBKEY
 if [ -n "$EXE" ]; then
   cp "$EXE" "$EXE.sig" "$W/"
   STANDIN_INSTALLER=$(winepath -w "$W/$(basename "$EXE")" 2>/dev/null | tr -d '\r')
-  export STANDIN_INSTALLER
+  STANDIN_VERSION="$2"
+  export STANDIN_INSTALLER STANDIN_VERSION
 fi
 
 timeout 600 wine "$TEST" --ignored --exact --nocapture \
