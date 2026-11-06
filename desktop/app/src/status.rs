@@ -79,6 +79,8 @@ pub struct Status {
     pub state_line: String,
     pub paused_by_user: bool,
     pub paused_fullscreen: bool,
+    /// Pause recording: the replay buffer is stopped on purpose until Resume recording.
+    pub recording_paused: bool,
     pub obs: ObsLine,
     /// The OBS that came with the app is there.
     pub bundled: bool,
@@ -268,16 +270,19 @@ impl Action {
     }
 }
 
-/// Save clip needs OBS connected with its replay buffer running; Save and share also needs a
-/// server, or standalone.
+/// Save clip needs recording on and OBS connected with its replay buffer running; Save and
+/// share also needs a server, or standalone.
 pub fn save_actions(
+    recording_paused: bool,
     obs_set_up: bool,
     connected: bool,
     state: Option<&reel_desktop_core::obs::ObsState>,
     paired: bool,
     standalone: bool,
 ) -> (Action, Action) {
-    let save = if !obs_set_up {
+    let save = if recording_paused {
+        Some(RECORDING_PAUSED)
+    } else if !obs_set_up {
         Some("no OBS is set up for reel")
     } else if !connected {
         Some("OBS is not connected")
@@ -294,6 +299,30 @@ pub fn save_actions(
         None
     });
     (Action::from(save), Action::from(share))
+}
+
+pub const RECORDING_PAUSED: &str = "recording is paused";
+
+/// What the app does with OBS's replay buffer, once it knows its state.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BufferStep {
+    Start,
+    Stop,
+    Leave,
+}
+
+/// Paused, a buffer that runs is stopped and a stopped one is left alone. Otherwise a stopped
+/// buffer is started when Start the replay buffer is on and OBS is not recording.
+pub fn buffer_step(
+    recording_paused: bool,
+    start_replay: bool,
+    st: &reel_desktop_core::obs::ObsState,
+) -> BufferStep {
+    match (recording_paused, st.replay_active) {
+        (true, true) => BufferStep::Stop,
+        (false, false) if start_replay && !st.recording => BufferStep::Start,
+        _ => BufferStep::Leave,
+    }
 }
 
 /// The copy of OBS in Program Files: there or not, and from which OBS.
@@ -436,35 +465,75 @@ mod tests {
     fn the_save_actions_run_only_while_the_replay_buffer_runs_and_say_why_not() {
         let mut st = ObsState::default();
         let why = |a: &Action| (a.ok, a.why.clone());
-        let (save, share) = save_actions(false, false, None, true, false);
+        let (save, share) = save_actions(false, false, false, None, true, false);
         assert_eq!(why(&save), (false, "no OBS is set up for reel".into()));
         assert_eq!(why(&share), why(&save));
-        let (save, _) = save_actions(true, false, None, true, false);
+        let (save, _) = save_actions(false, true, false, None, true, false);
         assert_eq!(why(&save), (false, "OBS is not connected".into()));
-        let (save, _) = save_actions(true, true, None, true, false);
+        let (save, _) = save_actions(false, true, true, None, true, false);
         assert!(!save.ok && save.why.contains("has not said yet"));
-        let (save, share) = save_actions(true, true, Some(&st), true, false);
+        let (save, share) = save_actions(false, true, true, Some(&st), true, false);
         assert_eq!(
             why(&save),
             (false, "OBS's replay buffer is not running".into())
         );
         assert_eq!(why(&share), why(&save));
         st.replay_active = true;
-        let (save, share) = save_actions(true, true, Some(&st), true, false);
+        let (save, share) = save_actions(false, true, true, Some(&st), true, false);
         assert_eq!(
             (why(&save), why(&share)),
             ((true, String::new()), (true, String::new()))
         );
-        let (save, share) = save_actions(true, true, Some(&st), false, false);
+        let (save, share) = save_actions(false, true, true, Some(&st), false, false);
         assert!(save.ok);
         assert_eq!(
             why(&share),
             (false, "the app is not paired with a server".into())
         );
         assert!(
-            save_actions(true, true, Some(&st), false, true).1.ok,
+            save_actions(false, true, true, Some(&st), false, true).1.ok,
             "standalone saves into its library"
         );
+    }
+
+    #[test]
+    fn paused_recording_greys_both_saves_and_says_why_first() {
+        let running = ObsState {
+            replay_active: true,
+            ..ObsState::default()
+        };
+        let (save, share) = save_actions(true, true, true, Some(&running), true, false);
+        assert_eq!((save.ok, save.why.as_str()), (false, "recording is paused"));
+        assert_eq!(share, save);
+        let (save, _) = save_actions(true, false, false, None, false, true);
+        assert_eq!(
+            save.why, "recording is paused",
+            "before what else is missing"
+        );
+    }
+
+    #[test]
+    fn the_restart_check_leaves_a_paused_buffer_alone_and_stops_one_that_runs() {
+        let stopped = ObsState::default();
+        let running = ObsState {
+            replay_active: true,
+            ..ObsState::default()
+        };
+        let recording = ObsState {
+            recording: true,
+            ..ObsState::default()
+        };
+        assert_eq!(buffer_step(false, true, &stopped), BufferStep::Start);
+        assert_eq!(buffer_step(true, true, &stopped), BufferStep::Leave);
+        assert_eq!(
+            buffer_step(true, true, &running),
+            BufferStep::Stop,
+            "a buffer that starts while paused, as the app's OBS starts its own, is stopped"
+        );
+        assert_eq!(buffer_step(true, false, &running), BufferStep::Stop);
+        assert_eq!(buffer_step(false, true, &running), BufferStep::Leave);
+        assert_eq!(buffer_step(false, false, &stopped), BufferStep::Leave);
+        assert_eq!(buffer_step(false, true, &recording), BufferStep::Leave);
     }
 
     #[test]

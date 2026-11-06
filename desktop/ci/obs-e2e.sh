@@ -386,6 +386,23 @@ filters() { # filters <noise> <gate|no-gate>: the requests the app builds for th
 [ "$(filters rnnoise gate)" = "noise_suppress_filter_v2:rnnoise:True noise_gate_filter::True" ] || fail "RNNoise and the gate, as the app asks for them: $(filters rnnoise gate)"
 ok "the microphone's filters as the app's requests set them in OBS: Speex alone, none, then RNNoise and the gate again"
 
+say "Pause recording stops OBS's replay buffer and a save while paused saves nothing; Resume starts it"
+buffer() { ws GetReplayBufferStatus '{}' | sed -n 's/.*"outputActive": \([a-z]*\).*/\1/p'; }
+buffer_is() { [ "$(buffer)" = "$1" ]; }
+wait_for 20 "the replay buffer to run before the pause" buffer_is true
+"$APP" --pause-recording >>"$ROOT/app.out" 2>&1 || true
+wait_for 20 "the replay buffer to stop" buffer_is false
+log_has "the replay buffer was stopped: recording is paused" || fail "the app did not say why the buffer stopped"
+n=$(log_n "obs saved a replay")
+xdotool key --clearmodifiers alt+F10
+wait_for 10 "the Save hotkey to say that recording is paused" log_has "no replay saved: recording is paused"
+sleep 3
+[ "$(log_n "obs saved a replay")" -eq "$n" ] || fail "a save while recording was paused saved a replay"
+buffer_is false || fail "the buffer runs again while paused: $(buffer)"
+"$APP" --resume-recording >>"$ROOT/app.out" 2>&1 || true
+wait_for 20 "the replay buffer to run again" buffer_is true
+ok "Pause recording: OBS's replay buffer stopped (outputActive false), the Save hotkey saved nothing and said why; Resume recording: it runs again"
+
 n=$(log_n "the bundled OBS started")
 "$APP" --clip-length=25 >>"$ROOT/app.out" 2>&1 || true
 wait_for 60 "OBS to start again with the clip length changed in the app" sh -c "[ \$(cat $LOG/reel-desktop.log* | grep -c 'the bundled OBS started') -gt $n ]"

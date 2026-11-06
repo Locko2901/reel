@@ -194,6 +194,9 @@ export function bindHeader() {
   $('#app-pause')?.addEventListener('change', async () => {
     try { await invoke('pause_set', { paused: isOn($('#app-pause')) }); } catch (e) { toast(String(e.message || e), 'err'); }
   });
+  $('#app-recording')?.addEventListener('change', async () => {
+    try { await invoke('recording_pause_set', { paused: isOn($('#app-recording')) }); } catch (e) { toast(String(e.message || e), 'err'); }
+  });
   $('#ver-updates')?.addEventListener('click', (e) => {
     e.preventDefault();
     invoke('view_show', { view: 'settings', section: 'startup' }).catch(err => toast(String(err.message || err), 'err'));
@@ -247,6 +250,7 @@ export function renderParts(status) {
   word.textContent = status.state_word || status.state;
   word.className = `chip-word ${app === 'ok' ? '' : app}`;
   setOn($('#app-pause'), !!status.paused_by_user);
+  setOn($('#app-recording'), !!status.recording_paused);
   $('#app-share').disabled = !status.paired;
   saveButtons(status, $('#app-save'), $('#app-save-share'));
   saveButtons(status, $('#menu-save'), $('#menu-save-share'));
@@ -320,7 +324,7 @@ export function header(page) {
       <dt>Server</dt><dd id="part-server"><i class="dot ok"></i><span><b></b> <span class="muted"></span></span></dd>
       <dt>Versions</dt><dd id="part-versions"><i class="dot"></i><span><b></b> <span class="muted"></span></span></dd>
     </dl>
-    <div class="pop-actions"><label class="toggle" data-panel="pause">Pause uploads <button type="button" class="switch" role="switch" aria-checked="false" id="app-pause"><i></i></button></label><a class="btn small quiet" href="#" data-page="/status">Status page</a><a class="btn small quiet" href="#" id="ver-updates">Updates</a></div>
+    <div class="pop-actions"><label class="toggle">Pause recording <button type="button" class="switch" role="switch" aria-checked="false" id="app-recording"><i></i></button></label><label class="toggle" data-panel="pause">Pause uploads <button type="button" class="switch" role="switch" aria-checked="false" id="app-pause"><i></i></button></label><a class="btn small quiet" href="#" data-page="/status">Status page</a><a class="btn small quiet" href="#" id="ver-updates">Updates</a></div>
   </div>
   <button class="avatar" id="user-btn" type="button" title="" aria-label="Menu" aria-haspopup="menu" aria-expanded="false"></button>
   <div class="menu" id="user-menu" role="menu" hidden>

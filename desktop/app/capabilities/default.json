@@ -57,6 +57,7 @@
     "allow-upload-local",
     "allow-open-folder",
     "allow-pause-set",
+    "allow-recording-pause-set",
     "allow-upload-now",
     "allow-obs-show",
     "allow-obs-done",
