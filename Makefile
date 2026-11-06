@@ -277,6 +277,11 @@ desktop-back: desktop-linux ## The way back in the window: the button, the mouse
 desktop-standalone: desktop-linux ## Standalone in the app under Xvfb, where a new install starts
 	$(DESKTOP_RUN) -w /work -e XVFB_SCREEN=1280x900 -e REEL_SHOTS_OUT $(DESKTOP_IMAGE) /work/desktop/ci/xvfb.sh run sh /work/desktop/ci/check-standalone.sh
 
+.PHONY: desktop-encoder-test
+ENCODER_SHOTS ?= shots/encoder-test
+desktop-encoder-test: desktop-linux ## The setup's encoder test in the app under Xvfb: each row as its test ends, a hung one stopped
+	$(DESKTOP_RUN) -w /work -e XVFB_SCREEN=1280x900 -e REEL_SHOTS_OUT=/work/$(ENCODER_SHOTS) $(DESKTOP_IMAGE) /work/desktop/ci/xvfb.sh run sh /work/desktop/ci/check-encoder-test.sh
+
 .PHONY: desktop-library
 desktop-library: desktop-linux ## The library moved to another drive, copied, cut short and away, in the app under Xvfb
 	mkdir -p "$(DESKTOP_OUT)"

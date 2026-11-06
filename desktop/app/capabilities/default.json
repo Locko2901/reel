@@ -73,6 +73,7 @@
     "allow-system-memory",
     "allow-obs-video",
     "allow-encoders-test",
+    "allow-encoders-seen",
     "allow-obs-items",
     "allow-obs-read",
     "allow-obs-input-set",

@@ -185,6 +185,7 @@ pub fn run() {
             commands::system_memory,
             commands::obs_video,
             commands::encoders_test,
+            commands::encoders_seen,
             commands::obs_items,
             commands::obs_input_set,
             commands::obs_meters,
