@@ -212,8 +212,9 @@ it and not ask again.
 2. Make the proxy send the signed-in user's name in the header
    `X-authentik-username`. Authentik does this by itself. For Authelia or
    oauth2-proxy, map their user header to that name.
-3. Put the admins' names in `REEL_ADMINS`, separated by commas. The first
-   user reel ever sees is an admin too.
+3. Put the admins' names in `REEL_ADMINS`, separated by commas, exactly
+   as the proxy sends them, case included. The first user reel ever sees
+   is an admin too.
 4. Let five paths through without the sign-in.
 
 !!! warning "Leave these paths open, or links and the app stop working"
@@ -272,7 +273,10 @@ provider to sign in, with no proxy asking first.
 
 3. Optional: set a [Role claim](../configuration.md#role-claim) such as
    `groups`, and the [Admin value](../configuration.md#admin-value) in it
-   that makes an admin. reel follows it at every sign-in.
+   that makes an admin. reel follows it at every sign-in. Or list the
+   admins in `REEL_ADMINS` by the subject the provider sends for them,
+   exactly, not by a name: Authentik's subject is the username unless the
+   client says otherwise.
 4. Optional: name the provider on the sign-in button with
    `REEL_OIDC_NAME: Authentik` ([Provider name](../configuration.md#provider-name)).
 

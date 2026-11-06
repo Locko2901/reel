@@ -7347,7 +7347,7 @@ async fn an_identity_is_bound_to_its_subject_not_its_name() {
     let Some((env, issuer)) = oidc_env(who.clone(), |c| {
         c.auth.oidc_role_claim = "groups".into();
         c.auth.oidc_admin_value = "reel-admins".into();
-        c.auth.admins = vec!["pat".into()];
+        c.auth.admins = vec!["sub-pat".into()];
     })
     .await
     else {
@@ -7459,7 +7459,7 @@ async fn an_identity_is_bound_to_its_subject_not_its_name() {
     assert_eq!(oidc_sign_in(&env).await.0, 303);
     assert!(
         env.store().user(&pat.id).await.unwrap().unwrap().is_admin(),
-        "and keeps the listed name an admin without the claim"
+        "and keeps the listed subject an admin without the claim"
     );
 }
 
@@ -7978,7 +7978,7 @@ async fn a_name_added_to_the_admins_counts_at_the_next_sign_in_without_a_restart
         "a second user is a member"
     );
 
-    save_setting_as(&env, &admin, "auth.admins", "pat").await;
+    save_setting_as(&env, &admin, "auth.admins", "sub-pat").await;
     let pat = sign_in_as("pat").await;
     assert_eq!(pat.name, "pat");
     assert!(pat.is_admin(), "the Admins list as saved a moment ago");
@@ -15542,4 +15542,64 @@ async fn wrong_passwords_from_strangers_do_not_hold_the_right_one_out() {
         303,
         "robin with the right password from another address, after a stranger's five wrong tries"
     );
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_name_in_the_admins_makes_no_admin_of_a_stranger_whose_name_differs_in_case() {
+    let who = persona(Persona {
+        groups: vec![],
+        ..Persona::mira()
+    });
+    let Some((env, issuer)) = oidc_env(who.clone(), |c| c.auth.admins = vec!["pat".into()]).await
+    else {
+        return;
+    };
+    assert_eq!(oidc_sign_in(&env).await.0, 303, "mira, the first user");
+    {
+        let mut p = who.lock().await;
+        p.sub = "PAT".into();
+        p.username = "PAT".into();
+    }
+    assert_eq!(oidc_sign_in(&env).await.0, 303);
+    let row = env
+        .store()
+        .user_by_oidc(&issuer, "PAT")
+        .await
+        .unwrap()
+        .unwrap();
+    assert!(
+        !row.is_admin(),
+        "{} is not the pat the Admins list names, and pat has not signed in yet",
+        row.name
+    );
+    {
+        let mut p = who.lock().await;
+        p.sub = "robin".into();
+        p.username = "pat".into();
+    }
+    assert_eq!(oidc_sign_in(&env).await.0, 303);
+    let named_pat = env
+        .store()
+        .user_by_oidc(&issuer, "robin")
+        .await
+        .unwrap()
+        .unwrap();
+    assert!(
+        !named_pat.is_admin(),
+        "a name claim of pat is not the subject pat: {}",
+        named_pat.name
+    );
+    {
+        let mut p = who.lock().await;
+        p.sub = "pat".into();
+        p.username = "pat".into();
+    }
+    assert_eq!(oidc_sign_in(&env).await.0, 303);
+    let pat = env
+        .store()
+        .user_by_oidc(&issuer, "pat")
+        .await
+        .unwrap()
+        .unwrap();
+    assert!(pat.is_admin(), "the subject pat, as Admins lists it");
 }
