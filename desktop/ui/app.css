@@ -6,8 +6,8 @@ header.top [data-page].disabled, nav.sections [data-page].disabled { opacity: 0.
 .test-result:last-child { border-bottom: 0; }
 .test-result p { margin: 0; overflow-wrap: anywhere; }
 .test-result p + p { margin-top: 4px; }
-table .bar { display: inline-block; width: 120px; height: 4px; background: var(--raised-2); vertical-align: middle; margin-right: 8px; border-radius: 2px; overflow: hidden; }
-table .bar i { display: block; height: 100%; background: var(--accent); }
+table .bar, #encoders-line .bar { display: inline-block; width: 120px; height: 4px; background: var(--raised-2); vertical-align: middle; margin-right: 8px; border-radius: 2px; overflow: hidden; }
+table .bar i, #encoders-line .bar i { display: block; height: 100%; background: var(--accent); }
 td.acts { white-space: nowrap; }
 td.acts button { margin-left: 4px; }
 .offline-page { display: flex; justify-content: center; padding-top: 48px; }
@@ -38,3 +38,5 @@ details.advanced[open] > summary { margin-bottom: var(--s2); }
 #library-job .notice .grow { flex: 1 1 320px; overflow-wrap: anywhere; }
 #library-line .mono { overflow-wrap: anywhere; }
 .settings[data-paired] .group > .section-line::after { content: " Kept on this PC: each PC has its own."; }
+#encoders details.ffmpeg > summary { cursor: pointer; color: var(--text-3); font-size: var(--fs-xs); width: max-content; margin-top: 2px; }
+#encoders details.ffmpeg > pre { margin: 6px 0 0; padding: 8px 10px; background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius); font-family: var(--mono); font-size: var(--fs-xs); line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--text-2); max-height: 200px; overflow: auto; }

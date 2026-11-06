@@ -131,28 +131,93 @@ async function renderQuality() {
   showWarnings($('#quality-warn'), v);
 }
 
+// The encoder test as the page sees it: its run, when it asked, which row is in test since when.
+const encTest = { run: 0, testing: null, since: 0, done: 0, total: 0, took: null, tick: null };
+const encRunning = () => encTest.run !== 0 && encTest.took == null;
+const firstOk = () => (encoders.find((e) => e.ok) || {}).id || 'obs_x264';
+
+function encoderCell(e, open) {
+  const st = document.createElement('span');
+  const why = document.createElement('span');
+  why.className = 'faint small';
+  if (e.state === 'waiting') {
+    st.className = 'st-neutral';
+    st.textContent = 'waiting';
+  } else if (e.state === 'testing') {
+    st.className = 'st-active';
+    st.textContent = 'testing';
+    why.textContent = ` ${Math.floor((Date.now() - encTest.since) / 1000)} s so far`;
+  } else if (e.state === 'works') {
+    st.className = 'st-ok';
+    st.textContent = 'works';
+    why.textContent = ` ${e.line}${e.ms != null ? ` in ${(e.ms / 1000).toFixed(1)} s` : ''}`;
+  } else if (e.state === 'no_answer') {
+    st.className = 'st-warn';
+    st.textContent = e.line;
+    why.textContent = ' and was stopped; Test again tries once more';
+  } else {
+    st.className = 'st-neutral';
+    st.textContent = 'not here';
+    why.textContent = ` ${e.line}`;
+  }
+  const out = [st, why];
+  if (e.details) {
+    const d = document.createElement('details');
+    d.className = 'ffmpeg';
+    d.dataset.id = e.id;
+    d.open = open.has(e.id);
+    const sum = document.createElement('summary');
+    sum.textContent = 'details';
+    const pre = document.createElement('pre');
+    pre.textContent = e.details;
+    d.append(sum, pre);
+    out.push(d);
+  }
+  return out;
+}
+
+// A status region: rebuilt only when its words change, so a screen reader says each once.
+function renderEncodersLine() {
+  const line = $('#encoders-line');
+  const running = encRunning() && encTest.total;
+  const words = !encRunning()
+    ? (encTest.took == null ? '' : `tested in ${encTest.took.toFixed(1)} s`)
+    : (running ? `testing ${Math.min(encTest.done + 1, encTest.total)} of ${encTest.total}` : 'starting the test');
+  const key = `${words}/${encTest.done}`;
+  if (line.dataset.key === key) return;
+  line.dataset.key = key;
+  line.replaceChildren();
+  if (running) {
+    const bar = document.createElement('span');
+    bar.className = 'bar';
+    const fill = document.createElement('i');
+    fill.style.width = `${Math.round((encTest.done / encTest.total) * 100)}%`;
+    bar.append(fill);
+    line.append(bar);
+  }
+  line.append(words);
+}
+
 function renderEncoders() {
   const body = $('#encoders tbody');
+  const open = new Set($$('details[open]', body).map((d) => d.dataset.id));
   body.replaceChildren();
   const sel = $('#encoder');
   sel.replaceChildren();
+  renderEncodersLine();
+  $('#encoders-again').disabled = encRunning();
   if (!encoders) {
     const tr = document.createElement('tr');
-    tr.innerHTML = '<td class="clip">testing each encoder</td><td class="sub"><span class="st-active">a few seconds</span></td>';
+    tr.innerHTML = '<td class="clip">each encoder</td><td class="sub"><span class="st-active">starting the test</span></td>';
     body.append(tr);
+    sel.disabled = true;
     return;
   }
   for (const e of encoders) {
     const tr = document.createElement('tr');
     tr.innerHTML = '<td class="clip"></td><td class="sub"></td>';
     tr.children[0].textContent = e.word;
-    const st = document.createElement('span');
-    st.className = e.ok ? 'st-ok' : 'st-neutral';
-    st.textContent = e.ok ? 'works' : 'not here';
-    const why = document.createElement('span');
-    why.className = 'faint small';
-    why.textContent = ` ${e.line}`;
-    tr.children[1].append(st, why);
+    tr.children[1].append(...encoderCell(e, open));
     body.append(tr);
     if (e.ok) {
       const o = document.createElement('option');
@@ -161,17 +226,50 @@ function renderEncoders() {
       sel.append(o);
     }
   }
-  const tested = encoders.find((e) => e.id === setup().encoder);
-  if (!setup().encoder || (tested && !tested.ok)) setup().encoder = (encoders.find((e) => e.ok) || {}).id || 'obs_x264';
+  if (!encRunning()) {
+    const tested = encoders.find((e) => e.id === setup().encoder);
+    if (!setup().encoder || (tested && !tested.ok)) setup().encoder = firstOk();
+  }
+  sel.disabled = encRunning() && !setup().encoder;
+  if (sel.disabled) {
+    const o = document.createElement('option');
+    o.value = '';
+    o.textContent = 'picked when the test ends';
+    sel.prepend(o);
+  }
   ensureOption(sel, setup().encoder);
-  sel.value = setup().encoder;
+  sel.value = setup().encoder || '';
+}
+
+// Each row's change as the app sends it; one of an older run, or after the answer, is dropped.
+function encoderEvent(p) {
+  if (!p || p.run !== encTest.run || !encRunning()) return;
+  const testing = (p.rows.find((e) => e.state === 'testing') || {}).id || null;
+  if (testing !== encTest.testing) {
+    encTest.testing = testing;
+    encTest.since = Date.now();
+  }
+  encoders = p.rows;
+  encTest.done = p.done;
+  encTest.total = p.total;
+  if (step === 'encoder') renderEncoders();
 }
 
 async function testEncoders() {
+  const run = Date.now();
+  Object.assign(encTest, { run, testing: null, since: run, done: 0, total: 0, took: null });
   encoders = null;
+  clearInterval(encTest.tick);
+  encTest.tick = setInterval(() => { if (step === 'encoder') renderEncoders(); }, 1000);
   if (step === 'encoder') renderEncoders();
-  try { encoders = await invoke('encoders_test'); } catch (e) { encoders = [{ id: 'obs_x264', word: 'x264 on the CPU', ok: true, line: String(e.message || e) }]; }
-  if (!seen.has('encoder') || !setup().encoder) setup().encoder = (encoders.find((e) => e.ok) || {}).id || 'obs_x264';
+  let rows;
+  try { rows = await invoke('encoders_test', { run, asked: run }); } catch (e) { rows = [{ id: 'obs_x264', word: 'x264 on the CPU', state: 'works', ok: true, line: String(e.message || e), details: '' }]; }
+  if (encTest.run !== run) return;
+  clearInterval(encTest.tick);
+  encoders = rows;
+  encTest.took = (Date.now() - run) / 1000;
+  invoke('encoders_seen', { run, pageMs: Date.now() - run }).catch(() => {});
+  if (!seen.has('encoder') || !setup().encoder) setup().encoder = firstOk();
   if (step === 'encoder') renderEncoders();
 }
 
@@ -664,6 +762,7 @@ async function main() {
   const s = setup();
   if (!s.screen || !s.screen.id) s.screen = screens.find((x) => x.main) || screens[0] || s.screen;
   if (!settings.hotkeys.save) settings.hotkeys.save = 'Alt+F10';
+  await listen('encoder-test', (ev) => encoderEvent(ev.payload));
   testEncoders();
   await listen('obs-meters', (ev) => {
     for (const [name, db] of ev.payload || []) meterIn($('#levels'), name, db);

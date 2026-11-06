@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-encoders-seen"
+description = "Enables the encoders_seen command without any pre-configured scope."
+commands.allow = ["encoders_seen"]
+
+[[permission]]
+identifier = "deny-encoders-seen"
+description = "Denies the encoders_seen command without any pre-configured scope."
+commands.deny = ["encoders_seen"]
