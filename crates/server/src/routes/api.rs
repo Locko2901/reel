@@ -633,6 +633,7 @@ pub async fn job_json(
     Path(id): Path<String>,
 ) -> AppResult<Json<Value>> {
     let job = st.ctx.store.job(&id).await?.ok_or(AppError::NotFound)?;
+    let job = crate::routes::jobs::shown(job, &st.ctx.config());
     Ok(Json(serde_json::to_value(job)?))
 }
 

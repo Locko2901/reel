@@ -16790,3 +16790,47 @@ async fn the_health_check_tells_a_stranger_no_version_and_no_counts() {
         "a member gets ok alone"
     );
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_member_reads_no_server_folder_in_the_jobs_api() {
+    let Some(env) = start(AuthMode::Local, vec![]).await else {
+        return;
+    };
+    let (_, members) = admin_and_members(&env, &["mira"]).await;
+    upload_as(&env, &members[0], "mine.mp4", Synth::small(2.0, "mine")).await;
+    let folder = env.ctx.config().data_dir.to_string_lossy().into_owned();
+    let (status, body) = as_user(
+        &env,
+        reqwest::Method::GET,
+        "/api/jobs?show=history",
+        &members[0],
+    )
+    .await;
+    assert_eq!(status, 200);
+    assert!(
+        !body.contains(&folder),
+        "the ingest job's payload names the data folder; the pages hide it"
+    );
+    let jobs: serde_json::Value = serde_json::from_str(&body).unwrap();
+    let ingest = jobs["jobs"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|j| j["kind"] == "ingest")
+        .expect("the upload's ingest");
+    let (status, one) = as_user(
+        &env,
+        reqwest::Method::GET,
+        &format!("/api/jobs/{}", ingest["id"].as_str().unwrap()),
+        &members[0],
+    )
+    .await;
+    assert_eq!(status, 200);
+    assert!(!one.contains(&folder), "{one}");
+    let payload: serde_json::Value =
+        serde_json::from_str(ingest["payload"].as_str().unwrap()).unwrap();
+    assert!(
+        payload["input"].as_str().unwrap().starts_with("uploads"),
+        "the folder by its name: {payload}"
+    );
+}
