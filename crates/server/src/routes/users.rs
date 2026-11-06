@@ -384,12 +384,13 @@ pub async fn oidc_callback(
         .tokens(&code, &pending)
         .await
         .map_err(|e| refused(&e))?;
-    let mut verified = oidc.identity(&tokens, &pending);
+    let cfg = st.ctx.config();
+    let mut verified = oidc.identity(&tokens, &pending, &cfg);
     if verified.as_ref().is_err_and(|e| e.by_its_signature()) {
         tracing::info!("the id token does not verify with the keys reel has; asking the identity provider for its keys again");
         if provider.refresh().await {
             if let Some(fresh) = provider.current() {
-                verified = fresh.identity(&tokens, &pending);
+                verified = fresh.identity(&tokens, &pending, &cfg);
             }
         }
     }
