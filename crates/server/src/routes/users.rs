@@ -163,9 +163,17 @@ async fn finish_login(
     remember: bool,
     session_days: u64,
 ) -> AppResult<()> {
+    let signed_in_before = auth.user.is_some();
     auth.login(user)
         .await
         .map_err(|e| AppError::Internal(anyhow::anyhow!("login: {e}")))?;
+    // the login rotates the id only for a session nobody was signed in to
+    if signed_in_before {
+        auth.session
+            .cycle_id()
+            .await
+            .map_err(|e| AppError::Internal(anyhow::anyhow!("session: {e}")))?;
+    }
     auth.session
         .insert(SIGNED_IN_AT, jiff::Timestamp::now().as_second())
         .await

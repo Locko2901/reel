@@ -33,6 +33,18 @@ use tower_sessions::session::{Id, Record};
 use tower_sessions::{session_store, ExpiredDeletion, SessionStore};
 
 pub const SESSION_COOKIE: &str = "reel_session";
+/// On https the browser takes this name only from reel's own host, with Secure, Path=/ and no
+/// Domain, so no other site under the same domain can set it.
+pub const HOST_SESSION_COOKIE: &str = "__Host-reel_session";
+
+/// The session cookie's name for a server at `public_url`.
+pub fn session_cookie(public_url: &str) -> &'static str {
+    if public_url.starts_with("https://") {
+        HOST_SESSION_COOKIE
+    } else {
+        SESSION_COOKIE
+    }
+}
 pub const SIGNED_IN_AT: &str = "signed_in_at";
 pub const OIDC_PENDING: &str = "oidc_pending";
 /// How long a browser has between the redirect to the provider and the callback.

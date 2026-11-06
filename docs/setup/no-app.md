@@ -101,12 +101,13 @@ you should know before you rely on it.
 ### Set it up
 
 1. Sign in to reel in your browser. In the browser's developer tools,
-   find the site's cookies and copy the value of `reel_session`.
+   find the site's cookies and copy the value of `__Host-reel_session`
+   (`reel_session` on a server without https).
 2. In ShareX, make a custom uploader:
     - method `POST`, request URL `https://clips.example.com/upload`;
     - body as form data (multipart/form-data), file form name `file`;
-    - a header `Cookie` with the value `reel_session=` followed by the
-      value you copied.
+    - a header `Cookie` with the value `__Host-reel_session=` followed by
+      the value you copied.
 3. Choose it as ShareX's file uploader, and upload a video.
 
 When it worked, the clip shows up in the library, and reel answers ShareX

@@ -101,8 +101,11 @@ You set the mode when the container starts (see
   is out from their own network. Admins see the failed tries (the address, the
   name and when), and reel removes them after a week.
 - The session cookie is `HttpOnly`, `SameSite=Lax`, and `Secure` when the
-  public URL is https. The database keeps only a hash of each session's
-  id, so a copy of the database signs nobody in.
+  public URL is https. On https it is called `__Host-reel_session`, a name
+  the browser takes only from reel's own host, so no other site under the
+  same domain can set it. Every sign-in gets a new session id. The
+  database keeps only a hash of each session's id, so a copy of the
+  database signs nobody in.
 - A session ends after [Idle timeout](configuration.md#idle-timeout)
   without use (30 days by default) and, however active, after
   [Session lifetime](configuration.md#session-lifetime) (90 days).

@@ -531,7 +531,7 @@ pub fn router(state: AppState) -> Router {
         .route_layer(guard(Part::Devices));
 
     let session_layer = tower_sessions::SessionManagerLayer::new(state.sessions.clone())
-        .with_name(accounts::SESSION_COOKIE)
+        .with_name(accounts::session_cookie(&cfg.public_url))
         .with_http_only(true)
         .with_same_site(tower_sessions::cookie::SameSite::Lax)
         .with_secure(cfg.public_url.starts_with("https://"))
