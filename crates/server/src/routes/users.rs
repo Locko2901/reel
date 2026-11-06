@@ -63,6 +63,16 @@ fn safe_next(next: Option<&str>, public_url: &str) -> String {
 
 pub const RETRY_SECONDS: u32 = 20;
 
+/// The sign-in page's error codes: an address carries a code, the words are reel's own.
+const REFUSED: &str = "refused";
+
+fn error_words(code: &str, provider: &str) -> String {
+    match code {
+        REFUSED => format!("{provider} did not sign you in. Try again, or ask an admin."),
+        _ => String::new(),
+    }
+}
+
 async fn signin_view(st: &AppState, next: &str, error: &str) -> SigninPage {
     let cfg = st.ctx.config();
     let local = cfg.auth.mode == AuthMode::Local;
@@ -102,7 +112,8 @@ pub async fn signin_page(
     Query(q): Query<SigninQuery>,
 ) -> AppResult<Response> {
     let next = safe_next(q.next.as_deref(), &st.ctx.config().public_url);
-    let mut page = signin_view(&st, &next, q.error.as_deref().unwrap_or("")).await;
+    let error = error_words(q.error.as_deref().unwrap_or(""), &st.provider_name());
+    let mut page = signin_view(&st, &next, &error).await;
     page.claim = claimer(&st, &auth).await?;
     Ok(html(page))
 }
@@ -435,7 +446,7 @@ pub async fn oidc_callback(
     };
     let pending: Option<OidcPending> = auth
         .session
-        .remove(OIDC_PENDING)
+        .get(OIDC_PENDING)
         .await
         .map_err(|e| AppError::Internal(anyhow::anyhow!("session: {e}")))?;
     let Some(pending) = pending else {
@@ -443,26 +454,26 @@ pub async fn oidc_callback(
             "no sign-in was started from this browser; try again".into(),
         ));
     };
-    if let Some(e) = q.error {
-        let why = q.error_description.unwrap_or(e);
-        tracing::warn!(why, "the provider refused");
-        return Ok(Redirect::to(&format!(
-            "/signin?error={}",
-            percent_encoding::utf8_percent_encode(
-                &format!("{} said: {why}", st.provider_name()),
-                percent_encoding::NON_ALPHANUMERIC
-            )
-        ))
-        .into_response());
-    }
-    let (Some(code), Some(state)) = (q.code, q.state) else {
-        return Err(AppError::BadRequest("the provider sent no code".into()));
-    };
-    if !same_code(&state, &pending.csrf) {
+    if !q
+        .state
+        .as_deref()
+        .is_some_and(|state| same_code(state, &pending.csrf))
+    {
         return Err(AppError::Forbidden(
             "the state does not match this browser's sign-in".into(),
         ));
     }
+    auth.session
+        .remove::<OidcPending>(OIDC_PENDING)
+        .await
+        .map_err(|e| AppError::Internal(anyhow::anyhow!("session: {e}")))?;
+    if let Some(e) = q.error {
+        tracing::warn!(error = %e, why = q.error_description.as_deref().unwrap_or(""), "the provider refused");
+        return Ok(Redirect::to(&format!("/signin?error={REFUSED}")).into_response());
+    }
+    let Some(code) = q.code else {
+        return Err(AppError::BadRequest("the provider sent no code".into()));
+    };
     let refused = |e: &dyn std::fmt::Display| {
         tracing::warn!(error = %e, "oidc sign-in failed");
         AppError::Forbidden(format!("the sign-in did not verify: {e}"))
