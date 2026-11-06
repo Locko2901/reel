@@ -46,6 +46,8 @@ pub fn session_cookie(public_url: &str) -> &'static str {
     }
 }
 pub const SIGNED_IN_AT: &str = "signed_in_at";
+/// When the session was last written, so a session in use is kept alive by a write an hour.
+pub const SEEN_AT: &str = "seen_at";
 pub const OIDC_PENDING: &str = "oidc_pending";
 /// How long a browser has between the redirect to the provider and the callback.
 pub const OIDC_PENDING_MINUTES: i64 = 10;

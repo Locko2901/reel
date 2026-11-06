@@ -747,7 +747,7 @@ Users with these names are admins, each exactly as reel gets it, case included; 
 
 ### Idle timeout
 
-A session ends this long after its last use.
+A session ends this long after its last use; behind an identity provider the default is 7 days, elsewhere 30.
 
 - Under Settings: Access, Sessions
 - In `config.toml`: `session_days` under `[auth]`
@@ -758,7 +758,7 @@ A session ends this long after its last use.
 
 ### Session lifetime
 
-A session ends this long after the sign-in, however active; 0 is no limit.
+A session ends this long after the sign-in, however active; 0 is no limit; behind an identity provider the default is 30 days, elsewhere 90.
 
 - Under Settings: Access, Sessions
 - In `config.toml`: `session_max_days` under `[auth]`

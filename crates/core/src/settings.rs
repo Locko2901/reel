@@ -291,8 +291,8 @@ pub static DEFS: &[Def] = &[
     fixed(def("auth.trusted_proxies", "REEL_TRUSTED_PROXIES", Section::Access, "Identity", "Trusted proxies", "only these addresses may name the user; anything else answers 401", Kind::List)),
     fixed(def("auth.dev_user", "REEL_DEV_USER", Section::Access, "Identity", "Single user", "the name everyone is in single mode", Kind::Text)),
     def("auth.admins", "REEL_ADMINS", Section::Access, "Identity", "Admins", "users with these names are admins, each exactly as reel gets it, case included; the first user ever seen is one too, except behind an identity provider, where the first admin is listed here, carries the admin value or types the setup code; with an identity provider, the subject the provider sends instead of a name (Authentik's is the username unless its client says otherwise), counted at the first sign-in, and at every sign-in with a role claim", Kind::List),
-    restart(def("auth.session_days", "REEL_SESSION_DAYS", Section::Access, "Sessions", "Idle timeout", "a session ends this long after its last use", int(1, 365, "days"))),
-    def("auth.session_max_days", "REEL_SESSION_MAX_DAYS", Section::Access, "Sessions", "Session lifetime", "a session ends this long after the sign-in, however active; 0 is no limit", int(0, 3650, "days")),
+    restart(def("auth.session_days", "REEL_SESSION_DAYS", Section::Access, "Sessions", "Idle timeout", "a session ends this long after its last use; behind an identity provider the default is 7 days, elsewhere 30", int(1, 365, "days"))),
+    def("auth.session_max_days", "REEL_SESSION_MAX_DAYS", Section::Access, "Sessions", "Session lifetime", "a session ends this long after the sign-in, however active; 0 is no limit; behind an identity provider the default is 30 days, elsewhere 90", int(0, 3650, "days")),
     restart(def("auth.oidc_issuer", "REEL_OIDC_ISSUER", Section::Access, "Identity provider", "Issuer", "the OpenID Connect issuer URL exactly as the provider gives it, its last slash included, such as https://auth.example.org/application/o/reel/; reel asks it for its metadata at start, again by itself until it answers, and every hour", Kind::Url)),
     def("auth.oidc_name", "REEL_OIDC_NAME", Section::Access, "Identity provider", "Provider name", "what the sign-in page calls the provider, as in Sign in with Authentik; empty shows the issuer's host; shown as typed, at most 40 characters", Kind::Text),
     restart(def("auth.oidc_client_id", "REEL_OIDC_CLIENT_ID", Section::Access, "Identity provider", "Client id", "the client registered at the issuer; its secret comes from REEL_OIDC_CLIENT_SECRET or the file REEL_OIDC_CLIENT_SECRET_FILE names, never from here", Kind::Text)),
@@ -953,6 +953,10 @@ pub fn private_host(url: &str) -> bool {
             .any(|s| host.ends_with(s))
 }
 
+/// The idle timeout and lifetime of a session behind an identity provider, unless set.
+pub const OIDC_SESSION_DAYS: u64 = 7;
+pub const OIDC_SESSION_MAX_DAYS: u64 = 30;
+
 /// Builds the config in force: `base`, then the table, then the file, then the environment.
 pub fn build(
     base: &Config,
@@ -988,6 +992,24 @@ pub fn build(
             set(&mut cfg, d.key, &v)
                 .map_err(|e| ConfigError::Invalid(format!("{}: {e}", d.env)))?;
             sources.insert(d.key, Source::Env);
+        }
+    }
+    // Behind an identity provider a session is shorter unless it is set: the provider signs a
+    // person in again without a password, and someone it disables keeps a session to its end.
+    if cfg.auth.mode == AuthMode::Oidc {
+        let generic = crate::config::AuthConfig::default();
+        if !sources.contains_key("auth.session_days")
+            && base.auth.session_days == generic.session_days
+        {
+            cfg.auth.session_days = OIDC_SESSION_DAYS;
+            if cfg.auth.session_max_days > 0 {
+                cfg.auth.session_days = cfg.auth.session_days.min(cfg.auth.session_max_days);
+            }
+        }
+        if !sources.contains_key("auth.session_max_days")
+            && base.auth.session_max_days == generic.session_max_days
+        {
+            cfg.auth.session_max_days = OIDC_SESSION_MAX_DAYS.max(cfg.auth.session_days);
         }
     }
     // The built-in default limit yields to a configured list that does not hold it.
@@ -1036,6 +1058,42 @@ pub fn secret_keys() -> impl Iterator<Item = &'static str> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_session_behind_an_identity_provider_is_shorter_unless_set() {
+        let no_env = |_: &str| None;
+        let of = |mode: AuthMode, table: &[(&str, &str)]| {
+            let mut base = Config::default();
+            base.auth.mode = mode;
+            base.auth.trusted_proxies = vec!["192.0.2.10/32".into()];
+            if mode == AuthMode::Oidc {
+                base.auth.oidc_issuer = "https://id.example.org/".into();
+                base.auth.oidc_client_id = "reel".into();
+            }
+            let table: Vec<(String, String)> = table
+                .iter()
+                .map(|(k, v)| (k.to_string(), v.to_string()))
+                .collect();
+            let eff = build(&base, None, &table, &no_env).unwrap();
+            (
+                eff.config.auth.session_days,
+                eff.config.auth.session_max_days,
+            )
+        };
+        assert_eq!(of(AuthMode::Oidc, &[]), (7, 30));
+        assert_eq!(of(AuthMode::Local, &[]), (30, 90));
+        assert_eq!(of(AuthMode::Proxy, &[]), (30, 90));
+        assert_eq!(of(AuthMode::Oidc, &[("auth.session_days", "14")]), (14, 30));
+        assert_eq!(of(AuthMode::Oidc, &[("auth.session_days", "60")]), (60, 60));
+        assert_eq!(
+            of(AuthMode::Oidc, &[("auth.session_max_days", "5")]),
+            (5, 5)
+        );
+        assert_eq!(
+            of(AuthMode::Oidc, &[("auth.session_max_days", "0")]),
+            (7, 0)
+        );
+    }
 
     #[test]
     fn every_select_value_has_a_word_that_is_not_the_value() {
