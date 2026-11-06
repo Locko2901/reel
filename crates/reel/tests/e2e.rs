@@ -6625,7 +6625,7 @@ async fn behind_a_trusted_proxy_the_limits_follow_the_client_and_the_name() {
     assert_eq!(
         r.status(),
         429,
-        "five tries on one name from anywhere, the sixth waits"
+        "five tries on one name from one network, the sixth waits"
     );
     assert!(
         r.headers()["retry-after"]
@@ -6634,6 +6634,14 @@ async fn behind_a_trusted_proxy_the_limits_follow_the_client_and_the_name() {
             .parse::<u64>()
             .unwrap()
             >= 1
+    );
+    let r = attempt("mira", "wrong wrong wrong", "198.51.100.30")
+        .await
+        .unwrap();
+    assert_eq!(
+        r.status(),
+        401,
+        "the name is still answered on another network"
     );
     let r = attempt("someone else", "wrong wrong wrong", "203.0.113.31")
         .await
@@ -15503,5 +15511,35 @@ async fn the_way_back_after_a_sign_in_stays_on_this_site() {
         "127.0.0.1",
         "with no sign-in at all the form sends the browser to {:?}",
         String::from_utf8_lossy(location)
+    );
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn wrong_passwords_from_strangers_do_not_hold_the_right_one_out() {
+    let Some(env) = start(AuthMode::Local, vec!["127.0.0.1/32"]).await else {
+        return;
+    };
+    let code = setup_code(&env).await;
+    assert_eq!(first_admin(&env, "robin", &code).await.status(), 303);
+    let attempt = |password: &str, from: String| {
+        env.client
+            .post(format!("{}/signin", env.base))
+            .header("x-forwarded-for", from)
+            .form(&[("name", "robin"), ("password", password)])
+            .send()
+    };
+    for n in 0..5 {
+        let r = attempt("wrong wrong wrong", format!("203.0.113.{}", 40 + n))
+            .await
+            .unwrap();
+        assert_eq!(r.status(), 401, "a stranger's try {n}");
+    }
+    let r = attempt("correct horse battery", "198.51.100.7".into())
+        .await
+        .unwrap();
+    assert_eq!(
+        r.status(),
+        303,
+        "robin with the right password from another address, after a stranger's five wrong tries"
     );
 }
