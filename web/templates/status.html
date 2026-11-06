@@ -8,7 +8,7 @@
 <div class="clip-layout status">
   <section class="panels">
     <div class="panel">
-      <header><h2>reel {{ version }}</h2><div class="actions"><button class="small" id="update-btn" type="button"{% if !update_on %} hidden{% endif %}>Check now</button></div></header>
+      <header><h2>reel {{ version }}</h2><div class="actions"><button class="small" id="update-btn" type="button"{% if !update_on || !who.admin %} hidden{% endif %}>Check now</button></div></header>
       <div class="body">
         <dl class="kv wide">
           <dt>built</dt><dd>{{ built }}</dd>

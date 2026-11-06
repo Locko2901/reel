@@ -1,6 +1,6 @@
 use crate::auth::User;
 use crate::disk::Originals;
-use crate::error::AppResult;
+use crate::error::{AppError, AppResult};
 use crate::routes::html;
 use crate::views::Who;
 use crate::AppState;
@@ -588,7 +588,13 @@ pub async fn doctor(State(st): State<AppState>) -> AppResult<Json<Value>> {
     Ok(Json(json!({ "ok": true, "hardware": json })))
 }
 
+/// Check now, for admins while the check is on: switched off, reel asks GitHub nothing.
 pub async fn update_check(State(st): State<AppState>) -> AppResult<Json<Value>> {
+    if !st.ctx.config().advanced.update_check {
+        return Err(AppError::Conflict(
+            "checking for updates is off: Settings, Advanced, Check for updates".into(),
+        ));
+    }
     let state = reel_pipeline::updates::check_once(&st.ctx).await;
     Ok(Json(json!({
         "ok": state.error.is_none(),

@@ -297,10 +297,6 @@ pub fn router(state: AppState) -> Router {
         .route("/jobs", get(routes::jobs::page))
         .route("/status", get(routes::status::page))
         .route("/api/status/doctor", post(routes::status::doctor))
-        .route(
-            "/api/status/update-check",
-            post(routes::status::update_check),
-        )
         .route("/api/jobs", get(routes::jobs::list))
         .route("/api/jobs/counts", get(routes::jobs::counts))
         .route("/api/jobs/{id}", get(routes::api::job_json))
@@ -375,6 +371,10 @@ pub fn router(state: AppState) -> Router {
             get(routes::settings::get_api).patch(routes::settings::patch_api),
         )
         .route("/api/settings/history", get(routes::settings::history))
+        .route(
+            "/api/status/update-check",
+            post(routes::status::update_check),
+        )
         .route("/api/imports/scan", post(routes::imports::scan))
         .route(
             "/api/storage/purge-trash",
