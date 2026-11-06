@@ -10,10 +10,11 @@ export function setOn(el, on) {
 export function switches() {
   if (document.documentElement.dataset.switches) return;
   document.documentElement.dataset.switches = 'on';
+  // in the capture phase: the header's popovers keep their clicks from the document
   document.addEventListener('click', (e) => {
     const s = e.target.closest('button[role="switch"]');
     if (!s || s.disabled) return;
     setOn(s, !isOn(s));
     s.dispatchEvent(new Event('change', { bubbles: true }));
-  });
+  }, true);
 }
