@@ -83,10 +83,13 @@ export function appShell() {
   const poll = async () => {
     try { render(await call('app_status')); } catch (e) { /* the app went away; the page stays a page */ }
   };
-  poll();
-  const timer = setInterval(poll, 2000);
+  let timer = 0;
+  const start = () => { poll(); clearInterval(timer); timer = setInterval(poll, 2000); };
+  start();
   document.addEventListener('visibilitychange', () => { if (!document.hidden) poll(); });
   window.addEventListener('pagehide', () => clearInterval(timer));
+  // Back brings a page out of the back/forward cache without running its scripts again.
+  window.addEventListener('pageshow', (e) => { if (e.persisted) start(); });
   if (share) share.addEventListener('click', () => call('app_share_last').catch(() => {}));
   $('#ver-updates')?.addEventListener('click', (e) => {
     e.preventDefault();
