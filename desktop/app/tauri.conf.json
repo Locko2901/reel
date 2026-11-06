@@ -68,6 +68,7 @@
     "updater": {
       "dangerousInsecureTransportProtocol": true,
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEQ4RjhCQzhENkQ3RDc2QzAKUldUQWRuMXRqYno0Mk90MlJnVFJ3SnlONHBPMTR5S3YwaU15cXZoaGU3UVBjMlFKZ01xdGhhTHUK",
+      "requireSignedVersion": true,
       "windows": {
         "installMode": "passive"
       }

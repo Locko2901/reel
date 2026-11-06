@@ -100,16 +100,19 @@ async fn download(
         .await
 }
 
-/// A download that failed, after "reel x.y": one the key built into the app refuses is never
-/// installed, any other failure may pass on a second try.
+/// A download that failed, after "reel x.y": one the key built into the app refuses, or one
+/// signed as another version than offered, is never installed; any other failure may pass on a
+/// second try.
 fn not_downloaded(version: &str, e: &tauri_plugin_updater::Error, again: &str) -> String {
     use tauri_plugin_updater::Error as E;
     match e {
-        E::Minisign(_)
-        | E::Base64(_)
-        | E::SignatureUtf8(_)
-        | E::SignedVersionMismatch { .. }
-        | E::MissingSignedVersion => format!(
+        E::SignedVersionMismatch { signed, .. } => format!(
+            "reel {version} was refused: its installer is signed as reel {signed}, so nothing was installed"
+        ),
+        E::MissingSignedVersion => format!(
+            "reel {version} was refused: its installer's signature names no version, so nothing was installed"
+        ),
+        E::Minisign(_) | E::Base64(_) | E::SignatureUtf8(_) => format!(
             "reel {version} was refused: the download does not match a signature of the release key built into this app, so nothing was installed"
         ),
         e => format!("reel {version} did not download: {e}; {again}"),
@@ -1240,7 +1243,7 @@ mod tests {
     type Asked = std::sync::Arc<std::sync::Mutex<Vec<(String, String, bool)>>>;
 
     impl StandIn {
-        async fn start(files: Vec<(String, Vec<u8>)>) -> StandIn {
+        async fn start(release: &str, files: Vec<(String, Vec<u8>)>) -> StandIn {
             use axum::extract::{Path, State};
             use axum::http::{HeaderMap, StatusCode};
             use axum::response::IntoResponse;
@@ -1252,12 +1255,12 @@ mod tests {
             let assets: Vec<serde_json::Value> = files
                 .iter()
                 .map(|(name, _)| {
-                    serde_json::json!({ "name": name, "browser_download_url": format!("{base}/download/v{RELEASE}/{name}"), "url": format!("{base}/api-only") })
+                    serde_json::json!({ "name": name, "browser_download_url": format!("{base}/download/v{release}/{name}"), "url": format!("{base}/api-only") })
                 })
                 .collect();
             let release = serde_json::json!({
-                "tag_name": format!("v{RELEASE}"),
-                "html_url": format!("{base}/releases/tag/v{RELEASE}"),
+                "tag_name": format!("v{release}"),
+                "html_url": format!("{base}/releases/tag/v{release}"),
                 "published_at": "2026-11-03T10:00:00Z",
                 "body": "### Features\n\n* **desktop:** a standalone app installs its own updates ([#50](https://example.org/50))\n",
                 "assets": assets,
@@ -1374,17 +1377,22 @@ mod tests {
         use std::sync::atomic::Ordering;
         use tauri::Manager;
         let pubkey = std::env::var("UPDATE_PUBKEY").expect("UPDATE_PUBKEY");
+        // the installer is signed as the version it was built as, which the release names
+        let release = std::env::var("STANDIN_VERSION").unwrap_or_else(|_| RELEASE.into());
         let gh = match std::env::var("STANDIN_INSTALLER") {
             Ok(exe) => {
-                let name = installer_name(RELEASE, Flavour::Plain);
+                let name = installer_name(&release, Flavour::Plain);
                 Some(
-                    StandIn::start(vec![
-                        (name.clone(), std::fs::read(&exe).unwrap()),
-                        (
-                            format!("{name}.sig"),
-                            std::fs::read(format!("{exe}.sig")).unwrap(),
-                        ),
-                    ])
+                    StandIn::start(
+                        &release,
+                        vec![
+                            (name.clone(), std::fs::read(&exe).unwrap()),
+                            (
+                                format!("{name}.sig"),
+                                std::fs::read(format!("{exe}.sig")).unwrap(),
+                            ),
+                        ],
+                    )
                     .await,
                 )
             }
@@ -1449,16 +1457,19 @@ mod tests {
         use std::sync::atomic::Ordering;
         use tauri::Manager;
         let name = installer_name(RELEASE, Flavour::AppImage);
-        let gh = StandIn::start(vec![
-            (
-                name.clone(),
-                include_bytes!("../tests/release/reel.AppImage").to_vec(),
-            ),
-            (
-                format!("{name}.sig"),
-                include_bytes!("../tests/release/reel.AppImage.sig").to_vec(),
-            ),
-        ])
+        let gh = StandIn::start(
+            RELEASE,
+            vec![
+                (
+                    name.clone(),
+                    include_bytes!("../tests/release/reel.AppImage").to_vec(),
+                ),
+                (
+                    format!("{name}.sig"),
+                    include_bytes!("../tests/release/reel.AppImage.sig").to_vec(),
+                ),
+            ],
+        )
         .await;
         let dir = tempfile::tempdir().unwrap();
         let local = standalone_read(&gh.base, dir.path()).await;
@@ -1665,6 +1676,23 @@ mod tests {
             std::fs::read(&running).unwrap(),
             release,
             "reel 9.9.0, signed as 9.9.0, in the place of the one that ran"
+        );
+    }
+
+    #[test]
+    fn an_installer_signed_as_another_version_says_so() {
+        use tauri_plugin_updater::Error as E;
+        let mismatch = E::SignedVersionMismatch {
+            signed: "1.12.0".into(),
+            announced: "1.13.0".into(),
+        };
+        assert_eq!(
+            super::not_downloaded("1.13.0", &mismatch, "Install tries again"),
+            "reel 1.13.0 was refused: its installer is signed as reel 1.12.0, so nothing was installed"
+        );
+        assert_eq!(
+            super::not_downloaded("1.13.0", &E::MissingSignedVersion, "Install tries again"),
+            "reel 1.13.0 was refused: its installer's signature names no version, so nothing was installed"
         );
     }
 

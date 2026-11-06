@@ -187,7 +187,8 @@ address you paired it with: the clips it uploads, the library its window
 shows, the links it makes, and once a day the question whether a newer
 app is there. The app's updates then come from your server, signed, and
 the app checks the signature against the key built into it before it
-installs anything.
+installs anything. The signature names the installer's version, so a
+server cannot offer an older installer as a newer one.
 
 Nothing else: no telemetry, no analytics, no crash reports, no account
 with anyone.

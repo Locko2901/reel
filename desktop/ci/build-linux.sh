@@ -35,7 +35,7 @@ cp "$B/appimage/reel_${VERSION}_amd64.AppImage" "$B/deb/reel_${VERSION}_amd64.de
 cd /out
 for f in "reel_${VERSION}_amd64.AppImage" "reel_${VERSION}_amd64.deb"; do
   if [ -n "${TAURI_SIGNING_PRIVATE_KEY:-}" ]; then
-    cargo tauri signer sign "$f"
+    cargo tauri signer sign --app-version "$VERSION" "$f"
   fi
   sha256sum "$f" > "$f.sha256"
 done

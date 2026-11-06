@@ -215,7 +215,8 @@ releases, and you see each step:
   newest release from GitHub. Each app gets its own kind: reel stays reel, with its OBS, reel light
   stays reel light, the AppImage gets the next AppImage.
 - **Signed.** Every installer is signed with reel's release key, and the app checks the signature
-  against the key built into it before it runs anything.
+  against the key built into it before it runs anything. The signature names the installer's
+  version, and the app takes it only as that version and only when it is newer than its own.
 - **When.** Paired, the app asks its server 45 seconds after it starts, then every six hours.
   Standalone, it asks GitHub only when you ask: **Check now**, or once a day when Settings,
   **Advanced**, **Check for updates** is on ([What leaves your PC](privacy.md#what-leaves-your-pc)).

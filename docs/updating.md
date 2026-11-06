@@ -89,7 +89,10 @@ updating the server is what updates the apps. The app asks its server
 45 seconds after it starts and then every six hours, and **Check now**
 under Settings, Startup, **Updates** asks at once. Every installer is
 signed with reel's release key, and the app checks the signature before
-it installs anything.
+it installs anything. The signature also names the installer's version,
+and the app installs it only as that version and only when it is newer
+than its own, so no server can pass an older installer off as a newer
+one.
 
 By default the app asks first: a notification says "reel 1.10.1 is
 ready", and **Install reel 1.10.1** appears in the tray menu and under
