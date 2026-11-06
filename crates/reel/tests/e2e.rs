@@ -6483,6 +6483,32 @@ async fn the_session_id_rotates_on_sign_in_and_dies_with_the_store_expiry() {
     let signed = cookie_of(&r);
     assert_ne!(signed, planted, "an id the store never made is not taken");
     assert_ne!(signed, first);
+    let r = env
+        .client
+        .post(format!("{}/signin", env.base))
+        .header("cookie", &signed)
+        .form(&[("name", "robin"), ("password", "correct horse battery")])
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(r.status(), 303);
+    let again = cookie_of(&r);
+    assert_ne!(
+        again, signed,
+        "a sign-in over a signed-in session rotates it too"
+    );
+    assert_eq!(
+        env.client
+            .get(format!("{}/", env.base))
+            .header("cookie", &signed)
+            .send()
+            .await
+            .unwrap()
+            .status(),
+        303,
+        "and the id it had signs nobody in"
+    );
+    let signed = again;
     let status = |cookie: &str| {
         env.client
             .get(format!("{}/", env.base))
@@ -15846,5 +15872,35 @@ async fn the_sign_in_page_says_only_what_reel_says() {
     assert!(
         page.contains("127.0.0.1 did not sign you in.") && !page.contains(words),
         "reel words the refusal itself: {page}"
+    );
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn the_session_cookie_of_a_server_on_https_is_bound_to_its_host() {
+    let file: toml::Value = toml::from_str(r#"public_url = "https://clips.example.org""#).unwrap();
+    let Some(env) = start_layered(AuthMode::Local, vec![], |_| {}, Some(file), true).await else {
+        return;
+    };
+    assert_eq!(env.ctx.config().public_url, "https://clips.example.org");
+    let code = setup_code(&env).await;
+    let r = first_admin(&env, "robin", &code).await;
+    assert_eq!(r.status(), 303);
+    let cookies: Vec<String> = r
+        .headers()
+        .get_all("set-cookie")
+        .iter()
+        .filter_map(|v| v.to_str().ok().map(String::from))
+        .collect();
+    assert!(
+        cookies
+            .iter()
+            .any(|c| c.starts_with("__Host-") && c.contains("Secure")),
+        "a sibling site under the same domain can set this cookie for reel: {cookies:?}"
+    );
+    assert!(
+        cookies
+            .iter()
+            .all(|c| c.contains("Path=/") && !c.to_lowercase().contains("domain=")),
+        "{cookies:?}"
     );
 }
