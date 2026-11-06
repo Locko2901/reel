@@ -474,9 +474,30 @@ pub fn obs_video(setup: reel_desktop_core::bundled::ObsSetup) -> reel_desktop_co
     setup.video()
 }
 
+/// Tests the encoders one by one; the page has each change of a row as an `encoder-test` event
+/// carrying its `run`. `asked`: when the page asked, in ms since 1970.
 #[tauri::command]
-pub async fn encoders_test() -> Vec<crate::setup::EncoderTest> {
-    crate::setup::test_encoders().await
+pub async fn encoders_test(
+    app: AppHandle,
+    run: u64,
+    asked: Option<u64>,
+) -> Vec<crate::setup::EncoderTest> {
+    use tauri::Emitter;
+    crate::setup::test_encoders(run, asked, |p| {
+        let _ = app.emit("encoder-test", p);
+    })
+    .await
+}
+
+/// Logs when the page had the encoder test's answer, by the page's clock: beside the app's own
+/// times it shows how long the window's way took.
+#[tauri::command]
+pub fn encoders_seen(run: u64, page_ms: u64) {
+    tracing::info!(
+        run,
+        page_ms,
+        "setup: the page has the encoder test's answer"
+    );
 }
 
 #[tauri::command]

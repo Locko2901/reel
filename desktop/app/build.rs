@@ -75,6 +75,7 @@ const COMMANDS: &[&str] = &[
     "system_memory",
     "obs_video",
     "encoders_test",
+    "encoders_seen",
     "obs_items",
     "obs_read",
     "obs_input_set",

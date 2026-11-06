@@ -1,4 +1,5 @@
 //! What the reel desktop app does without a window; nothing here needs Windows to be tested.
+pub mod adapters;
 pub mod api;
 pub mod audio;
 pub mod bundled;
