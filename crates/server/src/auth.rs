@@ -54,7 +54,7 @@ fn wants_json(req: &Request) -> bool {
     p.starts_with("/api/") || p.starts_with("/media/")
 }
 
-fn refuse(req: &Request, status: StatusCode, title: &str, line: &str) -> Response {
+pub(crate) fn refuse(req: &Request, status: StatusCode, title: &str, line: &str) -> Response {
     if wants_json(req) {
         (status, axum::Json(serde_json::json!({ "error": title }))).into_response()
     } else {

@@ -323,7 +323,10 @@ To end it at once, disable the user under Settings, **Access** too.
 `REEL_AUTH_MODE: single` lets everyone who reaches reel in as one user.
 reel refuses to start with it unless it listens on a loopback address
 such as `127.0.0.1`, so it is for trying reel on one machine, never for a
-server others reach.
+server others reach. It then answers only requests addressed to its own
+address (`127.0.0.1`, `localhost` or `[::1]` with its port) or to the
+public URL, so a web page that points its own name at your machine gets
+nothing from it.
 
 Every mode and every other setting is on
 [Configuration](../configuration.md). To change the mode of a server that

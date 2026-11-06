@@ -96,7 +96,9 @@ You set the mode when the container starts (see
   (`REEL_OIDC_CLIENT_SECRET`) or a file it names
   (`REEL_OIDC_CLIENT_SECRET_FILE`), never from Settings or the database.
 - **single**: no sign-in at all. reel allows it only on a loopback
-  address and refuses to start with it on any other.
+  address and refuses to start with it on any other. It answers only
+  requests addressed to that address or to the public URL: a web page
+  that points its own name at the loopback gets 421 and nothing else.
 
 ### Passwords and sessions
 

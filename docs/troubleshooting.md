@@ -441,6 +441,12 @@ In proxy mode, a browser that reaches reel's port directly, past the
 proxy, gets a 401 page ("This port is not the front door. Come in through
 the proxy."): open the site through the proxy's address instead.
 
+In single mode, reel answers only at its own address: `127.0.0.1`,
+`localhost` or `[::1]` with the port it listens on, or the public URL.
+Any other name, such as the other end of an SSH tunnel on another port,
+gets a 421 page ("That is not reel's address."). Open reel at one of
+those, or set the public URL to the address you open it at.
+
 ## The setup code is lost
 
 While nobody has an account, the code is in the log of every start, and
