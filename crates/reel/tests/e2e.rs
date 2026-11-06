@@ -7317,12 +7317,20 @@ async fn the_sign_in_button_names_the_provider_as_the_admin_calls_it() {
         .await
         .unwrap();
     let pending = cookie_of(&r);
+    let state = reqwest::Url::parse(r.headers()["location"].to_str().unwrap())
+        .unwrap()
+        .query_pairs()
+        .find(|(k, _)| k == "state")
+        .map(|(_, v)| v.to_string())
+        .unwrap();
     let r = env
         .client
-        .get(format!(
-            "{}/oidc/callback?error=access_denied&error_description=not%20today",
-            env.base
-        ))
+        .get(format!("{}/oidc/callback", env.base))
+        .query(&[
+            ("state", state.as_str()),
+            ("error", "access_denied"),
+            ("error_description", "not today"),
+        ])
         .header("cookie", &pending)
         .send()
         .await
@@ -7331,8 +7339,8 @@ async fn the_sign_in_button_names_the_provider_as_the_admin_calls_it() {
     let back = r.headers()["location"].to_str().unwrap().to_string();
     let page = page_text(&env, &back).await.1;
     assert!(
-        page.contains(&format!("{shown} said: not today")),
-        "the provider's refusal names it too: {page}"
+        page.contains(&format!("{shown} did not sign you in.")) && !page.contains("not today"),
+        "the provider's refusal names it too, in reel's words: {page}"
     );
 
     assert_eq!(name_it(String::new()).await.unwrap().status(), 200);
@@ -15750,4 +15758,93 @@ async fn a_fresh_server_behind_a_provider_makes_no_admin_of_whoever_signs_in_fir
         "once there is an admin the code makes no other"
     );
     assert!(!env.store().user(&row.id).await.unwrap().unwrap().is_admin());
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn the_sign_in_page_says_only_what_reel_says() {
+    let Some((env, _)) = oidc_env(persona(Persona::mira()), |_| {}).await else {
+        return;
+    };
+    let words = "Your account is locked. Call 555 0100 to open it again.";
+    let page = env
+        .client
+        .get(format!("{}/signin", env.base))
+        .query(&[("error", words)])
+        .send()
+        .await
+        .unwrap()
+        .text()
+        .await
+        .unwrap();
+    assert!(
+        !page.contains(words),
+        "a link to the sign-in page puts any words under its title"
+    );
+
+    let r = env
+        .client
+        .get(format!("{}/oidc/start", env.base))
+        .header("x-forwarded-for", "203.0.113.60")
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(r.status(), 303);
+    let pending = cookie_of(&r);
+    let r = env
+        .client
+        .get(format!("{}/oidc/callback", env.base))
+        .query(&[("error", "access_denied"), ("error_description", words)])
+        .header("cookie", &pending)
+        .send()
+        .await
+        .unwrap();
+    assert!(
+        matches!(r.status().as_u16(), 400 | 403),
+        "a callback with an error and without this browser's state ends its sign-in: {} to {:?}",
+        r.status(),
+        r.headers().get("location")
+    );
+
+    let to_issuer = reqwest::Url::parse(
+        env.client
+            .get(format!("{}/oidc/start", env.base))
+            .header("cookie", &pending)
+            .header("x-forwarded-for", "203.0.113.62")
+            .send()
+            .await
+            .unwrap()
+            .headers()["location"]
+            .to_str()
+            .unwrap(),
+    )
+    .unwrap();
+    let state = to_issuer
+        .query_pairs()
+        .find(|(k, _)| k == "state")
+        .map(|(_, v)| v.to_string())
+        .unwrap();
+    let r = env
+        .client
+        .get(format!("{}/oidc/callback", env.base))
+        .query(&[
+            ("state", state.as_str()),
+            ("error", "access_denied"),
+            ("error_description", words),
+        ])
+        .header("cookie", &pending)
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(
+        r.status(),
+        303,
+        "the provider's own refusal, with the state"
+    );
+    let to = r.headers()["location"].to_str().unwrap().to_string();
+    assert_eq!(to, "/signin?error=refused");
+    let page = page_text(&env, &to).await.1;
+    assert!(
+        page.contains("127.0.0.1 did not sign you in.") && !page.contains(words),
+        "reel words the refusal itself: {page}"
+    );
 }
