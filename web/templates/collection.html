@@ -17,6 +17,7 @@
     {% else %}
     <p class="muted">No link yet.</p>
     {% endif %}
+    {% if left_out > 0 %}<p class="small st-warn" id="set-link-left-out">{% if left_out == 1 %}1 clip here is{% else %}{{ left_out }} clips here are{% endif %} not on {% if link.is_some() %}the{% else %}a{% endif %} link: a link serves its maker's own clips, and an admin's every clip; a clip of someone else's, or a montage or cut holding their footage, needs their own link or an admin's.</p>{% endif %}
     {% if game %}<p class="small muted" id="set-link-words">Anyone with the link sees every clip with the game {{ name }} at the moment they open it, the ones that come later too. A clip whose game changes leaves it.</p>{% endif %}
     {% if can_link %}<div class="row wrap"><button type="button" id="set-link-make">{% if link.is_some() %}New link{% else %}Make a link{% endif %}</button></div>{% endif %}
   </div>

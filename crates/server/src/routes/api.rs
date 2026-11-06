@@ -477,6 +477,9 @@ pub async fn create_share(
     if clip.state != "ready" || clip.deleted_at.is_some() {
         return Err(AppError::NotFound);
     }
+    if !crate::rights::Sharer::of(&me).may_share(&clip) {
+        return Err(AppError::Forbidden(crate::rights::OTHERS_FOOTAGE.into()));
+    }
     let settings = crate::settings::client(&st.ctx.config());
     let allow = body
         .allow_download

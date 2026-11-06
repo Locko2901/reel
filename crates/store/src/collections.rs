@@ -5,6 +5,10 @@ use sqlx::Row;
 use std::collections::HashMap;
 
 /// Whether clip `c` is in collection `k`: put there by hand, or of the game it is.
+/// The clips a collection link `l` of collection `k` serves of `c`: every clip when its maker
+/// (or for a link made before reel kept it, the collection's owner) is an admin or is nobody (a
+/// game's collection), else the maker's own clips that hold no other user's footage.
+pub(crate) const LINK_SERVES: &str = "(COALESCE(l.made_by, k.owner_id) IS NULL OR EXISTS (SELECT 1 FROM user u WHERE u.id = COALESCE(l.made_by, k.owner_id) AND u.role = 'admin') OR (c.owner_id = COALESCE(l.made_by, k.owner_id) AND c.others_footage = 0))";
 pub(crate) const IN_SET: &str = "(CASE WHEN k.game IS NULL THEN EXISTS (SELECT 1 FROM collection_clip cc WHERE cc.collection_id = k.id AND cc.clip_id = c.id) ELSE lower(trim(c.game)) = k.game END)";
 
 impl Store {
@@ -178,7 +182,7 @@ impl Store {
     }
 
     pub async fn insert_collection_link(&self, l: &CollectionLink) -> Result<()> {
-        sqlx::query("INSERT INTO collection_link (id, collection_id, token, allow_download, created_at, revoked_at, views) VALUES (?,?,?,?,?,?,?)")
+        sqlx::query("INSERT INTO collection_link (id, collection_id, token, allow_download, created_at, revoked_at, views, made_by) VALUES (?,?,?,?,?,?,?,?)")
             .bind(&l.id)
             .bind(&l.collection_id)
             .bind(&l.token)
@@ -186,6 +190,7 @@ impl Store {
             .bind(&l.created_at)
             .bind(&l.revoked_at)
             .bind(l.views)
+            .bind(&l.made_by)
             .execute(&self.pool)
             .await?;
         Ok(())

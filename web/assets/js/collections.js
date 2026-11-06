@@ -65,7 +65,12 @@ function setPage() {
     try { await api('DELETE', `/api/collections/${id}`); location.href = '/collections'; } catch (err) { toast(err.message, 'err'); }
   });
   $('#set-link-make')?.addEventListener('click', async () => {
-    try { await api('POST', `/api/collections/${id}/link`, {}); toast('Link made. The one before stopped working.', 'ok'); setTimeout(() => location.reload(), 500); } catch (err) { toast(err.message, 'err'); }
+    try {
+      const d = await api('POST', `/api/collections/${id}/link`, {});
+      const out = d.left_out ? ` ${d.left_out === 1 ? '1 clip is' : `${d.left_out} clips are`} not on it: not yours to share.` : '';
+      toast(`Link made. The one before stopped working.${out}`, out ? '' : 'ok');
+      setTimeout(() => location.reload(), out ? 2500 : 500);
+    } catch (err) { toast(err.message, 'err'); }
   });
   $('#set-revoke')?.addEventListener('click', async (e) => {
     if (!arm(e.currentTarget, 'Sure?', 'Revoke')) return;

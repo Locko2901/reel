@@ -233,6 +233,11 @@ Whether those pages offer the download follows
 - A collection has one link at a time: **New link** makes another and retires the one before
   ("Link made. The one before stopped working."). **Revoke** (press it twice) ends it.
 - A clip taken out of the collection, or deleted, leaves the link at once.
+- A link serves the clips its maker may share: their own, and every clip when an admin made it.
+  A clip of someone else's in your collection stays off your link, and the collection's page
+  says how many are left out; its uploader or an admin can share it.
+- A montage, or a cut saved as its own clip, that holds another user's footage gets a link
+  from an admin only, on its own or through a collection.
 - A game's link shows the game's clips as they are when it is opened, later ones included.
 - Deleting a collection takes its link with it, never its clips.
 

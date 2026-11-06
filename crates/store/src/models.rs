@@ -41,6 +41,9 @@ pub struct Clip {
     pub uploaded_at: Option<String>,
     pub uploaded_to: Option<String>,
     pub deleted_by: Option<String>,
+    /// Made of another user's footage: a montage of their clips, or a cut of one as its own clip.
+    #[sqlx(default)]
+    pub others_footage: bool,
 }
 
 impl Clip {
@@ -96,6 +99,7 @@ impl Clip {
             uploaded_at: None,
             uploaded_to: None,
             deleted_by: None,
+            others_footage: false,
         }
     }
 }
@@ -651,10 +655,13 @@ pub struct CollectionLink {
     pub views: i64,
     pub last_posted_at: Option<String>,
     pub last_viewed_at: Option<String>,
+    /// The user who made it; none for a link made before reel kept it.
+    #[sqlx(default)]
+    pub made_by: Option<String>,
 }
 
 impl CollectionLink {
-    pub fn new(collection_id: &str, allow_download: bool) -> Self {
+    pub fn new(collection_id: &str, allow_download: bool, made_by: &str) -> Self {
         Self {
             id: reel_core::ids::new_id(),
             collection_id: collection_id.into(),
@@ -665,6 +672,7 @@ impl CollectionLink {
             views: 0,
             last_posted_at: None,
             last_viewed_at: None,
+            made_by: Some(made_by.into()),
         }
     }
 }

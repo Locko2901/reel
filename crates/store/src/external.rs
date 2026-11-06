@@ -124,8 +124,9 @@ impl Store {
              UNION ALL SELECT c.current_id AS version_id, c.id AS clip_id, l.created_at AS created_at, \
              l.last_posted_at AS last_posted_at, l.last_viewed_at AS last_viewed_at \
              FROM collection_link l JOIN collection k ON k.id = l.collection_id JOIN clip c ON {} \
-             WHERE l.revoked_at IS NULL AND c.deleted_at IS NULL AND c.state = 'ready'",
-            crate::collections::IN_SET
+             WHERE l.revoked_at IS NULL AND c.deleted_at IS NULL AND c.state = 'ready' AND {}",
+            crate::collections::IN_SET,
+            crate::collections::LINK_SERVES
         ))
         .bind(now())
         .fetch_all(&self.pool)

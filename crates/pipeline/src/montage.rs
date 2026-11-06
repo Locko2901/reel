@@ -173,6 +173,7 @@ pub async fn request(
     let mut games = Vec::new();
     let mut lengths = Vec::new();
     let mut bytes = 0u64;
+    let mut others = false;
     for (i, ask) in asked.parts.iter().enumerate() {
         let id = &ask.clip;
         let clip = ctx
@@ -190,6 +191,7 @@ pub async fn request(
         let (Some(clip), Some(current)) = (clip, current) else {
             return Ok(Err(Refused::NotReady(id.clone())));
         };
+        others |= clip.others_footage || clip.owner_id != owner_id;
         shapes.push((
             current.width.unwrap_or(0) as u32,
             current.height.unwrap_or(0) as u32,
@@ -267,6 +269,7 @@ pub async fn request(
         Some(now),
     );
     clip.owner_id = owner_id;
+    clip.others_footage = others;
     clip.game = shared_game(&games);
     ctx.store.insert_clip(&clip).await?;
     let r = Rendition::queued(

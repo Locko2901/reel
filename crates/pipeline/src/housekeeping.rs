@@ -157,6 +157,71 @@ pub async fn clear_not_games_once(ctx: &Ctx) -> anyhow::Result<u64> {
     Ok(n)
 }
 
+pub const OTHERS_FOOTAGE_PASS: &str = "others_footage_marked";
+
+/// Once: the montages and the cuts saved as their own clip made before reel kept it are marked
+/// when they hold another user's footage; a montage whose part is gone counts as such. How many.
+pub async fn mark_others_footage_once(ctx: &Ctx) -> anyhow::Result<u64> {
+    if ctx.store.setting(OTHERS_FOOTAGE_PASS).await?.is_some() {
+        return Ok(0);
+    }
+    let mut marked: std::collections::HashSet<String> = Default::default();
+    for c in ctx.store.clips_made_of_clips().await? {
+        let others = if c.source == "montage" {
+            let recipe = match c.master_id.as_deref() {
+                Some(m) => ctx.store.rendition(m).await?.and_then(|r| r.recipe),
+                None => None,
+            }
+            .and_then(|r| serde_json::from_str::<reel_core::recipe::MontageRecipe>(&r).ok());
+            match recipe {
+                Some(r) => {
+                    let mut others = false;
+                    for part in &r.parts {
+                        others |= match ctx.store.clip(&part.clip).await? {
+                            Some(p) => {
+                                p.owner_id != c.owner_id
+                                    || p.others_footage
+                                    || marked.contains(&p.id)
+                            }
+                            None => true,
+                        };
+                    }
+                    others
+                }
+                None => true,
+            }
+        } else {
+            match ctx
+                .store
+                .clip(c.source_clip_id.as_deref().unwrap_or(""))
+                .await?
+            {
+                Some(src) => {
+                    src.owner_id != c.owner_id || src.others_footage || marked.contains(&src.id)
+                }
+                None => false,
+            }
+        };
+        if others || c.others_footage {
+            marked.insert(c.id.clone());
+        }
+        if others && !c.others_footage {
+            ctx.store.set_others_footage(&c.id, true).await?;
+        }
+    }
+    let n = marked.len() as u64;
+    ctx.store
+        .set_setting(
+            OTHERS_FOOTAGE_PASS,
+            &format!("{n} at {}", reel_core::format::now()),
+        )
+        .await?;
+    if n > 0 {
+        tracing::info!(clips = n, "clips made of another user's footage marked");
+    }
+    Ok(n)
+}
+
 pub const PERSONAL_TAGS_PASS: &str = "personal_tags_removed";
 
 /// Once: every file reel made before it left out its sources' tags is read, and the ones that

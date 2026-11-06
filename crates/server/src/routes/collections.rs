@@ -139,6 +139,8 @@ pub struct CollectionPage {
     pub game: bool,
     pub cards: Vec<Card>,
     pub show_owners: bool,
+    /// The clips the link leaves out (or a link made now would): not its maker's to share.
+    pub left_out: usize,
 }
 
 pub async fn page(
@@ -168,6 +170,21 @@ pub async fn page(
         })
         .collect();
     let can_link = me.may_edit(row.collection.owner_id.as_deref());
+    let sharer = match row.token.as_deref() {
+        Some(t) => match st.ctx.store.collection_link_by_token(t).await? {
+            Some(l) => crate::rights::sharer_of_link(&st.ctx.store, &l, &row.collection).await?,
+            None => crate::rights::Sharer::of(&me),
+        },
+        None => crate::rights::Sharer::of(&me),
+    };
+    let left_out = st
+        .ctx
+        .store
+        .collection_clips(&id)
+        .await?
+        .iter()
+        .filter(|r| !sharer.may_share(&r.clip))
+        .count();
     Ok(html(CollectionPage {
         who: Who::at(&st, &me).await,
         nav: "collections",
@@ -182,6 +199,7 @@ pub async fn page(
         name: row.collection.name,
         cards,
         show_owners: st.ctx.store.user_count().await? > 1,
+        left_out,
     }))
 }
 
@@ -290,16 +308,24 @@ pub async fn make_link(
         .and_then(|b| b.0.allow_download)
         .unwrap_or(st.ctx.config().share.download_default);
     st.ctx.store.revoke_collection_links(&id).await?;
-    let l = CollectionLink::new(&id, allow);
+    let l = CollectionLink::new(&id, allow, &me.id);
     st.ctx.store.insert_collection_link(&l).await?;
     tracing::info!(collection = %id, token = %&l.token[..4], "collection link made");
+    let sharer = crate::rights::Sharer::of(&me);
+    let mut left_out = 0;
     for row in st.ctx.store.collection_clips(&id).await? {
+        if !sharer.may_share(&row.clip) {
+            left_out += 1;
+            continue;
+        }
         if let Some(r) = current_of(&st, &row.clip).await {
             let _ = reel_pipeline::enqueue::ensure_web(&st.ctx, &r).await;
         }
     }
     st.ctx.external.kick();
-    Ok(Json(json!({ "url": link_url(&st, &l.token) })))
+    Ok(Json(
+        json!({ "url": link_url(&st, &l.token), "left_out": left_out }),
+    ))
 }
 
 pub async fn revoke_link(
@@ -372,6 +398,9 @@ pub async fn public_page(
         return gone();
     };
     count_visit(&st, &link, &headers).await;
+    let Ok(sharer) = crate::rights::sharer_of_link(&st.ctx.store, &link, &c).await else {
+        return gone();
+    };
     let base = st.ctx.config().public_url.trim_end_matches('/').to_string();
     let mut tiles = Vec::new();
     for row in st
@@ -381,6 +410,9 @@ pub async fn public_page(
         .await
         .unwrap_or_default()
     {
+        if !sharer.may_share(&row.clip) {
+            continue;
+        }
         let Some(r) = current_of(&st, &row.clip).await else {
             continue;
         };
@@ -416,6 +448,12 @@ async fn served_in(st: &AppState, token: &str, clip_id: &str) -> Option<Served> 
         return None;
     }
     let clip = st.ctx.store.clip(clip_id).await.ok()??;
+    let sharer = crate::rights::sharer_of_link(&st.ctx.store, &link, &c)
+        .await
+        .ok()?;
+    if !sharer.may_share(&clip) {
+        return None;
+    }
     let served = current_of(st, &clip).await?;
     Some(Served {
         clip,

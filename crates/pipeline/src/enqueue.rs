@@ -172,6 +172,7 @@ pub async fn request_cut(
             );
             c.source_clip_id = Some(clip.id.clone());
             c.owner_id = owner_id.or_else(|| clip.owner_id.clone());
+            c.others_footage = clip.others_footage || c.owner_id != clip.owner_id;
             ctx.store.insert_clip(&c).await?;
             ctx.emit(Event::Clip {
                 id: c.id.clone(),
