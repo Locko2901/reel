@@ -7856,6 +7856,23 @@ async fn an_unverified_email_is_not_a_name() {
     );
 }
 
+/// Saves one setting under Settings as the user signed in with `cookie`, and checks that it waits
+/// for no restart.
+async fn save_setting_as(env: &Env, cookie: &str, key: &str, value: &str) {
+    let r = env
+        .client
+        .patch(format!("{}/api/settings", env.base))
+        .header("cookie", cookie)
+        .header("sec-fetch-site", "same-origin")
+        .json(&serde_json::json!({ key: value }))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(r.status(), 200, "{key}");
+    let answer: serde_json::Value = r.json().await.unwrap();
+    assert_eq!(answer["restart"], false, "{key} waits for no restart");
+}
+
 #[tokio::test(flavor = "multi_thread")]
 async fn the_claim_settings_count_at_the_next_sign_in_without_a_restart() {
     std::env::set_var("REEL_OIDC_CLIENT_SECRET", "secret-1");
@@ -7873,27 +7890,9 @@ async fn the_claim_settings_count_at_the_next_sign_in_without_a_restart() {
     let (status, admin, _) = oidc_sign_in_by(&env, "/oidc/start").await;
     assert_eq!(status, 303, "mira, the first user and so an admin");
     let asked = stand.asked();
-    let set = |key: &'static str, value: &'static str| {
-        let admin = admin.clone();
-        let env = &env;
-        async move {
-            let r = env
-                .client
-                .patch(format!("{}/api/settings", env.base))
-                .header("cookie", &admin)
-                .header("sec-fetch-site", "same-origin")
-                .json(&serde_json::json!({ key: value }))
-                .send()
-                .await
-                .unwrap();
-            assert_eq!(r.status(), 200, "{key}");
-            let answer: serde_json::Value = r.json().await.unwrap();
-            assert_eq!(answer["restart"], false, "{key} waits for no restart");
-        }
-    };
-    set("auth.oidc_username_claim", "email").await;
-    set("auth.oidc_role_claim", "roles").await;
-    set("auth.oidc_admin_value", "reel-crew").await;
+    save_setting_as(&env, &admin, "auth.oidc_username_claim", "email").await;
+    save_setting_as(&env, &admin, "auth.oidc_role_claim", "roles").await;
+    save_setting_as(&env, &admin, "auth.oidc_admin_value", "reel-crew").await;
 
     *who.lock().await = Persona {
         sub: "sub-pat".into(),
@@ -7930,7 +7929,7 @@ async fn the_claim_settings_count_at_the_next_sign_in_without_a_restart() {
     assert_eq!(robin.name, "robin@example.org");
     assert!(!robin.is_admin(), "the old admin value makes no admin");
 
-    set("auth.oidc_admin_value", "admin").await;
+    save_setting_as(&env, &admin, "auth.oidc_admin_value", "admin").await;
     assert_eq!(oidc_sign_in(&env).await.0, 303);
     assert!(
         env.store()
@@ -7946,6 +7945,44 @@ async fn the_claim_settings_count_at_the_next_sign_in_without_a_restart() {
         asked,
         "the provider was not asked for its metadata again"
     );
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_name_added_to_the_admins_counts_at_the_next_sign_in_without_a_restart() {
+    let who = persona(Persona {
+        groups: vec![],
+        ..Persona::mira()
+    });
+    let Some((env, issuer)) = oidc_env(who.clone(), |_| {}).await else {
+        return;
+    };
+    let (status, admin) = oidc_sign_in(&env).await;
+    assert_eq!(status, 303, "mira, the first user and so an admin");
+    let sign_in_as = |name: &'static str| {
+        let (who, env, issuer) = (who.clone(), &env, &issuer);
+        async move {
+            {
+                let mut p = who.lock().await;
+                p.sub = format!("sub-{name}");
+                p.username = name.into();
+            }
+            assert_eq!(oidc_sign_in(env).await.0, 303, "{name}");
+            env.store()
+                .user_by_oidc(issuer, &format!("sub-{name}"))
+                .await
+                .unwrap()
+                .unwrap()
+        }
+    };
+    assert!(
+        !sign_in_as("robin").await.is_admin(),
+        "a second user is a member"
+    );
+
+    save_setting_as(&env, &admin, "auth.admins", "pat").await;
+    let pat = sign_in_as("pat").await;
+    assert_eq!(pat.name, "pat");
+    assert!(pat.is_admin(), "the Admins list as saved a moment ago");
 }
 
 #[tokio::test(flavor = "multi_thread")]
