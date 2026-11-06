@@ -39,6 +39,10 @@ pub const OIDC_PENDING: &str = "oidc_pending";
 pub const OIDC_PENDING_MINUTES: i64 = 10;
 pub const SIGNIN_BURST: u32 = 5;
 pub const SIGNIN_PERIOD: Duration = Duration::from_secs(120);
+/// The body a sign-in, a setup code or a pairing may have: a form of a few short fields.
+pub const SIGNIN_BODY: usize = 16 * 1024;
+/// A name longer than any user's is refused before it is counted or logged.
+pub const NAME_MOST: usize = 40;
 
 /// The auth hash covers the password and session version, so changing either ends every session.
 #[derive(Debug, Clone)]
@@ -567,6 +571,51 @@ impl NameLimiter {
         self.limiter
             .check_key(&key)
             .map_err(|not_until| not_until.wait_time_from(self.clock.now()).as_secs().max(1))
+    }
+
+    /// Forgets the names whose tries are all spent and refilled.
+    pub fn prune(&self) {
+        self.limiter.retain_recent();
+        self.limiter.shrink_to_fit();
+    }
+}
+
+/// The per-address limit on the sign-in and pairing routes, made once so it can be pruned.
+pub type AddressLimits = Arc<
+    tower_governor::governor::GovernorConfig<
+        ClientKey,
+        governor::middleware::NoOpMiddleware<governor::clock::QuantaInstant>,
+    >,
+>;
+
+pub fn address_limits(cfg: &Arc<Config>) -> AddressLimits {
+    Arc::new(
+        tower_governor::governor::GovernorConfigBuilder::default()
+            .key_extractor(ClientKey { cfg: cfg.clone() })
+            .period(SIGNIN_PERIOD)
+            .burst_size(SIGNIN_BURST)
+            .finish()
+            .expect("a governor config"),
+    )
+}
+
+/// Every minute, drops the limiters' entries that have nothing left to count, so neither grows
+/// with every address and name that ever tried.
+pub async fn prune_limits(
+    names: Arc<NameLimiter>,
+    addresses: Vec<AddressLimits>,
+    stop: tokio_util::sync::CancellationToken,
+) {
+    loop {
+        tokio::select! {
+            _ = tokio::time::sleep(Duration::from_secs(60)) => {}
+            _ = stop.cancelled() => return,
+        }
+        names.prune();
+        for a in &addresses {
+            a.limiter().retain_recent();
+            a.limiter().shrink_to_fit();
+        }
     }
 }
 

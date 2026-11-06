@@ -83,16 +83,9 @@ async fn signin_view(st: &AppState, next: &str, error: &str) -> SigninPage {
 
 pub async fn signin_page(
     State(st): State<AppState>,
-    auth: AuthSession<Backend>,
     Query(q): Query<SigninQuery>,
 ) -> AppResult<Response> {
     let next = safe_next(q.next.as_deref());
-    if st.ctx.config().auth.mode == AuthMode::Local {
-        let _ = auth
-            .session
-            .insert("landed_at", jiff::Timestamp::now().as_second())
-            .await;
-    }
     Ok(html(
         signin_view(&st, &next, q.error.as_deref().unwrap_or("")).await,
     ))
@@ -161,6 +154,10 @@ pub async fn signin(
         return Err(AppError::Forbidden("that came from another site".into()));
     }
     let name = f.name.trim().to_string();
+    if name.chars().count() > accounts::NAME_MOST {
+        let page = signin_view(&st, &next, "That name and password do not go together.").await;
+        return Ok(html_status(StatusCode::UNAUTHORIZED, page));
+    }
     if let Err(secs) = st.limiter.check(&name) {
         return Ok(wait_page(&st, &next, secs).await);
     }

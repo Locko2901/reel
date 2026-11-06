@@ -32,6 +32,9 @@ pub struct AppState {
     pub disk: disk::DiskCache,
     pub sessions: accounts::HashedIdStore<tower_sessions_sqlx_store::SqliteStore>,
     pub limiter: std::sync::Arc<accounts::NameLimiter>,
+    /// Per address: the sign-in routes, and the pairing route on its own.
+    pub signin_limits: accounts::AddressLimits,
+    pub pair_limits: accounts::AddressLimits,
     pub provider: Option<std::sync::Arc<accounts::Provider>>,
     pub setup_done: std::sync::Arc<std::sync::atomic::AtomicBool>,
     pub uploads_busy: std::sync::Arc<tokio::sync::Mutex<std::collections::HashSet<String>>>,
@@ -62,6 +65,14 @@ impl AppState {
         } else {
             None
         };
+        let limiter = std::sync::Arc::new(accounts::NameLimiter::new());
+        let signin_limits = accounts::address_limits(&cfg);
+        let pair_limits = accounts::address_limits(&cfg);
+        tokio::spawn(accounts::prune_limits(
+            limiter.clone(),
+            vec![signin_limits.clone(), pair_limits.clone()],
+            ctx.shutdown.clone(),
+        ));
         // the app's standalone library has no first run
         let done = ctx.config().standalone() || routes::setup::is_done(&ctx).await;
         Ok(Self {
@@ -69,7 +80,9 @@ impl AppState {
             started_at: jiff::Timestamp::now(),
             disk: disk::DiskCache::default(),
             sessions,
-            limiter: std::sync::Arc::new(accounts::NameLimiter::new()),
+            limiter,
+            signin_limits,
+            pair_limits,
             provider,
             setup_done: std::sync::Arc::new(std::sync::atomic::AtomicBool::new(done)),
             uploads_busy: std::sync::Arc::new(tokio::sync::Mutex::new(
@@ -424,50 +437,42 @@ pub fn router(state: AppState) -> Router {
         ));
 
     let cfg = state.ctx.config();
-    let governor = tower_governor::governor::GovernorConfigBuilder::default()
-        .key_extractor(accounts::ClientKey { cfg: cfg.clone() })
-        .period(accounts::SIGNIN_PERIOD)
-        .burst_size(accounts::SIGNIN_BURST)
-        .finish()
-        .expect("a governor config");
     let limited = Router::new()
         .route("/signin", post(routes::users::signin))
         .route("/signin/first", post(routes::users::first_admin))
         .route("/oidc/start", get(routes::users::oidc_start))
         .route("/oidc/link/{token}", get(routes::users::oidc_link))
         .route_layer(guard(Part::Accounts))
+        .layer(DefaultBodyLimit::max(accounts::SIGNIN_BODY))
         .layer(
-            tower_governor::GovernorLayer::new(governor).error_handler(|e| match e {
-                tower_governor::GovernorError::TooManyRequests { wait_time, .. } => {
-                    let mut r = auth::error_page(
-                        axum::http::StatusCode::TOO_MANY_REQUESTS,
-                        "Too many sign-in attempts from this address.",
-                        &format!("Wait {wait_time} s and try again."),
-                    );
-                    if let Ok(v) = axum::http::HeaderValue::from_str(&wait_time.to_string()) {
-                        r.headers_mut().insert(axum::http::header::RETRY_AFTER, v);
+            tower_governor::GovernorLayer::new(state.signin_limits.clone()).error_handler(|e| {
+                match e {
+                    tower_governor::GovernorError::TooManyRequests { wait_time, .. } => {
+                        let mut r = auth::error_page(
+                            axum::http::StatusCode::TOO_MANY_REQUESTS,
+                            "Too many sign-in attempts from this address.",
+                            &format!("Wait {wait_time} s and try again."),
+                        );
+                        if let Ok(v) = axum::http::HeaderValue::from_str(&wait_time.to_string()) {
+                            r.headers_mut().insert(axum::http::header::RETRY_AFTER, v);
+                        }
+                        r
                     }
-                    r
+                    other => auth::error_page(
+                        axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+                        "The rate limiter could not read the request.",
+                        &other.to_string(),
+                    ),
                 }
-                other => auth::error_page(
-                    axum::http::StatusCode::INTERNAL_SERVER_ERROR,
-                    "The rate limiter could not read the request.",
-                    &other.to_string(),
-                ),
             }),
         );
 
-    let pair_governor = tower_governor::governor::GovernorConfigBuilder::default()
-        .key_extractor(accounts::ClientKey { cfg: cfg.clone() })
-        .period(accounts::SIGNIN_PERIOD)
-        .burst_size(accounts::SIGNIN_BURST)
-        .finish()
-        .expect("a governor config");
     let pair = Router::new()
         .route("/api/device/pair", post(routes::device::pair))
         .route_layer(guard(Part::Devices))
+        .route_layer(DefaultBodyLimit::max(accounts::SIGNIN_BODY))
         .route_layer(
-            tower_governor::GovernorLayer::new(pair_governor).error_handler(|e| match e {
+            tower_governor::GovernorLayer::new(state.pair_limits.clone()).error_handler(|e| match e {
                 tower_governor::GovernorError::TooManyRequests { wait_time, .. } => {
                     let mut r = (
                         axum::http::StatusCode::TOO_MANY_REQUESTS,

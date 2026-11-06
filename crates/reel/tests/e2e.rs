@@ -6470,28 +6470,19 @@ async fn the_session_id_rotates_on_sign_in_and_dies_with_the_store_expiry() {
     let r = first_admin(&env, "robin", &code).await;
     assert_eq!(r.status(), 303);
     let first = cookie_of(&r);
-    let r = env
-        .client
-        .get(format!("{}/signin", env.base))
-        .send()
-        .await
-        .unwrap();
-    let anonymous = cookie_of(&r);
-    assert_ne!(
-        anonymous, first,
-        "a visit to the sign-in page gets its own anonymous session"
-    );
+    let planted = "reel_session=AAAAAAAAAAAAAAAAAAAAAA";
     let r = env
         .client
         .post(format!("{}/signin", env.base))
-        .header("cookie", &anonymous)
+        .header("cookie", planted)
         .form(&[("name", "robin"), ("password", "correct horse battery")])
         .send()
         .await
         .unwrap();
     assert_eq!(r.status(), 303);
     let signed = cookie_of(&r);
-    assert_ne!(signed, anonymous, "the session id is rotated at sign-in");
+    assert_ne!(signed, planted, "an id the store never made is not taken");
+    assert_ne!(signed, first);
     let status = |cookie: &str| {
         env.client
             .get(format!("{}/", env.base))
@@ -6500,9 +6491,9 @@ async fn the_session_id_rotates_on_sign_in_and_dies_with_the_store_expiry() {
     };
     assert_eq!(status(&signed).await.unwrap().status(), 200);
     assert_eq!(
-        status(&anonymous).await.unwrap().status(),
+        status(planted).await.unwrap().status(),
         303,
-        "the old id is gone from the store"
+        "the planted id signs nobody in"
     );
 
     let rows: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM tower_sessions")
@@ -15353,5 +15344,103 @@ async fn a_copy_of_the_library_made_while_reel_works_opens_in_a_fresh_reel() {
     assert!(
         !page.contains("file missing"),
         "the clip's page finds every file"
+    );
+}
+
+/// The status reel answers a POST to `path` with when the headers announce `claimed` bytes and
+/// only `first` of them follow, or 0 when it waits for the rest.
+async fn status_for_a_body_of(
+    env: &Env,
+    path: &str,
+    kind: &str,
+    first: &[u8],
+    claimed: usize,
+) -> u16 {
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    let host = env.base.trim_start_matches("http://");
+    let mut s = tokio::net::TcpStream::connect(host).await.unwrap();
+    let head = format!(
+        "POST {path} HTTP/1.1\r\nHost: {host}\r\nContent-Type: {kind}\r\nContent-Length: {claimed}\r\n\r\n"
+    );
+    s.write_all(head.as_bytes()).await.unwrap();
+    s.write_all(first).await.unwrap();
+    let mut answer = vec![0u8; 1024];
+    let n = match tokio::time::timeout(Duration::from_secs(10), s.read(&mut answer)).await {
+        Ok(Ok(n)) => n,
+        _ => 0,
+    };
+    String::from_utf8_lossy(&answer[..n])
+        .split(' ')
+        .nth(1)
+        .and_then(|c| c.parse().ok())
+        .unwrap_or(0)
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_sign_in_or_a_pairing_the_size_of_a_video_is_refused_unread() {
+    let Some(env) = start(AuthMode::Local, vec![]).await else {
+        return;
+    };
+    let video = 64 * 1024 * 1024;
+    let mut form = b"name=".to_vec();
+    form.resize(64 * 1024, b'a');
+    assert_eq!(
+        status_for_a_body_of(
+            &env,
+            "/signin",
+            "application/x-www-form-urlencoded",
+            &form,
+            video
+        )
+        .await,
+        413,
+        "64 MB of a name, from anyone"
+    );
+    let mut json = br#"{"name": "pc", "code": ""#.to_vec();
+    json.resize(64 * 1024, b'a');
+    assert_eq!(
+        status_for_a_body_of(&env, "/api/device/pair", "application/json", &json, video).await,
+        413,
+        "64 MB of a pairing code, from anyone"
+    );
+    let r = env
+        .client
+        .post(format!("{}/signin", env.base))
+        .form(&[
+            ("name", "a".repeat(41).as_str()),
+            ("password", "wrong wrong wrong"),
+        ])
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(r.status(), 401, "a name longer than any user's");
+    let kept: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM signin_attempt")
+        .fetch_one(env.store().pool())
+        .await
+        .unwrap();
+    assert_eq!(kept, 0, "is neither counted nor logged");
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_visit_to_the_sign_in_page_keeps_nothing_on_the_server() {
+    let Some(env) = start(AuthMode::Local, vec![]).await else {
+        return;
+    };
+    for _ in 0..20 {
+        let r = env
+            .client
+            .get(format!("{}/signin", env.base))
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(r.status(), 200);
+    }
+    let kept: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM tower_sessions")
+        .fetch_one(env.store().pool())
+        .await
+        .unwrap();
+    assert_eq!(
+        kept, 0,
+        "twenty visits to the sign-in page by nobody in particular, each kept for 30 days"
     );
 }
