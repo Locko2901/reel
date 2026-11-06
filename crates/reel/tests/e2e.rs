@@ -16103,3 +16103,38 @@ async fn a_track_title_in_an_upload_cannot_end_the_clip_pages_script() {
         "no markup of the title reaches the page"
     );
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn the_pages_refuse_frames_sniffing_and_scripts_from_elsewhere() {
+    let Some(env) = start(AuthMode::Single, vec![]).await else {
+        return;
+    };
+    for (path, status) in [
+        ("/", 200),
+        ("/s/aaaaaaaaaaaaaaaaaaaaaa", 404),
+        ("/api/clips/none", 404),
+    ] {
+        let r = env
+            .client
+            .get(format!("{}{path}", env.base))
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(r.status(), status, "{path}");
+        let h = r.headers();
+        let csp = h
+            .get("content-security-policy")
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or("");
+        assert!(
+            csp.contains("script-src 'self';") && csp.contains("frame-ancestors 'none'"),
+            "a policy for scripts and frames on {path}: {csp:?}"
+        );
+        assert_eq!(
+            h.get("x-content-type-options")
+                .and_then(|v| v.to_str().ok()),
+            Some("nosniff"),
+            "{path}"
+        );
+    }
+}
