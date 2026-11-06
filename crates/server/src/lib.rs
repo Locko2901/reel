@@ -52,6 +52,14 @@ impl AppState {
         reel_pipeline::housekeeping::clear_not_games_once(&ctx).await?;
         reel_pipeline::housekeeping::remake_utc_titles_once(&ctx).await?;
         reel_pipeline::housekeeping::remake_not_game_titles_once(&ctx).await?;
+        {
+            let ctx = ctx.clone();
+            tokio::spawn(async move {
+                if let Err(e) = reel_pipeline::housekeeping::remove_personal_tags_once(&ctx).await {
+                    tracing::warn!(error = %e, "the files' tags were not looked through");
+                }
+            });
+        }
         if let Some(code) = auth::ensure_setup_code(&ctx).await? {
             if cfg.auth.mode == AuthMode::Oidc {
                 tracing::warn!(

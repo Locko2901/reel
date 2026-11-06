@@ -15,7 +15,11 @@ Only what you share. Two kinds of address work without an account:
   The page shows the clip's title, its description if it has one, its
   length, the height it plays at, the date it was recorded and, for a
   link that expires, when. It does not show who uploaded it, any other
-  clip, or anything of the library.
+  clip, or anything of the library. The files carry none of the tags the
+  uploaded file had: a phone's place, its make and model and the like
+  stay out of every video reel makes. Files made before 1.13 that still
+  carry such a tag are copied again without it, once, at the first start
+  of 1.13 (the log says how many); the kept originals stay as they came.
 - **A shared collection** (`https://clips.example.com/c/...`): the
   collection's name and its clips, each with its title, poster and
   length, each playable on a page like a share link's. A clip you add to

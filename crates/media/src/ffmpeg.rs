@@ -174,6 +174,50 @@ impl Ffmpeg {
         ))?)
     }
 
+    /// The names of every tag a file carries, its container's and its streams'.
+    pub async fn tag_names(&self, path: &Path) -> Result<Vec<String>, MediaError> {
+        let out = self
+            .tool(&self.ffprobe)
+            .args([
+                "-v",
+                "error",
+                "-show_entries",
+                "format_tags:stream_tags",
+                "-of",
+                "json",
+            ])
+            .arg(path)
+            .stdin(Stdio::null())
+            .output()
+            .await
+            .map_err(|e| MediaError::Spawn {
+                tool: "ffprobe".into(),
+                source: e,
+            })?;
+        if !out.status.success() {
+            return Err(MediaError::Failed {
+                tool: "ffprobe".into(),
+                code: out.status.code().unwrap_or(-1),
+                stderr: tail(&String::from_utf8_lossy(&out.stderr), 3),
+            });
+        }
+        let v: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap_or_default();
+        let mut names = Vec::new();
+        let tags = std::iter::once(&v["format"]["tags"]).chain(
+            v["streams"]
+                .as_array()
+                .into_iter()
+                .flatten()
+                .map(|s| &s["tags"]),
+        );
+        for t in tags {
+            if let Some(map) = t.as_object() {
+                names.extend(map.keys().cloned());
+            }
+        }
+        Ok(names)
+    }
+
     pub async fn average_color(&self, image: &Path) -> Result<[u8; 3], MediaError> {
         let out = self
             .tool(&self.ffmpeg)
