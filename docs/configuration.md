@@ -811,7 +811,7 @@ What is asked of the issuer, space separated.
 
 ### Name claim
 
-The claim shown as the user's name (email only when the provider marks it verified); the subject when it is missing; who the user is comes from the issuer and subject, never from the name.
+The claim a user is named by when first seen (email only when the provider marks it verified); the subject when it is missing; a known user keeps their name: who the user is comes from the issuer and subject, never from the name.
 
 - Under Settings: Access, Identity provider
 - In `config.toml`: `oidc_username_claim` under `[auth]`
