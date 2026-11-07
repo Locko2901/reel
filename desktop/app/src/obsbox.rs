@@ -2,6 +2,7 @@
 //! stopped cleanly on quit. On Windows it waits while the user's own OBS runs.
 use crate::updates::secs;
 use reel_desktop_core::bundled::{Bundled, ObsSetup, Platform};
+use reel_desktop_core::encoders::X264;
 use reel_desktop_core::obsproc;
 use serde::Serialize;
 use std::path::PathBuf;
@@ -61,6 +62,9 @@ enum Cmd {
 pub enum Said {
     /// OBS kept stopping and is not started again until asked; the words say why.
     GaveUp(String),
+    /// OBS stopped right after it started with the encoder `from`, for `why`: the app changes
+    /// the encoder back, which starts OBS again with the one it goes back to.
+    FellBack { from: String, why: String },
 }
 
 /// OBS held stopped while a step in Program Files runs; released when dropped.
@@ -80,14 +84,46 @@ pub struct ObsBox {
     ready: Arc<tokio::sync::watch::Sender<bool>>,
     /// What the app says after OBS's own line.
     note: Arc<Mutex<Option<String>>>,
+    flags: Flags,
+}
+
+/// What the app sets for the supervisor's next starts.
+#[derive(Clone, Default)]
+struct Flags {
     /// Recording is paused: OBS starts without its replay buffer.
     paused: Arc<AtomicBool>,
+    /// The starts try an encoder: an exit counts toward neither the fall back nor the tries.
+    trial: Arc<AtomicBool>,
 }
 
 /// A run this long clears the count of stops in a row.
 const CALM: Duration = Duration::from_secs(300);
 /// Starts in a row that end before CALM, after which the app stops starting OBS.
 pub const TRIES: u32 = 5;
+/// A run that ends this soon stopped right after its start: an encoder that crashes OBS does
+/// so as the replay buffer starts, seconds in.
+const QUICK: Duration = Duration::from_secs(30);
+/// How long a start again waits for the setup with x264 the app saves after a fall back.
+const FALL_BACK_WAIT: Duration = Duration::from_secs(15);
+
+/// Whether OBS's encoder should be changed back: it stopped right after its start twice in a
+/// row, or once right after its encoder changed, with an encoder other than x264.
+pub fn fall_back(encoder: &str, quick_in_row: u32, after_change: bool) -> bool {
+    encoder != X264 && (quick_in_row >= 2 || (after_change && quick_in_row >= 1))
+}
+
+/// Why the encoder is changed back, for the app's log and what it keeps of the encoder.
+pub fn fell_back_why(after_change: bool) -> String {
+    format!(
+        "OBS stopped within {} s of its start {}",
+        QUICK.as_secs(),
+        if after_change {
+            "right after the encoder changed"
+        } else {
+            "twice in a row"
+        }
+    )
+}
 /// How long OBS gets to stop its outputs and exit before it is ended.
 const GRACE: Duration = Duration::from_secs(10);
 /// How long a started OBS may take to answer on its WebSocket before the app says so and
@@ -138,14 +174,14 @@ impl ObsBox {
             line: line.clone(),
             ready: Arc::new(tokio::sync::watch::Sender::new(false)),
             note: Arc::new(Mutex::new(None)),
-            paused: Arc::new(AtomicBool::new(false)),
+            flags: Flags::default(),
         };
         tauri::async_runtime::spawn(supervise(
             (bundled, copy),
             (setup, clips_dir, save_key),
             rx,
             (line, pid, me.ready.clone()),
-            me.paused.clone(),
+            me.flags.clone(),
             (Arc::new(changed), Arc::new(said)),
         ));
         me
@@ -158,7 +194,13 @@ impl ObsBox {
 
     /// Whether recording is paused, for the next start of OBS.
     pub fn paused(&self, yes: bool) {
-        self.paused.store(yes, Ordering::Relaxed);
+        self.flags.paused.store(yes, Ordering::Relaxed);
+    }
+
+    /// While on, the starts try an encoder: OBS stopping is started again after the shortest
+    /// pause and counts toward neither the fall back to x264 nor the five tries.
+    pub fn trying(&self, yes: bool) {
+        self.flags.trial.store(yes, Ordering::Relaxed);
     }
 
     pub fn line(&self) -> BoxLine {
@@ -260,11 +302,14 @@ async fn supervise(
         Arc<AtomicU32>,
         Arc<tokio::sync::watch::Sender<bool>>,
     ),
-    paused: Arc<AtomicBool>,
+    Flags { paused, trial }: Flags,
     (changed, said): Callbacks,
 ) {
     let mut crashes = 0u32;
     let mut gave_up: Option<String> = None;
+    // Runs in a row with this encoder that stopped right after their start.
+    let mut quick_in_row = 0u32;
+    let mut last_encoder: Option<String> = None;
     let mut stop_reply: Option<std::sync::mpsc::Sender<()>> = None;
     let mut held = false;
     let mut hold_reply: Option<std::sync::mpsc::Sender<()>> = None;
@@ -532,6 +577,12 @@ async fn supervise(
             }
         };
         let started = Instant::now();
+        let encoder = setup.encoder_id().to_string();
+        let after_change = last_encoder.as_ref().is_some_and(|e| *e != encoder);
+        last_encoder = Some(encoder.clone());
+        if after_change {
+            quick_in_row = 0;
+        }
         pid.store(p, Ordering::Relaxed);
         ready.send_replace(true);
         let version = match from_copy {
@@ -623,22 +674,41 @@ async fn supervise(
                         break 'run;
                     }
                     if restarting {
+                        if started.elapsed() >= QUICK {
+                            quick_in_row = 0;
+                        }
                         continue 'run;
                     }
                     if started.elapsed() >= CALM {
                         crashes = 0;
                     }
-                    crashes += 1;
                     let why = ended.take().unwrap_or_else(|| format!("OBS stopped (exit code {code})"));
-                    if crashes >= TRIES {
+                    let trying = trial.load(Ordering::Relaxed);
+                    if !trying {
+                        crashes += 1;
+                        quick_in_row = if started.elapsed() < QUICK { quick_in_row + 1 } else { 0 };
+                    }
+                    let mut wait = backoff(crashes.max(1));
+                    let words = if trying {
+                        tracing::info!(encoder, "OBS stopped while an encoder is tried");
+                        format!("{why} while an encoder is tried; starting it again in {} s", wait.as_secs())
+                    } else if fall_back(&encoder, quick_in_row, after_change) {
+                        tracing::warn!(from = encoder, after_change, quick_in_row, "OBS stopped right after it started; its encoder is changed back");
+                        quick_in_row = 0;
+                        crashes = crashes.min(TRIES - 1);
+                        wait = wait.max(FALL_BACK_WAIT);
+                        said(Said::FellBack { from: encoder.clone(), why: fell_back_why(after_change) });
+                        format!("{why} right after it started with {}; reel changes the encoder back", reel_desktop_core::obs::encoder_word(&encoder))
+                    } else if crashes >= TRIES {
                         let words = gave_up_words(&why);
                         tracing::warn!(crashes, "the bundled OBS keeps stopping; reel stops starting it");
                         said(Said::GaveUp(words.clone()));
                         gave_up = Some(words);
                         continue 'run;
-                    }
-                    let wait = backoff(crashes);
-                    set(&line, &*changed, "restarting", format!("{why}; starting it again in {} s (try {} of {TRIES})", wait.as_secs(), crashes + 1));
+                    } else {
+                        format!("{why}; starting it again in {} s (try {} of {TRIES})", wait.as_secs(), crashes + 1)
+                    };
+                    set(&line, &*changed, "restarting", words);
                     tokio::select! {
                         _ = tokio::time::sleep(wait) => continue 'run,
                         cmd = rx.recv() => match cmd {
@@ -1123,6 +1193,107 @@ mod tests {
         bx.stop();
     }
 
+    /// A stand-in OBS that crashes at once while its profile names AMF, and runs otherwise; the
+    /// box's `said` saves x264 as the app does, and what it said is kept.
+    #[cfg(target_os = "linux")]
+    fn crashing_with_amf(first: &str) -> (Standin, super::ObsBox, Arc<Mutex<Vec<super::Said>>>) {
+        let st = Standin::running(
+            "p=$(dirname {log})/obs/obs-studio/basic/profiles/reel/basic.ini\nenc=$(sed -n 's/^RecEncoder=//p' \"$p\")\necho \"start $enc\" >> {log}\n[ \"$enc\" = h264_texture_amf ] && exit 3\ntrap 'exit 0' TERM\nwhile :; do sleep 0.1; done",
+        );
+        let told = Arc::new(Mutex::new(Vec::new()));
+        let cell: Arc<std::sync::OnceLock<super::ObsBox>> = Arc::default();
+        let (t, c, clips) = (told.clone(), cell.clone(), st.dir.path().join("clips"));
+        let setup = |encoder: &str| reel_desktop_core::bundled::ObsSetup {
+            encoder: encoder.into(),
+            ..Default::default()
+        };
+        let bx = st.start_telling(setup(first), move |said| {
+            if let super::Said::FellBack { from, .. } = &said {
+                let bx = c.get().expect("the box");
+                bx.apply(
+                    setup(super::X264),
+                    clips.clone(),
+                    "F9".into(),
+                    Some((setup(from), clips.clone(), "F9".into())),
+                );
+            }
+            t.lock().unwrap().push(said);
+        });
+        let _ = cell.set(bx.clone());
+        (st, bx, told)
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn an_obs_that_crashes_twice_right_after_its_start_starts_with_x264() {
+        let (st, bx, told) = crashing_with_amf("h264_texture_amf");
+        st.wait_for("start h264_texture_amf\nstart h264_texture_amf\nstart obs_x264\n");
+        assert_eq!(line_in(&bx, "running").state, "running");
+        let told = told.lock().unwrap().clone();
+        assert_eq!(
+            told,
+            [super::Said::FellBack {
+                from: "h264_texture_amf".into(),
+                why: super::fell_back_why(false),
+            }]
+        );
+        bx.stop();
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn while_an_encoder_is_tried_obs_stopping_counts_toward_nothing() {
+        let (st, bx, told) = crashing_with_amf("h264_texture_amf");
+        bx.trying(true);
+        std::thread::sleep(Duration::from_secs(2));
+        let starts = st.said().lines().count();
+        assert!(starts > super::TRIES as usize, "{starts} starts");
+        assert!(
+            told.lock().unwrap().is_empty(),
+            "{:?}",
+            told.lock().unwrap()
+        );
+        bx.trying(false);
+        let n = st.said().lines().count();
+        for _ in 0..100 {
+            if st.said().ends_with("start obs_x264\n") {
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(100));
+        }
+        assert!(st.said().ends_with("start obs_x264\n"), "{}", st.said());
+        assert!(
+            st.said().lines().count() <= n + 3,
+            "two stops after the try, then x264"
+        );
+        assert_eq!(told.lock().unwrap().len(), 1);
+        bx.stop();
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn an_encoder_change_that_crashes_obs_right_away_falls_back_after_one_crash() {
+        let (st, bx, told) = crashing_with_amf(super::X264);
+        st.wait_for("start obs_x264\n");
+        let setup = |encoder: &str| reel_desktop_core::bundled::ObsSetup {
+            encoder: encoder.into(),
+            ..Default::default()
+        };
+        let clips = st.dir.path().join("clips");
+        bx.apply(
+            setup("h264_texture_amf"),
+            clips.clone(),
+            "F9".into(),
+            Some((setup(super::X264), clips, "F9".into())),
+        );
+        st.wait_for("start obs_x264\nstart h264_texture_amf\nstart obs_x264\n");
+        assert!(matches!(
+            told.lock().unwrap().as_slice(),
+            [super::Said::FellBack { from, .. }] if from == "h264_texture_amf"
+        ));
+        bx.stop();
+    }
+
     #[cfg(target_os = "linux")]
     #[test]
     fn while_recording_is_paused_obs_starts_without_its_replay_buffer() {
@@ -1223,6 +1394,34 @@ mod tests {
         assert_eq!(
             running_words(&b, Reach::Task, true, None, "32.2.2"),
             format!("running with the highest rights from its copy in Program Files, hidden; the copy is OBS 32.2.2, and this version of reel brought OBS {wanted}: Settings, OBS, Update the copy")
+        );
+    }
+
+    #[test]
+    fn a_crash_loop_falls_back_to_x264_twice_in_a_row_or_once_after_the_encoder_changed() {
+        use super::fall_back;
+        let amf = "h264_texture_amf";
+        assert!(
+            !fall_back(amf, 1, false),
+            "one stop right after a start: once more as it is"
+        );
+        assert!(fall_back(amf, 2, false), "again right after the start");
+        assert!(fall_back(amf, 1, true), "right after the encoder changed");
+        assert!(
+            !fall_back(amf, 0, true),
+            "a stop after half a minute is no crash loop"
+        );
+        assert!(
+            !fall_back(super::X264, 3, true),
+            "x264 is where it falls back to"
+        );
+        assert_eq!(
+            super::fell_back_why(true),
+            "OBS stopped within 30 s of its start right after the encoder changed"
+        );
+        assert_eq!(
+            super::fell_back_why(false),
+            "OBS stopped within 30 s of its start twice in a row"
         );
     }
 

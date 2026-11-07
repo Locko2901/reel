@@ -124,6 +124,7 @@ impl Trial {
             g.obs_box.clone()
         };
         if let Some(bx) = bx {
+            bx.trying(true);
             bx.apply(
                 trial,
                 s.clips_dir.clone(),
@@ -167,7 +168,7 @@ async fn restore(rt: Runtime, tried: ObsSetup) {
         let gen = g.obs_seen.borrow().gen;
         (gen, g.obs_box.clone())
     };
-    if let Some(bx) = bx {
+    if let Some(bx) = &bx {
         bx.apply(
             s.obs.setup.clone(),
             s.clips_dir.clone(),
@@ -177,6 +178,9 @@ async fn restore(rt: Runtime, tried: ObsSetup) {
     }
     let back = until(&rt, START, |x| x.gen > gen && x.connected).await;
     rt.lock().encoder_trial = None;
+    if let Some(bx) = bx {
+        bx.trying(false);
+    }
     tracing::info!(
         answered = back.is_ok(),
         encoder = s.obs.setup.encoder_id(),

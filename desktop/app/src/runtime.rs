@@ -606,6 +606,8 @@ impl Runtime {
                 .to_string(),
                 o.title.clone(),
             )
+        } else if let Some((_, words)) = &g.encoder_back {
+            ("error", "encoder changed back".to_string(), words.clone())
         } else if !paired && !standalone {
             (
                 "unpaired",
@@ -641,8 +643,6 @@ impl Runtime {
             ("preparing", "preparing the link".to_string(), p.clone())
         } else if let Some(p) = &g.save_problem {
             ("error", "no replay saved".to_string(), p.clone())
-        } else if let Some((_, words)) = &g.encoder_back {
-            ("error", "encoder changed back".to_string(), words.clone())
         } else if g.paused_by_user && (!standalone || paired) {
             (
                 "paused",
@@ -1630,7 +1630,7 @@ impl Runtime {
             ),
             None => {
                 let rt = self.clone();
-                let told = self.app.clone();
+                let told = self.clone();
                 let copy = self.lock().copy.clone();
                 let bx = crate::obsbox::ObsBox::start(
                     (b, copy),
@@ -1638,19 +1638,7 @@ impl Runtime {
                     s.clips_dir.clone(),
                     s.hotkeys.save.clone(),
                     move || rt.obs_box_changed(),
-                    move |said| {
-                        match said {
-                        crate::obsbox::Said::GaveUp(_) => notify::show(
-                            &told,
-                            "OBS keeps stopping",
-                            &format!(
-                                "{} stopped {} times in a row, so reel stopped starting it. Start OBS again is in the tray; Settings, Log has what OBS said.",
-                                if cfg!(target_os = "linux") { "reel's own OBS" } else { "The OBS that came with reel" },
-                                crate::obsbox::TRIES
-                            ),
-                        ),
-                    }
-                    },
+                    move |said| told.obs_said(said),
                 );
                 let mut g = self.lock();
                 bx.paused(g.recording_paused);
@@ -2308,6 +2296,31 @@ impl Runtime {
             _ => bx.stop(),
         }
         true
+    }
+
+    /// What the bundled OBS's supervisor tells beyond its line, off the async runtime's
+    /// threads, as a notification may not be sent from one.
+    fn obs_said(&self, said: crate::obsbox::Said) {
+        use crate::obsbox::Said;
+        let rt = self.clone();
+        std::thread::spawn(move || {
+            match said {
+            Said::GaveUp(_) => notify::show(
+                &rt.app,
+                "OBS keeps stopping",
+                &format!(
+                    "{} stopped {} times in a row, so reel stopped starting it. Start OBS again is in the tray; Settings, Log has what OBS said.",
+                    if cfg!(target_os = "linux") {
+                        "reel's own OBS"
+                    } else {
+                        "The OBS that came with reel"
+                    },
+                    crate::obsbox::TRIES
+                ),
+            ),
+            Said::FellBack { from, why } => crate::encoders::take_back(&rt, &from, &why),
+        }
+        });
     }
 
     /// Start OBS again: once more after the app stopped starting it.
@@ -4257,6 +4270,9 @@ impl Runtime {
                 changed = true;
             } else if let Some(f) = a.strip_prefix("--format=") {
                 s.obs.setup.format = f.to_string();
+                changed = true;
+            } else if let Some(e) = a.strip_prefix("--encoder=") {
+                s.obs.setup.encoder = e.to_string();
                 changed = true;
             } else if a == "--show-obs" || a == "--hide-obs" {
                 self.show_bundled_and_read(a == "--show-obs");
