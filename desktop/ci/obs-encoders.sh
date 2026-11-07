@@ -129,8 +129,9 @@ t1=$(date +%s)
 grep -q '^RecEncoder=obs_x264$' "$PROFILE" || fail "OBS's profile: $(grep RecEncoder "$PROFILE")"
 missing_dialog && fail "the Missing Encoders dialog stayed"
 refused obs_nvenc_h264_tex || fail "NVENC is not refused now"
+log_has "obs_nvenc_h264_tex did not record" || fail "OBS's own words did not reach the app's log"
 quit
-ok "taken back to x264 and recording $((t1 - t0)) s after the start; NVENC refused"
+ok "taken back to x264 and recording $((t1 - t0)) s after the start; NVENC refused; OBS's words in the app's log"
 trap - EXIT
 echo
 echo "the encoders with the real OBS: all ok"
