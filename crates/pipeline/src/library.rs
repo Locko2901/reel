@@ -26,7 +26,9 @@ pub enum Status {
 #[derive(Default)]
 pub struct State {
     status: Mutex<Status>,
-    checking: AtomicBool,
+    /// One check at a time, so two never meet at `reading`. A check asked meanwhile waits and
+    /// then looks itself: the one under way may have read the folder before it went away.
+    checking: tokio::sync::Mutex<()>,
     /// A read of the folder still out: a share that hangs keeps its thread past the check's
     /// time limit, and no other read starts until it is back (else one thread more every 10 s).
     reading: Arc<AtomicBool>,
@@ -241,15 +243,12 @@ async fn inspect(ctx: &Ctx, dir: PathBuf) -> Result<Status, String> {
 
 /// Looks now, keeps what it found, and logs a change.
 pub async fn check(ctx: &Ctx) -> Status {
-    if ctx.library.checking.swap(true, Ordering::SeqCst) {
-        return ctx.library.status();
-    }
+    let _one = ctx.library.checking.lock().await;
     let dir = ctx.config().library_dir();
     let status = match inspect(ctx, dir.clone()).await {
         Ok(s) => s,
         Err(why) => Status::Away(why),
     };
-    ctx.library.checking.store(false, Ordering::SeqCst);
     let mut held = ctx.library.status.lock().unwrap();
     if *held != status {
         match &status {
