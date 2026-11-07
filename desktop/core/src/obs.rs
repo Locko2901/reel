@@ -49,6 +49,8 @@ pub enum ObsEvent {
     },
     Disconnected {
         reason: String,
+        /// What the app waits for, for an OBS it does not run.
+        words: String,
     },
     ReplayBufferSaved {
         path: String,
@@ -283,6 +285,29 @@ impl ObsError {
             ),
         }
     }
+}
+
+/// The line while the app waits for an OBS it does not run: what it waits for, or the error
+/// when waiting alone does not help (a password).
+pub fn waiting_words(e: &ObsError, host: &str, port: u16) -> String {
+    let at = format!("{host}:{port}");
+    match e {
+        ObsError::Connect(_, cause)
+            if cause.to_lowercase().contains("refused") || cause.contains("10061") =>
+        {
+            format!("waiting for OBS at {at}: it is not running, or its WebSocket server is off; reel connects once it answers")
+        }
+        ObsError::Connect(..) => {
+            format!("waiting for OBS at {at}, which does not answer; reel connects once it does")
+        }
+        ObsError::Closed(why) => gone_words(why, host, port),
+        other => format!("not connected: {other}"),
+    }
+}
+
+/// The line once a connection to an OBS the app does not run ended.
+fn gone_words(why: &str, host: &str, port: u16) -> String {
+    format!("waiting for OBS at {host}:{port} to come back ({why}); reel connects once it answers")
 }
 
 /// obs-websocket's auth string: base64(sha256(base64(sha256(password + salt)) + challenge)).
@@ -927,13 +952,15 @@ pub async fn run(
                     }
                 };
                 tracing::warn!(reason, "OBS disconnected");
-                let _ = tx.send(ObsEvent::Disconnected { reason }).await;
+                let words = gone_words(&reason, &cfg.host, cfg.port);
+                let _ = tx.send(ObsEvent::Disconnected { reason, words }).await;
             }
             Err(e) => {
                 tracing::debug!(error = %e, "OBS not reachable");
                 let _ = tx
                     .send(ObsEvent::Disconnected {
                         reason: e.to_string(),
+                        words: waiting_words(&e, &cfg.host, cfg.port),
                     })
                     .await;
             }
@@ -1500,7 +1527,7 @@ mod tests {
         let mut seen = Vec::new();
         let reason = loop {
             match tokio::time::timeout(QUIET + ANSWER * 6, rx.recv()).await {
-                Ok(Some(ObsEvent::Disconnected { reason })) => break reason,
+                Ok(Some(ObsEvent::Disconnected { reason, .. })) => break reason,
                 Ok(Some(e)) => seen.push(e),
                 other => panic!("the frozen connection did not end: {other:?}"),
             }
@@ -1543,7 +1570,7 @@ mod tests {
         ready.send_replace(false);
         let gone = loop {
             match tokio::time::timeout(Duration::from_secs(5), rx.recv()).await {
-                Ok(Some(ObsEvent::Disconnected { reason })) => break reason,
+                Ok(Some(ObsEvent::Disconnected { reason, .. })) => break reason,
                 Ok(Some(_)) => continue,
                 other => panic!("no end of the connection: {other:?}"),
             }
@@ -1557,6 +1584,32 @@ mod tests {
         );
         cancel.cancel();
         task.await.unwrap();
+    }
+
+    #[test]
+    fn an_obs_the_app_does_not_run_is_waited_for_in_words_that_say_for_what() {
+        let refused = ObsError::Connect(
+            "ws://127.0.0.1:4455".into(),
+            "Connection refused (os error 111)".into(),
+        );
+        assert_eq!(
+            waiting_words(&refused, "127.0.0.1", 4455),
+            "waiting for OBS at 127.0.0.1:4455: it is not running, or its WebSocket server is off; reel connects once it answers"
+        );
+        let silent = ObsError::Connect("ws://pc:4455".into(), "timed out".into());
+        assert_eq!(
+            waiting_words(&silent, "pc", 4455),
+            "waiting for OBS at pc:4455, which does not answer; reel connects once it does"
+        );
+        assert_eq!(
+            waiting_words(&ObsError::Closed("OBS closed the socket".into()), "127.0.0.1", 4455),
+            "waiting for OBS at 127.0.0.1:4455 to come back (OBS closed the socket); reel connects once it answers"
+        );
+        assert_eq!(
+            waiting_words(&ObsError::NeedsPassword, "127.0.0.1", 4455),
+            "not connected: OBS needs a password and none is set",
+            "a password is not waited for"
+        );
     }
 
     #[test]

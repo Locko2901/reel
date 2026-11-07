@@ -55,6 +55,11 @@ OBS tells the app over its WebSocket the moment it saves a replay.
 The panel **What reel needs from OBS**, at the top of the page, keeps checking the WebSocket and
 the replay buffer for as long as the app runs, and says in words what to do about either.
 
+reel never starts or ends your OBS. While it is closed, or after it crashed, the OBS line under
+Settings, **Status** says what reel waits for ("waiting for OBS at 127.0.0.1:4455: it is not
+running, or its WebSocket server is off"), and reel connects again within a few seconds of OBS
+being back, with the replay buffer started again when **Start the replay buffer** is on.
+
 ## 3. The replay buffer
 
 reel saves clips from OBS's replay buffer: the last minute or so, kept in memory and written to a
