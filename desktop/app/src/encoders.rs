@@ -242,6 +242,10 @@ pub async fn try_in_obs(trial: &Trial, id: &str, word: &str) -> Result<u64, Refu
         .log_since(since)
         .map(|l| encoders::obs_reason(&l))
         .unwrap_or_default();
+    b.log_what_obs_said(
+        since,
+        &format!("setup: OBS did not record with {id} ({why})"),
+    );
     let line = match obs_said.first() {
         Some(l) => format!("OBS could not record with it: {l}"),
         None => format!("OBS could not record with it: {why}"),
@@ -283,18 +287,35 @@ fn watched(rt: &Runtime) -> bool {
         && g.encoder_trial.is_none()
 }
 
-/// After each connection to reel's OBS: an encoder no replay was saved with yet must have its
-/// replay buffer running within BUFFER, or it is taken back.
+/// Puts OBS's own words of its run since `since` into the app's log after `what`: the end of
+/// its log, and the lines that say what failed.
+pub fn obs_said(rt: &Runtime, since: Option<SystemTime>, what: &str) {
+    let Some(b) = rt.running_obs() else {
+        return;
+    };
+    let since = since.unwrap_or(std::time::UNIX_EPOCH);
+    b.log_what_obs_said(since, what);
+    let lines = b
+        .log_since(since)
+        .map(|l| encoders::obs_reason(&l))
+        .unwrap_or_default();
+    if !lines.is_empty() {
+        tracing::warn!("{what}; OBS's lines about it:\n{}", lines.join("\n"));
+    }
+}
+
+/// After each connection to reel's OBS: its replay buffer must run within BUFFER. When it does
+/// not, OBS's words go in the log, and an encoder no replay was saved with yet is taken back.
 pub async fn watch_start(rt: Runtime, gen: u64) {
     if !watched(&rt) {
         return;
     }
     let enc = current(&rt);
     let ran = until(&rt, BUFFER, |s| s.gen != gen || s.active).await;
-    let (seen, started) = {
+    let (seen, started, since) = {
         let g = rt.lock();
         let seen = *g.obs_seen.borrow();
-        (seen, g.encoder_started.clone())
+        (seen, g.encoder_started.clone(), g.obs_since)
     };
     if seen.gen != gen || seen.active || !watched(&rt) || current(&rt) != enc {
         return;
@@ -313,6 +334,12 @@ pub async fn watch_start(rt: Runtime, gen: u64) {
         Sign::NotStarted,
     ) {
         take_back(&rt, &enc, &why);
+    } else {
+        obs_said(
+            &rt,
+            since,
+            &format!("the replay buffer did not start ({why})"),
+        );
     }
 }
 
@@ -347,7 +374,7 @@ pub fn on_save_failed(rt: &Runtime, why: &str) {
 
 /// Goes back to the last encoder that saved a replay (x264 when none did), refuses the one that
 /// failed until the setup tests it again, and says so in the state line, the tray's tooltip and
-/// a notification. It never picks the encoder that failed
+/// a notification; OBS's own lines go in the app's log. It never picks the encoder that failed
 /// or one refused; a second call for the same encoder, or one while the setup tries encoders,
 /// does nothing.
 pub fn take_back(rt: &Runtime, failed: &str, why: &str) {
@@ -355,7 +382,7 @@ pub fn take_back(rt: &Runtime, failed: &str, why: &str) {
 }
 
 fn back(rt: &Runtime, failed: &str, why: &str, now: bool) {
-    let back = {
+    let (back, b, since) = {
         let mut g = rt.lock();
         if g.encoder_trial.is_some() || g.encoder_back.as_ref().is_some_and(|(f, _)| f == failed) {
             return;
@@ -367,9 +394,12 @@ fn back(rt: &Runtime, failed: &str, why: &str, now: bool) {
             encoder_word(&back)
         );
         g.encoder_back = Some((failed.to_string(), words));
-        back
+        (back, g.bundled.clone(), g.obs_since)
     };
     tracing::warn!(failed, back = %back, why, "the change of encoder is taken back");
+    if b.is_some() {
+        obs_said(rt, since, &format!("{failed} did not record ({why})"));
+    }
     rt.keep_known(|k| {
         k.set(Verdict {
             id: failed.to_string(),

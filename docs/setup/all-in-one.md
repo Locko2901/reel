@@ -199,6 +199,7 @@ as well.
   it, or a save fails before any replay was saved with it, reel goes back to the encoder the last
   replay was saved with (x264 on the CPU if none was) and says so in its status, the tray's tooltip
   and a notification. That encoder is not offered again until **Run the setup again** tests it.
+  OBS's own lines about it go into reel's log (Settings, Log), as they do when a save fails.
 - **Its name**: reel runs the OBS that comes with it as `reel-capture.exe`, so Discord does not
   switch to Streamer Mode while it records in the background. The files are OBS's own, unchanged,
   and their source ships with every release. The OBS for games that run as administrator, when an

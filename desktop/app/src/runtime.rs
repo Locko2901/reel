@@ -170,6 +170,8 @@ pub struct Inner {
     /// A change of encoder taken back (the encoder, the words), until a replay is saved.
     pub encoder_back: Option<(String, String)>,
     pub obs_seen: watch::Sender<crate::encoders::Seen>,
+    /// When the app last connected to OBS: the log of that OBS's run is written after it.
+    pub obs_since: Option<std::time::SystemTime>,
 }
 
 /// What went wrong with the server, in words and in code, and when the next try is.
@@ -456,6 +458,7 @@ impl Runtime {
             encoder_started: None,
             encoder_back: None,
             obs_seen: watch::Sender::new(Default::default()),
+            obs_since: None,
         };
         let mut inner = inner;
         inner.encoders = reel_desktop_core::encoders::Known::load(&inner.paths.encoders_file());
@@ -2366,7 +2369,8 @@ impl Runtime {
                         };
                         tracing::info!(obs_version, ws_version, "obs connected");
                         let gen = {
-                            let g = rt.lock();
+                            let mut g = rt.lock();
+                            g.obs_since = Some(std::time::SystemTime::now());
                             let mut gen = 0;
                             g.obs_seen.send_modify(|s| {
                                 s.gen += 1;
@@ -3357,6 +3361,10 @@ impl Runtime {
 
     fn save_failed(&self, why: &str) {
         tracing::warn!(why, "no replay saved");
+        if self.bundled_in_use() {
+            let since = self.lock().obs_since;
+            crate::encoders::obs_said(self, since, "no replay saved");
+        }
         self.lock().save_problem = Some(why.to_string());
         self.push_status();
         notify::show(&self.app, "No replay saved", why);
