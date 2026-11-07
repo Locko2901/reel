@@ -6,6 +6,7 @@ pub mod bundled;
 pub mod cache;
 pub mod cues;
 pub mod elevated;
+pub mod encoders;
 pub mod gaming;
 pub mod hash;
 pub mod install;

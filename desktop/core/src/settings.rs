@@ -414,6 +414,10 @@ impl Paths {
     pub fn ledger_file(&self) -> PathBuf {
         self.data_dir.join("ledger.json")
     }
+    /// What the app knows of this PC's encoders for OBS.
+    pub fn encoders_file(&self) -> PathBuf {
+        self.data_dir.join("encoders.json")
+    }
     /// Standalone: reel's data folder (its library, cache, trash and database) where it starts
     /// out; `Settings::library_dir` says where it is.
     pub fn library_dir(&self) -> PathBuf {

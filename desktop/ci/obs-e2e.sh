@@ -419,6 +419,8 @@ no_reel_obs || fail "OBS was started again after the app quit for an installer"
 ok "the app stopped OBS, did not start it again as after a crash, and quit"
 trap - EXIT
 
+REEL_E2E_DIR="$ROOT" bash "$HERE/obs-encoders.sh" || fail "the encoders"
+
 say "the user's OBS ran beside reel's all along, its settings the same to the byte"
 main_alive || fail "the user's OBS stopped"
 MAIN_AFTER=$(main_sum)

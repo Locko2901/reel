@@ -336,14 +336,34 @@ function renderLocal() {
   $('#local-ffmpeg').textContent = f.name ? `${f.name}, ${f.license}; source ${f.source}; build ${f.build_page}; the licence text is ${f.license_file} next to the app` : '';
 }
 
+// Only an encoder whose last test here recorded in OBS can be picked; x264 always can, and the
+// one in use stays as it is.
+function renderEncoderChoices(s) {
+  const row = $('.srow[data-key="obs.setup.encoder"]');
+  const help = $('.shelp', row);
+  if (help.dataset.base == null) help.dataset.base = help.textContent;
+  const known = new Map((status.obs_encoders || []).map((v) => [v.id, v]));
+  const not = [];
+  for (const o of $('select', row).options) {
+    if (o.dataset.word == null) o.dataset.word = o.textContent;
+    const v = known.get(o.value);
+    const ok = o.value === 'obs_x264' || o.value === s.encoder || !!(v && v.ok);
+    o.disabled = !ok;
+    o.textContent = ok ? o.dataset.word : `${o.dataset.word} (${v ? 'not here' : 'not tested'})`;
+    if (!ok) not.push(`${o.dataset.word}: ${v ? v.why : 'not tested on this PC yet'}`);
+  }
+  help.textContent = not.length ? `${help.dataset.base}. Not offered: ${not.join('; ')}` : help.dataset.base;
+}
+
 let ownMicApp = null;
 function renderChoicesApp() {
   if (!settings || !status) return;
   const s = settings.obs.setup;
   syncCustom($('.srow[data-key="obs.setup.quality"] select'), s);
   ensureOption($('.srow[data-key="obs.setup.encoder"] select'), s.encoder);
+  renderEncoderChoices(s);
   ensureOption($('.srow[data-key="obs.setup.format"] select'), s.format);
-  for (const [k, v] of [['obs.setup.quality', s.quality], ['obs.setup.encoder', s.encoder], ['obs.setup.format', s.format]]) {
+  for (const [k, v] of [['obs.setup.quality', s.quality], ['obs.setup.encoder', s.encoder || 'obs_x264'], ['obs.setup.format', s.format]]) {
     const sel = $(`.srow[data-key="${k}"] select`);
     if (sel !== document.activeElement && sel.value !== v) sel.value = v;
   }

@@ -1266,6 +1266,27 @@ impl Bundled {
         Some((newest, tail))
     }
 
+    /// The whole log of OBS's newest run written since `since`.
+    pub fn log_since(&self, since: std::time::SystemTime) -> Option<String> {
+        let newest = newest_txt(&self.logs_dir(), since)?;
+        Some(String::from_utf8_lossy(&std::fs::read(newest).ok()?).into_owned())
+    }
+
+    /// The video encoders OBS listed at its newest start that got as far; None before any.
+    /// A start held by a dialog lists none yet, so older logs answer for it.
+    pub fn encoders_listed(&self) -> Option<Vec<String>> {
+        let mut logs: Vec<(std::time::SystemTime, PathBuf)> = std::fs::read_dir(self.logs_dir())
+            .ok()?
+            .flatten()
+            .filter_map(|e| Some((e.metadata().ok()?.modified().ok()?, e.path())))
+            .filter(|(_, p)| p.extension().is_some_and(|x| x == "txt"))
+            .collect();
+        logs.sort_by_key(|a| std::cmp::Reverse(a.0));
+        logs.iter().find_map(|(_, p)| {
+            crate::encoders::listed(&String::from_utf8_lossy(&std::fs::read(p).ok()?))
+        })
+    }
+
     /// The first lines of the crash report OBS wrote since `since`, with its path.
     pub fn crash_report(
         &self,
@@ -2952,6 +2973,37 @@ mod tests {
         );
         assert!(b.args(true).contains(&"--minimize-to-tray".to_string()));
         assert_eq!(api_version("32.2.2"), 537001986);
+    }
+
+    #[test]
+    fn obs_s_encoders_come_from_its_newest_log_that_lists_them() {
+        use std::time::{Duration, SystemTime};
+        let dir = tempfile::tempdir().unwrap();
+        let b = Bundled::linux(dir.path().join("obs"), dir.path());
+        assert_eq!(b.encoders_listed(), None, "OBS never started");
+        std::fs::create_dir_all(b.logs_dir()).unwrap();
+        let older = b.logs_dir().join("2026-11-06 09-00-00.txt");
+        std::fs::write(
+            &older,
+            "09:00:00.100: Available Encoders:\n09:00:00.100:   Video Encoders:\n09:00:00.100: \t- obs_qsv11_v2 (QuickSync H.264)\n09:00:00.100: \t- obs_x264 (x264)\n09:00:00.100:   Audio Encoders:\n",
+        )
+        .unwrap();
+        std::fs::File::options()
+            .write(true)
+            .open(&older)
+            .unwrap()
+            .set_modified(SystemTime::now() - Duration::from_secs(3600))
+            .unwrap();
+        std::fs::write(
+            b.logs_dir().join("2026-11-07 10-00-00.txt"),
+            "10:00:00.000: Command Line Arguments: --multi\n",
+        )
+        .unwrap();
+        assert_eq!(
+            b.encoders_listed().unwrap(),
+            ["obs_qsv11_v2", "obs_x264"],
+            "a start held by a dialog lists none: the run before answers"
+        );
     }
 
     #[test]

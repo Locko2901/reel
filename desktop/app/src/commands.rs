@@ -486,16 +486,17 @@ pub fn obs_video(setup: reel_desktop_core::bundled::ObsSetup) -> reel_desktop_co
     setup.video()
 }
 
-/// Tests the encoders one by one; the page has each change of a row as an `encoder-test` event
-/// carrying its `run`. `asked`: when the page asked, in ms since 1970.
+/// Tests the encoders one by one, in ffmpeg then in OBS; the page has each change of a row as
+/// an `encoder-test` event carrying its `run`. `asked`: when the page asked, in ms since 1970.
 #[tauri::command]
 pub async fn encoders_test(
     app: AppHandle,
     run: u64,
     asked: Option<u64>,
 ) -> Vec<crate::setup::EncoderTest> {
-    use tauri::Emitter;
-    crate::setup::test_encoders(run, asked, |p| {
+    use tauri::{Emitter, Manager};
+    let rt = app.try_state::<Runtime>().map(|r| r.inner().clone());
+    crate::setup::test_encoders(rt, run, asked, |p| {
         let _ = app.emit("encoder-test", p);
     })
     .await
