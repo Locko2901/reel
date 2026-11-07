@@ -14974,6 +14974,89 @@ async fn a_library_that_is_not_there_is_not_written_to() {
     assert_eq!(r.status(), 200);
 }
 
+/// A pipe in the marker's place holds a check in its read, as a slow share does, while the
+/// folder goes away; the check asked meanwhile must not answer with what that read finds.
+#[cfg(unix)]
+#[tokio::test(flavor = "multi_thread")]
+async fn a_library_that_goes_away_while_a_check_reads_it_is_seen_by_the_next() {
+    let Some(env) = start_with(AuthMode::Single, vec![], |c| c.library_dir = nas_of(c)).await
+    else {
+        return;
+    };
+    let nas = nas_of(&env.ctx.config());
+    env.synth("first.mp4", Synth::small(2.0, "one")).await;
+    env.wait_ready(Duration::from_secs(90)).await;
+    env.wait_no_jobs(Duration::from_secs(120)).await;
+
+    let marker = nas.join(reel_core::config::MARKER);
+    let text = std::fs::read(&marker).unwrap();
+    std::fs::remove_file(&marker).unwrap();
+    assert!(std::process::Command::new("mkfifo")
+        .arg(&marker)
+        .status()
+        .unwrap()
+        .success());
+    let ctx = env.ctx.clone();
+    let first = tokio::spawn(async move { reel_pipeline::library::check(&ctx).await });
+    let pipe = marker.clone();
+    // opening a pipe to write returns once a reader has it open: a check is in its read
+    let mut writer = tokio::time::timeout(
+        Duration::from_secs(30),
+        tokio::task::spawn_blocking(move || std::fs::OpenOptions::new().write(true).open(pipe)),
+    )
+    .await
+    .expect("a check reads the marker")
+    .unwrap()
+    .unwrap();
+
+    let away = nas.with_file_name("nas-away");
+    std::fs::rename(&nas, &away).unwrap();
+    std::fs::create_dir(&nas).unwrap();
+    let ctx = env.ctx.clone();
+    let second = tokio::spawn(async move { reel_pipeline::library::check(&ctx).await });
+    // time for the second check to answer at once, were it to answer for the read under way
+    tokio::time::sleep(Duration::from_millis(500)).await;
+    std::io::Write::write_all(&mut writer, &text).unwrap();
+    drop(writer);
+    first.await.unwrap();
+    let status = second.await.unwrap();
+    assert!(
+        matches!(&status, reel_pipeline::library::Status::Away(w) if w.contains("is empty")),
+        "{status:?}"
+    );
+    assert_eq!(
+        env.ctx.library.status(),
+        status,
+        "and that is what it keeps"
+    );
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_check_dropped_before_it_is_done_leaves_the_next_free_to_look() {
+    let Some(env) = start_with(AuthMode::Single, vec![], |c| c.library_dir = nas_of(c)).await
+    else {
+        return;
+    };
+    let nas = nas_of(&env.ctx.config());
+    env.synth("first.mp4", Synth::small(2.0, "one")).await;
+    env.wait_ready(Duration::from_secs(90)).await;
+    env.wait_no_jobs(Duration::from_secs(120)).await;
+
+    let mut dropped = Box::pin(reel_pipeline::library::check(&env.ctx));
+    assert!(
+        futures::poll!(&mut dropped).is_pending(),
+        "polled once, the check waits for the database or the folder"
+    );
+    drop(dropped);
+    std::fs::rename(&nas, nas.with_file_name("nas-away")).unwrap();
+    std::fs::create_dir(&nas).unwrap();
+    let status = reel_pipeline::library::check(&env.ctx).await;
+    assert!(
+        matches!(&status, reel_pipeline::library::Status::Away(w) if w.contains("is empty")),
+        "{status:?}"
+    );
+}
+
 #[tokio::test(flavor = "multi_thread")]
 async fn an_existing_library_moves_out_and_its_old_trash_follows() {
     let Some(env) = start(AuthMode::Single, vec![]).await else {
