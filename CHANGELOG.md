@@ -1,5 +1,50 @@
 # Changelog
 
+## [1.13.0](https://github.com/Locko2901/reel/compare/v1.12.2...v1.13.0) (2026-11-07)
+
+
+### Features
+
+* pause recording, in the tray and the window, stops OBS's replay buffer until you resume ([2240d6c](https://github.com/Locko2901/reel/commit/2240d6ce9b0d7631cdab4110655013ad68ebfc19))
+* the sign-in button names the identity provider as you call it, such as Sign in with Authentik ([3a2e30c](https://github.com/Locko2901/reel/commit/3a2e30c9ce4ee91913a7b1e3086fbb7307470d6b))
+
+
+### Bug Fixes
+
+* a clip in the trash plays and downloads only for who may edit it ([f873859](https://github.com/Locko2901/reel/commit/f8738595ce5bd2a14207d645e2805844e83fab92))
+* a collection's link serves only the clips its maker may share, and a montage of someone else's footage gets a link from an admin only ([b3622b3](https://github.com/Locko2901/reel/commit/b3622b3fa78b5d8ac5d4b0a3a4a1dbb1ecb8fbda))
+* a name added to Admins under Settings counts at the next sign-in through the identity provider, without a restart ([fc619b7](https://github.com/Locko2901/reel/commit/fc619b75d5b90ca58142f402d1d33c9308901132))
+* a new ntfy server address clears the ntfy token, so the token never goes to another server ([25608d4](https://github.com/Locko2901/reel/commit/25608d4946092dfbf3219d827ffc6c4ee42331ce))
+* a page that stopped answering in the Linux app loads again where it was, not on the front page ([ca04e8d](https://github.com/Locko2901/reel/commit/ca04e8d7862e0546577cd7872d18527ab0672f18))
+* Admins counts a person only by exactly what reel gets for them, the subject behind an identity provider ([4681488](https://github.com/Locko2901/reel/commit/46814887588d7112a6b2db69bd735632f98cd92b))
+* an audio track's name from an uploaded file shows as text on the clip page and never runs ([5d08898](https://github.com/Locko2901/reel/commit/5d0889867742af44e0a2b5b50af5d20c567659c2))
+* an empty Admin value is refused while a role claim is set ([60181e8](https://github.com/Locko2901/reel/commit/60181e83de276bd5e5040c2d88b550ad696cc2a1))
+* an upload sent without its length stops at the upload size limit ([d2559f9](https://github.com/Locko2901/reel/commit/d2559f9dd642db95714f738cb505b6f34ef29995))
+* Back from Settings or Status keeps the page live, so it is not reloaded ten seconds later ([0798927](https://github.com/Locko2901/reel/commit/079892707791ad283c5988e93bd634a5eb653ffc))
+* behind a proxy, a name that differs from a user's only in case is refused instead of let in as that user ([0b8f8ba](https://github.com/Locko2901/reel/commit/0b8f8baac0b704324b96e6a69065f8e71cb48293))
+* behind an identity provider a session lasts 7 days without use and 30 at most, and a session in use is kept ([6744511](https://github.com/Locko2901/reel/commit/6744511ed52e2441294e732a3e4f902eb44e17d8))
+* behind an identity provider the first sign-in makes an admin only with the setup code, Admins or the admin value ([6fec2af](https://github.com/Locko2901/reel/commit/6fec2af87c30fa1de5b2e01511acd589931bc0f9))
+* Check now on Status is an admin's, and with the update check off reel asks GitHub nothing ([20f3a54](https://github.com/Locko2901/reel/commit/20f3a541d00ec98e43b029e60df297b3716922ea))
+* on https the session cookie is bound to reel's own host, and every sign-in gets a new session id ([a9eacaa](https://github.com/Locko2901/reel/commit/a9eacaa305e59958887c4195255fe269ec30038c))
+* Quick Sync is found and used on Windows ([a531395](https://github.com/Locko2901/reel/commit/a53139568d9c569a8f9703c8af05e38d1aa15dda))
+* reel without sign-in answers only at its own address ([90d97d3](https://github.com/Locko2901/reel/commit/90d97d397d95d7bafd0c65cbaced7f68efe742f5))
+* reel's pages run only reel's own scripts and cannot be shown in another site's frame ([ab6899b](https://github.com/Locko2901/reel/commit/ab6899bb997b45641e6e9fb88d587607155370c5))
+* sign-in through the identity provider recovers by itself when the provider did not answer at start ([ef8e752](https://github.com/Locko2901/reel/commit/ef8e7522d8997d68ef03089475e00c2fe73ebe64))
+* sign-in, setup code and pairing requests larger than a form are refused before they are read ([1d119eb](https://github.com/Locko2901/reel/commit/1d119eb941c27cfd06c85099afe09c2770bf344e))
+* starting a sign-in through the identity provider no longer cuts a signed-in session to ten minutes ([a1cdea4](https://github.com/Locko2901/reel/commit/a1cdea4137ab4a9c53fb09f8b2c463b3b24bb27b))
+* the app installs an update only as the version its signature names, never an older one ([938080a](https://github.com/Locko2901/reel/commit/938080affb123e8471d098a19f251c92b7611a3c))
+* the desktop app's library lets in the app alone, not any program on the PC ([48c1a7d](https://github.com/Locko2901/reel/commit/48c1a7df90f8076b3d485b3a57f1a5d287a3e972))
+* the desktop app's log gives the right number of commands a server's pages may call ([ff6c464](https://github.com/Locko2901/reel/commit/ff6c464729358ebe16824af2b623b6ee6b7b449d))
+* the health check tells the internet whether reel is ok and nothing more ([cd098d6](https://github.com/Locko2901/reel/commit/cd098d6d70917f10993da7d04cd53e4f8dc43db2))
+* the jobs API names the server's folders instead of showing their paths ([b187434](https://github.com/Locko2901/reel/commit/b18743408e633b566087ffa70cbc3aac681ab1bf))
+* the name claim, role claim and admin value saved under Settings count from the next sign-in, without a restart ([9f24756](https://github.com/Locko2901/reel/commit/9f247567dc49772d360ebfdeedb8006ae981f1a9))
+* the sign-in page shows only reel's own words, and a provider's error counts only with the browser's state ([4325c2e](https://github.com/Locko2901/reel/commit/4325c2ed1c50afe3268fc4cc51cf2f4354ccd34b))
+* the switches in the window's status popover turn on and off again, Pause uploads among them ([b7c5abc](https://github.com/Locko2901/reel/commit/b7c5abc06ef97e2a2c1b6bb4eceef7bcf9c0e7c7))
+* the way back after a sign-in always stays on this site ([ee9a0a7](https://github.com/Locko2901/reel/commit/ee9a0a7119204667005b4597586cf3abd0e70b77))
+* videos reel makes carry none of the uploaded file's tags, such as the place a phone recorded ([600ae72](https://github.com/Locko2901/reel/commit/600ae72d3c1d4c6424ed9dace687b5ad6a2abf45))
+* with recording paused, the App line of the status popover fits and its switches stay where they were ([ca63675](https://github.com/Locko2901/reel/commit/ca63675573bbc868434326361790bc1900d4d159))
+* wrong passwords from strangers no longer hold the right one out of a name ([6c289ed](https://github.com/Locko2901/reel/commit/6c289edec07440d64b1bdf960aae56acd0bd5557))
+
 ## [1.12.2](https://github.com/Locko2901/reel/compare/v1.12.1...v1.12.2) (2026-11-05)
 
 
