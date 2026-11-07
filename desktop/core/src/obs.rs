@@ -299,6 +299,22 @@ pub struct Session {
     events: VecDeque<ObsEvent>,
     next_id: u64,
     pub version: Version,
+    /// Why the connection is no good any more: a request found it closed or got no answer.
+    broken: Option<String>,
+}
+
+/// How long OBS has for its Hello and to take the password.
+const HANDSHAKE: Duration = Duration::from_secs(if cfg!(test) { 1 } else { 10 });
+/// How long OBS has to answer a request.
+const ANSWER: Duration = Duration::from_secs(if cfg!(test) { 1 } else { 10 });
+/// How long a connection may be quiet before OBS is asked something to prove it still answers.
+const QUIET: Duration = Duration::from_secs(if cfg!(test) { 1 } else { 15 });
+
+/// The next message of the handshake; a frozen OBS takes the connection and says nothing.
+async fn handshake_json(socket: &mut Socket, url: &str) -> Result<Value, ObsError> {
+    tokio::time::timeout(HANDSHAKE, next_json(socket))
+        .await
+        .map_err(|_| ObsError::Connect(url.to_string(), "timed out in the handshake".into()))?
 }
 
 fn text(v: &Value) -> Message {
@@ -347,7 +363,7 @@ impl Session {
             Ok(Err(e)) => return Err(ObsError::Connect(url, e.to_string())),
             Err(_) => return Err(ObsError::Connect(url, "timed out".into())),
         };
-        let hello = next_json(&mut socket).await?;
+        let hello = handshake_json(&mut socket, &url).await?;
         if hello["op"].as_u64() != Some(0) {
             return Err(ObsError::Protocol("expected a Hello".into()));
         }
@@ -368,7 +384,7 @@ impl Session {
             .send(text(&json!({ "op": 1, "d": identify })))
             .await
             .map_err(|e| ObsError::Closed(e.to_string()))?;
-        let identified = match next_json(&mut socket).await {
+        let identified = match handshake_json(&mut socket, &url).await {
             Ok(v) => v,
             Err(ObsError::Closed(_)) => return Err(ObsError::Auth),
             Err(e) => return Err(e),
@@ -380,6 +396,7 @@ impl Session {
             socket,
             events: VecDeque::new(),
             next_id: 1,
+            broken: None,
             version: Version {
                 obs_version: String::new(),
                 ws_version,
@@ -442,6 +459,14 @@ impl Session {
 
     /// Sends a request and waits for its answer, keeping any events that arrive meanwhile.
     pub async fn request(&mut self, kind: &str, data: Value) -> Result<Value, ObsError> {
+        let answer = self.answer(kind, data).await;
+        if let Err(ObsError::Closed(why)) = &answer {
+            self.broken = Some(why.clone());
+        }
+        answer
+    }
+
+    async fn answer(&mut self, kind: &str, data: Value) -> Result<Value, ObsError> {
         let id = format!("r{}", self.next_id);
         self.next_id += 1;
         self.socket
@@ -449,9 +474,11 @@ impl Session {
             .await
             .map_err(|e| ObsError::Closed(e.to_string()))?;
         loop {
-            let v = tokio::time::timeout(Duration::from_secs(10), next_json(&mut self.socket))
+            let v = tokio::time::timeout(ANSWER, next_json(&mut self.socket))
                 .await
-                .map_err(|_| ObsError::Closed("no answer in ten seconds".into()))??;
+                .map_err(|_| {
+                    ObsError::Closed(format!("no answer to {kind} in {} s", ANSWER.as_secs()))
+                })??;
             match v["op"].as_u64() {
                 Some(5) => {
                     if let Some(e) = Self::event_of(&v) {
@@ -854,10 +881,21 @@ pub async fn run(
                     .await;
                 let game = session.game_capture_target().await.unwrap_or(None);
                 let _ = tx.send(ObsEvent::Game { game }).await;
+                let quiet = tokio::time::sleep(QUIET);
+                tokio::pin!(quiet);
                 let reason = loop {
+                    if let Some(why) = session.broken.take() {
+                        break why;
+                    }
+                    quiet.as_mut().reset(tokio::time::Instant::now() + QUIET);
                     tokio::select! {
                         _ = cancel.cancelled() => return,
                         _ = closing(&mut ready) => break "reel asked OBS to close".to_string(),
+                        _ = &mut quiet => {
+                            if let Err(e) = session.request("GetVersion", json!({})).await {
+                                tracing::warn!(error = %e, "OBS did not answer on a quiet connection");
+                            }
+                        }
                         ev = session.next_event() => match ev {
                             Ok(ObsEvent::SceneChanged) => {
                                 let game = session.game_capture_target().await.unwrap_or(None);
@@ -1396,6 +1434,83 @@ mod tests {
         let (reply, got) = oneshot::channel();
         ctx.send(ObsCommand::RecordDirectory(reply)).await.unwrap();
         assert_eq!(got.await.unwrap().unwrap(), "C:/Clips");
+        cancel.cancel();
+        task.await.unwrap();
+    }
+
+    /// An OBS that takes connections and then freezes: with `hello` after its Hello and two
+    /// answers (GetVersion, the scene of the game capture); without, before its Hello.
+    async fn frozen_obs(hello: bool) -> u16 {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let port = listener.local_addr().unwrap().port();
+        tokio::spawn(async move {
+            let mut held = Vec::new();
+            while let Ok((stream, _)) = listener.accept().await {
+                let mut ws = tokio_tungstenite::accept_async(stream).await.unwrap();
+                if hello {
+                    ws.send(text(&json!({ "op": 0, "d": { "obsWebSocketVersion": "5.5.2", "rpcVersion": 1 } }))).await.unwrap();
+                    let _identify = ws.next().await;
+                    ws.send(text(
+                        &json!({ "op": 2, "d": { "negotiatedRpcVersion": 1 } }),
+                    ))
+                    .await
+                    .unwrap();
+                    for _ in 0..2 {
+                        let req: Value = serde_json::from_str(
+                            ws.next().await.unwrap().unwrap().to_text().unwrap(),
+                        )
+                        .unwrap();
+                        ws.send(text(&json!({ "op": 7, "d": { "requestType": req["d"]["requestType"], "requestId": req["d"]["requestId"], "requestStatus": { "result": true, "code": 100 }, "responseData": { "obsVersion": "33.0.1" } } }))).await.unwrap();
+                    }
+                }
+                held.push(ws);
+            }
+        });
+        port
+    }
+
+    #[tokio::test]
+    async fn an_obs_frozen_before_its_hello_is_not_waited_for_forever() {
+        let port = frozen_obs(false).await;
+        let cfg = ObsConfig {
+            host: "127.0.0.1".into(),
+            port,
+            password: String::new(),
+        };
+        let t = std::time::Instant::now();
+        match Session::connect(&cfg).await {
+            Err(ObsError::Connect(_, why)) => assert_eq!(why, "timed out in the handshake"),
+            other => panic!("not a handshake that timed out: {:?}", other.err()),
+        }
+        assert!(t.elapsed() < HANDSHAKE * 2);
+    }
+
+    #[tokio::test]
+    async fn a_connection_that_stops_answering_ends_and_says_why() {
+        let port = frozen_obs(true).await;
+        let cfg = ObsConfig {
+            host: "127.0.0.1".into(),
+            port,
+            password: String::new(),
+        };
+        let (tx, mut rx) = mpsc::channel(16);
+        let (_ctx, crx) = mpsc::channel(4);
+        let cancel = CancellationToken::new();
+        let task = tokio::spawn(run(cfg, tx, crx, cancel.clone(), None));
+        let mut seen = Vec::new();
+        let reason = loop {
+            match tokio::time::timeout(QUIET + ANSWER * 6, rx.recv()).await {
+                Ok(Some(ObsEvent::Disconnected { reason })) => break reason,
+                Ok(Some(e)) => seen.push(e),
+                other => panic!("the frozen connection did not end: {other:?}"),
+            }
+        };
+        assert!(matches!(seen[0], ObsEvent::Connected { .. }), "{seen:?}");
+        assert_eq!(
+            reason,
+            format!("no answer to GetVersion in {} s", ANSWER.as_secs()),
+            "the quiet connection's question"
+        );
         cancel.cancel();
         task.await.unwrap();
     }

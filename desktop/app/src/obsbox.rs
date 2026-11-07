@@ -80,6 +80,9 @@ const GRACE: Duration = Duration::from_secs(10);
 /// How long a started OBS may take to answer on its WebSocket before the app says so and
 /// shows OBS's windows: an OBS that stops on an error waits on a dialog the app hid.
 const SILENT: Duration = Duration::from_secs(15);
+/// How long an OBS that answered may stay away on its WebSocket before it is taken for gone
+/// (a crash dialog, a hang) and ended, to start again.
+const DROPPED: Duration = Duration::from_secs(if cfg!(test) { 2 } else { 20 });
 
 fn backoff(crashes: u32) -> Duration {
     Duration::from_secs(1u64 << crashes.saturating_sub(1).min(6)).min(Duration::from_secs(60))
@@ -490,9 +493,28 @@ async fn supervise(
         let mut restarting = false;
         let mut stopping = false;
         let mut asked: Option<Instant> = None;
+        let gone = tokio::time::sleep(DROPPED);
+        tokio::pin!(gone);
+        let mut dropped = false;
+        // Why the app ended this OBS itself, for the words after its exit.
+        let mut ended: Option<String> = None;
         loop {
             tokio::select! {
-                _ = &mut silence, if !answered && !silent && !stopping && !restarting => {
+                _ = &mut gone, if dropped && !stopping && !restarting => {
+                    let p = pid.load(Ordering::Relaxed);
+                    let theirs = line.lock().map(|l| l.shown && !shown_for_silence).unwrap_or(false);
+                    if theirs {
+                        gone.as_mut().reset(tokio::time::Instant::now() + DROPPED);
+                        set(&line, &*changed, "silent", "OBS's WebSocket does not answer; reel starts OBS again once its window is hidden".into());
+                    } else {
+                        dropped = false;
+                        let why = format!("OBS stopped answering for {} s, so reel ended it", DROPPED.as_secs());
+                        obs.log_what_obs_said(started_at, &format!("the bundled OBS (pid {p}) stopped answering on its WebSocket and is ended"));
+                        ended = Some(why);
+                        end(reach, p);
+                    }
+                }
+                _ = &mut silence, if !answered && !silent && !dropped && ended.is_none() && !stopping && !restarting => {
                     silent = true;
                     let p = pid.load(Ordering::Relaxed);
                     let words = not_answering(obs, p, started_at, reach);
@@ -511,6 +533,7 @@ async fn supervise(
                     let p = pid.swap(0, Ordering::Relaxed);
                     match asked {
                         Some(a) => tracing::info!(pid = p, code, after = %secs(a.elapsed()), "the bundled OBS exited, after it was asked to close"),
+                        None if ended.is_some() => tracing::info!(pid = p, code, "the bundled OBS exited, ended by the app"),
                         None => {
                             tracing::info!(pid = p, code, "the bundled OBS exited");
                             obs.log_what_obs_said(started_at, &format!("the bundled OBS exited by itself (exit code {code})"));
@@ -532,7 +555,8 @@ async fn supervise(
                         crashed(crashes);
                     }
                     let wait = backoff(crashes);
-                    set(&line, &*changed, "restarting", format!("OBS stopped (exit code {code}); starting it again in {} s", wait.as_secs()));
+                    let why = ended.take().unwrap_or_else(|| format!("OBS stopped (exit code {code})"));
+                    set(&line, &*changed, "restarting", format!("{why}; starting it again in {} s", wait.as_secs()));
                     tokio::select! {
                         _ = tokio::time::sleep(wait) => continue 'run,
                         cmd = rx.recv() => match cmd {
@@ -575,6 +599,10 @@ async fn supervise(
                         }
                         Some(Cmd::Answered(true)) => {
                             answered = true;
+                            if std::mem::take(&mut dropped) {
+                                tracing::info!("OBS's WebSocket answers again");
+                                set(&line, &*changed, "running", words.clone());
+                            }
                             // its main window is there by the first answer, and goes unless
                             // someone asked to see it
                             if reach != Reach::Tray && !hidden_once && !beside {
@@ -599,9 +627,13 @@ async fn supervise(
                             if let Some(a) = asked {
                                 tracing::info!(after = %secs(a.elapsed()), "OBS's WebSocket closed while it stops");
                             }
-                            if answered {
+                            // an OBS that answered and went away is gone unless it is back soon;
+                            // the silence is for a start that never answered
+                            if answered && !stopping && !restarting {
                                 answered = false;
-                                silence.as_mut().reset(tokio::time::Instant::now() + SILENT);
+                                dropped = true;
+                                gone.as_mut().reset(tokio::time::Instant::now() + DROPPED);
+                                tracing::warn!(after = %secs(started.elapsed()), "OBS's WebSocket went away; OBS is ended unless it answers again within {} s", DROPPED.as_secs());
                             }
                         }
                         Some(Cmd::Hold(r)) => {
@@ -673,6 +705,18 @@ fn not_answering(
         "; its windows are shown, and the app's log has the details"
     });
     words
+}
+
+/// Ends an OBS that does not answer: one with the highest rights through its task, as the
+/// app may not end it itself.
+fn end(reach: Reach, pid: u32) {
+    match reach {
+        Reach::Own => obsproc::kill(pid),
+        Reach::Task | Reach::Tray => {
+            obsproc::task_end();
+            obsproc::kill(pid);
+        }
+    }
 }
 
 fn show(reach: Reach, pid: u32, shown: bool) {
@@ -859,41 +903,111 @@ mod tests {
     use super::backoff;
     use std::time::Duration;
 
+    /// A stand-in OBS that writes "start" as it starts and "stop" when asked to close, with
+    /// what it wrote and a wait for it.
     #[cfg(target_os = "linux")]
-    #[test]
-    fn a_held_obs_stays_stopped_until_released_then_starts_once() {
-        use reel_desktop_core::bundled::{Bundled, ObsSetup};
-        use std::os::unix::fs::PermissionsExt;
-        let dir = tempfile::tempdir().unwrap();
-        let log = dir.path().join("log");
-        let exe = dir.path().join("standin-obs");
-        std::fs::write(
-            &exe,
-            format!(
-                "#!/bin/sh\necho start >> {0}\ntrap 'echo stop >> {0}; exit 0' TERM\nwhile :; do sleep 0.1; done\n",
-                log.display()
-            ),
-        )
-        .unwrap();
-        std::fs::set_permissions(&exe, std::fs::Permissions::from_mode(0o755)).unwrap();
-        let said = || std::fs::read_to_string(&log).unwrap_or_default();
-        let wait_for = |want: &str| {
+    struct Standin {
+        dir: tempfile::TempDir,
+        exe: std::path::PathBuf,
+        log: std::path::PathBuf,
+    }
+
+    #[cfg(target_os = "linux")]
+    impl Standin {
+        fn new() -> Standin {
+            use std::os::unix::fs::PermissionsExt;
+            let dir = tempfile::tempdir().unwrap();
+            let log = dir.path().join("log");
+            let exe = dir.path().join("standin-obs");
+            std::fs::write(
+                &exe,
+                format!(
+                    "#!/bin/sh\necho start >> {0}\ntrap 'echo stop >> {0}; exit 0' TERM\nwhile :; do sleep 0.1; done\n",
+                    log.display()
+                ),
+            )
+            .unwrap();
+            std::fs::set_permissions(&exe, std::fs::Permissions::from_mode(0o755)).unwrap();
+            Standin { dir, exe, log }
+        }
+
+        fn said(&self) -> String {
+            std::fs::read_to_string(&self.log).unwrap_or_default()
+        }
+
+        fn wait_for(&self, want: &str) {
             for _ in 0..100 {
-                if said() == want {
+                if self.said() == want {
                     return;
                 }
                 std::thread::sleep(Duration::from_millis(100));
             }
-            panic!("the stand-in said {:?}, not {want:?}", said());
-        };
-        let bx = super::ObsBox::start(
-            (Bundled::linux(exe, dir.path()), None),
-            ObsSetup::default(),
-            dir.path().join("clips"),
-            "F9".into(),
-            || {},
-            |_| {},
+            panic!("the stand-in said {:?}, not {want:?}", self.said());
+        }
+
+        fn start(&self, setup: reel_desktop_core::bundled::ObsSetup) -> super::ObsBox {
+            super::ObsBox::start(
+                (
+                    reel_desktop_core::bundled::Bundled::linux(self.exe.clone(), self.dir.path()),
+                    None,
+                ),
+                setup,
+                self.dir.path().join("clips"),
+                "F9".into(),
+                || {},
+                |_| {},
+            )
+        }
+    }
+
+    /// The box's line once it is in `state`.
+    #[cfg(target_os = "linux")]
+    fn line_in(bx: &super::ObsBox, state: &str) -> super::BoxLine {
+        for _ in 0..200 {
+            let l = bx.line();
+            if l.state == state {
+                return l;
+            }
+            std::thread::sleep(Duration::from_millis(50));
+        }
+        panic!("the line is {:?}, not in {state}", bx.line());
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn an_obs_whose_websocket_goes_away_is_ended_and_started_again() {
+        let st = Standin::new();
+        let bx = st.start(Default::default());
+        st.wait_for("start\n");
+        bx.answered(true);
+        bx.answered(false);
+        let l = line_in(&bx, "restarting");
+        assert!(
+            l.line.starts_with(
+                "OBS stopped answering for 2 s, so reel ended it; starting it again in "
+            ),
+            "{}",
+            l.line
         );
+        st.wait_for("start\nstart\n");
+        bx.answered(true);
+        bx.answered(false);
+        bx.answered(true);
+        std::thread::sleep(super::DROPPED + Duration::from_secs(1));
+        assert_eq!(st.said(), "start\nstart\n", "back in time: left running");
+        assert_eq!(bx.line().state, "running");
+        bx.stop();
+        st.wait_for("start\nstart\nstop\n");
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn a_held_obs_stays_stopped_until_released_then_starts_once() {
+        use reel_desktop_core::bundled::ObsSetup;
+        let st = Standin::new();
+        let (said, wait_for) = (|| st.said(), |w: &str| st.wait_for(w));
+        let clips = st.dir.path().join("clips");
+        let bx = st.start(ObsSetup::default());
         wait_for("start\n");
         let held = bx.hold();
         assert_eq!(said(), "start\nstop\n", "out before the hold returns");
@@ -902,7 +1016,7 @@ mod tests {
                 clip_seconds: 45,
                 ..ObsSetup::default()
             },
-            dir.path().join("clips"),
+            clips,
             "F9".into(),
             None,
         );
