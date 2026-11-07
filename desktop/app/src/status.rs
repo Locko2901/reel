@@ -102,6 +102,8 @@ pub struct Status {
     /// Linux: the bundled OBS is the installed one; the screen comes through PipeWire on
     /// Wayland, through X11 otherwise.
     pub obs_linux: bool,
+    /// Each encoder's last test on this PC: Settings offers only those that recorded in OBS.
+    pub obs_encoders: Vec<reel_desktop_core::encoders::Verdict>,
     pub wayland: bool,
     pub linux: bool,
     /// Linux, once reel's OBS answered: whether it has the PipeWire audio capture plugin

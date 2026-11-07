@@ -132,7 +132,7 @@ async function renderQuality() {
 }
 
 // The encoder test as the page sees it: its run, when it asked, which row is in test since when.
-const encTest = { run: 0, testing: null, since: 0, done: 0, total: 0, took: null, tick: null };
+const encTest = { run: 0, testing: null, since: 0, done: 0, total: 0, phase: 'ffmpeg', took: null, tick: null };
 const encRunning = () => encTest.run !== 0 && encTest.took == null;
 const firstOk = () => (encoders.find((e) => e.ok) || {}).id || 'obs_x264';
 
@@ -143,14 +143,23 @@ function encoderCell(e, open) {
   if (e.state === 'waiting') {
     st.className = 'st-neutral';
     st.textContent = 'waiting';
-  } else if (e.state === 'testing') {
+  } else if (e.state === 'testing' || e.state === 'in_obs') {
     st.className = 'st-active';
-    st.textContent = 'testing';
+    st.textContent = e.state === 'testing' ? 'testing' : 'trying in OBS';
     why.textContent = ` ${Math.floor((Date.now() - encTest.since) / 1000)} s so far`;
   } else if (e.state === 'works') {
     st.className = 'st-ok';
     st.textContent = 'works';
-    why.textContent = ` ${e.line}${e.ms != null ? ` in ${(e.ms / 1000).toFixed(1)} s` : ''}`;
+    const took = [[e.ms, 'test encode'], [e.obs_ms, 'OBS']].filter(([n]) => n != null).map(([n, w]) => `${w} ${(n / 1000).toFixed(1)} s`);
+    why.textContent = ` ${e.line}${took.length ? ` (${took.join(', ')})` : ''}`;
+  } else if (e.state === 'refused' && e.untried) {
+    st.className = 'st-neutral';
+    st.textContent = 'not tried in OBS';
+    why.textContent = ` ${e.line.replace(/^not tried in OBS: /, '')}; Test again tries it`;
+  } else if (e.state === 'refused') {
+    st.className = 'st-warn';
+    st.textContent = 'OBS cannot use it';
+    why.textContent = ` ${e.line}`;
   } else if (e.state === 'no_answer') {
     st.className = 'st-warn';
     st.textContent = e.line;
@@ -182,8 +191,8 @@ function renderEncodersLine() {
   const running = encRunning() && encTest.total;
   const words = !encRunning()
     ? (encTest.took == null ? '' : `tested in ${encTest.took.toFixed(1)} s`)
-    : (running ? `testing ${Math.min(encTest.done + 1, encTest.total)} of ${encTest.total}` : 'starting the test');
-  const key = `${words}/${encTest.done}`;
+    : (running ? `${encTest.phase === 'obs' ? 'trying' : 'testing'} ${Math.min(encTest.done + 1, encTest.total)} of ${encTest.total}${encTest.phase === 'obs' ? ' in OBS' : ''}` : 'starting the test');
+  const key = `${words}/${encTest.phase}/${encTest.done}`;
   if (line.dataset.key === key) return;
   line.dataset.key = key;
   line.replaceChildren();
@@ -244,7 +253,9 @@ function renderEncoders() {
 // Each row's change as the app sends it; one of an older run, or after the answer, is dropped.
 function encoderEvent(p) {
   if (!p || p.run !== encTest.run || !encRunning()) return;
-  const testing = (p.rows.find((e) => e.state === 'testing') || {}).id || null;
+  const testing = (p.rows.find((e) => e.state === 'testing' || e.state === 'in_obs') || {}).id || null;
+  if (p.phase !== encTest.phase) encTest.testing = null;
+  encTest.phase = p.phase;
   if (testing !== encTest.testing) {
     encTest.testing = testing;
     encTest.since = Date.now();
@@ -257,7 +268,7 @@ function encoderEvent(p) {
 
 async function testEncoders() {
   const run = Date.now();
-  Object.assign(encTest, { run, testing: null, since: run, done: 0, total: 0, took: null });
+  Object.assign(encTest, { run, testing: null, since: run, done: 0, total: 0, phase: 'ffmpeg', took: null });
   encoders = null;
   clearInterval(encTest.tick);
   encTest.tick = setInterval(() => { if (step === 'encoder') renderEncoders(); }, 1000);
@@ -559,6 +570,8 @@ function go(id) {
   $('#finish-err').hidden = true;
   devicesTried = 0;
   renderSteps();
+  // A test that ran before reel's OBS did could not try the encoders in it.
+  if (id === 'encoder' && encoders && !encRunning() && encoders.some((e) => e.untried)) testEncoders();
   if (RENDER[id]) RENDER[id]();
   window.scrollTo(0, 0);
   if (location.hash !== `#${id}`) history.replaceState(null, '', `#${id}`);

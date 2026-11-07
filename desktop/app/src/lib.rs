@@ -1,6 +1,7 @@
 //! The Tauri shell: tray, window, plugins and hotkeys; the logic lives in reel-desktop-core.
 mod commands;
 mod downloads;
+mod encoders;
 mod hotkey;
 mod library;
 #[cfg(target_os = "linux")]

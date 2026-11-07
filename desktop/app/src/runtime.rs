@@ -161,6 +161,11 @@ pub struct Inner {
     pub portal_cancel: Option<CancellationToken>,
     /// Linux: what to know when the desktop shows no tray; empty when it shows one.
     pub tray_line: String,
+    /// Each encoder's last test on this PC.
+    pub encoders: reel_desktop_core::encoders::Known,
+    /// The setup tries this encoder in OBS: OBS runs with it for the try alone.
+    pub encoder_trial: Option<String>,
+    pub obs_seen: watch::Sender<crate::encoders::Seen>,
 }
 
 /// What went wrong with the server, in words and in code, and when the next try is.
@@ -442,8 +447,12 @@ impl Runtime {
             obs_without_rights: false,
             copy_told: Default::default(),
             copy_updating: false,
+            encoders: reel_desktop_core::encoders::Known::default(),
+            encoder_trial: None,
+            obs_seen: watch::Sender::new(Default::default()),
         };
         let mut inner = inner;
+        inner.encoders = reel_desktop_core::encoders::Known::load(&inner.paths.encoders_file());
         if inner
             .bundled
             .as_ref()
@@ -806,6 +815,7 @@ impl Runtime {
                 .bundled
                 .as_ref()
                 .is_some_and(|b| b.platform == reel_desktop_core::bundled::Platform::Linux),
+            obs_encoders: g.encoders.tested.clone(),
             #[cfg(target_os = "linux")]
             wayland: crate::linux::session() == crate::linux::Session::Wayland,
             #[cfg(not(target_os = "linux"))]
@@ -1067,6 +1077,15 @@ impl Runtime {
         let base = base.unwrap_or_else(|| self.settings());
         // the library folder changes by a move alone
         new.standalone.library_dir = base.standalone.library_dir.clone();
+        let enc = new.obs.setup.encoder_id();
+        if new.obs.bundled && enc != base.obs.setup.encoder_id() {
+            if let Err(why) = self.lock().encoders.selectable(enc) {
+                return Err(format!(
+                    "{} cannot be chosen: {why}",
+                    reel_desktop_core::obs::encoder_word(enc)
+                ));
+            }
+        }
         let changes = reel_desktop_core::lane::Changes::between(&base, &new);
         let lane = self.lane.clone();
         tokio::task::block_in_place(|| lane.ask(reel_desktop_core::lane::Ask::Save(changes)))
@@ -1524,6 +1543,23 @@ impl Runtime {
             .obs_box
             .as_ref()
             .is_some_and(|b| b.line().without_rights)
+    }
+
+    /// The OBS that runs as reel's, whose folder has its logs: the copy in Program Files while
+    /// it runs games as administrator, else the one that came with the app.
+    pub(crate) fn running_obs(&self) -> Option<reel_desktop_core::bundled::Bundled> {
+        let (b, copy, elevated) = {
+            let g = self.lock();
+            (
+                g.bundled.clone(),
+                g.copy.clone(),
+                g.settings.obs.setup.elevated,
+            )
+        };
+        match copy {
+            Some(c) if elevated && c.exe.is_file() && !self.obs_runs_without_rights() => Some(c),
+            _ => b,
+        }
     }
 
     /// The app came with OBS, and the setup chose that OBS.
@@ -1986,7 +2022,9 @@ impl Runtime {
         };
         // An OBS about to start again with a change of reel's still has the old value, and one
         // a step in Program Files stops is not read.
-        let Some(b) = b.filter(|_| s.obs.bundled && !restarting && self.lane.idle()) else {
+        let trying = self.lock().encoder_trial.is_some();
+        let Some(b) = b.filter(|_| s.obs.bundled && !restarting && !trying && self.lane.idle())
+        else {
             return Vec::new();
         };
         let obs = match copy {
@@ -2098,6 +2136,15 @@ impl Runtime {
             );
         }
         self.push_status();
+    }
+
+    /// What the app knows of the encoders, changed and kept on disk.
+    pub(crate) fn keep_known(&self, change: impl FnOnce(&mut reel_desktop_core::encoders::Known)) {
+        let mut g = self.lock();
+        change(&mut g.encoders);
+        if let Err(e) = g.encoders.save(&g.paths.encoders_file()) {
+            tracing::warn!(error = %e, "what the app knows of the encoders was not saved");
+        }
     }
 
     /// An OBS with the highest rights is ended by its task without saving, so the volumes and
@@ -2281,6 +2328,11 @@ impl Runtime {
                             line: format!("OBS {obs_version}, websocket {ws_version}"),
                         };
                         tracing::info!(obs_version, ws_version, "obs connected");
+                        rt.lock().obs_seen.send_modify(|s| {
+                            s.gen += 1;
+                            s.connected = true;
+                            s.active = false;
+                        });
                         if bundled {
                             if let Some(bx) = rt.lock().obs_box.clone() {
                                 bx.answered(true);
@@ -2298,6 +2350,10 @@ impl Runtime {
                             };
                             g.obs_state = None;
                             g.obs_game = None;
+                            g.obs_seen.send_modify(|s| {
+                                s.connected = false;
+                                s.active = false;
+                            });
                             if bundled {
                                 if let Some(bx) = g.obs_box.clone() {
                                     bx.answered(false);
@@ -2323,6 +2379,7 @@ impl Runtime {
                             }
                             g.obs_state.clone()
                         };
+                        rt.buffer_seen(active);
                         tracing::info!(active, "obs replay buffer");
                         rt.push_status();
                         if let Some(st) = st.filter(|_| active && rt.lock().recording_paused) {
@@ -2462,6 +2519,7 @@ impl Runtime {
     }
 
     fn after_obs_state(&self, st: &ObsState) {
+        self.buffer_seen(st.replay_active);
         let follow = {
             let mut g = self.lock();
             g.obs_state = Some(st.clone());
@@ -2491,9 +2549,17 @@ impl Runtime {
         Ok(lines)
     }
 
+    /// The replay buffer runs or not.
+    fn buffer_seen(&self, active: bool) {
+        self.lock().obs_seen.send_modify(|s| s.active = active);
+    }
+
     /// The replay buffer as Pause recording and the setting "start the replay buffer" want it:
     /// stopped while recording is paused, else started when it is off and OBS is not recording.
     pub async fn ensure_replay_buffer(&self, st: &ObsState) {
+        if self.lock().encoder_trial.is_some() {
+            return;
+        }
         let paused = self.lock().recording_paused;
         match crate::status::buffer_step(paused, self.settings().obs.start_replay, st) {
             BufferStep::Start => self.start_replay_buffer(st).await,

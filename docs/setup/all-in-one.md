@@ -74,11 +74,16 @@ error appears.
     ![Quality](img/app-setup-2-quality.png)
 
 3. **Encoder**: reel tests each encoder this PC has with a short encode, the graphics card's first,
-   and picks the first that works. NVIDIA NVENC, AMD AMF and Intel Quick Sync leave the game more
-   room than the CPU. Each row shows where its test is (waiting, testing, works, not here) as the
-   test goes. **not here** says why in plain words, such as "no NVIDIA graphics card here", with
-   ffmpeg's own lines under **details**; a driver that does not answer within 10 seconds is
-   stopped and its row says so. **Test again** runs the test once more.
+   then tries each one that passed in OBS itself, and picks the first OBS records with. NVIDIA
+   NVENC, AMD AMF and Intel Quick Sync leave the game more room than the CPU. Each row shows where
+   its test is (waiting, testing, trying in OBS, works, not here) as the test goes. **not here**
+   says why in plain words, such as "no NVIDIA graphics card here", with ffmpeg's own lines under
+   **details**; a driver that does not answer within 10 seconds is stopped and its row says so.
+   For the try in OBS, OBS starts again with the encoder, a few seconds each, and its replay
+   buffer has to run with it. **OBS cannot use it** means OBS does not have that encoder or could
+   not start it, with OBS's own lines under **details**. Only an encoder that works in both can
+   be picked, here and later under Settings, OBS, where the others are listed with the reason.
+   **Test again** runs the test once more.
 
     ![Encoder, after the test](img/app-setup-3-encoder.png)
 

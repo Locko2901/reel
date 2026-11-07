@@ -1,5 +1,6 @@
-//! Which encoders the bundled OBS can use on this PC, by a short test encode with the bundled
-//! ffmpeg. H.264 throughout, so reel keeps the clips untouched.
+//! Which encoders the bundled OBS can use on this PC: a short test encode with the bundled
+//! ffmpeg, then a start of OBS's replay buffer with each one that passed. H.264 throughout, so
+//! reel keeps the clips untouched.
 use reel_desktop_core::adapters;
 use reel_media::HwBackend;
 use serde::Serialize;
@@ -18,9 +19,13 @@ pub const LIMIT: Duration = Duration::from_secs(10);
 pub enum State {
     Waiting,
     Testing,
+    /// ffmpeg's test passed; OBS starts with it.
+    InObs,
     Works,
     NotHere,
     NoAnswer,
+    /// ffmpeg's test passed, but OBS could not record with it.
+    Refused,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -32,9 +37,13 @@ pub struct EncoderTest {
     pub ok: bool,
     /// What the test found, in words.
     pub line: String,
-    /// ffmpeg's own lines, behind the row's details.
+    /// ffmpeg's or OBS's own lines, behind the row's details.
     pub details: String,
     pub ms: Option<u64>,
+    /// How long OBS took to start and run its replay buffer with it.
+    pub obs_ms: Option<u64>,
+    /// Passed the test encode, but OBS was not there to try it: the page tests again once it is.
+    pub untried: bool,
 }
 
 /// The test so far, sent to the page each time a row changes.
@@ -45,6 +54,8 @@ pub struct Progress {
     pub done: usize,
     pub total: usize,
     pub finished: bool,
+    /// "ffmpeg" while the test encodes run, "obs" while OBS tries the ones that passed.
+    pub phase: &'static str,
 }
 
 /// An encoder the setup tests: the ffmpeg backend of its test, OBS's id, its name, the test's
@@ -264,6 +275,8 @@ fn row(gpu: &Gpu) -> EncoderTest {
         line: String::new(),
         details: String::new(),
         ms: None,
+        obs_ms: None,
+        untried: false,
     }
 }
 
@@ -276,6 +289,8 @@ fn x264() -> EncoderTest {
         line: "always there; the GPU's encoders leave the game more room".into(),
         details: String::new(),
         ms: None,
+        obs_ms: None,
+        untried: false,
     }
 }
 
@@ -306,6 +321,7 @@ pub async fn run_tests(plan: Plan<'_>, mut sent: impl FnMut(&Progress)) -> Vec<E
             done,
             total,
             finished,
+            phase: "ffmpeg",
         })
     };
     tell(&rows, 0, false);
@@ -361,15 +377,91 @@ pub async fn run_tests(plan: Plan<'_>, mut sent: impl FnMut(&Progress)) -> Vec<E
     rows
 }
 
+/// Each encoder ffmpeg's test passed, tried in OBS itself one after another: one OBS cannot
+/// record with is refused with OBS's reason. OBS runs with the saved setup again after.
+async fn in_obs(
+    rt: Option<&crate::runtime::Runtime>,
+    run: u64,
+    mut rows: Vec<EncoderTest>,
+    mut sent: impl FnMut(&Progress),
+) -> Vec<EncoderTest> {
+    let tried: Vec<usize> = (0..rows.len())
+        .filter(|&i| rows[i].ok && rows[i].id != "obs_x264")
+        .collect();
+    if tried.is_empty() {
+        return rows;
+    }
+    let started = Instant::now();
+    let total = tried.len();
+    let mut tell = |rows: &[EncoderTest], done: usize, finished: bool| {
+        sent(&Progress {
+            run,
+            rows: rows.to_vec(),
+            done,
+            total,
+            finished,
+            phase: "obs",
+        })
+    };
+    let trial = rt.and_then(crate::encoders::Trial::begin);
+    for (n, &i) in tried.iter().enumerate() {
+        rows[i].state = State::InObs;
+        rows[i].ok = false;
+        tell(&rows, n, false);
+        let t = Instant::now();
+        let got = match &trial {
+            Some(tr) => crate::encoders::try_in_obs(tr, &rows[i].id, &rows[i].word).await,
+            None => Err(crate::encoders::untried(
+                "not tried in OBS: the app does not run its own OBS",
+            )),
+        };
+        let r = &mut rows[i];
+        r.obs_ms = Some(ms(t.elapsed()));
+        match got {
+            Ok(_) => {
+                r.state = State::Works;
+                r.ok = true;
+                r.line = "a test encode worked, and OBS recorded with it".into();
+            }
+            Err(why) => {
+                r.state = State::Refused;
+                r.line = why.line;
+                r.details = why.details;
+                r.untried = why.untried;
+            }
+        }
+        tracing::info!(
+            encoder = %r.id,
+            ok = r.ok,
+            ms = r.obs_ms,
+            line = %r.line,
+            obs = %r.details.lines().collect::<Vec<_>>().join(" | "),
+            "setup: encoder tried in OBS"
+        );
+        tell(&rows, n + 1, false);
+    }
+    if let Some(tr) = trial {
+        tr.finish().await;
+    }
+    tracing::info!(
+        run,
+        ms = ms(started.elapsed()),
+        "setup: the encoders tried in OBS, and OBS back on the saved setup"
+    );
+    tell(&rows, total, true);
+    rows
+}
+
 /// The last run, stopped when another starts (the setup page opened again).
 static CURRENT: Mutex<Option<CancellationToken>> = Mutex::new(None);
 
 /// The setup's encoder test with the bundled ffmpeg. `asked` is when the page asked, in ms
 /// since 1970, so the log shows how long the request took to reach the app.
 pub async fn test_encoders(
+    rt: Option<crate::runtime::Runtime>,
     run: u64,
     asked: Option<u64>,
-    sent: impl FnMut(&Progress),
+    mut sent: impl FnMut(&Progress),
 ) -> Vec<EncoderTest> {
     let now = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -404,8 +496,17 @@ pub async fn test_encoders(
         limit: LIMIT,
         run,
     };
+    let work = async {
+        let rows = run_tests(plan, &mut sent).await;
+        let rows = in_obs(rt.as_ref(), run, rows, &mut sent).await;
+        if let Some(rt) = &rt {
+            crate::encoders::keep_verdicts(rt, &rows);
+            rt.push_status();
+        }
+        rows
+    };
     tokio::select! {
-        rows = run_tests(plan, sent) => rows,
+        rows = work => rows,
         _ = cancel.cancelled() => {
             tracing::info!(run, "setup: encoder test stopped, another started");
             Vec::new()
@@ -658,5 +759,42 @@ esac"#,
         assert_eq!(rows[0].state, State::NotHere);
         assert_eq!(rows[0].line, "no NVIDIA graphics card here");
         assert!(!ran.exists(), "ffmpeg was asked to encode");
+    }
+
+    #[tokio::test]
+    async fn without_reels_own_obs_a_passed_encoder_is_not_offered() {
+        let gpu = GPU[0];
+        let passed = EncoderTest {
+            state: State::Works,
+            ok: true,
+            line: "a test encode worked".into(),
+            ..row(&gpu)
+        };
+        let mut seen = Vec::new();
+        let rows = in_obs(None, 7, vec![passed, x264()], |p| seen.push(p.clone())).await;
+        assert_eq!(
+            (rows[0].state, rows[0].ok, rows[0].line.as_str()),
+            (
+                State::Refused,
+                false,
+                "not tried in OBS: the app does not run its own OBS"
+            )
+        );
+        assert!(rows[0].untried, "the page tests again once reel's OBS runs");
+        assert!(rows[1].ok, "x264 needs no try");
+        let states: Vec<(State, &str, usize, bool)> = seen
+            .iter()
+            .map(|p| (p.rows[0].state, p.phase, p.done, p.finished))
+            .collect();
+        assert_eq!(
+            states,
+            [
+                (State::InObs, "obs", 0, false),
+                (State::Refused, "obs", 1, false),
+                (State::Refused, "obs", 1, true)
+            ]
+        );
+        let none = in_obs(None, 8, vec![x264()], |_| panic!("nothing to try")).await;
+        assert_eq!(none.len(), 1);
     }
 }
