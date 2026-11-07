@@ -305,6 +305,17 @@ pub fn save_actions(
 
 pub const RECORDING_PAUSED: &str = "recording is paused";
 
+/// The app's state and its word while reel's own OBS is in trouble, by the OBS's state.
+pub fn obs_trouble(box_state: &str) -> Option<(&'static str, &'static str)> {
+    Some(match box_state {
+        "gave_up" => ("error", "OBS stopped"),
+        "restarting" => ("error", "OBS restarting"),
+        "silent" => ("error", "OBS does not answer"),
+        "failed" => ("error", "OBS did not start"),
+        _ => return None,
+    })
+}
+
 /// What the app does with OBS's replay buffer, once it knows its state.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BufferStep {
@@ -512,6 +523,14 @@ mod tests {
             save.why, "recording is paused",
             "before what else is missing"
         );
+    }
+
+    #[test]
+    fn an_obs_in_trouble_comes_first_in_the_state_line() {
+        assert_eq!(obs_trouble("gave_up"), Some(("error", "OBS stopped")));
+        assert_eq!(obs_trouble("restarting"), Some(("error", "OBS restarting")));
+        assert_eq!(obs_trouble("running"), None);
+        assert_eq!(obs_trouble("starting"), None);
     }
 
     #[test]

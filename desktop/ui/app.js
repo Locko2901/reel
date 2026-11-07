@@ -512,6 +512,7 @@ function renderBundled() {
       : 'obs-vkcapture\'s capture of a Vulkan or OpenGL game started with obs-gamecapture, over the screen';
     $('#elevated-app-row').hidden = true;
   }
+  $('#bundled-again').hidden = !inUse || box.state !== 'gave_up';
   const show = $('#bundled-show');
   show.hidden = !inUse || !box.can_show || lin;
   show.disabled = !box || !['running', 'silent'].includes(box.state);
@@ -768,6 +769,10 @@ function bindButtons() {
   };
   $('#bundled-show').onclick = async () => {
     try { status = await invoke('obs_show', { shown: true }); renderStatus(); }
+    catch (e) { toast(String(e.message || e), 'err'); }
+  };
+  $('#bundled-again').onclick = async () => {
+    try { status = await invoke('obs_again'); renderStatus(); }
     catch (e) { toast(String(e.message || e), 'err'); }
   };
   bindObsBar((r) => doneInObs(r, false));

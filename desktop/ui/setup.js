@@ -466,7 +466,7 @@ function renderObsNotice() {
   const connected = !!(status && status.obs && status.obs.connected);
   if (!settings || !settings.obs.bundled || !box || connected) { unanswered = null; n.hidden = true; return; }
   if (unanswered == null) unanswered = Date.now();
-  const wrong = ['silent', 'failed', 'restarting', 'waiting'].includes(box.state);
+  const wrong = ['silent', 'failed', 'restarting', 'waiting', 'gave_up'].includes(box.state);
   const secs = Math.round((Date.now() - unanswered) / 1000);
   if (!wrong && secs < 5) { n.hidden = true; return; }
   $('#obs-notice-line').textContent = wrong ? `OBS: ${box.line}` : `OBS started and has not answered yet (${secs} s)`;

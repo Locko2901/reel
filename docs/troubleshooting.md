@@ -107,9 +107,12 @@ PC's own crashes, in its Reliability Monitor.
    time it happened and the app's log of that day with your report.
 
 The app starts its own OBS again by itself after a crash, a little later
-each time. After the third crash in a row it tells you in a
-notification: "The OBS that came with reel stopped 3 times in a row;
-reel starts it again each time. Settings, Log has the details."
+each time; an OBS that stops answering for 20 seconds is ended first.
+After five stops in a row it stops trying and tells you in a
+notification: "The OBS that came with reel stopped 5 times in a row, so
+reel stopped starting it. Start OBS again is in the tray; Settings, Log
+has what OBS said." The app's log then holds the end of OBS's own log and
+the start of its crash report, so the log you send names the cause.
 
 ## Pairing
 
@@ -361,7 +364,9 @@ about WebVTT is about subtitles, and reel's clips have none.
 
 **reel's own OBS keeps stopping.** Settings, **OBS** shows its line
 ("OBS stopped (exit code 1); starting it again in ..."), and after the
-third stop in a row a notification says so. OBS's own log is in reel's
+fifth stop in a row the app stops starting it and a notification says
+so; **Start OBS again** in the tray tries once more. The app's log has
+the end of OBS's own log for each stop. OBS's own log is in reel's
 copy of its settings: `~/.local/share/reel/obs/obs-studio/logs`, or for
 OBS from Flathub `~/.var/app/com.obsproject.Studio/reel/obs-studio/logs`.
 Start your own OBS once to see whether it starts at all. To leave reel's

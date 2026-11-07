@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-obs-again"
+description = "Enables the obs_again command without any pre-configured scope."
+commands.allow = ["obs_again"]
+
+[[permission]]
+identifier = "deny-obs-again"
+description = "Denies the obs_again command without any pre-configured scope."
+commands.deny = ["obs_again"]
