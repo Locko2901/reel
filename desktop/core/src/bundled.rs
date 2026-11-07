@@ -15,6 +15,8 @@ const ENCODER: &str = "obs-studio/basic/profiles/reel/recordEncoder.json";
 const SCENES: &str = "obs-studio/basic/scenes/reel.json";
 const WEBSOCKET: &str = "obs-studio/plugin_config/obs-websocket/config.json";
 const PINNED: &str = include_str!("../../obs/pinned.json");
+/// How much of OBS's own log goes into the app's log when OBS exits or does not answer.
+pub const OBS_LOG_LINES: usize = 30;
 
 /// The pinned OBS: its version and where its source is, for the GPL's naming.
 #[derive(Debug, Clone, Deserialize)]
@@ -1249,13 +1251,7 @@ impl Bundled {
         since: std::time::SystemTime,
         lines: usize,
     ) -> Option<(PathBuf, Vec<String>)> {
-        let newest = std::fs::read_dir(self.obs_dir().join("logs"))
-            .ok()?
-            .flatten()
-            .filter_map(|e| Some((e.metadata().ok()?.modified().ok()?, e.path())))
-            .filter(|(t, p)| *t >= since && p.extension().map(|x| x == "txt").unwrap_or(false))
-            .max_by_key(|(t, _)| *t)?
-            .1;
+        let newest = newest_txt(&self.logs_dir(), since)?;
         let text = String::from_utf8_lossy(&std::fs::read(&newest).ok()?).to_string();
         let all: Vec<&str> = text.lines().collect();
         let tail = all[all.len().saturating_sub(lines)..]
@@ -1263,6 +1259,44 @@ impl Bundled {
             .map(|l| l.to_string())
             .collect();
         Some((newest, tail))
+    }
+
+    /// The first lines of the crash report OBS wrote since `since`, with its path.
+    pub fn crash_report(
+        &self,
+        since: std::time::SystemTime,
+        lines: usize,
+    ) -> Option<(PathBuf, Vec<String>)> {
+        let newest = newest_txt(&self.obs_dir().join("crashes"), since)?;
+        let text = String::from_utf8_lossy(&std::fs::read(&newest).ok()?).to_string();
+        let head = text
+            .lines()
+            .filter(|l| !l.trim().is_empty())
+            .take(lines)
+            .map(str::to_string)
+            .collect();
+        Some((newest, head))
+    }
+
+    /// Puts what OBS wrote of a run started at `since` into the app's log after `what` (OBS
+    /// exited, a save failed): the end of its newest log and the head of a crash report, as
+    /// the user may not reach OBS's folder and a log they send should name the cause.
+    pub fn log_what_obs_said(&self, since: std::time::SystemTime, what: &str) {
+        match self.log_tail(since, OBS_LOG_LINES) {
+            Some((path, lines)) => tracing::warn!(
+                log = %path.display(),
+                "{what}; the end of OBS's own log:\n{}",
+                lines.join("\n")
+            ),
+            None => tracing::warn!("{what}; OBS wrote no log of this run"),
+        }
+        if let Some((path, lines)) = self.crash_report(since, 12) {
+            tracing::warn!(
+                report = %path.display(),
+                "OBS wrote a crash report:\n{}",
+                lines.join("\n")
+            );
+        }
     }
 
     /// OBS leaves a file per run in .sentinel and removes it on a clean exit; one left over
@@ -1277,6 +1311,17 @@ impl Bundled {
             }
         }
     }
+}
+
+/// The newest .txt in `dir` written since `since`: OBS names its logs and crash reports by date.
+fn newest_txt(dir: &Path, since: std::time::SystemTime) -> Option<PathBuf> {
+    std::fs::read_dir(dir)
+        .ok()?
+        .flatten()
+        .filter_map(|e| Some((e.metadata().ok()?.modified().ok()?, e.path())))
+        .filter(|(t, p)| *t >= since && p.extension().is_some_and(|x| x == "txt"))
+        .max_by_key(|(t, _)| *t)
+        .map(|(_, p)| p)
 }
 
 /// Keeps PipeWire's restore token in a collection written whole, or the desktop asks for the
@@ -2873,5 +2918,44 @@ mod tests {
         );
         assert!(b.args(true).contains(&"--minimize-to-tray".to_string()));
         assert_eq!(api_version("32.2.2"), 537001986);
+    }
+
+    #[test]
+    fn what_obs_wrote_of_a_run_is_its_newest_logs_end_and_its_crash_reports_head() {
+        use std::time::{Duration, SystemTime};
+        let dir = tempfile::tempdir().unwrap();
+        let b = Bundled::linux(dir.path().join("obs"), dir.path());
+        let crashes = b.obs_dir().join("crashes");
+        std::fs::create_dir_all(b.logs_dir()).unwrap();
+        std::fs::create_dir_all(&crashes).unwrap();
+        let start = SystemTime::now() - Duration::from_secs(60);
+        let before = b.logs_dir().join("2026-11-06 09-00-00.txt");
+        std::fs::write(&before, "an earlier run\n").unwrap();
+        std::fs::File::options()
+            .write(true)
+            .open(&before)
+            .unwrap()
+            .set_modified(start - Duration::from_secs(3600))
+            .unwrap();
+        assert_eq!(b.log_tail(start, 30), None, "no log of this run");
+        let lines: String = (1..=40).map(|i| format!("line {i}\n")).collect();
+        std::fs::write(b.logs_dir().join("2026-11-07 10-00-00.txt"), lines).unwrap();
+        let (path, tail) = b.log_tail(start, 30).unwrap();
+        assert!(path.ends_with("2026-11-07 10-00-00.txt"));
+        assert_eq!((tail.len(), tail[0].as_str()), (30, "line 11"));
+        assert_eq!(b.crash_report(start, 12), None);
+        std::fs::write(
+            crashes.join("Crash 2026-11-07 10-00-05.txt"),
+            "Unhandled exception: c0000005\n\nFault address: 7FFB1234 (amfrt64.dll)\n",
+        )
+        .unwrap();
+        let (_, head) = b.crash_report(start, 12).unwrap();
+        assert_eq!(
+            head,
+            [
+                "Unhandled exception: c0000005",
+                "Fault address: 7FFB1234 (amfrt64.dll)"
+            ]
+        );
     }
 }

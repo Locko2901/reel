@@ -511,7 +511,10 @@ async fn supervise(
                     let p = pid.swap(0, Ordering::Relaxed);
                     match asked {
                         Some(a) => tracing::info!(pid = p, code, after = %secs(a.elapsed()), "the bundled OBS exited, after it was asked to close"),
-                        None => tracing::info!(pid = p, code, "the bundled OBS exited"),
+                        None => {
+                            tracing::info!(pid = p, code, "the bundled OBS exited");
+                            obs.log_what_obs_said(started_at, &format!("the bundled OBS exited by itself (exit code {code})"));
+                        }
                     }
                     if stopping {
                         set(&line, &*changed, "stopped", "stopped with the app".into());
@@ -646,19 +649,11 @@ fn not_answering(
     reach: Reach,
 ) -> String {
     let titles = obsproc::window_titles(pid);
-    let log = bundled.log_tail(since, 30);
-    match &log {
-        Some((path, lines)) => tracing::warn!(
-            pid,
-            log = %path.display(),
-            "the bundled OBS does not answer; the end of its own log:\n{}",
-            lines.join("\n")
-        ),
-        None => tracing::warn!(
-            pid,
-            "the bundled OBS does not answer and wrote no log of this start"
-        ),
-    }
+    let wrote = bundled.log_tail(since, 1).is_some();
+    bundled.log_what_obs_said(
+        since,
+        &format!("the bundled OBS (pid {pid}) does not answer"),
+    );
     tracing::warn!(pid, ?titles, "the bundled OBS's windows");
     let mut words = format!(
         "OBS started but does not answer after {} s; it may be showing an error",
@@ -669,7 +664,7 @@ fn not_answering(
         let quoted: Vec<String> = titles.iter().map(|t| format!("\"{t}\"")).collect();
         words.push_str(&format!(" (its windows: {})", quoted.join(", ")));
     }
-    if log.is_none() {
+    if !wrote {
         words.push_str("; it wrote no log of this start, so it stopped before it could");
     }
     words.push_str(if reach == Reach::Tray {
