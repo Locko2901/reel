@@ -19,16 +19,18 @@ fn act(id: &str, label: impl Into<String>, on: bool) -> Item {
     Item::Act(id.into(), label.into(), on)
 }
 
+/// The menu's first line: the app's state and what it is doing.
+fn state_line(st: &Status) -> String {
+    if st.state_line.is_empty() {
+        st.state_word.clone()
+    } else {
+        format!("{}: {}", st.state_word, st.state_line)
+    }
+}
+
 pub fn items(st: &Status) -> Vec<Item> {
     let standalone = st.mode == "standalone";
-    let mut out = vec![Item::Line(
-        "state".into(),
-        if st.state_line.is_empty() {
-            st.state_word.clone()
-        } else {
-            format!("{}: {}", st.state_word, st.state_line)
-        },
-    )];
+    let mut out = vec![Item::Line("state".into(), state_line(st))];
     if st.obs_box.as_ref().is_some_and(|b| b.state == "gave_up") {
         out.push(act("obs-again", "Start OBS again", true));
     }
@@ -226,6 +228,14 @@ pub fn set_icon(app: &AppHandle, kind: TrayIcon) {
 }
 
 pub fn refresh(app: &AppHandle, st: &Status) {
+    static SHOWN: std::sync::Mutex<String> = std::sync::Mutex::new(String::new());
+    let line = state_line(st);
+    let mut shown = SHOWN.lock().unwrap_or_else(|e| e.into_inner());
+    if *shown != line {
+        tracing::debug!(line = %line, "the tray's state line");
+        *shown = line;
+    }
+    drop(shown);
     if let Some(tray) = app.tray_by_id(TRAY_ID) {
         match menu(app, st) {
             Ok(m) => {

@@ -43,6 +43,8 @@ nothing here can.
 | OBS's own Save hotkey, when OBS runs elevated | | | `bundled.rs` (the key written); by hand |
 | Capture games that run as administrator: the copy, the task | | on without the copy: OBS runs without the rights, the app says why | `check-elevate.sh`; by hand |
 | No safe mode question after a crash (`.sentinel`) | killed, started again, no question | the first start after an update ended to skip Wine's warning | by hand, after Quit and an update |
+| Started again after a crash, as it was | killed while the buffer runs: it runs again; killed while paused: started without `--startreplaybuffer`, the buffer stays stopped; the end of OBS's log in reel's | | `obsbox.rs` (the stops in a row, Start OBS again, a hang or a WebSocket gone ended) |
+| A crash loop after an encoder change goes back to the encoder of the last replay | an OBS started with SVT-AV1 killed 2 s in: x264 in reel's settings and OBS's, SVT-AV1 refused, the buffer runs, the notification and the tray's line say so | | `obsbox.rs` (the rule, a stand-in OBS that crashes with AMF); a real crashing encoder: by hand |
 | How reel stops OBS: SIGTERM; WM_CLOSE, the task, `reel-stop` | SIGTERM, and an installer's quit stops it for good | | `check-obs-window.sh` (WM_CLOSE), `check-install-stop.sh` (a stand-in) |
 | An update of reel, the package with OBS | | the newest older release, then this one: OBS's settings kept, the app and OBS back | |
 
