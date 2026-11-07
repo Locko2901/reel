@@ -27,6 +27,8 @@ wait_for() { # wait_for <seconds> <description> <command...>
 log_has() { cat "$LOG"/reel-desktop.log* 2>/dev/null | grep -q -- "$1"; }
 log_n() { cat "$LOG"/reel-desktop.log* 2>/dev/null | grep -c -- "$1" || true; }
 ms_after() { python3 "$HERE/ms-after.py" "$1" "$2" "$LOG"; }
+# An app that exited by itself is a failure of its own, not a kill that fails under set -e.
+quit_app() { local c=0; kill -TERM "$APP_PID" 2>/dev/null && return; wait "$APP_PID" || c=$?; fail "the app had exited by itself (exit code $c) before it was asked to quit"; }
 # reel's OBS is the one whose XDG_CONFIG_HOME is reel's; the user's own runs beside it.
 obs_pid() { local p; for p in $(pgrep -x reel-capture; pgrep -x obs); do tr '\0' '\n' < "/proc/$p/environ" 2>/dev/null | grep -qx "XDG_CONFIG_HOME=$ROOT/data/obs" && { echo "$p"; return; }; done; true; }
 no_reel_obs() { [ -z "$(obs_pid)" ]; }
@@ -89,6 +91,9 @@ cat > "$ROOT/config/settings.json" <<JSON
 }
 JSON
 
+# SVT-AV1 as the setup's test would leave it: one this OBS lists, so it may be chosen.
+printf '{"tested":[{"id":"ffmpeg_svt_av1","ok":true,"why":""}]}' > "$ROOT/data/encoders.json"
+
 # A silent microphone of its own: the null sink's monitor would bring every sound in twice.
 pactl load-module module-null-sink sink_name=micsink >/dev/null
 pactl set-default-sink null
@@ -106,6 +111,9 @@ MAIN_BEFORE=$(main_sum)
 ok "the user's OBS runs, pid $MAIN_PID, its settings in $MAIN_CONF ($(echo "$MAIN_BEFORE" | wc -l) files)"
 
 say "start the app hidden: it finds the OBS installed here"
+# No notification server runs here: the calls reel makes are read off the session bus.
+dbus-monitor --session "type=method_call,interface=org.freedesktop.Notifications,member=Notify" >"$ROOT/notifications.txt" 2>&1 &
+notified() { grep -qF "string \"$1\"" "$ROOT/notifications.txt"; }
 export REEL_DESKTOP_DIR="$ROOT"
 "$APP" --hidden >"$ROOT/app.out" 2>&1 &
 APP_PID=$!
@@ -133,6 +141,10 @@ say "OBS connects, hidden"
 wait_for 60 "the app to connect to OBS" log_has "obs connected"
 ok "connected: $(cat "$LOG"/reel-desktop.log* | grep -o 'obs_version=[^ ]*' | tail -1)"
 PW=$(python3 -c 'import json, sys; print(json.load(open(sys.argv[1]))["obs"]["setup"]["password"])' "$ROOT/config/settings.json")
+ws() { python3 "$HERE/obs-ws.py" 4466 "$PW" "$@"; }
+buffer() { ws GetReplayBufferStatus '{}' 2>/dev/null | sed -n 's/.*"outputActive": \([a-z]*\).*/\1/p'; }
+buffer_is() { [ "$(buffer)" = "$1" ]; }
+newest_obs_log() { ls -t "$OBSCONF"/logs/*.txt | head -1; }
 sh "$HERE/check-obs-requests.sh" 4466 "$PW" || fail "the protocol"
 wait_for 20 "the app to read the microphone's filters" log_has "the microphone's filters in OBS"
 FILTERS=$(cat "$LOG"/reel-desktop.log* | grep "the microphone's filters in OBS" | tail -1)
@@ -202,9 +214,42 @@ wait_for 60 "the app to connect again" sh -c "[ \$(cat $LOG/reel-desktop.log* | 
 sleep 4
 [ "$(visible_obs_windows)" = "0" ] || { shot obs-after-crash; fail "OBS shows a window after the crash (the safe mode question?)"; }
 ok "connected again, nothing shows"
+wait_for 30 "the replay buffer to run again after the crash" buffer_is true
+log_has "the bundled OBS exited by itself (exit code -1); the end of OBS's own log:" || fail "OBS's own log is not in reel's log after it stopped"
+ok "the replay buffer runs again, as before the crash; reel's log has the end of OBS's own log: $(cat "$LOG"/reel-desktop.log* | grep -A3 "the end of OBS's own log" | tail -1 | cut -c1-100)"
+
+say "a crash loop after an encoder change: OBS stops right after each start until reel changes the encoder back"
+ADV="$OBSCONF/basic/profiles/reel/basic.ini"
+# Stands in for an encoder that crashes OBS: an OBS of reel's started with it is killed 2 s in.
+(
+  while :; do
+    p=$(obs_pid)
+    if [ -n "$p" ] && grep -q '^RecEncoder=ffmpeg_svt_av1$' "$ADV"; then
+      sleep 2
+      kill -9 "$p" 2>/dev/null && echo "killed $p" >>"$ROOT/killed.txt"
+    fi
+    sleep 0.2
+  done
+) &
+KILLER=$!
+c=$(log_n "obs connected")
+"$APP" --encoder=ffmpeg_svt_av1 >>"$ROOT/app.out" 2>&1 || true
+wait_for 60 "OBS to start with SVT-AV1" grep -q '^RecEncoder=ffmpeg_svt_av1$' "$ADV"
+wait_for 60 "reel to change the encoder back" log_has "OBS stopped right after it started; its encoder is changed back"
+wait_for 60 "OBS's profile to have x264 again" grep -q '^RecEncoder=obs_x264$' "$ADV"
+kill "$KILLER" 2>/dev/null || true
+wait_for 60 "the app to connect to OBS with x264" sh -c "[ \$(cat $LOG/reel-desktop.log* | grep -c 'obs connected') -gt $c ]"
+wait_for 30 "the replay buffer to run with x264" buffer_is true
+python3 -c 'import json,sys; e=json.load(open(sys.argv[1]))["obs"]["setup"]["encoder"]; sys.exit(e != "obs_x264")' "$ROOT/config/settings.json" || fail "the app's settings do not have x264"
+python3 -c 'import json,sys; k=json.load(open(sys.argv[1])); sys.exit(not any(v["id"] == "ffmpeg_svt_av1" and not v["ok"] for v in k["tested"]))' "$ROOT/data/encoders.json" || fail "SVT-AV1 is not refused: $(cat "$ROOT/data/encoders.json")"
+WORDS="SVT-AV1 (CPU) did not record here, so reel records with x264 (CPU) again"
+wait_for 20 "the notification" notified "Encoder changed back"
+notified "$WORDS" || fail "the notification's words: $(grep -A1 'Encoder changed back' "$ROOT/notifications.txt" | tail -1)"
+wait_for 20 "the tray's state line" log_has "line=encoder changed back: $WORDS"
+ok "SVT-AV1 stopped OBS $(wc -l <"$ROOT/killed.txt") time(s) right after its start; reel went back to x264, the encoder of the last replay, in its settings and OBS's, refused SVT-AV1 until the setup tests it, started OBS (the buffer runs) and said so in a notification and the tray's first line: \"encoder changed back: $WORDS\""
 
 say "the app quits: OBS stops"
-kill -TERM "$APP_PID"
+quit_app
 wait_for 20 "the app to stop OBS" log_has "stopping the bundled OBS"
 wait_for 20 "OBS to exit" no_reel_obs
 wait_for 20 "the app to exit" sh -c "! kill -0 $APP_PID"
@@ -243,7 +288,7 @@ if [ -n "$TOKEN" ]; then
   curl -fsS -b "$JAR" "$SERVER/clips/$MP4_CLIP" | grep -q '"tracks":\["Full mix","Microphone","Desktop"\]' || fail "the MP4's tracks on the server are not named"
   ok "the server names them as the app said: Full mix, Microphone, Desktop"
 fi
-kill -TERM "$APP_PID"
+quit_app
 wait_for 20 "OBS to exit" no_reel_obs
 wait_for 20 "the app to exit" sh -c "! kill -0 $APP_PID"
 trap - EXIT
@@ -275,7 +320,7 @@ assert s["volumes"].get("Desktop audio") == -6.0, s["volumes"]
 PY
 ok "Hide OBS read them into the app's settings, which its page shows: $(cat "$LOG"/reel-desktop.log* | grep 'read from OBS' | tail -1 | sed 's/.*read=//; s/ read from OBS$//')"
 ws SetInputVolume '{"inputName":"Microphone","inputVolumeDb":-3}' >/dev/null || fail "OBS took no volume"
-kill -TERM "$APP_PID"
+quit_app
 wait_for 20 "OBS to exit" no_reel_obs
 wait_for 20 "the app to exit" sh -c "! kill -0 $APP_PID"
 ok "the microphone at -3 dB in OBS's mixer, then the app quits; OBS saves its mixer as it exits"
@@ -304,7 +349,7 @@ assert s["clip_seconds"] == 45 and s["volumes"].get("Microphone") == -3.0, (s["c
 PY
 ok "the next start: OBS has 45 s and 29.97 fps (its own log: $(ls -t "$OBSCONF"/logs/*.txt | head -1 | xargs -d '\n' grep -h -m1 '30000/1001' | sed 's/^[0-9:. ]*//; s/  */ /g')), the cursor off, both levels; the app took the microphone's level at the start"
 
-kill -TERM "$APP_PID"
+quit_app
 wait_for 20 "OBS to exit" no_reel_obs
 wait_for 20 "the app to exit" sh -c "! kill -0 $APP_PID"
 trap - EXIT
@@ -357,7 +402,6 @@ grep -q '^Mode=Simple$' "$PROFILE" && grep -q '^RecQuality=Small$' "$PROFILE" ||
 [ "$(simple RecRB)" = true ] && [ "$(simple RecRBTime)" = 10 ] || fail "the start did more or less than the replay buffer on: RecRB=$(simple RecRB) RecRBTime=$(simple RecRBTime)"
 wait_for 20 "the app to show OBS's clip length" python3 -c "import json,sys; sys.exit(json.load(open('$ROOT/config/settings.json'))['obs']['setup']['clip_seconds'] != 10)"
 ok "OBS's simple output mode and its quality stand, its clip length too (10 s, which the app shows); the start only turned the replay buffer on"
-newest_obs_log() { ls -t "$OBSCONF"/logs/*.txt | head -1; }
 wait_for 30 "OBS's replay buffer to start with its own settings" sh -c "ls -t '$OBSCONF'/logs/*.txt | head -1 | xargs -d '\n' grep -q 'Replay Buffer Start'"
 ok "OBS's own log: $(newest_obs_log | xargs -d '\n' grep -h -m1 'simple_video_recording' | sed 's/^[0-9:. ]*//')"
 
@@ -387,8 +431,6 @@ filters() { # filters <noise> <gate|no-gate>: the requests the app builds for th
 ok "the microphone's filters as the app's requests set them in OBS: Speex alone, none, then RNNoise and the gate again"
 
 say "Pause recording stops OBS's replay buffer and a save while paused saves nothing; Resume starts it"
-buffer() { ws GetReplayBufferStatus '{}' | sed -n 's/.*"outputActive": \([a-z]*\).*/\1/p'; }
-buffer_is() { [ "$(buffer)" = "$1" ]; }
 wait_for 20 "the replay buffer to run before the pause" buffer_is true
 "$APP" --pause-recording >>"$ROOT/app.out" 2>&1 || true
 wait_for 20 "the replay buffer to stop" buffer_is false
@@ -399,6 +441,17 @@ wait_for 10 "the Save hotkey to say that recording is paused" log_has "no replay
 sleep 3
 [ "$(log_n "obs saved a replay")" -eq "$n" ] || fail "a save while recording was paused saved a replay"
 buffer_is false || fail "the buffer runs again while paused: $(buffer)"
+P=$(obs_pid)
+c=$(log_n "obs connected")
+kill -9 "$P"
+wait_for 30 "OBS to be started again while recording is paused" reel_obs_not "$P"
+P=$(obs_pid)
+! tr '\0' ' ' <"/proc/$P/cmdline" | grep -q -- --startreplaybuffer || fail "OBS was started with its replay buffer while recording is paused: $(tr '\0' ' ' <"/proc/$P/cmdline")"
+wait_for 60 "the app to connect again while paused" sh -c "[ \$(cat $LOG/reel-desktop.log* | grep -c 'obs connected') -gt $c ]"
+sleep 5
+buffer_is false || fail "the replay buffer runs after OBS was started again while paused: $(buffer)"
+! newest_obs_log | xargs -d '\n' grep -q 'Replay Buffer Start' || fail "OBS's own log has its replay buffer starting while paused"
+ok "killed while paused: started again without --startreplaybuffer, the buffer stayed stopped (OBS's own log has no Replay Buffer Start)"
 "$APP" --resume-recording >>"$ROOT/app.out" 2>&1 || true
 wait_for 20 "the replay buffer to run again" buffer_is true
 ok "Pause recording: OBS's replay buffer stopped (outputActive false), the Save hotkey saved nothing and said why; Resume recording: it runs again"
