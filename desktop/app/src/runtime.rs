@@ -161,10 +161,14 @@ pub struct Inner {
     pub portal_cancel: Option<CancellationToken>,
     /// Linux: what to know when the desktop shows no tray; empty when it shows one.
     pub tray_line: String,
-    /// Each encoder's last test on this PC.
+    /// Each encoder's last test on this PC and the one the last replay was saved with.
     pub encoders: reel_desktop_core::encoders::Known,
     /// The setup tries this encoder in OBS: OBS runs with it for the try alone.
     pub encoder_trial: Option<String>,
+    /// The encoder the replay buffer last ran with in this run.
+    pub encoder_started: Option<String>,
+    /// A change of encoder taken back (the encoder, the words), until a replay is saved.
+    pub encoder_back: Option<(String, String)>,
     pub obs_seen: watch::Sender<crate::encoders::Seen>,
 }
 
@@ -449,6 +453,8 @@ impl Runtime {
             copy_updating: false,
             encoders: reel_desktop_core::encoders::Known::default(),
             encoder_trial: None,
+            encoder_started: None,
+            encoder_back: None,
             obs_seen: watch::Sender::new(Default::default()),
         };
         let mut inner = inner;
@@ -489,6 +495,7 @@ impl Runtime {
 
     /// Starts OBS and the app's connection to it, once the window and the tray are up.
     pub fn start_obs(&self) {
+        crate::encoders::before_start(self);
         self.apply_bundled(None);
         self.restart_obs();
         if self.lock().copy.is_some() {
@@ -624,6 +631,8 @@ impl Runtime {
             ("preparing", "preparing the link".to_string(), p.clone())
         } else if let Some(p) = &g.save_problem {
             ("error", "no replay saved".to_string(), p.clone())
+        } else if let Some((_, words)) = &g.encoder_back {
+            ("error", "encoder changed back".to_string(), words.clone())
         } else if g.paused_by_user && (!standalone || paired) {
             (
                 "paused",
@@ -1085,6 +1094,7 @@ impl Runtime {
                     reel_desktop_core::obs::encoder_word(enc)
                 ));
             }
+            self.lock().encoder_back = None;
         }
         let changes = reel_desktop_core::lane::Changes::between(&base, &new);
         let lane = self.lane.clone();
@@ -1640,6 +1650,7 @@ impl Runtime {
         let Some(line) = self.lock().obs_box.as_ref().map(|b| b.line()) else {
             return;
         };
+        crate::encoders::on_box(self, &line.state, &line.line);
         let was = std::mem::replace(&mut self.lock().obs_without_rights, line.without_rights);
         if was == line.without_rights {
             return;
@@ -2147,6 +2158,32 @@ impl Runtime {
         }
     }
 
+    /// Saves `id` as the setup's encoder, OBS started again with it: in the lane's turn, or at
+    /// once before OBS's first start.
+    pub(crate) fn set_encoder(&self, id: &str, now: bool) {
+        let rt = self.clone();
+        let id = id.to_string();
+        let set = move || {
+            let old = rt.settings();
+            if old.obs.setup.encoder_id() == id {
+                return;
+            }
+            let mut new = old.clone();
+            new.obs.setup.encoder = id;
+            if now {
+                rt.keep_setup(&new);
+            } else if let Err(e) = rt.store(&old, new) {
+                tracing::warn!(error = %e, "the encoder was not saved");
+            }
+        };
+        if now {
+            set();
+        } else {
+            self.lane
+                .post(reel_desktop_core::lane::Ask::Run(Box::new(set)));
+        }
+    }
+
     /// An OBS with the highest rights is ended by its task without saving, so the volumes and
     /// the microphone's filters go to it again once it answers.
     async fn live_again(&self) {
@@ -2328,15 +2365,25 @@ impl Runtime {
                             line: format!("OBS {obs_version}, websocket {ws_version}"),
                         };
                         tracing::info!(obs_version, ws_version, "obs connected");
-                        rt.lock().obs_seen.send_modify(|s| {
-                            s.gen += 1;
-                            s.connected = true;
-                            s.active = false;
-                        });
+                        let gen = {
+                            let g = rt.lock();
+                            let mut gen = 0;
+                            g.obs_seen.send_modify(|s| {
+                                s.gen += 1;
+                                s.connected = true;
+                                s.active = false;
+                                gen = s.gen;
+                            });
+                            gen
+                        };
                         if bundled {
                             if let Some(bx) = rt.lock().obs_box.clone() {
                                 bx.answered(true);
                             }
+                            tauri::async_runtime::spawn(crate::encoders::watch_start(
+                                rt.clone(),
+                                gen,
+                            ));
                         }
                         rt.push_status();
                         rt.obs_connected();
@@ -2406,6 +2453,7 @@ impl Runtime {
                         let p = PathBuf::from(&path);
                         tracing::info!(path = %path, "obs saved a replay");
                         let size = std::fs::metadata(&p).map(|m| m.len()).unwrap_or(0);
+                        rt.replay_saved();
                         let waiting = {
                             let mut g = rt.lock();
                             g.save_problem = None;
@@ -2549,9 +2597,29 @@ impl Runtime {
         Ok(lines)
     }
 
-    /// The replay buffer runs or not.
+    /// The replay buffer runs or not; with reel's own OBS, the encoder it ran with is known.
     fn buffer_seen(&self, active: bool) {
-        self.lock().obs_seen.send_modify(|s| s.active = active);
+        let mut g = self.lock();
+        g.obs_seen.send_modify(|s| s.active = active);
+        if active && g.bundled.is_some() && g.settings.obs.bundled && g.encoder_trial.is_none() {
+            g.encoder_started = Some(g.settings.obs.setup.encoder_id().to_string());
+        }
+    }
+
+    /// A replay saved: the encoder recorded here, and is the one a failed change goes back to.
+    fn replay_saved(&self) {
+        let enc = {
+            let g = self.lock();
+            (g.bundled.is_some() && g.settings.obs.bundled && g.encoder_trial.is_none())
+                .then(|| g.settings.obs.setup.encoder_id().to_string())
+        };
+        let Some(enc) = enc else {
+            return;
+        };
+        self.lock().encoder_back = None;
+        if self.lock().encoders.worked != enc {
+            self.keep_known(|k| k.worked = enc);
+        }
     }
 
     /// The replay buffer as Pause recording and the setting "start the replay buffer" want it:
@@ -3292,6 +3360,7 @@ impl Runtime {
         self.lock().save_problem = Some(why.to_string());
         self.push_status();
         notify::show(&self.app, "No replay saved", why);
+        crate::encoders::on_save_failed(self, why);
     }
 
     /// Why a save OBS took gave no file, and where OBS's own log says more.

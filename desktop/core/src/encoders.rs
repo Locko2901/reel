@@ -1,9 +1,9 @@
-//! Which encoders the bundled OBS may record with on this PC: the ones OBS lists, and each
-//! one's last test.
+//! Which encoders the bundled OBS may record with on this PC: the ones OBS lists, each one's
+//! last test, and the one to go back to when a change of encoder stops the recording.
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 
-/// x264 on the CPU: OBS always has it.
+/// x264 on the CPU: OBS always has it, and it is where a failed encoder goes back to.
 pub const X264: &str = "obs_x264";
 
 /// The video encoders OBS lists in its log as it starts, under "Available Encoders"; None when
@@ -116,6 +116,8 @@ pub struct Verdict {
 #[serde(default)]
 pub struct Known {
     pub tested: Vec<Verdict>,
+    /// The encoder the last replay was saved with: the one a failed change goes back to.
+    pub worked: String,
 }
 
 fn id_of(id: &str) -> &str {
@@ -163,6 +165,44 @@ impl Known {
             Some(v) => Err(v.why.clone()),
             None => Err("not tested on this PC yet: the setup's Encoder step tests it".into()),
         }
+    }
+
+    /// A replay was saved with it, or it is x264: a failure later is not the change's.
+    pub fn proven(&self, id: &str) -> bool {
+        let id = id_of(id);
+        id == X264 || id == self.worked
+    }
+
+    /// Where a change to `failed` goes back to: the encoder the last replay was saved with,
+    /// x264 when that is the one that failed, or none was, or it may no longer be chosen.
+    pub fn back_to(&self, failed: &str) -> String {
+        let w = id_of(&self.worked);
+        if w != id_of(failed) && self.selectable(w).is_ok() {
+            w.to_string()
+        } else {
+            X264.to_string()
+        }
+    }
+}
+
+/// What OBS showed after the bundled OBS started with an encoder.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Sign {
+    /// The replay buffer did not run within its time: a failed start, a dialog, an exit.
+    NotStarted,
+    /// OBS took a save and wrote no replay, or refused it.
+    SaveFailed,
+}
+
+/// The rule for undoing a change of encoder: only one no replay was saved with yet, and a
+/// buffer that does not start only when it never ran with this encoder in this run.
+pub fn undo(known: &Known, encoder: &str, started_with: Option<&str>, sign: Sign) -> bool {
+    if known.proven(encoder) {
+        return false;
+    }
+    match sign {
+        Sign::NotStarted => started_with.map(id_of) != Some(id_of(encoder)),
+        Sign::SaveFailed => true,
     }
 }
 
@@ -228,6 +268,7 @@ mod tests {
                     },
                 })
                 .collect(),
+            worked: String::new(),
         }
     }
 
@@ -251,11 +292,54 @@ mod tests {
     }
 
     #[test]
+    fn a_failed_change_goes_back_to_the_last_encoder_that_saved_a_replay() {
+        let mut k = tested(&[("obs_qsv11_v2", true), ("obs_nvenc_h264_tex", true)]);
+        assert_eq!(k.back_to("obs_qsv11_v2"), X264, "none saved a replay yet");
+        k.worked = "obs_nvenc_h264_tex".into();
+        assert_eq!(k.back_to("obs_qsv11_v2"), "obs_nvenc_h264_tex");
+        assert_eq!(
+            k.back_to("obs_nvenc_h264_tex"),
+            X264,
+            "the one that worked failed itself"
+        );
+        k.set(Verdict {
+            id: "obs_nvenc_h264_tex".into(),
+            ok: false,
+            why: "did not record".into(),
+        });
+        assert_eq!(k.back_to("obs_qsv11_v2"), X264, "it is refused now");
+    }
+
+    #[test]
+    fn only_a_change_no_replay_was_saved_with_is_undone() {
+        let mut k = tested(&[("obs_qsv11_v2", true)]);
+        let q = "obs_qsv11_v2";
+        assert!(undo(&k, q, None, Sign::NotStarted));
+        assert!(
+            !undo(&k, q, Some(q), Sign::NotStarted),
+            "it ran in this run: a stop later is not the change's"
+        );
+        assert!(undo(&k, q, Some(q), Sign::SaveFailed));
+        assert!(
+            !undo(&k, "obs_x264", None, Sign::NotStarted),
+            "x264 is where it goes back to"
+        );
+        assert!(!undo(&k, "", None, Sign::SaveFailed));
+        k.worked = q.into();
+        assert!(
+            !undo(&k, q, None, Sign::NotStarted),
+            "a replay was saved with it"
+        );
+        assert!(!undo(&k, q, Some(q), Sign::SaveFailed));
+    }
+
+    #[test]
     fn what_is_known_is_kept_on_disk() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("encoders.json");
         assert_eq!(Known::load(&path), Known::default(), "none yet");
-        let k = tested(&[("obs_qsv11_v2", false)]);
+        let mut k = tested(&[("obs_qsv11_v2", false)]);
+        k.worked = "obs_x264".into();
         k.save(&path).unwrap();
         assert_eq!(Known::load(&path), k);
         std::fs::write(&path, "not json").unwrap();

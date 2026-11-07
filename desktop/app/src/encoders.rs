@@ -1,4 +1,5 @@
-//! The encoder the bundled OBS records with: the setup tries each one in OBS itself.
+//! The encoder the bundled OBS records with: the setup tries each one in OBS itself, and a
+//! change of encoder that stops the recording is taken back.
 //!
 //! obs-websocket makes no output and no encoder and names no encoder OBS has: OBS's outputs
 //! take their encoder from the profile when OBS loads it. So a try starts reel's OBS again
@@ -6,7 +7,8 @@
 //! log it writes at each start.
 use crate::runtime::Runtime;
 use reel_desktop_core::bundled::ObsSetup;
-use reel_desktop_core::encoders::{self, Verdict, X264};
+use reel_desktop_core::encoders::{self, Sign, Verdict, X264};
+use reel_desktop_core::obs::encoder_word;
 use std::sync::Mutex;
 use std::time::{Duration, Instant, SystemTime};
 
@@ -263,4 +265,150 @@ pub fn keep_verdicts(rt: &Runtime, rows: &[crate::setup::EncoderTest]) {
             });
         }
     });
+}
+
+/// The encoder the saved setup records with.
+fn current(rt: &Runtime) -> String {
+    rt.settings().obs.setup.encoder_id().to_string()
+}
+
+/// The watch over a change of encoder needs reel's own OBS, recording wanted, and no try of
+/// the setup's running.
+fn watched(rt: &Runtime) -> bool {
+    let g = rt.lock();
+    g.bundled.is_some()
+        && g.settings.obs.bundled
+        && g.settings.obs.start_replay
+        && !g.recording_paused
+        && g.encoder_trial.is_none()
+}
+
+/// After each connection to reel's OBS: an encoder no replay was saved with yet must have its
+/// replay buffer running within BUFFER, or it is taken back.
+pub async fn watch_start(rt: Runtime, gen: u64) {
+    if !watched(&rt) {
+        return;
+    }
+    let enc = current(&rt);
+    let ran = until(&rt, BUFFER, |s| s.gen != gen || s.active).await;
+    let (seen, started) = {
+        let g = rt.lock();
+        let seen = *g.obs_seen.borrow();
+        (seen, g.encoder_started.clone())
+    };
+    if seen.gen != gen || seen.active || !watched(&rt) || current(&rt) != enc {
+        return;
+    }
+    let why = match ran {
+        Err(Some(line)) => line,
+        _ => format!(
+            "OBS's replay buffer did not run within {} s of its start",
+            BUFFER.as_secs()
+        ),
+    };
+    if encoders::undo(
+        &rt.lock().encoders,
+        &enc,
+        started.as_deref(),
+        Sign::NotStarted,
+    ) {
+        take_back(&rt, &enc, &why);
+    }
+}
+
+/// OBS's supervisor: an OBS that does not answer or stopped by itself before its replay buffer
+/// ran with a new encoder takes the change back.
+pub fn on_box(rt: &Runtime, state: &str, line: &str) {
+    if !matches!(state, "silent" | "restarting") || !watched(rt) {
+        return;
+    }
+    let enc = current(rt);
+    let started = rt.lock().encoder_started.clone();
+    if encoders::undo(
+        &rt.lock().encoders,
+        &enc,
+        started.as_deref(),
+        Sign::NotStarted,
+    ) {
+        take_back(rt, &enc, line);
+    }
+}
+
+/// A save OBS refused or wrote nothing for, with an encoder no replay was saved with yet.
+pub fn on_save_failed(rt: &Runtime, why: &str) {
+    if !watched(rt) || !rt.lock().obs.connected {
+        return;
+    }
+    let enc = current(rt);
+    if encoders::undo(&rt.lock().encoders, &enc, None, Sign::SaveFailed) {
+        take_back(rt, &enc, why);
+    }
+}
+
+/// Goes back to the last encoder that saved a replay (x264 when none did), refuses the one that
+/// failed until the setup tests it again, and says so in the state line, the tray's tooltip and
+/// a notification. It never picks the encoder that failed
+/// or one refused; a second call for the same encoder, or one while the setup tries encoders,
+/// does nothing.
+pub fn take_back(rt: &Runtime, failed: &str, why: &str) {
+    back(rt, failed, why, false)
+}
+
+fn back(rt: &Runtime, failed: &str, why: &str, now: bool) {
+    let back = {
+        let mut g = rt.lock();
+        if g.encoder_trial.is_some() || g.encoder_back.as_ref().is_some_and(|(f, _)| f == failed) {
+            return;
+        }
+        let back = g.encoders.back_to(failed);
+        let words = format!(
+            "{} did not record here, so reel records with {} again",
+            encoder_word(failed),
+            encoder_word(&back)
+        );
+        g.encoder_back = Some((failed.to_string(), words));
+        back
+    };
+    tracing::warn!(failed, back = %back, why, "the change of encoder is taken back");
+    rt.keep_known(|k| {
+        k.set(Verdict {
+            id: failed.to_string(),
+            ok: false,
+            why: format!("it did not record here: {why}"),
+        })
+    });
+    rt.set_encoder(&back, now);
+    let words = rt
+        .lock()
+        .encoder_back
+        .as_ref()
+        .map(|(_, w)| w.clone())
+        .unwrap_or_default();
+    crate::notify::show(&rt.app, "Encoder changed back", &words);
+    rt.push_status();
+}
+
+/// Before reel's OBS starts: an encoder OBS's last start did not list would hold OBS on its
+/// "Missing Encoders" dialog, so the setup goes back first.
+pub fn before_start(rt: &Runtime) {
+    let (bundled, enc) = {
+        let g = rt.lock();
+        let enc = g.settings.obs.setup.encoder_id().to_string();
+        (g.bundled.is_some() && g.settings.obs.bundled, enc)
+    };
+    let Some(listed) = listed(rt).filter(|_| bundled) else {
+        return;
+    };
+    if enc != X264 && !listed.contains(&enc) {
+        back(
+            rt,
+            &enc,
+            &format!(
+                "OBS's last start listed no {}; its encoders: {}",
+                encoder_word(&enc),
+                listed.join(", ")
+            ),
+            true,
+        );
+    }
 }
