@@ -134,8 +134,12 @@ pub fn items(st: &Status) -> Vec<Item> {
 }
 
 pub fn menu(app: &AppHandle, st: &Status) -> tauri::Result<Menu<Wry>> {
+    menu_of(app, items(st))
+}
+
+fn menu_of(app: &AppHandle, items: Vec<Item>) -> tauri::Result<Menu<Wry>> {
     let menu = Menu::new(app)?;
-    for item in items(st) {
+    for item in items {
         match item {
             Item::Gap => menu.append(&PredefinedMenuItem::separator(app)?)?,
             Item::Sub(id, label, inner) => menu.append(&submenu(app, &id, &label, inner)?)?,
@@ -236,15 +240,46 @@ pub fn refresh(app: &AppHandle, st: &Status) {
         *shown = line;
     }
     drop(shown);
-    if let Some(tray) = app.tray_by_id(TRAY_ID) {
-        match menu(app, st) {
-            Ok(m) => {
-                let _ = tray.set_menu(Some(m));
+    let _ = writer(app).send((items(st), st.tooltip()));
+}
+
+/// How long the tray's writer waits for the rest of a burst of changes.
+const SETTLE: std::time::Duration = std::time::Duration::from_millis(100);
+
+/// One thread sets the tray's menu and tooltip, in turn, the newest of a burst and only when
+/// it changed: Linux's appindicator can crash on a menu replaced in a burst, as a crashing
+/// OBS's line changes several times a second. The main thread never waits on it.
+fn writer(app: &AppHandle) -> &'static std::sync::mpsc::Sender<(Vec<Item>, String)> {
+    static TX: std::sync::OnceLock<std::sync::mpsc::Sender<(Vec<Item>, String)>> =
+        std::sync::OnceLock::new();
+    TX.get_or_init(|| {
+        let (tx, rx) = std::sync::mpsc::channel::<(Vec<Item>, String)>();
+        let app = app.clone();
+        std::thread::spawn(move || {
+            let mut set: Option<(Vec<Item>, String)> = None;
+            while let Ok(mut next) = rx.recv() {
+                std::thread::sleep(SETTLE);
+                while let Ok(newer) = rx.try_recv() {
+                    next = newer;
+                }
+                let Some(tray) = app.tray_by_id(TRAY_ID) else {
+                    continue;
+                };
+                if set.as_ref() == Some(&next) {
+                    continue;
+                }
+                match menu_of(&app, next.0.clone()) {
+                    Ok(m) => {
+                        let _ = tray.set_menu(Some(m));
+                    }
+                    Err(e) => tracing::warn!(error = %e, "tray menu"),
+                }
+                let _ = tray.set_tooltip(Some(next.1.clone()));
+                set = Some(next);
             }
-            Err(e) => tracing::warn!(error = %e, "tray menu"),
-        }
-        let _ = tray.set_tooltip(Some(st.tooltip()));
-    }
+        });
+        tx
+    })
 }
 
 #[cfg(test)]
