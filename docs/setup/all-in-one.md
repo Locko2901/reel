@@ -194,6 +194,11 @@ as well.
   ...; reel's OBS starts once it is closed"), so two captures never run at once.
 - **If OBS crashes**, the app starts it again, a little later each time, and tells you after the
   third crash in a row.
+- **If another encoder does not record**: after the encoder changes (in the setup, under Settings,
+  OBS, or in OBS itself), reel watches OBS's next start. If the replay buffer does not run with
+  it, or a save fails before any replay was saved with it, reel goes back to the encoder the last
+  replay was saved with (x264 on the CPU if none was) and says so in its status, the tray's tooltip
+  and a notification. That encoder is not offered again until **Run the setup again** tests it.
 - **Its name**: reel runs the OBS that comes with it as `reel-capture.exe`, so Discord does not
   switch to Streamer Mode while it records in the background. The files are OBS's own, unchanged,
   and their source ships with every release. The OBS for games that run as administrator, when an
