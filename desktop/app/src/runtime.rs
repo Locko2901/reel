@@ -582,7 +582,14 @@ impl Runtime {
                 }
             },
         });
-        let (state, word, line) = if g.recording_paused {
+        let obs_trouble = g
+            .obs_box
+            .as_ref()
+            .map(|b| b.line())
+            .and_then(|l| crate::status::obs_trouble(&l.state).map(|w| (w, l.line)));
+        let (state, word, line) = if let Some(((state, word), line)) = obs_trouble {
+            (state, word.to_string(), line)
+        } else if g.recording_paused {
             (
                 "paused",
                 "recording paused".to_string(),
@@ -1414,6 +1421,7 @@ impl Runtime {
             "save" => self.save_clip(),
             "pause-recording" => self.set_recording_paused(true),
             "resume-recording" => self.set_recording_paused(false),
+            "start-obs" => self.start_obs_again(),
             other => tracing::warn!(action = other, "no such action"),
         }
     }
@@ -1630,18 +1638,23 @@ impl Runtime {
                     s.clips_dir.clone(),
                     s.hotkeys.save.clone(),
                     move || rt.obs_box_changed(),
-                    move |n| {
-                        notify::show(
+                    move |said| {
+                        match said {
+                        crate::obsbox::Said::GaveUp(_) => notify::show(
                             &told,
                             "OBS keeps stopping",
                             &format!(
-                                "{} stopped {n} times in a row; reel starts it again each time. Settings, Log has the details.",
-                                if cfg!(target_os = "linux") { "reel's own OBS" } else { "The OBS that came with reel" }
+                                "{} stopped {} times in a row, so reel stopped starting it. Start OBS again is in the tray; Settings, Log has what OBS said.",
+                                if cfg!(target_os = "linux") { "reel's own OBS" } else { "The OBS that came with reel" },
+                                crate::obsbox::TRIES
                             ),
-                        )
+                        ),
+                    }
                     },
                 );
-                self.lock().obs_box = Some(bx);
+                let mut g = self.lock();
+                bx.paused(g.recording_paused);
+                g.obs_box = Some(bx);
             }
         }
     }
@@ -2295,6 +2308,14 @@ impl Runtime {
             _ => bx.stop(),
         }
         true
+    }
+
+    /// Start OBS again: once more after the app stopped starting it.
+    pub fn start_obs_again(&self) {
+        if let Some(bx) = self.lock().obs_box.clone() {
+            tracing::info!("Start OBS again");
+            bx.again();
+        }
     }
 
     pub fn show_bundled(&self, shown: bool) {
@@ -3680,7 +3701,13 @@ impl Runtime {
     /// encoder and its memory; Resume recording starts it again.
     pub fn set_recording_paused(&self, paused: bool) {
         tracing::info!(paused, "recording paused by the user");
-        self.lock().recording_paused = paused;
+        {
+            let mut g = self.lock();
+            g.recording_paused = paused;
+            if let Some(bx) = &g.obs_box {
+                bx.paused(paused);
+            }
+        }
         self.push_status();
         let rt = self.clone();
         tauri::async_runtime::spawn(async move {

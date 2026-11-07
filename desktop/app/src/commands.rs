@@ -543,6 +543,13 @@ pub fn obs_show(rt: State<'_, Runtime>, shown: bool) -> Status {
     rt.status()
 }
 
+/// Starts the OBS that came with the app once more, after the app stopped starting it.
+#[tauri::command]
+pub fn obs_again(rt: State<'_, Runtime>) -> Status {
+    rt.start_obs_again();
+    rt.status()
+}
+
 /// Makes the copy of OBS in Program Files again, after an update or when it is missing;
 /// Windows asks once.
 #[tauri::command]

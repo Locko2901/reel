@@ -63,6 +63,7 @@ const COMMANDS: &[&str] = &[
     "recording_pause_set",
     "upload_now",
     "obs_show",
+    "obs_again",
     "obs_done",
     "obs_copy_again",
     "obs_copy_remove",

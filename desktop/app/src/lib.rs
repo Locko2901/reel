@@ -26,13 +26,14 @@ use runtime::Runtime;
 use tauri::{Manager, RunEvent, WindowEvent};
 
 /// The flags a desktop's own shortcut passes to the running app, as the hotkeys do.
-pub const ACTIONS: [&str; 6] = [
+pub const ACTIONS: [&str; 7] = [
     "--save-and-share",
     "--share-last",
     "--upload-last",
     "--save",
     "--pause-recording",
     "--resume-recording",
+    "--start-obs",
 ];
 
 fn action(args: &[String]) -> Option<&'static str> {
@@ -172,6 +173,7 @@ pub fn run() {
             commands::recording_pause_set,
             commands::upload_now,
             commands::obs_show,
+            commands::obs_again,
             commands::obs_done,
             commands::obs_read,
             commands::obs_copy_again,
@@ -224,6 +226,7 @@ pub fn run() {
                         }
                         "share" => rt.share_last(None),
                         "obs-show" => rt.show_bundled_and_read(true),
+                        "obs-again" => rt.start_obs_again(),
                         "obs-hide" => rt.show_bundled_and_read(false),
                         "save" => rt.save_clip(),
                         "save-share" => rt.save_and_share(),

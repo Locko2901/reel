@@ -13,7 +13,7 @@ use tokio::sync::mpsc;
 /// What the bundled OBS is doing, for Settings, OBS and the chip.
 #[derive(Debug, Clone, Serialize, PartialEq)]
 pub struct BoxLine {
-    /// starting, running, silent, waiting, restarting, stopped, failed
+    /// starting, running, silent, waiting, restarting, stopped, failed, gave_up
     pub state: String,
     pub line: String,
     pub shown: bool,
@@ -52,6 +52,15 @@ enum Cmd {
     /// A step in Program Files runs: OBS stops, and stays stopped until Release.
     Hold(std::sync::mpsc::Sender<()>),
     Release,
+    /// Start again an OBS the app stopped starting.
+    Again,
+}
+
+/// What the supervisor tells beyond its line, in a notification.
+#[derive(Debug, Clone, PartialEq)]
+pub enum Said {
+    /// OBS kept stopping and is not started again until asked; the words say why.
+    GaveUp(String),
 }
 
 /// OBS held stopped while a step in Program Files runs; released when dropped.
@@ -71,10 +80,14 @@ pub struct ObsBox {
     ready: Arc<tokio::sync::watch::Sender<bool>>,
     /// What the app says after OBS's own line.
     note: Arc<Mutex<Option<String>>>,
+    /// Recording is paused: OBS starts without its replay buffer.
+    paused: Arc<AtomicBool>,
 }
 
-/// A crash right after a start counts toward the third; a run of five minutes clears the count.
+/// A run this long clears the count of stops in a row.
 const CALM: Duration = Duration::from_secs(300);
+/// Starts in a row that end before CALM, after which the app stops starting OBS.
+pub const TRIES: u32 = 5;
 /// How long OBS gets to stop its outputs and exit before it is ended.
 const GRACE: Duration = Duration::from_secs(10);
 /// How long a started OBS may take to answer on its WebSocket before the app says so and
@@ -84,20 +97,30 @@ const SILENT: Duration = Duration::from_secs(15);
 /// (a crash dialog, a hang) and ended, to start again.
 const DROPPED: Duration = Duration::from_secs(if cfg!(test) { 2 } else { 20 });
 
+/// The unit of the pause before a start again.
+const PAUSE: Duration = Duration::from_millis(if cfg!(test) { 50 } else { 1000 });
+
 fn backoff(crashes: u32) -> Duration {
-    Duration::from_secs(1u64 << crashes.saturating_sub(1).min(6)).min(Duration::from_secs(60))
+    (PAUSE * (2u32 << crashes.saturating_sub(1).min(5))).min(PAUSE * 60)
+}
+
+/// The words once OBS stopped TRIES times in a row, `last` the last time's.
+fn gave_up_words(last: &str) -> String {
+    format!(
+        "{last}; it stopped {TRIES} times in a row, each within minutes of its start, so reel stopped starting it. Start OBS again, in the tray or in Settings, OBS, tries once more; the log has what OBS said"
+    )
 }
 
 impl ObsBox {
-    /// Starts the supervisor; `changed` runs whenever the line changes, `crashed` with the
-    /// count at the third crash in a row.
+    /// Starts the supervisor; `changed` runs whenever the line changes, `said` with what the
+    /// user is told of beyond it.
     pub fn start(
         (bundled, copy): (Bundled, Option<Bundled>),
         setup: ObsSetup,
         clips_dir: PathBuf,
         save_key: String,
         changed: impl Fn() + Send + Sync + 'static,
-        crashed: impl Fn(u32) + Send + Sync + 'static,
+        said: impl Fn(Said) + Send + Sync + 'static,
     ) -> ObsBox {
         let (tx, rx) = mpsc::unbounded_channel();
         let line = Arc::new(Mutex::new(BoxLine {
@@ -115,15 +138,27 @@ impl ObsBox {
             line: line.clone(),
             ready: Arc::new(tokio::sync::watch::Sender::new(false)),
             note: Arc::new(Mutex::new(None)),
+            paused: Arc::new(AtomicBool::new(false)),
         };
         tauri::async_runtime::spawn(supervise(
             (bundled, copy),
             (setup, clips_dir, save_key),
             rx,
             (line, pid, me.ready.clone()),
-            (Arc::new(changed), Arc::new(crashed)),
+            me.paused.clone(),
+            (Arc::new(changed), Arc::new(said)),
         ));
         me
+    }
+
+    /// Starts OBS once more after the app stopped starting it.
+    pub fn again(&self) {
+        let _ = self.tx.send(Cmd::Again);
+    }
+
+    /// Whether recording is paused, for the next start of OBS.
+    pub fn paused(&self, yes: bool) {
+        self.paused.store(yes, Ordering::Relaxed);
     }
 
     pub fn line(&self) -> BoxLine {
@@ -214,7 +249,7 @@ fn set(line: &Mutex<BoxLine>, changed: &(dyn Fn() + Send + Sync), state: &str, w
     changed();
 }
 
-type Callbacks = (Arc<dyn Fn() + Send + Sync>, Arc<dyn Fn(u32) + Send + Sync>);
+type Callbacks = (Arc<dyn Fn() + Send + Sync>, Arc<dyn Fn(Said) + Send + Sync>);
 
 async fn supervise(
     (bundled, copy): (Bundled, Option<Bundled>),
@@ -225,9 +260,11 @@ async fn supervise(
         Arc<AtomicU32>,
         Arc<tokio::sync::watch::Sender<bool>>,
     ),
-    (changed, crashed): Callbacks,
+    paused: Arc<AtomicBool>,
+    (changed, said): Callbacks,
 ) {
     let mut crashes = 0u32;
+    let mut gave_up: Option<String> = None;
     let mut stop_reply: Option<std::sync::mpsc::Sender<()>> = None;
     let mut held = false;
     let mut hold_reply: Option<std::sync::mpsc::Sender<()>> = None;
@@ -266,13 +303,46 @@ async fn supervise(
                     clips = c;
                     save_key = k;
                 }
-                Some(Cmd::Show(_)) | Some(Cmd::Answered(_)) => {}
+                Some(Cmd::Show(_)) | Some(Cmd::Answered(_)) | Some(Cmd::Again) => {}
                 Some(Cmd::Stop(reply)) => {
                     let _ = reply.send(());
                     break 'run;
                 }
                 None => break 'run,
             }
+            continue 'run;
+        }
+        if let Some(why) = gave_up.clone() {
+            set(&line, &*changed, "gave_up", why);
+            match rx.recv().await {
+                Some(Cmd::Again) => tracing::info!("OBS is started again, as asked"),
+                Some(Cmd::Apply(s, c, k, f)) => {
+                    pending = pending.or(f);
+                    setup = *s;
+                    clips = c;
+                    save_key = k;
+                    tracing::info!("the setup changed: OBS is started again");
+                }
+                Some(Cmd::Update(s, c, k)) => {
+                    setup = *s;
+                    clips = c;
+                    save_key = k;
+                    continue 'run;
+                }
+                Some(Cmd::Show(_)) | Some(Cmd::Answered(_)) | Some(Cmd::Release) => continue 'run,
+                Some(Cmd::Hold(r)) => {
+                    held = true;
+                    let _ = r.send(());
+                    continue 'run;
+                }
+                Some(Cmd::Stop(reply)) => {
+                    let _ = reply.send(());
+                    break 'run;
+                }
+                None => break 'run,
+            }
+            gave_up = None;
+            crashes = 0;
             continue 'run;
         }
         if here
@@ -290,7 +360,7 @@ async fn supervise(
                 cmd = rx.recv() => match cmd {
                     Some(Cmd::Apply(s, c, k, f)) => { pending = pending.or(f); setup = *s; clips = c; save_key = k; continue 'run; }
                     Some(Cmd::Update(s, c, k)) => { setup = *s; clips = c; save_key = k; continue 'run; }
-                    Some(Cmd::Show(_)) | Some(Cmd::Answered(_)) => continue 'run,
+                    Some(Cmd::Show(_)) | Some(Cmd::Answered(_)) | Some(Cmd::Again) => continue 'run,
                     Some(Cmd::Stop(reply)) => { let _ = reply.send(()); break 'run; }
                     Some(Cmd::Hold(r)) => { held = true; let _ = r.send(()); continue 'run; }
                     Some(Cmd::Release) => { held = false; continue 'run; }
@@ -350,7 +420,7 @@ async fn supervise(
                 cmd = rx.recv() => match cmd {
                     Some(Cmd::Apply(s, c, k, f)) => { pending = pending.or(f); setup = *s; clips = c; save_key = k; continue 'run; }
                     Some(Cmd::Update(s, c, k)) => { setup = *s; clips = c; save_key = k; continue 'run; }
-                    Some(Cmd::Show(_)) | Some(Cmd::Answered(_)) => continue 'run,
+                    Some(Cmd::Show(_)) | Some(Cmd::Answered(_)) | Some(Cmd::Again) => continue 'run,
                     Some(Cmd::Stop(reply)) => { let _ = reply.send(()); break 'run; }
                     Some(Cmd::Hold(r)) => { held = true; let _ = r.send(()); continue 'run; }
                     Some(Cmd::Release) => { held = false; continue 'run; }
@@ -405,7 +475,7 @@ async fn supervise(
                     None => break 'run,
                     Some(Cmd::Apply(s, c, k, f)) => { pending = pending.or(f); setup = *s; clips = c; save_key = k; continue 'run; }
                     Some(Cmd::Update(s, c, k)) => { setup = *s; clips = c; save_key = k; continue 'run; }
-                    Some(Cmd::Show(_)) | Some(Cmd::Answered(_)) => continue 'run,
+                    Some(Cmd::Show(_)) | Some(Cmd::Answered(_)) | Some(Cmd::Again) => continue 'run,
                 },
             }
         }
@@ -421,7 +491,7 @@ async fn supervise(
         } else if elevated {
             start_through_task(obs, from_copy).await.map(|p| (p, None))
         } else {
-            obsproc::spawn(&bundled)
+            obsproc::spawn(&bundled, !paused.load(Ordering::Relaxed))
                 .map(|p| (p.pid, Some(p)))
                 .map_err(|e| e.to_string())
         };
@@ -429,14 +499,22 @@ async fn supervise(
             Ok(x) => x,
             Err(e) => {
                 crashes += 1;
+                if crashes >= TRIES {
+                    let words = gave_up_words(&format!("OBS did not start: {e}"));
+                    tracing::warn!(crashes, "the bundled OBS does not start; reel stops trying");
+                    said(Said::GaveUp(words.clone()));
+                    gave_up = Some(words);
+                    continue 'run;
+                }
                 let wait = backoff(crashes);
                 set(
                     &line,
                     &*changed,
                     "failed",
                     format!(
-                        "OBS did not start: {e}; trying again in {} s",
-                        wait.as_secs()
+                        "OBS did not start: {e}; trying again in {} s (try {} of {TRIES})",
+                        wait.as_secs(),
+                        crashes + 1
                     ),
                 );
                 tokio::select! {
@@ -448,7 +526,7 @@ async fn supervise(
                         None => break 'run,
                         Some(Cmd::Apply(s, c, k, f)) => { pending = pending.or(f); setup = *s; clips = c; save_key = k; continue 'run; }
                         Some(Cmd::Update(s, c, k)) => { setup = *s; clips = c; save_key = k; continue 'run; }
-                        Some(Cmd::Show(_)) | Some(Cmd::Answered(_)) => continue 'run,
+                        Some(Cmd::Show(_)) | Some(Cmd::Answered(_)) | Some(Cmd::Again) => continue 'run,
                     },
                 }
             }
@@ -551,12 +629,16 @@ async fn supervise(
                         crashes = 0;
                     }
                     crashes += 1;
-                    if crashes == 3 {
-                        crashed(crashes);
+                    let why = ended.take().unwrap_or_else(|| format!("OBS stopped (exit code {code})"));
+                    if crashes >= TRIES {
+                        let words = gave_up_words(&why);
+                        tracing::warn!(crashes, "the bundled OBS keeps stopping; reel stops starting it");
+                        said(Said::GaveUp(words.clone()));
+                        gave_up = Some(words);
+                        continue 'run;
                     }
                     let wait = backoff(crashes);
-                    let why = ended.take().unwrap_or_else(|| format!("OBS stopped (exit code {code})"));
-                    set(&line, &*changed, "restarting", format!("{why}; starting it again in {} s", wait.as_secs()));
+                    set(&line, &*changed, "restarting", format!("{why}; starting it again in {} s (try {} of {TRIES})", wait.as_secs(), crashes + 1));
                     tokio::select! {
                         _ = tokio::time::sleep(wait) => continue 'run,
                         cmd = rx.recv() => match cmd {
@@ -567,7 +649,7 @@ async fn supervise(
                             Some(Cmd::Apply(s, c, k, f)) => { pending = pending.or(f); setup = *s; clips = c; save_key = k; continue 'run; }
                             Some(Cmd::Update(s, c, k)) => { setup = *s; clips = c; save_key = k; continue 'run; }
                             Some(Cmd::Show(v)) => { if let Ok(mut l) = line.lock() { l.shown = v; } continue 'run; }
-                            Some(Cmd::Answered(_)) => continue 'run,
+                            Some(Cmd::Answered(_)) | Some(Cmd::Again) => continue 'run,
                         },
                     }
                 }
@@ -646,7 +728,7 @@ async fn supervise(
                             set(&line, &*changed, "waiting", "OBS stops for the step in Program Files".into());
                             close_then_end(&pid, reach);
                         }
-                        Some(Cmd::Release) => {}
+                        Some(Cmd::Release) | Some(Cmd::Again) => {}
                         Some(Cmd::Stop(reply)) => {
                             stopping = true;
                             stop_reply = Some(reply);
@@ -901,6 +983,9 @@ async fn start_through_task(b: &Bundled, from_copy: bool) -> Result<u32, String>
 #[cfg(test)]
 mod tests {
     use super::backoff;
+    #[cfg(target_os = "linux")]
+    use std::sync::{Arc, Mutex};
+    #[cfg(target_os = "linux")]
     use std::time::Duration;
 
     /// A stand-in OBS that writes "start" as it starts and "stop" when asked to close, with
@@ -915,18 +1000,19 @@ mod tests {
     #[cfg(target_os = "linux")]
     impl Standin {
         fn new() -> Standin {
+            Standin::running(
+                "echo start >> {log}\ntrap 'echo stop >> {log}; exit 0' TERM\nwhile :; do sleep 0.1; done",
+            )
+        }
+
+        /// A stand-in running `body`, {log} in it the file it writes to.
+        fn running(body: &str) -> Standin {
             use std::os::unix::fs::PermissionsExt;
             let dir = tempfile::tempdir().unwrap();
             let log = dir.path().join("log");
             let exe = dir.path().join("standin-obs");
-            std::fs::write(
-                &exe,
-                format!(
-                    "#!/bin/sh\necho start >> {0}\ntrap 'echo stop >> {0}; exit 0' TERM\nwhile :; do sleep 0.1; done\n",
-                    log.display()
-                ),
-            )
-            .unwrap();
+            let body = body.replace("{log}", &log.display().to_string());
+            std::fs::write(&exe, format!("#!/bin/sh\n{body}\n")).unwrap();
             std::fs::set_permissions(&exe, std::fs::Permissions::from_mode(0o755)).unwrap();
             Standin { dir, exe, log }
         }
@@ -946,6 +1032,14 @@ mod tests {
         }
 
         fn start(&self, setup: reel_desktop_core::bundled::ObsSetup) -> super::ObsBox {
+            self.start_telling(setup, |_| {})
+        }
+
+        fn start_telling(
+            &self,
+            setup: reel_desktop_core::bundled::ObsSetup,
+            said: impl Fn(super::Said) + Send + Sync + 'static,
+        ) -> super::ObsBox {
             super::ObsBox::start(
                 (
                     reel_desktop_core::bundled::Bundled::linux(self.exe.clone(), self.dir.path()),
@@ -955,7 +1049,7 @@ mod tests {
                 self.dir.path().join("clips"),
                 "F9".into(),
                 || {},
-                |_| {},
+                said,
             )
         }
     }
@@ -998,6 +1092,83 @@ mod tests {
         assert_eq!(bx.line().state, "running");
         bx.stop();
         st.wait_for("start\nstart\nstop\n");
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn an_obs_that_keeps_stopping_is_started_a_few_times_then_once_more_when_asked() {
+        let st = Standin::running("echo start >> {log}\nexit 3");
+        let told = Arc::new(Mutex::new(Vec::new()));
+        let t = told.clone();
+        let bx = st.start_telling(Default::default(), move |s| t.lock().unwrap().push(s));
+        let l = line_in(&bx, "gave_up");
+        assert_eq!(st.said(), "start\n".repeat(super::TRIES as usize));
+        assert!(
+            l.line.starts_with("OBS stopped (exit code 3); it stopped 5 times in a row, each within minutes of its start, so reel stopped starting it. Start OBS again"),
+            "{}",
+            l.line
+        );
+        assert_eq!(
+            *told.lock().unwrap(),
+            [super::Said::GaveUp(l.line.clone())],
+            "told once"
+        );
+        std::thread::sleep(Duration::from_secs(1));
+        assert_eq!(st.said().lines().count(), 5, "not started by itself");
+        bx.again();
+        std::thread::sleep(Duration::from_millis(300));
+        let l = line_in(&bx, "gave_up");
+        assert_eq!(st.said().lines().count(), 10, "a few tries again");
+        assert_eq!(told.lock().unwrap().len(), 2, "{}", l.line);
+        bx.stop();
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn while_recording_is_paused_obs_starts_without_its_replay_buffer() {
+        let st = Standin::running(
+            "echo \"start $*\" >> {log}\ntrap 'exit 0' TERM\nwhile :; do sleep 0.1; done",
+        );
+        let bx = st.start(Default::default());
+        let starts = |n: usize| {
+            for _ in 0..100 {
+                if st.said().lines().count() >= n {
+                    break;
+                }
+                std::thread::sleep(Duration::from_millis(100));
+            }
+            st.said().lines().map(str::to_string).collect::<Vec<_>>()
+        };
+        assert!(
+            starts(1)[0].contains(" --startreplaybuffer "),
+            "{:?}",
+            st.said()
+        );
+        bx.paused(true);
+        bx.apply(
+            Default::default(),
+            st.dir.path().join("clips"),
+            "F9".into(),
+            None,
+        );
+        let lines = starts(2);
+        assert!(
+            lines.len() == 2 && !lines[1].contains("--startreplaybuffer"),
+            "{lines:?}"
+        );
+        bx.paused(false);
+        bx.apply(
+            Default::default(),
+            st.dir.path().join("clips"),
+            "F9".into(),
+            None,
+        );
+        assert!(
+            starts(3)[2].contains(" --startreplaybuffer "),
+            "{:?}",
+            st.said()
+        );
+        bx.stop();
     }
 
     #[cfg(target_os = "linux")]
@@ -1056,9 +1227,10 @@ mod tests {
     }
 
     #[test]
-    fn the_pause_before_a_restart_grows_to_a_minute() {
-        let secs: Vec<u64> = (1..=9).map(|n| backoff(n).as_secs()).collect();
-        assert_eq!(secs, [1, 2, 4, 8, 16, 32, 60, 60, 60]);
-        assert_eq!(backoff(0), Duration::from_secs(1));
+    fn the_pause_before_a_restart_grows_until_the_app_stops_trying() {
+        let units = |n| backoff(n).as_millis() / super::PAUSE.as_millis();
+        let pauses: Vec<u128> = (1..super::TRIES).map(units).collect();
+        assert_eq!(pauses, [2, 4, 8, 16], "a few tries, half a minute in all");
+        assert_eq!((units(0), units(9)), (2, 60));
     }
 }

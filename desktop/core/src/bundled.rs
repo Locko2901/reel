@@ -12,6 +12,8 @@ pub const PORT: u16 = 4466;
 pub const NAME: &str = "reel";
 /// OBS's Quick Sync encoder keeps its bitrate in 16 bits: more wraps around to far less.
 const QSV_MAX_KBIT: u32 = 65535;
+/// OBS's flag that starts its replay buffer with it.
+pub const START_REPLAY: &str = "--startreplaybuffer";
 const PROFILE: &str = "obs-studio/basic/profiles/reel/basic.ini";
 const ENCODER: &str = "obs-studio/basic/profiles/reel/recordEncoder.json";
 const SCENES: &str = "obs-studio/basic/scenes/reel.json";
@@ -1004,7 +1006,7 @@ impl Bundled {
             "--multi",
             "--disable-updater",
             "--disable-missing-files-check",
-            "--startreplaybuffer",
+            START_REPLAY,
             "--profile",
             NAME,
             "--collection",

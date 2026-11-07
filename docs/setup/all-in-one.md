@@ -192,8 +192,11 @@ as well.
   **Hide OBS** to hide it again; what you changed shows under Settings, OBS.
 - **Your own OBS at the same time**: while it is open, reel's OBS waits ("your own OBS is running
   ...; reel's OBS starts once it is closed"), so two captures never run at once.
-- **If OBS crashes**, the app starts it again, a little later each time, and tells you after the
-  third crash in a row.
+- **If OBS crashes**, or stops answering for 20 seconds (a crash dialog, a hang), the app ends it
+  and starts it again, a little later each time, with the replay buffer as it was: running, or
+  stopped while recording is paused. After five stops in a row it stops trying and says why in
+  its status, the tray and a notification; **Start OBS again**, in the tray or at the top of
+  Settings, OBS, tries once more.
 - **If another encoder does not record**: after the encoder changes (in the setup, under Settings,
   OBS, or in OBS itself), reel watches OBS's next start. If the replay buffer does not run with
   it, or a save fails before any replay was saved with it, reel goes back to the encoder the last

@@ -21,17 +21,18 @@ fn act(id: &str, label: impl Into<String>, on: bool) -> Item {
 
 pub fn items(st: &Status) -> Vec<Item> {
     let standalone = st.mode == "standalone";
-    let mut out = vec![
-        Item::Line(
-            "state".into(),
-            if st.state_line.is_empty() {
-                st.state_word.clone()
-            } else {
-                format!("{}: {}", st.state_word, st.state_line)
-            },
-        ),
-        Item::Gap,
-    ];
+    let mut out = vec![Item::Line(
+        "state".into(),
+        if st.state_line.is_empty() {
+            st.state_word.clone()
+        } else {
+            format!("{}: {}", st.state_word, st.state_line)
+        },
+    )];
+    if st.obs_box.as_ref().is_some_and(|b| b.state == "gave_up") {
+        out.push(act("obs-again", "Start OBS again", true));
+    }
+    out.push(Item::Gap);
     let recent: Vec<(String, String)> = st
         .recent
         .iter()
@@ -314,6 +315,26 @@ mod tests {
                 _ => None,
             })
             .collect()
+    }
+
+    #[test]
+    fn an_obs_the_app_stopped_starting_is_started_again_from_under_the_state_line() {
+        let mut st = status("connected", true, "https://clips.example.org");
+        let line = |state: &str| crate::obsbox::BoxLine {
+            state: state.into(),
+            line: "OBS stopped (exit code 3); it stopped 5 times in a row".into(),
+            shown: false,
+            version: "33.0.1".into(),
+            elevated: false,
+            without_rights: false,
+            can_show: true,
+        };
+        st.obs_box = Some(line("running"));
+        assert!(!ids(&st).contains(&"obs-again".to_string()));
+        st.obs_box = Some(line("gave_up"));
+        assert_eq!(&ids(&st)[..2], ["state", "obs-again"]);
+        assert!(on(&st, "obs-again"));
+        assert!(!on(&st, "obs-show"), "no window to open");
     }
 
     #[test]

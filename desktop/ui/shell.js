@@ -43,7 +43,7 @@ const NAV = [
 
 const WORST = ['err', 'warn', 'active', 'ok', 'neutral'];
 const worst = (states) => WORST.find(s => states.includes(s)) || 'ok';
-const APP_DOT = { error: 'err', unpaired: 'err', paused: 'warn', uploading: 'active', working: 'active', preparing: 'active', idle: 'ok' };
+const APP_DOT = { error: 'err', unpaired: 'err', paused: 'warn', waiting: 'warn', changed: 'warn', uploading: 'active', working: 'active', preparing: 'active', idle: 'ok' };
 const HEALTH_WORD = { ok: 'ok', warn: 'warning', err: 'error' };
 let serverState = 'ok';
 let serverLine = '';

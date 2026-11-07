@@ -12,8 +12,9 @@ pub struct Proc {
 }
 
 /// Starts OBS hidden: Windows gives the start's show state to the first window a program shows.
-pub fn spawn(b: &Bundled) -> std::io::Result<Proc> {
-    sys::spawn(b)
+/// Starts OBS; without `replay` it leaves its replay buffer off, as while recording is paused.
+pub fn spawn(b: &Bundled, replay: bool) -> std::io::Result<Proc> {
+    sys::spawn(b, replay)
 }
 
 /// As `spawn`, held in a job that ends OBS with this process, so ending the task ends OBS;
@@ -236,8 +237,12 @@ mod sys {
     }
 
     /// CreateProcessW, as std's Command cannot set the start's show state that keeps OBS hidden.
-    pub fn spawn(b: &Bundled) -> std::io::Result<Proc> {
-        spawn_with(b, &b.args(false))
+    pub fn spawn(b: &Bundled, replay: bool) -> std::io::Result<Proc> {
+        let mut args = b.args(false);
+        if !replay {
+            args.retain(|a| a != crate::bundled::START_REPLAY);
+        }
+        spawn_with(b, &args)
     }
 
     pub fn spawn_held(b: &Bundled, args: &[String]) -> std::io::Result<Proc> {
@@ -844,8 +849,11 @@ mod sys {
     use reel_core::proc::command;
     use std::process::Stdio;
 
-    pub fn spawn(b: &Bundled) -> std::io::Result<Proc> {
-        let (program, args) = b.command();
+    pub fn spawn(b: &Bundled, replay: bool) -> std::io::Result<Proc> {
+        let (program, mut args) = b.command();
+        if !replay {
+            args.retain(|a| a != crate::bundled::START_REPLAY);
+        }
         let program = if b.flatpak {
             program
         } else {

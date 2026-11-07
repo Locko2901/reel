@@ -60,6 +60,7 @@
     "allow-recording-pause-set",
     "allow-upload-now",
     "allow-obs-show",
+    "allow-obs-again",
     "allow-obs-done",
     "allow-obs-copy-again",
     "allow-obs-copy-remove",
