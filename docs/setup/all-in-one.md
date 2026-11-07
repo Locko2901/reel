@@ -192,14 +192,14 @@ as well.
   **Hide OBS** to hide it again; what you changed shows under Settings, OBS.
 - **Your own OBS at the same time**: while it is open, reel's OBS waits ("your own OBS is running
   ...; reel's OBS starts once it is closed"), so two captures never run at once.
-- **If OBS crashes**, or stops answering for 20 seconds (a crash dialog, a hang), the app ends it
-  and starts it again, a little later each time, with the replay buffer as it was: running, or
-  stopped while recording is paused. An OBS that stops again right after it starts (twice in a
-  row, or once right after the encoder changed) counts as an encoder that does not record: reel
-  changes the encoder back, as the next point says. After five stops in a row it stops trying
-  and says why; **Start OBS again**, in the tray or at the top of Settings, OBS, tries once more.
-  An OBS with the highest rights that its task does not bring up is waited for instead: reel
-  says so and takes it over once it runs.
+- **If OBS crashes**, also when its crash dialog keeps it open, or stops answering for 20
+  seconds, the app ends it and starts it again, a little later each time, with the replay buffer
+  as it was: running, or stopped while recording is paused. An OBS that stops again right after
+  it starts (twice in a row, or once right after the encoder changed) counts as an encoder that
+  does not record: reel changes the encoder back, as the next point says. After five stops in a
+  row it stops trying and says why; **Start OBS again**, in the tray or at the top of Settings,
+  OBS, tries once more. An OBS with the highest rights that its task does not bring up is
+  waited for instead: reel says so and takes it over once it runs.
 - **If another encoder does not record**: after the encoder changes (in the setup, under Settings,
   OBS, or in OBS itself), reel watches OBS's next start. If the replay buffer does not run with
   it, or a save fails before any replay was saved with it, reel goes back to the encoder the last

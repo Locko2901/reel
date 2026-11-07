@@ -132,6 +132,8 @@ const SILENT: Duration = Duration::from_secs(15);
 /// How long an OBS that answered may stay away on its WebSocket before it is taken for gone
 /// (a crash dialog, a hang) and ended, to start again.
 const DROPPED: Duration = Duration::from_secs(if cfg!(test) { 2 } else { 20 });
+/// How often the app looks for a crash report of the running OBS.
+const CRASH_CHECK: Duration = Duration::from_secs(3);
 
 /// The unit of the pause before a start again.
 const PAUSE: Duration = Duration::from_millis(if cfg!(test) { 50 } else { 1000 });
@@ -655,11 +657,23 @@ async fn supervise(
         let mut asked: Option<Instant> = None;
         let gone = tokio::time::sleep(DROPPED);
         tokio::pin!(gone);
+        // OBS writes its crash report before its crash dialog, which keeps the process alive.
+        let mut crash_check = tokio::time::interval(CRASH_CHECK);
+        crash_check.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
         let mut dropped = false;
         // Why the app ended this OBS itself, for the words after its exit.
         let mut ended: Option<String> = None;
         loop {
             tokio::select! {
+                _ = crash_check.tick(), if ended.is_none() && !stopping && !restarting => {
+                    if let Some((report, _)) = obs.crash_report(started_at, 1) {
+                        let p = pid.load(Ordering::Relaxed);
+                        obs.log_what_obs_said(started_at, &format!("the bundled OBS (pid {p}) crashed: it wrote {}, and is ended", report.display()));
+                        ended = Some("OBS crashed (it wrote a crash report), so reel ended it".into());
+                        dropped = false;
+                        end(reach, p);
+                    }
+                }
                 _ = &mut gone, if dropped && !stopping && !restarting => {
                     let p = pid.load(Ordering::Relaxed);
                     let theirs = line.lock().map(|l| l.shown && !shown_for_silence).unwrap_or(false);
@@ -1193,6 +1207,25 @@ mod tests {
         assert_eq!(bx.line().state, "running");
         bx.stop();
         st.wait_for("start\nstart\nstop\n");
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn an_obs_that_wrote_a_crash_report_is_ended_though_its_process_lives_on() {
+        let st = Standin::running(
+            "echo start >> {log}\nc=$(dirname {log})/obs/obs-studio/crashes\nmkdir -p \"$c\"\necho 'Unhandled exception: c0000005' > \"$c/Crash $(date +%s%N).txt\"\ntrap 'exit 0' TERM\nwhile :; do sleep 0.1; done",
+        );
+        let bx = st.start(Default::default());
+        let l = line_in(&bx, "restarting");
+        assert!(
+            l.line.starts_with(
+                "OBS crashed (it wrote a crash report), so reel ended it; starting it again in "
+            ),
+            "{}",
+            l.line
+        );
+        st.wait_for("start\nstart\n");
+        bx.stop();
     }
 
     #[cfg(target_os = "linux")]
