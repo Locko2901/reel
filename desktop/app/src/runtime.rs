@@ -2426,12 +2426,16 @@ impl Runtime {
                         rt.push_status();
                         rt.obs_connected();
                     }
-                    ObsEvent::Disconnected { reason } => {
+                    ObsEvent::Disconnected { reason, words } => {
                         {
                             let mut g = rt.lock();
                             g.obs = ObsLine {
                                 connected: false,
-                                line: format!("not connected: {reason}"),
+                                line: if bundled {
+                                    format!("not connected: {reason}")
+                                } else {
+                                    words
+                                },
                             };
                             g.obs_state = None;
                             g.obs_game = None;

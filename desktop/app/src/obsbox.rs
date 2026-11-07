@@ -310,6 +310,8 @@ async fn supervise(
     // Runs in a row with this encoder that stopped right after their start.
     let mut quick_in_row = 0u32;
     let mut last_encoder: Option<String> = None;
+    // Starts through the task that did not bring OBS up, in a row.
+    let mut unstarted = 0u32;
     let mut stop_reply: Option<std::sync::mpsc::Sender<()>> = None;
     let mut held = false;
     let mut hold_reply: Option<std::sync::mpsc::Sender<()>> = None;
@@ -542,6 +544,34 @@ async fn supervise(
         };
         let (p, child) = match started_pid {
             Ok(x) => x,
+            Err(e) if elevated => {
+                // The app cannot start an OBS with the rights itself: it takes one over once it
+                // runs (the task at sign-in, the Start menu) and asks the task again meanwhile.
+                unstarted += 1;
+                let wait = backoff(unstarted).max(PAUSE * 10);
+                tracing::warn!(error = %e, unstarted, "OBS with the highest rights did not start through its task; the app waits for it");
+                set(
+                    &line,
+                    &*changed,
+                    "waiting",
+                    format!(
+                        "waiting for OBS with the highest rights: {e}; reel takes it over once it runs, and asks its task again in {} s",
+                        wait.as_secs()
+                    ),
+                );
+                tokio::select! {
+                    _ = tokio::time::sleep(wait) => continue 'run,
+                    cmd = rx.recv() => match cmd {
+                        Some(Cmd::Stop(reply)) => { let _ = reply.send(()); break 'run; }
+                        Some(Cmd::Hold(r)) => { held = true; let _ = r.send(()); continue 'run; }
+                        Some(Cmd::Release) => { held = false; continue 'run; }
+                        None => break 'run,
+                        Some(Cmd::Apply(s, c, k, f)) => { pending = pending.or(f); setup = *s; clips = c; save_key = k; continue 'run; }
+                        Some(Cmd::Update(s, c, k)) => { setup = *s; clips = c; save_key = k; continue 'run; }
+                        Some(Cmd::Show(_)) | Some(Cmd::Answered(_)) | Some(Cmd::Again) => continue 'run,
+                    },
+                }
+            }
             Err(e) => {
                 crashes += 1;
                 if crashes >= TRIES {
@@ -577,6 +607,7 @@ async fn supervise(
             }
         };
         let started = Instant::now();
+        unstarted = 0;
         let encoder = setup.encoder_id().to_string();
         let after_change = last_encoder.as_ref().is_some_and(|e| *e != encoder);
         last_encoder = Some(encoder.clone());

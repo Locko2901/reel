@@ -312,6 +312,7 @@ pub fn obs_trouble(box_state: &str) -> Option<(&'static str, &'static str)> {
         "restarting" => ("error", "OBS restarting"),
         "silent" => ("error", "OBS does not answer"),
         "failed" => ("error", "OBS did not start"),
+        "waiting" => ("waiting", "OBS waits"),
         _ => return None,
     })
 }
@@ -529,6 +530,7 @@ mod tests {
     fn an_obs_in_trouble_comes_first_in_the_state_line() {
         assert_eq!(obs_trouble("gave_up"), Some(("error", "OBS stopped")));
         assert_eq!(obs_trouble("restarting"), Some(("error", "OBS restarting")));
+        assert_eq!(obs_trouble("waiting"), Some(("waiting", "OBS waits")));
         assert_eq!(obs_trouble("running"), None);
         assert_eq!(obs_trouble("starting"), None);
     }
