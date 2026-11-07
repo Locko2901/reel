@@ -10,6 +10,8 @@ use std::path::{Path, PathBuf};
 pub const PORT: u16 = 4466;
 /// The profile's and the scene collection's name.
 pub const NAME: &str = "reel";
+/// OBS's Quick Sync encoder keeps its bitrate in 16 bits: more wraps around to far less.
+const QSV_MAX_KBIT: u32 = 65535;
 const PROFILE: &str = "obs-studio/basic/profiles/reel/basic.ini";
 const ENCODER: &str = "obs-studio/basic/profiles/reel/recordEncoder.json";
 const SCENES: &str = "obs-studio/basic/scenes/reel.json";
@@ -656,7 +658,10 @@ impl ObsSetup {
                     s["cqp"] = json!(self.level);
                 } else {
                     s["rate_control"] = json!("CBR");
-                    s["bitrate"] = json!(v.kbit);
+                    s["bitrate"] = json!(match id {
+                        "obs_qsv11_v2" => v.kbit.min(QSV_MAX_KBIT),
+                        _ => v.kbit,
+                    });
                 }
             }
         }
@@ -2266,6 +2271,35 @@ mod tests {
             ..s
         };
         assert_eq!(s.video().buffer_mb, 64, "never under 64 MB");
+    }
+
+    #[test]
+    fn quick_sync_gets_its_highest_bitrate_instead_of_one_that_wraps_around() {
+        let native = ObsSetup {
+            screen: screen(2560, 1440, 165),
+            quality: Quality::Native,
+            encoder: "obs_qsv11_v2".into(),
+            ..Default::default()
+        };
+        assert_eq!(native.video().kbit, 121500, "the preset's own");
+        let e = native.encoder_settings();
+        assert_eq!(
+            (
+                e["rate_control"].as_str(),
+                e["bitrate"].as_u64(),
+                e["target_usage"].as_str()
+            ),
+            (Some("CBR"), Some(65535), Some("TU4"))
+        );
+        let nvenc = ObsSetup {
+            encoder: "obs_nvenc_h264_tex".into(),
+            ..native
+        };
+        assert_eq!(
+            nvenc.encoder_settings()["bitrate"],
+            121500,
+            "NVENC takes it whole"
+        );
     }
 
     #[test]
