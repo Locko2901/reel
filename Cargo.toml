@@ -4,7 +4,7 @@ members = ["crates/*"]
 exclude = ["desktop"]
 
 [workspace.package]
-version = "1.12.2"
+version = "1.13.0"
 edition = "2021"
 license = "MIT"
 authors = ["Lockoo"]
