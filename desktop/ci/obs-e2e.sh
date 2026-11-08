@@ -245,7 +245,7 @@ wait_for 60 "the app to connect to OBS with x264" sh -c "[ \$(cat $LOG/reel-desk
 wait_for 30 "the replay buffer to run with x264" buffer_is true
 python3 -c 'import json,sys; e=json.load(open(sys.argv[1]))["obs"]["setup"]["encoder"]; sys.exit(e != "obs_x264")' "$ROOT/config/settings.json" || fail "the app's settings do not have x264"
 python3 -c 'import json,sys; k=json.load(open(sys.argv[1])); sys.exit(not any(v["id"] == "ffmpeg_svt_av1" and not v["ok"] for v in k["tested"]))' "$ROOT/data/encoders.json" || fail "SVT-AV1 is not refused: $(cat "$ROOT/data/encoders.json")"
-WORDS="SVT-AV1 (CPU) did not record here, so reel records with x264 (CPU) again"
+WORDS="OBS stopped right after it started with SVT-AV1 (CPU), so reel records with x264 (CPU) again"
 wait_for 20 "the notification" notified "Encoder changed back"
 notified "$WORDS" || fail "the notification's words: $(grep -A1 'Encoder changed back' "$ROOT/notifications.txt" | tail -1)"
 wait_for 20 "the tray's state line" log_has "line=encoder changed back: $WORDS"

@@ -348,9 +348,15 @@ pub async fn watch_start(rt: Runtime, gen: u64) {
 }
 
 /// OBS's supervisor: an OBS that does not answer or stopped by itself before its replay buffer
-/// ran with a new encoder takes the change back.
+/// ran with a new encoder takes the change back; a stop is said as the supervisor's crash loop
+/// says it.
 pub fn on_box(rt: &Runtime, state: &str, line: &str) {
-    if !matches!(state, "silent" | "restarting") || !watched(rt) {
+    let did = match state {
+        "silent" => Did::NotRecord,
+        "restarting" => Did::StopObs,
+        _ => return,
+    };
+    if !watched(rt) {
         return;
     }
     let enc = current(rt);
@@ -361,7 +367,7 @@ pub fn on_box(rt: &Runtime, state: &str, line: &str) {
         started.as_deref(),
         Sign::NotStarted,
     ) {
-        take_back(rt, &enc, line);
+        back(rt, &enc, line, false, did);
     }
 }
 
@@ -382,33 +388,67 @@ pub fn on_save_failed(rt: &Runtime, why: &str) {
 /// or one refused; a second call for the same encoder, or one while the setup tries encoders,
 /// does nothing.
 pub fn take_back(rt: &Runtime, failed: &str, why: &str) {
-    back(rt, failed, why, false)
+    back(rt, failed, why, false, Did::NotRecord)
 }
 
-fn back(rt: &Runtime, failed: &str, why: &str, now: bool) {
-    let (back, b, since) = {
+/// The same for OBS stopping right after it started with `failed`, again and again (the
+/// supervisor's crash loop, decided by `encoders::undo`): the words say just that.
+pub fn take_back_stopped(rt: &Runtime, failed: &str, why: &str) {
+    back(rt, failed, why, false, Did::StopObs)
+}
+
+/// What the encoder did that has it changed back, as far as reel knows.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Did {
+    /// The replay buffer did not run with it, or a save failed.
+    NotRecord,
+    /// OBS stopped right after it started with it.
+    StopObs,
+}
+
+/// The state line's words for a change back from `failed` to `back`, and what is kept as the
+/// reason `failed` is refused: with `why`, the details, when it did not record; a stop is said
+/// the same whichever watch saw it, its details in the log.
+fn back_words(did: Did, failed: &str, back: &str, why: &str) -> (String, String) {
+    let (failed, back) = (encoder_word(failed), encoder_word(back));
+    match did {
+        Did::NotRecord => (
+            format!("{failed} did not record here, so reel records with {back} again"),
+            format!("it did not record here: {why}"),
+        ),
+        Did::StopObs => (
+            format!(
+                "OBS stopped right after it started with {failed}, so reel records with {back} again"
+            ),
+            "OBS stopped right after it started with it".to_string(),
+        ),
+    }
+}
+
+fn back(rt: &Runtime, failed: &str, why: &str, now: bool, did: Did) {
+    let (back, refused, b, since) = {
         let mut g = rt.lock();
         if g.encoder_trial.is_some() || g.encoder_back.as_ref().is_some_and(|(f, _)| f == failed) {
             return;
         }
         let back = g.encoders.back_to(failed);
-        let words = format!(
-            "{} did not record here, so reel records with {} again",
-            encoder_word(failed),
-            encoder_word(&back)
-        );
+        let (words, refused) = back_words(did, failed, &back, why);
         g.encoder_back = Some((failed.to_string(), words));
-        (back, g.bundled.clone(), g.obs_since)
+        (back, refused, g.bundled.clone(), g.obs_since)
     };
     tracing::warn!(failed, back = %back, why, "the change of encoder is taken back");
     if b.is_some() {
-        obs_said(rt, since, &format!("{failed} did not record ({why})"));
+        let what = match did {
+            Did::NotRecord => format!("{failed} did not record ({why})"),
+            Did::StopObs => format!("OBS stopped right after it started with {failed} ({why})"),
+        };
+        obs_said(rt, since, &what);
     }
     rt.keep_known(|k| {
         k.set(Verdict {
             id: failed.to_string(),
             ok: false,
-            why: format!("it did not record here: {why}"),
+            why: refused,
         })
     });
     rt.set_encoder(&back, now);
@@ -443,6 +483,44 @@ pub fn before_start(rt: &Runtime) {
                 listed.join(", ")
             ),
             true,
+            Did::NotRecord,
+        );
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{back_words, Did};
+
+    #[test]
+    fn a_change_back_says_what_the_encoder_did() {
+        assert_eq!(
+            back_words(
+                Did::NotRecord,
+                "obs_nvenc_h264_tex",
+                "obs_x264",
+                "OBS's replay buffer did not run within 10 s of its start"
+            ),
+            (
+                "NVIDIA NVENC H.264 did not record here, so reel records with x264 (CPU) again"
+                    .to_string(),
+                "it did not record here: OBS's replay buffer did not run within 10 s of its start"
+                    .to_string()
+            )
+        );
+        assert_eq!(
+            back_words(
+                Did::StopObs,
+                "ffmpeg_svt_av1",
+                "obs_x264",
+                "OBS stopped within 30 s of its start twice in a row"
+            ),
+            (
+                "OBS stopped right after it started with SVT-AV1 (CPU), so reel records with x264 (CPU) again"
+                    .to_string(),
+                "OBS stopped right after it started with it".to_string()
+            ),
+            "what is known, not that it did not record"
         );
     }
 }
