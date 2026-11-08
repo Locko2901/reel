@@ -232,6 +232,9 @@ ADV="$OBSCONF/basic/profiles/reel/basic.ini"
   done
 ) &
 KILLER=$!
+# A crash loop changes back only an encoder no replay was saved with yet: SVT-AV1 is tested, and
+# the last replay is x264's.
+python3 -c 'import json,sys; k=json.load(open(sys.argv[1])); sys.exit(k.get("worked") != "obs_x264")' "$ROOT/data/encoders.json" || fail "the last replay is not x264's: $(cat "$ROOT/data/encoders.json")"
 c=$(log_n "obs connected")
 "$APP" --encoder=ffmpeg_svt_av1 >>"$ROOT/app.out" 2>&1 || true
 wait_for 60 "OBS to start with SVT-AV1" grep -q '^RecEncoder=ffmpeg_svt_av1$' "$ADV"
@@ -246,7 +249,7 @@ WORDS="SVT-AV1 (CPU) did not record here, so reel records with x264 (CPU) again"
 wait_for 20 "the notification" notified "Encoder changed back"
 notified "$WORDS" || fail "the notification's words: $(grep -A1 'Encoder changed back' "$ROOT/notifications.txt" | tail -1)"
 wait_for 20 "the tray's state line" log_has "line=encoder changed back: $WORDS"
-ok "SVT-AV1 stopped OBS $(wc -l <"$ROOT/killed.txt") time(s) right after its start; reel went back to x264, the encoder of the last replay, in its settings and OBS's, refused SVT-AV1 until the setup tests it, started OBS (the buffer runs) and said so in a notification and the tray's first line: \"encoder changed back: $WORDS\""
+ok "SVT-AV1, tested but no replay saved with it, stopped OBS $(wc -l <"$ROOT/killed.txt") time(s) right after its start; reel went back to x264, the encoder of the last replay, in its settings and OBS's, refused SVT-AV1 until the setup tests it, started OBS (the buffer runs) and said so in a notification and the tray's first line: \"encoder changed back: $WORDS\""
 
 say "the app quits: OBS stops"
 quit_app

@@ -2,7 +2,7 @@
 //! stopped cleanly on quit. On Windows it waits while the user's own OBS runs.
 use crate::updates::secs;
 use reel_desktop_core::bundled::{Bundled, ObsSetup, Platform};
-use reel_desktop_core::encoders::X264;
+use reel_desktop_core::encoders::{self, Known, Sign};
 use reel_desktop_core::obsproc;
 use serde::Serialize;
 use std::path::PathBuf;
@@ -62,8 +62,9 @@ enum Cmd {
 pub enum Said {
     /// OBS kept stopping and is not started again until asked; the words say why.
     GaveUp(String),
-    /// OBS stopped right after it started with the encoder `from`, for `why`: the app changes
-    /// the encoder back, which starts OBS again with the one it goes back to.
+    /// OBS stopped right after it started with the encoder `from`, one no replay was saved with
+    /// yet, for `why`: the app changes the encoder back, which starts OBS again with the one it
+    /// goes back to.
     FellBack { from: String, why: String },
 }
 
@@ -106,13 +107,7 @@ const QUICK: Duration = Duration::from_secs(30);
 /// How long a start again waits for the setup with x264 the app saves after a fall back.
 const FALL_BACK_WAIT: Duration = Duration::from_secs(15);
 
-/// Whether OBS's encoder should be changed back: it stopped right after its start twice in a
-/// row, or once right after its encoder changed, with an encoder other than x264.
-pub fn fall_back(encoder: &str, quick_in_row: u32, after_change: bool) -> bool {
-    encoder != X264 && (quick_in_row >= 2 || (after_change && quick_in_row >= 1))
-}
-
-/// Why the encoder is changed back, for the app's log and what it keeps of the encoder.
+/// Why the encoder is changed back, for the app's log.
 pub fn fell_back_why(after_change: bool) -> String {
     format!(
         "OBS stopped within {} s of its start {}",
@@ -151,7 +146,7 @@ fn gave_up_words(last: &str) -> String {
 
 impl ObsBox {
     /// Starts the supervisor; `changed` runs whenever the line changes, `said` with what the
-    /// user is told of beyond it.
+    /// user is told of beyond it, `known` for what the app knows of the encoders now.
     pub fn start(
         (bundled, copy): (Bundled, Option<Bundled>),
         setup: ObsSetup,
@@ -159,6 +154,7 @@ impl ObsBox {
         save_key: String,
         changed: impl Fn() + Send + Sync + 'static,
         said: impl Fn(Said) + Send + Sync + 'static,
+        known: impl Fn() -> Known + Send + Sync + 'static,
     ) -> ObsBox {
         let (tx, rx) = mpsc::unbounded_channel();
         let line = Arc::new(Mutex::new(BoxLine {
@@ -184,7 +180,7 @@ impl ObsBox {
             rx,
             (line, pid, me.ready.clone()),
             me.flags.clone(),
-            (Arc::new(changed), Arc::new(said)),
+            (Arc::new(changed), Arc::new(said), Arc::new(known)),
         ));
         me
     }
@@ -293,7 +289,11 @@ fn set(line: &Mutex<BoxLine>, changed: &(dyn Fn() + Send + Sync), state: &str, w
     changed();
 }
 
-type Callbacks = (Arc<dyn Fn() + Send + Sync>, Arc<dyn Fn(Said) + Send + Sync>);
+type Callbacks = (
+    Arc<dyn Fn() + Send + Sync>,
+    Arc<dyn Fn(Said) + Send + Sync>,
+    Arc<dyn Fn() -> Known + Send + Sync>,
+);
 
 async fn supervise(
     (bundled, copy): (Bundled, Option<Bundled>),
@@ -305,7 +305,7 @@ async fn supervise(
         Arc<tokio::sync::watch::Sender<bool>>,
     ),
     Flags { paused, trial }: Flags,
-    (changed, said): Callbacks,
+    (changed, said, known): Callbacks,
 ) {
     let mut crashes = 0u32;
     let mut gave_up: Option<String> = None;
@@ -734,10 +734,11 @@ async fn supervise(
                         quick_in_row = if started.elapsed() < QUICK { quick_in_row + 1 } else { 0 };
                     }
                     let mut wait = backoff(crashes.max(1));
+                    let stopped = Sign::StoppedQuickly { in_row: quick_in_row, after_change };
                     let words = if trying {
                         tracing::info!(encoder, "OBS stopped while an encoder is tried");
                         format!("{why} while an encoder is tried; starting it again in {} s", wait.as_secs())
-                    } else if fall_back(&encoder, quick_in_row, after_change) {
+                    } else if encoders::undo(&known(), &encoder, None, stopped) {
                         tracing::warn!(from = encoder, after_change, quick_in_row, "OBS stopped right after it started; its encoder is changed back");
                         quick_in_row = 0;
                         crashes = crashes.min(TRIES - 1);
@@ -1099,6 +1100,8 @@ async fn start_through_task(b: &Bundled, from_copy: bool) -> Result<u32, String>
 mod tests {
     use super::backoff;
     #[cfg(target_os = "linux")]
+    use reel_desktop_core::encoders::{Known, Verdict, X264};
+    #[cfg(target_os = "linux")]
     use std::sync::{Arc, Mutex};
     #[cfg(target_os = "linux")]
     use std::time::Duration;
@@ -1155,6 +1158,16 @@ mod tests {
             setup: reel_desktop_core::bundled::ObsSetup,
             said: impl Fn(super::Said) + Send + Sync + 'static,
         ) -> super::ObsBox {
+            self.start_knowing(setup, said, Known::default())
+        }
+
+        /// Started with `known` as what the app knows of the encoders.
+        fn start_knowing(
+            &self,
+            setup: reel_desktop_core::bundled::ObsSetup,
+            said: impl Fn(super::Said) + Send + Sync + 'static,
+            known: Known,
+        ) -> super::ObsBox {
             super::ObsBox::start(
                 (
                     reel_desktop_core::bundled::Bundled::linux(self.exe.clone(), self.dir.path()),
@@ -1165,6 +1178,7 @@ mod tests {
                 "F9".into(),
                 || {},
                 said,
+                move || known.clone(),
             )
         }
     }
@@ -1257,10 +1271,27 @@ mod tests {
         bx.stop();
     }
 
+    /// What the app knows of AMF: its test passed, and the last replay was saved with it when
+    /// `proven`, else with x264.
+    #[cfg(target_os = "linux")]
+    fn amf_known(proven: bool) -> Known {
+        Known {
+            tested: vec![Verdict {
+                id: "h264_texture_amf".into(),
+                ok: true,
+                why: String::new(),
+            }],
+            worked: if proven { "h264_texture_amf" } else { X264 }.into(),
+        }
+    }
+
     /// A stand-in OBS that crashes at once while its profile names AMF, and runs otherwise; the
     /// box's `said` saves x264 as the app does, and what it said is kept.
     #[cfg(target_os = "linux")]
-    fn crashing_with_amf(first: &str) -> (Standin, super::ObsBox, Arc<Mutex<Vec<super::Said>>>) {
+    fn crashing_with_amf(
+        first: &str,
+        known: Known,
+    ) -> (Standin, super::ObsBox, Arc<Mutex<Vec<super::Said>>>) {
         let st = Standin::running(
             "p=$(dirname {log})/obs/obs-studio/basic/profiles/reel/basic.ini\nenc=$(sed -n 's/^RecEncoder=//p' \"$p\")\necho \"start $enc\" >> {log}\n[ \"$enc\" = h264_texture_amf ] && exit 3\ntrap 'exit 0' TERM\nwhile :; do sleep 0.1; done",
         );
@@ -1271,18 +1302,19 @@ mod tests {
             encoder: encoder.into(),
             ..Default::default()
         };
-        let bx = st.start_telling(setup(first), move |said| {
+        let told_by = move |said| {
             if let super::Said::FellBack { from, .. } = &said {
                 let bx = c.get().expect("the box");
                 bx.apply(
-                    setup(super::X264),
+                    setup(X264),
                     clips.clone(),
                     "F9".into(),
                     Some((setup(from), clips.clone(), "F9".into())),
                 );
             }
             t.lock().unwrap().push(said);
-        });
+        };
+        let bx = st.start_knowing(setup(first), told_by, known);
         let _ = cell.set(bx.clone());
         (st, bx, told)
     }
@@ -1290,7 +1322,7 @@ mod tests {
     #[cfg(target_os = "linux")]
     #[test]
     fn an_obs_that_crashes_twice_right_after_its_start_starts_with_x264() {
-        let (st, bx, told) = crashing_with_amf("h264_texture_amf");
+        let (st, bx, told) = crashing_with_amf("h264_texture_amf", amf_known(false));
         st.wait_for("start h264_texture_amf\nstart h264_texture_amf\nstart obs_x264\n");
         assert_eq!(line_in(&bx, "running").state, "running");
         let told = told.lock().unwrap().clone();
@@ -1307,7 +1339,7 @@ mod tests {
     #[cfg(target_os = "linux")]
     #[test]
     fn while_an_encoder_is_tried_obs_stopping_counts_toward_nothing() {
-        let (st, bx, told) = crashing_with_amf("h264_texture_amf");
+        let (st, bx, told) = crashing_with_amf("h264_texture_amf", amf_known(false));
         bx.trying(true);
         std::thread::sleep(Duration::from_secs(2));
         let starts = st.said().lines().count();
@@ -1337,8 +1369,20 @@ mod tests {
     #[cfg(target_os = "linux")]
     #[test]
     fn an_encoder_change_that_crashes_obs_right_away_falls_back_after_one_crash() {
-        let (st, bx, told) = crashing_with_amf(super::X264);
+        let (st, bx, told) = crashing_with_amf(X264, amf_known(false));
         st.wait_for("start obs_x264\n");
+        to_amf(&st, &bx);
+        st.wait_for("start obs_x264\nstart h264_texture_amf\nstart obs_x264\n");
+        assert!(matches!(
+            told.lock().unwrap().as_slice(),
+            [super::Said::FellBack { from, .. }] if from == "h264_texture_amf"
+        ));
+        bx.stop();
+    }
+
+    /// The setup's encoder changed from x264 to AMF, as Settings does it.
+    #[cfg(target_os = "linux")]
+    fn to_amf(st: &Standin, bx: &super::ObsBox) {
         let setup = |encoder: &str| reel_desktop_core::bundled::ObsSetup {
             encoder: encoder.into(),
             ..Default::default()
@@ -1348,13 +1392,61 @@ mod tests {
             setup("h264_texture_amf"),
             clips.clone(),
             "F9".into(),
-            Some((setup(super::X264), clips, "F9".into())),
+            Some((setup(X264), clips, "F9".into())),
         );
-        st.wait_for("start obs_x264\nstart h264_texture_amf\nstart obs_x264\n");
-        assert!(matches!(
-            told.lock().unwrap().as_slice(),
-            [super::Said::FellBack { from, .. }] if from == "h264_texture_amf"
-        ));
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn a_crash_loop_with_the_encoder_of_the_last_replay_keeps_it_and_gives_up_after_five() {
+        let (st, bx, told) = crashing_with_amf("h264_texture_amf", amf_known(true));
+        let l = line_in(&bx, "gave_up");
+        assert_eq!(
+            st.said(),
+            "start h264_texture_amf\n".repeat(super::TRIES as usize),
+            "five tries, all with AMF"
+        );
+        assert!(
+            l.line
+                .starts_with("OBS stopped (exit code 3); it stopped 5 times in a row"),
+            "{}",
+            l.line
+        );
+        assert_eq!(
+            *told.lock().unwrap(),
+            [super::Said::GaveUp(l.line.clone())],
+            "no change back"
+        );
+        bx.again();
+        std::thread::sleep(Duration::from_millis(300));
+        line_in(&bx, "gave_up");
+        assert_eq!(
+            st.said(),
+            "start h264_texture_amf\n".repeat(2 * super::TRIES as usize),
+            "Start OBS again: a few tries more, still with AMF"
+        );
+        bx.stop();
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn a_change_to_the_encoder_of_the_last_replay_that_crashes_obs_is_not_changed_back() {
+        let (st, bx, told) = crashing_with_amf(X264, amf_known(true));
+        st.wait_for("start obs_x264\n");
+        to_amf(&st, &bx);
+        let l = line_in(&bx, "gave_up");
+        assert_eq!(
+            st.said(),
+            format!(
+                "start obs_x264\n{}",
+                "start h264_texture_amf\n".repeat(super::TRIES as usize)
+            )
+        );
+        assert_eq!(
+            *told.lock().unwrap(),
+            [super::Said::GaveUp(l.line.clone())],
+            "no change back"
+        );
         bx.stop();
     }
 
@@ -1462,23 +1554,7 @@ mod tests {
     }
 
     #[test]
-    fn a_crash_loop_falls_back_to_x264_twice_in_a_row_or_once_after_the_encoder_changed() {
-        use super::fall_back;
-        let amf = "h264_texture_amf";
-        assert!(
-            !fall_back(amf, 1, false),
-            "one stop right after a start: once more as it is"
-        );
-        assert!(fall_back(amf, 2, false), "again right after the start");
-        assert!(fall_back(amf, 1, true), "right after the encoder changed");
-        assert!(
-            !fall_back(amf, 0, true),
-            "a stop after half a minute is no crash loop"
-        );
-        assert!(
-            !fall_back(super::X264, 3, true),
-            "x264 is where it falls back to"
-        );
+    fn why_a_crash_loop_changed_the_encoder_back() {
         assert_eq!(
             super::fell_back_why(true),
             "OBS stopped within 30 s of its start right after the encoder changed"

@@ -1631,6 +1631,7 @@ impl Runtime {
             None => {
                 let rt = self.clone();
                 let told = self.clone();
+                let knows = self.clone();
                 let copy = self.lock().copy.clone();
                 let bx = crate::obsbox::ObsBox::start(
                     (b, copy),
@@ -1639,6 +1640,7 @@ impl Runtime {
                     s.hotkeys.save.clone(),
                     move || rt.obs_box_changed(),
                     move |said| told.obs_said(said),
+                    move || knows.lock().encoders.clone(),
                 );
                 let mut g = self.lock();
                 bx.paused(g.recording_paused);

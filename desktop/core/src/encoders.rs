@@ -192,10 +192,16 @@ pub enum Sign {
     NotStarted,
     /// OBS took a save and wrote no replay, or refused it.
     SaveFailed,
+    /// OBS stopped within seconds of its start `in_row` times in a row with the encoder, the
+    /// first of them right after the encoder changed to it when `after_change`.
+    StoppedQuickly { in_row: u32, after_change: bool },
 }
 
-/// The rule for undoing a change of encoder: only one no replay was saved with yet, and a
-/// buffer that does not start only when it never ran with this encoder in this run.
+/// The rule for undoing a change of encoder, for every sign: only one no replay was saved with
+/// yet; a buffer that does not start only when it never ran with this encoder in this run; a
+/// crash loop only when OBS stopped right after its start twice in a row, or once right after
+/// the encoder changed. OBS stopping again and again with the encoder of the last replay is not
+/// the encoder's: it goes the way of any crash loop.
 pub fn undo(known: &Known, encoder: &str, started_with: Option<&str>, sign: Sign) -> bool {
     if known.proven(encoder) {
         return false;
@@ -203,6 +209,10 @@ pub fn undo(known: &Known, encoder: &str, started_with: Option<&str>, sign: Sign
     match sign {
         Sign::NotStarted => started_with.map(id_of) != Some(id_of(encoder)),
         Sign::SaveFailed => true,
+        Sign::StoppedQuickly {
+            in_row,
+            after_change,
+        } => in_row >= 2 || (after_change && in_row >= 1),
     }
 }
 
@@ -331,6 +341,57 @@ mod tests {
             "a replay was saved with it"
         );
         assert!(!undo(&k, q, Some(q), Sign::SaveFailed));
+    }
+
+    fn stopped(in_row: u32, after_change: bool) -> Sign {
+        Sign::StoppedQuickly {
+            in_row,
+            after_change,
+        }
+    }
+
+    #[test]
+    fn a_crash_loop_undoes_only_an_encoder_no_replay_was_saved_with() {
+        let mut k = tested(&[("h264_texture_amf", true), ("obs_nvenc_h264_tex", true)]);
+        let amf = "h264_texture_amf";
+        assert!(
+            !undo(&k, amf, None, stopped(1, false)),
+            "one stop right after a start: once more as it is"
+        );
+        assert!(
+            undo(&k, amf, None, stopped(2, false)),
+            "again right after the start"
+        );
+        assert!(
+            undo(&k, amf, None, stopped(1, true)),
+            "right after the encoder changed"
+        );
+        assert!(
+            !undo(&k, amf, None, stopped(0, true)),
+            "a stop after half a minute is no crash loop"
+        );
+        assert!(
+            undo(&k, amf, Some(amf), stopped(2, false)),
+            "its buffer ran in this run: a crash loop still counts"
+        );
+        assert!(
+            !undo(&k, X264, None, stopped(3, true)),
+            "x264 is where it goes back to"
+        );
+        assert!(!undo(&k, "", None, stopped(3, true)));
+        k.worked = "obs_nvenc_h264_tex".into();
+        assert!(
+            !undo(&k, "obs_nvenc_h264_tex", None, stopped(5, false)),
+            "the last replay was saved with it: not the encoder's, however often OBS stops"
+        );
+        assert!(
+            !undo(&k, "obs_nvenc_h264_tex", None, stopped(1, true)),
+            "picked again after another one: still not the encoder's"
+        );
+        assert!(
+            undo(&k, amf, None, stopped(2, false)),
+            "another encoder's crash loop is still undone"
+        );
     }
 
     #[test]
