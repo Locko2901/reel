@@ -11,8 +11,23 @@ S=/work/desktop/.wine-standins
 W=$(mktemp -d)
 export HOME="$W/home" WINEDEBUG=-all DISPLAY=:97 WINEDLLOVERRIDES="mscoree,mshtml="
 mkdir -p "$HOME"
-fail() { printf 'FAIL %s\n' "$*"; wineserver -k 2>/dev/null || true; exit 1; }
-ok() { printf 'ok   %s\n' "$*"; }
+# The output of the commands the check does not show, and the step it is at: a command that stops
+# the check under set -e names both, instead of ending it without a word.
+OUT="$W/quiet.log" STEP="its start" SAID=""
+: >"$OUT"
+at() { STEP=$*; }
+said() {
+  tail -n 20 "$OUT" | cut -c1-300 | sed 's/^/     /'
+  printf '     (Linux %s, %s)\n' "$(uname -r)" "$(wine --version 2>&1 | head -1)"
+}
+fail() { SAID=1; printf 'FAIL %s\n' "$*"; wineserver -k 2>/dev/null || true; exit 1; }
+trap 'code=$?; [ "$code" = 0 ] || [ -n "$SAID" ] || { printf "FAIL %s: a command stopped the check with exit %s; the last quiet one said:\n" "$STEP" "$code"; said; }' EXIT
+quiet() { # quiet <command...>: its output kept with Wine's errors, and shown when it fails
+  printf '$ %s\n' "$*" >"$OUT"
+  WINEDEBUG=-all,err+all "$@" >>"$OUT" 2>&1 || { c=$?; fail "$STEP: $* ended with exit $c, saying:
+$(said)"; }
+}
+ok() { printf 'ok   %s\n' "$*"; STEP="the step after the last ok"; }
 running() { pgrep -fi "$1" >/dev/null 2>&1; }
 [ -f "$WITH" ] || fail "$(basename "$WITH") is not there"
 skip() { printf 'skip %s\n' "$*"; }
@@ -21,31 +36,36 @@ HAVE_PLAIN=""
 Xvfb :97 -screen 0 1024x768x24 -nolisten tcp >/dev/null 2>&1 &
 sleep 1
 prefix() { # a Windows 10 of its own, WebView2 there as far as the installers look
+  at "a Windows 10 of its own ($1)"
   export WINEPREFIX="$W/$1"
-  wineboot -i >/dev/null 2>&1
-  wine winecfg -v win10 >/dev/null 2>&1
-  wine reg add 'HKCU\Software\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}' /v pv /d 130.0.2849.80 /f >/dev/null 2>&1
-  wineserver -w
-  L=$(wine cmd /c "echo %LOCALAPPDATA%" 2>/dev/null | tr -d '\r')
-  R=$(wine cmd /c "echo %APPDATA%" 2>/dev/null | tr -d '\r')
-  I="$(winepath -u "$L" 2>/dev/null)/reel"
-  WI=$(winepath -w "$I" 2>/dev/null | tr -d '\r')
-  SET="$(winepath -u "$R" 2>/dev/null)/reel"
-  MENU="$(winepath -u "$R" 2>/dev/null)/Microsoft/Windows/Start Menu/Programs/reel.lnk"
+  quiet wineboot -i
+  quiet wine winecfg -v win10
+  quiet wine reg add 'HKCU\Software\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}' /v pv /d 130.0.2849.80 /f
+  quiet wineserver -w
+  L=$(wine cmd /c "echo %LOCALAPPDATA%" 2>>"$OUT" | tr -d '\r')
+  R=$(wine cmd /c "echo %APPDATA%" 2>>"$OUT" | tr -d '\r')
+  [ -n "$L" ] && [ -n "$R" ] || fail "$STEP: Wine names no %LOCALAPPDATA% or %APPDATA%:
+$(said)"
+  I="$(winepath -u "$L" 2>>"$OUT")/reel"
+  WI=$(winepath -w "$I" 2>>"$OUT" | tr -d '\r')
+  SET="$(winepath -u "$R" 2>>"$OUT")/reel"
+  MENU="$(winepath -u "$R" 2>>"$OUT")/Microsoft/Windows/Start Menu/Programs/reel.lnk"
 }
 inst() { # inst <installer> [switches]: silently, as the updater and a switch run it
   f=$1
   shift
+  at "$(basename "$f") $*, silently"
   timeout 600 wine "$f" /S "$@" || fail "$(basename "$f") $*: exit $?"
-  wineserver -w
+  quiet wineserver -w
   [ -f "$I/reel-desktop.exe" ] || fail "$(basename "$f") $*: no reel-desktop.exe in $I"
 }
 key() { wine reg query "$1" >/dev/null 2>&1; }
 UNINST='HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall'
 entries() { wine reg query "$UNINST" /s 2>/dev/null | tr -d '\r' | grep -c 'DisplayName.*REG_SZ *reel$' || true; }
 uninstall() { # the uninstaller, silently, in place, waited for to its end
+  at "the uninstaller, silently"
   timeout 600 wine "$I/uninstall.exe" /S "_?=$WI" >/dev/null 2>&1 || true
-  wineserver -w
+  quiet wineserver -w
 }
 SCHEME='HKCU\Software\Classes\reel-desktop'
 scheme() {
@@ -58,6 +78,7 @@ app_files() { for f in reel-desktop.exe ffmpeg.exe ffprobe.exe binaries/ffmpeg-L
 update() {
   exe=$1 title=$2 what=$3
   shift 3
+  at "$what ($*)"
   rm -f "$I/logs/installer.log"
   timeout 600 wine "$exe" "$@" >/dev/null 2>&1 &
   seen=""
@@ -202,8 +223,9 @@ else
 skip "$P over $F, refused silently and with /WITHOUTOBS: its installer was not built in this run"
 fi
 
-wine reg add 'HKCU\Software\Microsoft\Windows\CurrentVersion\Run' /v reel /d "$WI\\reel-desktop.exe" /f >/dev/null 2>&1
-C="$(winepath -u 'C:\' 2>/dev/null)Clips"
+at "the uninstaller's start: reel set to start at sign-in, its settings, a clip and a log"
+quiet wine reg add 'HKCU\Software\Microsoft\Windows\CurrentVersion\Run' /v reel /d "$WI\\reel-desktop.exe" /f
+C="$(winepath -u 'C:\' 2>>"$OUT")Clips"
 mkdir -p "$SET" "$C" "$I/logs"
 printf '{\n  "clips_dir": "C:\\\\Clips",\n  "device_name": "kept"\n}' > "$SET/settings.json"
 printf 'a clip' > "$C/Replay 2026-10-13 21-14-03.mp4"
