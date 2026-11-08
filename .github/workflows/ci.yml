@@ -252,7 +252,9 @@ jobs:
     name: Desktop · installers on the release
     needs: [release-please]
     if: ${{ always() && (needs.release-please.outputs.release_created == 'true' || (github.event_name == 'workflow_dispatch' && inputs.tag != '')) }}
-    runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}
+    # Wine does not start in a container on GitHub's Ubuntu 26.04 runners (ubuntu-latest there):
+    # wineboot -i ends with exit 1. Back to ubuntu-latest once it does.
+    runs-on: ${{ vars.RUNS_ON || 'ubuntu-24.04' }}
     permissions:
       contents: write
     steps:

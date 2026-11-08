@@ -92,7 +92,9 @@ jobs:
     name: Desktop · Windows installer
     needs: [changes, check]
     if: ${{ !cancelled() && needs.changes.outputs.windows != 'false' && contains(fromJSON('["success", "skipped"]'), needs.check.result) && !startsWith(github.head_ref, 'release-please--') }}
-    runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}
+    # Wine does not start in a container on GitHub's Ubuntu 26.04 runners (ubuntu-latest there):
+    # wineboot -i ends with exit 1. Back to ubuntu-latest once it does.
+    runs-on: ${{ vars.RUNS_ON || 'ubuntu-24.04' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/free-disk
