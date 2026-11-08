@@ -14990,18 +14990,22 @@ async fn a_library_that_goes_away_while_a_check_reads_it_is_seen_by_the_next() {
 
     let marker = nas.join(reel_core::config::MARKER);
     let text = std::fs::read(&marker).unwrap();
-    std::fs::remove_file(&marker).unwrap();
+    // made beside the marker and moved over it: a check that found no marker would mark the
+    // folder again, as it holds the clip's folder
+    let pipe = nas.join("marker.pipe");
     assert!(std::process::Command::new("mkfifo")
-        .arg(&marker)
+        .arg(&pipe)
         .status()
         .unwrap()
         .success());
+    std::fs::rename(&pipe, &marker).unwrap();
     let ctx = env.ctx.clone();
     let first = tokio::spawn(async move { reel_pipeline::library::check(&ctx).await });
     let pipe = marker.clone();
-    // opening a pipe to write returns once a reader has it open: a check is in its read
+    // opening a pipe to write returns once a reader has it open: a check is in its read, and
+    // stays in it until the pipe is written and closed (or its 10 s are up)
     let mut writer = tokio::time::timeout(
-        Duration::from_secs(30),
+        Duration::from_secs(30) * SLOW,
         tokio::task::spawn_blocking(move || std::fs::OpenOptions::new().write(true).open(pipe)),
     )
     .await
@@ -15012,14 +15016,17 @@ async fn a_library_that_goes_away_while_a_check_reads_it_is_seen_by_the_next() {
     let away = nas.with_file_name("nas-away");
     std::fs::rename(&nas, &away).unwrap();
     std::fs::create_dir(&nas).unwrap();
-    let ctx = env.ctx.clone();
-    let second = tokio::spawn(async move { reel_pipeline::library::check(&ctx).await });
-    // time for the second check to answer at once, were it to answer for the read under way
-    tokio::time::sleep(Duration::from_millis(500)).await;
+    // polled once, the check meets the one in its read: it answers at once or waits its turn
+    let mut second = Box::pin(reel_pipeline::library::check(&env.ctx));
+    let polled = futures::poll!(&mut second);
     std::io::Write::write_all(&mut writer, &text).unwrap();
     drop(writer);
+    // before `first`, which may wait its turn behind it
+    let status = match polled {
+        std::task::Poll::Ready(status) => status,
+        std::task::Poll::Pending => second.await,
+    };
     first.await.unwrap();
-    let status = second.await.unwrap();
     assert!(
         matches!(&status, reel_pipeline::library::Status::Away(w) if w.contains("is empty")),
         "{status:?}"
