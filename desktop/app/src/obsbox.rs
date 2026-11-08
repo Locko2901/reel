@@ -734,6 +734,7 @@ async fn supervise(
                         quick_in_row = if started.elapsed() < QUICK { quick_in_row + 1 } else { 0 };
                     }
                     let mut wait = backoff(crashes.max(1));
+                    let mut fell_back = None;
                     let stopped = Sign::StoppedQuickly { in_row: quick_in_row, after_change };
                     let words = if trying {
                         tracing::info!(encoder, "OBS stopped while an encoder is tried");
@@ -743,7 +744,7 @@ async fn supervise(
                         quick_in_row = 0;
                         crashes = crashes.min(TRIES - 1);
                         wait = wait.max(FALL_BACK_WAIT);
-                        said(Said::FellBack { from: encoder.clone(), why: fell_back_why(after_change) });
+                        fell_back = Some(Said::FellBack { from: encoder.clone(), why: fell_back_why(after_change) });
                         format!("{why} right after it started with {}; reel changes the encoder back", reel_desktop_core::obs::encoder_word(&encoder))
                     } else if crashes >= TRIES {
                         let words = gave_up_words(&why);
@@ -755,6 +756,11 @@ async fn supervise(
                         format!("{why}; starting it again in {} s (try {} of {TRIES})", wait.as_secs(), crashes + 1)
                     };
                     set(&line, &*changed, "restarting", words);
+                    // told after the line: the app's watch over a new encoder reads it first, so
+                    // a stop both see is changed back once, the same way each time
+                    if let Some(s) = fell_back {
+                        said(s);
+                    }
                     tokio::select! {
                         _ = tokio::time::sleep(wait) => continue 'run,
                         cmd = rx.recv() => match cmd {

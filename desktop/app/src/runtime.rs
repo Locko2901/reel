@@ -2320,7 +2320,7 @@ impl Runtime {
                     crate::obsbox::TRIES
                 ),
             ),
-            Said::FellBack { from, why } => crate::encoders::take_back(&rt, &from, &why),
+            Said::FellBack { from, why } => crate::encoders::take_back_stopped(&rt, &from, &why),
         }
         });
     }
