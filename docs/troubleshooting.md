@@ -116,11 +116,13 @@ the start of its crash report, so the log you send names the cause.
 
 **"Encoder changed back" after OBS stopped.** OBS stopped right after it
 started with the encoder the setup or Settings chose (twice in a row, or
-once right after the encoder changed), so the app went back to the
-encoder the last replay was saved with (x264 when none was) and started
-OBS with it. That encoder is not offered again until **Run the setup
-again** tests it. Send the app's log with the report: it has what OBS
-said.
+once right after the encoder changed), and no replay was saved with that
+encoder yet. So the app went back to the encoder the last replay was
+saved with (x264 when none was) and started OBS with it. That encoder is
+not offered again until **Run the setup again** tests it. The encoder the
+last replay was saved with is never changed back for this: OBS is
+started again a few times, then the app stops and says so, as above.
+Send the app's log with the report: it has what OBS said.
 
 ## Pairing
 
