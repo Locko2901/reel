@@ -15031,6 +15031,8 @@ async fn a_library_that_goes_away_while_a_check_reads_it_is_seen_by_the_next() {
     );
 }
 
+/// A check dropped while it holds `checking`, as a request handler's can be, waiting for the
+/// database: every connection is held, so it waits there however fast the machine.
 #[tokio::test(flavor = "multi_thread")]
 async fn a_check_dropped_before_it_is_done_leaves_the_next_free_to_look() {
     let Some(env) = start_with(AuthMode::Single, vec![], |c| c.library_dir = nas_of(c)).await
@@ -15042,15 +15044,40 @@ async fn a_check_dropped_before_it_is_done_leaves_the_next_free_to_look() {
     env.wait_ready(Duration::from_secs(90)).await;
     env.wait_no_jobs(Duration::from_secs(120)).await;
 
-    let mut dropped = Box::pin(reel_pipeline::library::check(&env.ctx));
+    // a reel on the same folders and database with nothing spawned and a pool of its own: no
+    // check but the test's runs there, so the first takes `checking` when polled
+    let cfg = env.ctx.layers().base.clone();
+    let store = Store::open(&cfg.db_path()).await.unwrap();
+    let hw = env.ctx.hw.read().await.clone();
+    let ctx = Ctx::new(
+        Layers::of(cfg),
+        store.clone(),
+        env.ctx.ff.clone(),
+        hw,
+        new_bus(),
+    )
+    .await
+    .unwrap();
+    assert!(ctx.library.ready());
+    let mut held = Vec::new();
+    for _ in 0..store.pool().options().get_max_connections() {
+        held.push(store.pool().acquire().await.unwrap());
+    }
+    assert!(
+        store.pool().try_acquire().is_none(),
+        "every connection held"
+    );
+
+    let mut dropped = Box::pin(reel_pipeline::library::check(&ctx));
     assert!(
         futures::poll!(&mut dropped).is_pending(),
-        "polled once, the check waits for the database or the folder"
+        "polled once, the check waits for a connection"
     );
     drop(dropped);
+    drop(held);
     std::fs::rename(&nas, nas.with_file_name("nas-away")).unwrap();
     std::fs::create_dir(&nas).unwrap();
-    let status = reel_pipeline::library::check(&env.ctx).await;
+    let status = reel_pipeline::library::check(&ctx).await;
     assert!(
         matches!(&status, reel_pipeline::library::Status::Away(w) if w.contains("is empty")),
         "{status:?}"
