@@ -188,6 +188,7 @@ pub fn run() {
             commands::obs_mic_filters,
             commands::obs_volume,
             commands::system_memory,
+            commands::obs_suggested_quality,
             commands::obs_video,
             commands::encoders_test,
             commands::encoders_seen,

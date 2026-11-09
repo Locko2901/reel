@@ -791,7 +791,7 @@ mod tests {
         s.obs.setup.noise = Noise::Speex;
         s.save(&file).unwrap();
         let text = std::fs::read_to_string(&file).unwrap();
-        let newer = text.replacen(r#""quality": "smooth""#, r#""quality": "light""#, 1);
+        let newer = text.replacen(r#""quality": "smooth""#, r#""quality": "ultra""#, 1);
         assert_ne!(newer, text, "the file names its quality");
         std::fs::write(&file, &newer).unwrap();
         let back = Settings::load(&file).expect("a quality of a later version loads");
@@ -819,6 +819,24 @@ mod tests {
             (setup.rate, setup.noise, setup.level),
             (RateMode::Bitrate, Noise::Rnnoise, 19)
         );
+    }
+
+    #[test]
+    fn the_light_quality_is_saved_and_read_back() {
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("settings.json");
+        let mut s = Settings {
+            server_url: "https://clips.example.org".into(),
+            ..Settings::default()
+        };
+        s.obs.bundled = true;
+        s.obs.setup.done = true;
+        s.obs.setup.quality = crate::bundled::Quality::Light;
+        s.save(&file).unwrap();
+        assert!(std::fs::read_to_string(&file)
+            .unwrap()
+            .contains(r#""quality": "light""#));
+        assert_eq!(Settings::load(&file).unwrap(), s);
     }
 
     #[test]

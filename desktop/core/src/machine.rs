@@ -1,7 +1,13 @@
-//! The PC's memory, for the setup to warn when the replay buffer would take a quarter of it.
+//! The PC's memory, for the setup to warn when the replay buffer would take a quarter of it,
+//! and its processors, for the quality it suggests.
 
 pub fn memory_mb() -> Option<u64> {
     sys::memory_mb()
+}
+
+/// The PC's logical processors on Windows; on Linux those this process may run on.
+pub fn logical_processors() -> Option<usize> {
+    std::thread::available_parallelism().ok().map(|n| n.get())
 }
 
 #[cfg(windows)]
@@ -41,5 +47,10 @@ mod tests {
             Some(32000)
         );
         assert!(super::memory_mb().unwrap_or(1) > 0);
+    }
+
+    #[test]
+    fn the_processors_are_counted() {
+        assert!(super::logical_processors().is_some_and(|n| n >= 1));
     }
 }

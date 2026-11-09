@@ -67,9 +67,12 @@ error appears.
 
 1. **Clip length**: how much of the past a clip keeps when you save it. The default is 1 min;
    30 s, 2, 3, 5 and 10 min are one click away, or type a number of seconds.
-2. **Quality**: **Smooth: 1080p60** suits most games; **Sharp: 1440p60** keeps small text
-   readable; **Native: your screen** records the screen as it is. "What that comes to" shows what
-   OBS records at and how much memory the replay buffer takes.
+2. **Quality**: **Smooth: 1080p60** suits most games; **Light: 1080p30**, at 30 frames a second,
+   asks about half as much of the PC, and fast motion looks less fluid; **Sharp: 1440p60** keeps
+   small text readable; **Native: your screen** records the screen as it is. On a PC with 4
+   logical processors or fewer, a first setup starts at Light and says why; a quality already
+   chosen stays. "What that comes to" shows what OBS records at and how much memory the replay
+   buffer takes.
 
     ![Quality](img/app-setup-2-quality.png)
 

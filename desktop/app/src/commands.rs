@@ -439,6 +439,13 @@ pub fn system_memory() -> Option<u64> {
     reel_desktop_core::machine::memory_mb()
 }
 
+/// The quality the setup suggests for this PC; None keeps the default.
+#[tauri::command]
+pub fn obs_suggested_quality() -> Option<reel_desktop_core::bundled::Suggestion> {
+    reel_desktop_core::machine::logical_processors()
+        .and_then(reel_desktop_core::bundled::suggested_quality)
+}
+
 /// The audio outputs and inputs as Windows lists them, by the ids OBS takes; None where there
 /// is no such list.
 #[tauri::command]

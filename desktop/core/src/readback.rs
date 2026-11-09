@@ -548,13 +548,18 @@ pub fn take(setup: &ObsSetup, platform: Platform, ours: &Observed, now: &Observe
             if s.rate == RateMode::Bitrate && s.kbit == 0 {
                 s.kbit = setup.video().kbit;
             }
-            let preset = [Quality::Smooth, Quality::Sharp, Quality::Native]
-                .into_iter()
-                .find(|q| {
-                    let mut x = s.clone();
-                    x.quality = *q;
-                    x.video_mode() == v
-                });
+            let preset = [
+                Quality::Smooth,
+                Quality::Light,
+                Quality::Sharp,
+                Quality::Native,
+            ]
+            .into_iter()
+            .find(|q| {
+                let mut x = s.clone();
+                x.quality = *q;
+                x.video_mode() == v
+            });
             match preset {
                 Some(q) => (s.quality, s.custom_video) = (q, None),
                 None => (s.quality, s.custom_video) = (Quality::Custom, Some(v)),
@@ -916,6 +921,40 @@ mod tests {
             .iter_mut()
             .find(|s| s["name"] == name)
             .unwrap()
+    }
+
+    #[test]
+    fn thirty_frames_set_in_obs_read_back_as_light() {
+        let dir = tempfile::tempdir().unwrap();
+        let b = bundled(dir.path(), Platform::Windows);
+        let clips = dir.path().join("clips");
+        let s = ObsSetup {
+            screen: crate::bundled::Screen {
+                id: "monitor-1".into(),
+                width: 2560,
+                height: 1440,
+                hz: 144,
+                ..Default::default()
+            },
+            ..ObsSetup::default()
+        };
+        b.write(&s, &clips, "Alt+F10").unwrap();
+        let profile = dir
+            .path()
+            .join("config/obs-studio/basic/profiles/reel/basic.ini");
+        edit(&profile, |t| ini_set(&t, "Video", "FPSInt", "30"));
+        let a = b.read(&s, &clips, "Alt+F10", None, None).unwrap();
+        assert_eq!(
+            (a.setup.quality, a.setup.custom_video),
+            (Quality::Light, None)
+        );
+        assert!(
+            a.words
+                .iter()
+                .any(|w| w == "the video, 1920x1080 at 30 fps"),
+            "{:?}",
+            a.words
+        );
     }
 
     #[test]

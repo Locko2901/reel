@@ -9,12 +9,13 @@ import { audioPlan, meterIn, renderLevelRows, wordsInto } from './sources.js';
 
 const GUIDED = [['length', 'Clip length'], ['quality', 'Quality'], ['encoder', 'Encoder'], ['capture', 'What to capture'], ['audio', 'Audio'], ['hotkeys', 'Hotkeys'], ['where', 'Where clips go'], ['done', 'Done']];
 const steps = () => GUIDED;
-const QUALITY = { smooth: 'Smooth: 1080p60', sharp: 'Sharp: 1440p60', native: 'Native: your screen', custom: 'As set in OBS' };
+const QUALITY = { light: 'Light: 1080p30', smooth: 'Smooth: 1080p60', sharp: 'Sharp: 1440p60', native: 'Native: your screen', custom: 'As set in OBS' };
 const FORMAT = { hybrid_mp4: 'hybrid MP4', mkv: 'MKV' };
 let settings = null;
 let status = null;
 let screens = [];
 let encoders = null;
+let suggested = null;
 let step = 'choose';
 let seen = new Set();
 const setup = () => settings.obs.setup;
@@ -107,6 +108,8 @@ async function renderQuality() {
   $('#quality').value = s.quality;
   const v = await video();
   $('#quality-help').textContent = `the screen it captures: ${screenWords(s.screen.width ? s.screen : null)}`;
+  $('#quality-suggest').hidden = !suggested;
+  $('#quality-suggest').textContent = suggested ? suggested.why : '';
   const kv = $('#quality-kv');
   kv.replaceChildren();
   const rows = v ? [
@@ -636,6 +639,8 @@ function bind() {
   $('#choose-bundled').onclick = async () => {
     settings.obs.bundled = true;
     if (!setup().done && !setup().mic) setup().mic = 'default';
+    // Only the default: a quality chosen before stays.
+    if (!setup().done && suggested && setup().quality === 'smooth') setup().quality = suggested.quality;
     try { await save(); } catch (e) { toast(String(e.message || e), 'err'); return; }
     go('length');
   };
@@ -767,6 +772,7 @@ async function main() {
     settings = await invoke('settings_get');
     status = await invoke('status_get');
     screens = await invoke('screens_get');
+    suggested = await invoke('obs_suggested_quality').catch(() => null);
   } catch (e) {
     toast(`no shell: ${String(e.message || e)}`, 'err');
     return;

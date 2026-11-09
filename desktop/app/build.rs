@@ -75,6 +75,7 @@ const COMMANDS: &[&str] = &[
     "obs_mic_filters",
     "obs_volume",
     "system_memory",
+    "obs_suggested_quality",
     "obs_video",
     "encoders_test",
     "encoders_seen",

@@ -45,12 +45,13 @@
 
       <section data-step="quality" hidden>
         <h1>Quality</h1>
-        <p class="intro">What the clips are recorded at. Smooth suits most games and links; Sharp keeps small text readable; Native records the screen as it is.</p>
+        <p class="intro">What the clips are recorded at. Smooth suits most games and links; Light, at 30 frames a second, asks about half as much of the PC, and fast motion looks less fluid; Sharp keeps small text readable; Native records the screen as it is.</p>
         <div class="panel">
           <div class="body flush">
-            <div class="srow"><div class="slabel"><b>Quality</b><span class="shelp" id="quality-help"></span></div><div class="sctl"><select id="quality" aria-label="Quality"><option value="smooth">Smooth: 1080p60</option><option value="sharp">Sharp: 1440p60</option><option value="native">Native: your screen</option><option value="custom" hidden>As set in OBS</option></select></div></div>
+            <div class="srow"><div class="slabel"><b>Quality</b><span class="shelp" id="quality-help"></span></div><div class="sctl"><select id="quality" aria-label="Quality"><option value="light">Light: 1080p30</option><option value="smooth">Smooth: 1080p60</option><option value="sharp">Sharp: 1440p60</option><option value="native">Native: your screen</option><option value="custom" hidden>As set in OBS</option></select></div></div>
           </div>
         </div>
+        <p class="small" id="quality-suggest" hidden></p>
         <div class="panel">
           <header><h2>What that comes to</h2></header>
           <div class="body"><dl class="kv wide" id="quality-kv"></dl></div>
