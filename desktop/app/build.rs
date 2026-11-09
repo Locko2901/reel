@@ -88,6 +88,7 @@ const COMMANDS: &[&str] = &[
     "open_releases",
     "uninstall",
     "app_status",
+    "app_page_error",
     "app_share_last",
     "app_save_clip",
     "app_save_and_share",

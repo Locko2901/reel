@@ -184,6 +184,28 @@ for _ in $(seq 1 20); do [ "$(logged 'save: OBS saves the replay')" -gt "$asked"
 for _ in $(seq 1 180); do [ "$(logged 'standalone: the clip is published')" -gt "$b" ] && break; sleep 0.5; done
 [ "$(logged 'standalone: the clip is published')" -gt "$b" ] || fail "Alt+F9 did not save a clip"
 ok "Save a clip's hotkey changed on the Hotkeys page, from the setup's Alt+F10 to Alt+F9: saved, and it saves a clip"
+# Too quiet to measure: a peak, and a loudness under the gate all through
+"$FFMPEG" -v error -f lavfi -i "testsrc2=duration=3:size=1280x720:rate=30" -f lavfi -i "anoisesrc=color=pink:amplitude=0.0008:r=48000:duration=3" \
+  -c:v libx264 -pix_fmt yuv420p -c:a aac -b:a 160k -ac 2 -shortest "$W/quiet.mp4"
+echo "$W/quiet.mp4" > "$W/rec/next-clip"
+b=$(logged "standalone: the clip is published")
+xdotool key --clearmodifiers alt+F9
+for _ in $(seq 1 180); do [ "$(logged 'standalone: the clip is published')" -gt "$b" ] && break; sleep 0.5; done
+[ "$(logged 'standalone: the clip is published')" -gt "$b" ] || fail "the quiet clip was not saved"
+QUIET=$(cat "$L"/reel-desktop.log* | sed -n 's/.*standalone: the clip is published.* clip=\([0-9A-Z]*\).*/\1/p' | sed -n "$((b + 1))p")
+[ -n "$QUIET" ] || fail "no id of the quiet clip in the log"
+lifeless=$(logged "no sign of life from the page")
+"$APP" "reel-desktop://open/$QUIET" > /dev/null 2>&1 || true
+waitlog "library loaded at=127.0.0.1/clips/$QUIET" 20 "Open did not open the quiet clip"
+sleep 12
+# the editor's audio line, under the player
+xdotool mousemove 400 600 click 5 click 5 click 5 click 5 click 5 click 5
+sleep 1
+shot "6b-quiet-clip"
+[ "$(logged 'no sign of life from the page')" -eq "$lifeless" ] || fail "the quiet clip's page never called the app"
+[ "$(logged "page error path=/clips/$QUIET")" -eq 0 ] || fail "the quiet clip's page had an error: $(cat "$L"/reel-desktop.log* | grep -m1 "page error path=/clips/$QUIET")"
+ok "a clip too quiet to measure: its page calls the app, no page error in the Log"
+echo "     page errors in the Log of the standalone pages: $(logged 'page error')"
 CLIP_AT="library loaded at=127.0.0.1/clips/$LOCAL"
 b=$(logged "$CLIP_AT")
 "$APP" "reel-desktop://open/$LOCAL" > /dev/null 2>&1 || true
@@ -228,6 +250,33 @@ sleep 1
 xdotool key Escape 2>/dev/null || true
 stop
 ok "the tray's menu drawn (shot)"
+
+# A server's pages in the window: a part that throws, then a page whose script is missing.
+D="$W/pages"
+L="$D/data/logs"
+mkdir -p "$D/config"
+PAGES_PORT=4497
+python3 /work/desktop/ci/standin-pages.py "$PAGES_PORT" /work/web/assets > "$W/pages.out" 2>&1 &
+PIDS="$PIDS $!"
+printf '{"mode":"connected","server_url":"http://127.0.0.1:%s","obs":{"enabled":false},"startup":{"autostart":false},"log_level":"debug"}' "$PAGES_PORT" > "$D/config/settings.json"
+export REEL_DESKTOP_DIR="$D"
+start --hidden
+waitlog "reel desktop starts" 30 "the app set to the stand-in server did not start"
+"$APP" > /dev/null 2>&1 || true
+waitlog "the server's page reached the app" 30 "a page with a part that throws did not reach the app"
+waitlog "page error path=/ error=.*a part that throws, on purpose" 20 "the part that threw is not in the Log"
+for _ in $(seq 1 20); do grep -q "the-last-part-ran" "$W/pages.out" && break; sleep 0.5; done
+grep -q "the-last-part-ran" "$W/pages.out" || fail "the parts after the one that threw did not start"
+echo "     the Log: $(cat "$L"/reel-desktop.log* | grep -m1 'page error' | sed 's/.*WARN //')"
+ok "a page with a part that throws: it reaches the app, the part's error is in the Log, the last part ran"
+"$APP" --page=/broken > /dev/null 2>&1 || true
+waitlog "page error path=/broken error=a script did not load: /assets/missing.js" 20 "the script that did not load is not in the Log"
+waitlog "cannot reach the server title=The page stopped at an error code=a script did not load: /assets/missing.js" 30 \
+  "the offline page does not say the page had an error: $(cat "$L"/reel-desktop.log* | grep "WARN cannot reach the server" | tail -1)"
+sleep 2
+shot "11-page-error"
+stop
+ok "a page whose script did not load: the Log has it, the offline page says the page had an error, with its line"
 
 D="$W/old"
 L="$D/data/logs"

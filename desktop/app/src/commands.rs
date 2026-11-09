@@ -252,6 +252,18 @@ pub fn app_status(rt: State<'_, Runtime>) -> R<Value> {
     Ok(rt.app_status())
 }
 
+/// An uncaught error, an unhandled rejection or a script that did not load on a server page.
+#[tauri::command]
+pub fn app_page_error(
+    rt: State<'_, Runtime>,
+    message: String,
+    stack: Option<String>,
+    path: String,
+) -> R<()> {
+    rt.page_error(&message, stack.as_deref().unwrap_or(""), &path);
+    Ok(())
+}
+
 #[tauri::command]
 pub fn app_share_last(rt: State<'_, Runtime>) -> R<()> {
     rt.share_last(None);
