@@ -1,4 +1,4 @@
-import './js/global.js';
+import { everyPage } from './js/global.js';
 import { library } from './js/library.js';
 import { upload } from './js/upload.js';
 import { clip } from './js/clip.js';
@@ -16,22 +16,10 @@ import { stars } from './js/star.js';
 import { selectSeveral } from './js/select.js';
 import { montage } from './js/montage.js';
 import { pwa, shareTarget } from './js/share-target.js';
+import { startParts } from './js/parts.js';
 
-library();
-upload();
-clip();
-settings();
-jobs();
-status();
-access();
-devices();
-appShell();
-setup();
-collections();
-clipMenu();
-trash();
-stars();
-selectSeveral();
-montage();
-shareTarget();
-pwa();
+// the app's part first: a server page in the app reaches the app whatever another part does
+startParts(
+  appShell, ...everyPage, library, upload, clip, settings, jobs, status, access, devices, setup,
+  collections, clipMenu, trash, stars, selectSeveral, montage, shareTarget, pwa,
+);
