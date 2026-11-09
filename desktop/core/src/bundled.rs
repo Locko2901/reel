@@ -50,15 +50,16 @@ fn api_version(version: &str) -> u64 {
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum Quality {
-    /// 1080p at 60 frames a second.
-    #[default]
-    Smooth,
     /// 1440p at 60.
     Sharp,
     /// The screen's own size and refresh rate.
     Native,
     /// What was set in OBS's own Video settings, read back into `custom_video`.
     Custom,
+    /// 1080p at 60 frames a second; a quality of a later version reads as this one.
+    #[default]
+    #[serde(other)]
+    Smooth,
 }
 
 /// OBS's Video settings: the canvas, the output and the frame rate as a fraction.
@@ -72,11 +73,13 @@ pub struct VideoMode {
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum RateMode {
-    /// A constant bitrate: the replay buffer's memory and the clips' sizes are known.
-    #[default]
-    Bitrate,
     /// A constant quality level instead (CQP, or CRF with x264): smaller still scenes, larger busy ones.
     Quality,
+    /// A constant bitrate: the replay buffer's memory and the clips' sizes are known; a mode
+    /// of a later version reads as this one.
+    #[default]
+    #[serde(other)]
+    Bitrate,
 }
 
 /// The screen the setup captures, as the app reads it from Windows.
@@ -166,13 +169,15 @@ pub enum Noise {
     Off,
     /// Speex: little CPU, the steady hiss and hum.
     Speex,
-    /// RNNoise: a small neural network on the CPU; also keys and noise between words.
-    #[default]
-    Rnnoise,
     /// NVIDIA's noise removal on an RTX card, when OBS reports it.
     Nvidia,
     /// The filters of the user's own OBS's microphone, as they are.
     Own,
+    /// RNNoise: a small neural network on the CPU; also keys and noise between words. A
+    /// suppression of a later version reads as this one.
+    #[default]
+    #[serde(other)]
+    Rnnoise,
 }
 
 impl Default for ObsSetup {

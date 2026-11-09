@@ -68,21 +68,25 @@ impl WebviewAudio {
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum TrayIcon {
-    #[default]
-    Colour,
     White,
     Black,
+    /// An icon of a later version reads as this one.
+    #[default]
+    #[serde(other)]
+    Colour,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum UpdateMode {
-    /// Says so in a notification, the tray and the Status page; installs on the click.
-    #[default]
-    Ask,
     /// Downloads at once and installs when the app quits.
     OnQuit,
     Off,
+    /// Says so in a notification, the tray and the Status page; installs on the click. A mode
+    /// of a later version reads as this one: nothing installs without the click.
+    #[default]
+    #[serde(other)]
+    Ask,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -154,6 +158,8 @@ pub enum UploadMode {
     #[default]
     Auto,
     Hotkey,
+    /// A mode of a later version reads as this one: no clip goes up that the user did not send.
+    #[serde(other)]
     Manual,
 }
 
@@ -753,6 +759,65 @@ mod tests {
         assert_eq!(
             Settings::load(&dir.path().join("none.json")).unwrap(),
             Settings::fresh()
+        );
+    }
+
+    #[test]
+    fn a_file_of_a_later_version_loads_with_what_this_one_knows() {
+        use crate::bundled::{Noise, Quality, RateMode};
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("settings.json");
+        let mut s = Settings {
+            mode: Mode::Standalone,
+            server_url: "https://clips.example.org".into(),
+            device_name: "PC".into(),
+            stable_seconds: 7,
+            tray_icon: TrayIcon::White,
+            updates: UpdateMode::OnQuit,
+            upload: UploadSettings {
+                mode: UploadMode::Hotkey,
+                keep_last: 30,
+                ..UploadSettings::default()
+            },
+            log_level: "debug".into(),
+            ..Settings::default()
+        };
+        s.obs.port = 4460;
+        s.obs.bundled = true;
+        s.obs.setup.done = true;
+        s.obs.setup.quality = Quality::Smooth;
+        s.obs.setup.rate = RateMode::Quality;
+        s.obs.setup.level = 21;
+        s.obs.setup.noise = Noise::Speex;
+        s.save(&file).unwrap();
+        let text = std::fs::read_to_string(&file).unwrap();
+        let newer = text.replacen(r#""quality": "smooth""#, r#""quality": "light""#, 1);
+        assert_ne!(newer, text, "the file names its quality");
+        std::fs::write(&file, &newer).unwrap();
+        let back = Settings::load(&file).expect("a quality of a later version loads");
+        assert_eq!(back.obs.setup.quality, Quality::Smooth);
+        assert_eq!(back, s, "every other value as it was");
+
+        let read = |json: &str| {
+            std::fs::write(&file, json).unwrap();
+            Settings::load(&file).unwrap_or_else(|e| panic!("{json}: {e}"))
+        };
+        assert_eq!(
+            read(r#"{"tray_icon":"rainbow"}"#).tray_icon,
+            TrayIcon::Colour
+        );
+        assert_eq!(read(r#"{"updates":"nightly"}"#).updates, UpdateMode::Ask);
+        assert_eq!(
+            read(r#"{"upload":{"mode":"on_wifi"}}"#).upload.mode,
+            UploadMode::Manual,
+            "no clip goes up by itself"
+        );
+        let setup = read(r#"{"obs":{"setup":{"rate":"vbr","noise":"deep","level":19}}}"#)
+            .obs
+            .setup;
+        assert_eq!(
+            (setup.rate, setup.noise, setup.level),
+            (RateMode::Bitrate, Noise::Rnnoise, 19)
         );
     }
 
