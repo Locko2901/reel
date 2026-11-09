@@ -419,7 +419,15 @@ pub fn version_view(r: &Rendition, current_id: Option<&str>) -> VersionView {
             .as_deref()
             .and_then(|x| serde_json::from_str::<reel_core::CutRecipe>(x).ok());
         if let Some(recipe) = &recipe {
-            parts.push(recipe.describe_cut(r.duration.unwrap_or(0.0)));
+            let len = r.duration.unwrap_or(0.0);
+            let too_quiet = recipe.loudness.is_some()
+                && r.audio_measured_at.is_some()
+                && r.audio_loudness.is_none();
+            parts.push(if too_quiet {
+                recipe.describe_cut_too_quiet(len)
+            } else {
+                recipe.describe_cut(len)
+            });
         }
         let audio = recipe.map(|x| x.audio_changed()).unwrap_or(false);
         parts.push(match (r.video_copied == 1, audio) {

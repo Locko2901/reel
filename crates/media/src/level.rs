@@ -1,4 +1,5 @@
-/// Integrated loudness in LUFS and true peak in dBTP; None where the audio is silent.
+/// Integrated loudness in LUFS and true peak in dBTP; None where the audio is silent. A peak
+/// without a loudness is audio too quiet to measure: under the gate all through.
 #[derive(Debug, Clone, Copy, Default, PartialEq)]
 pub struct Level {
     pub loudness: Option<f64>,
@@ -16,6 +17,9 @@ impl Level {
     }
 }
 
+/// EBU R 128's absolute gate: ebur128 prints it as the loudness of audio that stays under it.
+pub const LOUDNESS_GATE: f64 = -70.0;
+
 fn value_after(line: &str, label: &str) -> Option<f64> {
     let rest = line.trim().strip_prefix(label)?;
     rest.split_whitespace().next()?.parse::<f64>().ok()
@@ -28,7 +32,7 @@ pub fn parse_ebur128(log: &str) -> Option<Level> {
     for line in summary.lines() {
         if let Some(i) = value_after(line, "I:") {
             seen = true;
-            level.loudness = (i > -70.0).then_some(i);
+            level.loudness = (i > LOUDNESS_GATE).then_some(i);
         } else if let Some(p) = value_after(line, "Peak:") {
             level.peak = p.is_finite().then_some(p);
         }
@@ -45,7 +49,8 @@ pub struct Loudnorm {
     pub target_offset: f64,
 }
 
-/// None for silence too: the values are not finite.
+/// None too for audio too quiet to measure: its values are not finite, or its loudness is
+/// under the gate.
 pub fn parse_loudnorm(log: &str) -> Option<Loudnorm> {
     let start = log.rfind("\n{").map(|i| i + 1).or_else(|| log.find('{'))?;
     let end = start + log[start..].find('}')? + 1;
@@ -59,7 +64,7 @@ pub fn parse_loudnorm(log: &str) -> Option<Loudnorm> {
             .filter(|x| x.is_finite())
     };
     Some(Loudnorm {
-        input_i: num("input_i")?,
+        input_i: num("input_i").filter(|i| *i > LOUDNESS_GATE)?,
         input_tp: num("input_tp")?,
         input_lra: num("input_lra")?,
         input_thresh: num("input_thresh")?,
@@ -127,5 +132,10 @@ mod tests {
         assert_eq!(m.input_thresh, -31.76);
         assert_eq!(m.target_offset, 0.01);
         assert_eq!(parse_loudnorm(&log.replace("\"-21.76\"", "\"-inf\"")), None);
+        assert_eq!(
+            parse_loudnorm(&log.replace("\"-21.76\"", "\"-70.00\"")),
+            None,
+            "under the gate"
+        );
     }
 }

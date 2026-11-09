@@ -502,21 +502,19 @@ pub fn cut_with(
 }
 
 /// What follows the mix of the tracks; None when the audio is copied. A boost, a raised track
-/// or summed tracks are limited at `aim`, four times oversampled for the true peak.
+/// or summed tracks are limited at `aim`, four times oversampled for the true peak. Without
+/// `measured` (audio too quiet to measure) the loudness asked is left out.
 pub fn audio_filter(recipe: &CutRecipe, measured: Option<&Loudnorm>, aim: f64) -> Option<String> {
     if !recipe.audio_changed() {
         return None;
     }
     let active = recipe.active_tracks();
     let summed = active.len() > 1 || active.iter().any(|(_, g)| *g > 0.0);
-    if let Some(target) = recipe.loudness {
-        return Some(match measured {
-            Some(m) => format!(
-                "loudnorm=I={target:.1}:TP={aim:.2}:LRA={LOUDNORM_LRA:.1}:measured_I={:.2}:measured_TP={:.2}:measured_LRA={:.2}:measured_thresh={:.2}:offset={:.2}:linear=true",
-                m.input_i, m.input_tp, m.input_lra, m.input_thresh, m.target_offset
-            ),
-            None => s("anull"),
-        });
+    if let (Some(target), Some(m)) = (recipe.loudness, measured) {
+        return Some(format!(
+            "loudnorm=I={target:.1}:TP={aim:.2}:LRA={LOUDNORM_LRA:.1}:measured_I={:.2}:measured_TP={:.2}:measured_LRA={:.2}:measured_thresh={:.2}:offset={:.2}:linear=true",
+            m.input_i, m.input_tp, m.input_lra, m.input_thresh, m.target_offset
+        ));
     }
     let g = recipe.gain_db;
     let limit = 10f64.powf(aim / 20.0);
@@ -1698,7 +1696,24 @@ mod tests {
         );
         assert_eq!(
             audio_filter(&norm, None, FIRST_AIM).as_deref(),
-            Some("anull")
+            Some("anull"),
+            "too quiet to measure: as it is"
+        );
+        let norm_mix = CutRecipe {
+            loudness: Some(-16.0),
+            tracks: Some(vec![
+                reel_core::recipe::TrackEdit {
+                    on: true,
+                    gain_db: 0.0,
+                };
+                2
+            ]),
+            ..Default::default()
+        };
+        assert_eq!(
+            audio_filter(&norm_mix, None, FIRST_AIM).as_deref(),
+            Some("aresample=192000,alimiter=limit=0.84140:attack=5:release=50:level=0:latency=1,aresample=48000"),
+            "too quiet to measure, two tracks: summed and limited as without the loudness"
         );
         let muted = CutRecipe {
             mute: true,
