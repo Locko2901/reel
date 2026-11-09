@@ -72,6 +72,7 @@
     "allow-obs-mic-filters",
     "allow-obs-volume",
     "allow-system-memory",
+    "allow-obs-suggested-quality",
     "allow-obs-video",
     "allow-encoders-test",
     "allow-encoders-seen",

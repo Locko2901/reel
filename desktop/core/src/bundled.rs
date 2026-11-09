@@ -50,6 +50,8 @@ fn api_version(version: &str) -> u64 {
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum Quality {
+    /// 1080p at 30: OBS captures and converts half the frames, for a PC with little to spare.
+    Light,
     /// 1440p at 60.
     Sharp,
     /// The screen's own size and refresh rate.
@@ -60,6 +62,30 @@ pub enum Quality {
     #[default]
     #[serde(other)]
     Smooth,
+}
+
+/// A PC with at most this many logical processors starts the setup at Light: OBS's capture
+/// and conversion at 60 frames a second keep a steady share of so few busy.
+pub const LIGHT_UP_TO: usize = 4;
+
+/// The quality the setup suggests for this PC, and why in its words.
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct Suggestion {
+    pub quality: Quality,
+    pub why: String,
+}
+
+/// Light on a PC with at most LIGHT_UP_TO logical processors; None keeps the default.
+pub fn suggested_quality(logical_processors: usize) -> Option<Suggestion> {
+    let n = logical_processors;
+    (1..=LIGHT_UP_TO).contains(&n).then(|| Suggestion {
+        quality: Quality::Light,
+        why: format!(
+            "Light is suggested for this PC: it has {n} logical processor{}, and at 30 frames a second OBS asks about half as much of {} as at 60.",
+            if n == 1 { "" } else { "s" },
+            if n == 1 { "it" } else { "them" },
+        ),
+    })
 }
 
 /// OBS's Video settings: the canvas, the output and the frame rate as a fraction.
@@ -496,6 +522,7 @@ impl ObsSetup {
         }
         let (w, h, hz) = self.screen_mode();
         let (height, fps) = match self.quality {
+            Quality::Light => (1080, 30),
             Quality::Sharp => (1440, 60),
             Quality::Native => (h, hz.min(240)),
             Quality::Smooth | Quality::Custom => (1080, 60),
@@ -2282,6 +2309,97 @@ mod tests {
             (1280, 720),
             "never larger than the screen"
         );
+    }
+
+    #[test]
+    fn light_is_1080p_at_30_with_half_the_bitrate() {
+        let light = |w, h, hz| {
+            ObsSetup {
+                screen: screen(w, h, hz),
+                quality: Quality::Light,
+                ..Default::default()
+            }
+            .video()
+        };
+        let v = light(1920, 1080, 60);
+        assert_eq!((v.base, v.output, v.fps), ((1920, 1080), (1920, 1080), 30));
+        assert_eq!(
+            v.kbit, 12500,
+            "1920x1080 at 30 and 0.2 bits a pixel is 12442, to the nearest 500"
+        );
+        assert_eq!(v.buffer_mb, (12500 + 160) * 60 * 5 / 4 / 8 / 1000);
+        let v = light(2560, 1440, 165);
+        assert_eq!((v.base, v.output, v.fps), ((2560, 1440), (1920, 1080), 30));
+        assert_eq!(v.kbit, 12500);
+        let v = light(1280, 720, 60);
+        assert_eq!(
+            (v.output, v.fps),
+            ((1280, 720), 30),
+            "never larger than the screen"
+        );
+        assert_eq!(v.kbit, 5500);
+        let smooth = ObsSetup {
+            screen: screen(1920, 1080, 60),
+            ..Default::default()
+        };
+        assert_eq!(smooth.video().kbit, 25000, "Smooth's twice as many frames");
+        let ini = profile_ini(
+            &ObsSetup {
+                quality: Quality::Light,
+                ..smooth
+            },
+            Platform::Windows,
+            Path::new("C:/clips"),
+            None,
+        );
+        assert!(
+            ini.contains("OutputCX=1920\nOutputCY=1080\nFPSType=1\nFPSInt=30\n"),
+            "{ini}"
+        );
+    }
+
+    #[test]
+    fn a_pc_with_four_logical_processors_or_fewer_is_suggested_light() {
+        let s = suggested_quality(4).unwrap();
+        assert_eq!(s.quality, Quality::Light);
+        assert_eq!(
+            s.why,
+            "Light is suggested for this PC: it has 4 logical processors, and at 30 frames a second OBS asks about half as much of them as at 60."
+        );
+        assert_eq!(
+            suggested_quality(1).unwrap().why,
+            "Light is suggested for this PC: it has 1 logical processor, and at 30 frames a second OBS asks about half as much of it as at 60."
+        );
+        assert!(suggested_quality(2).is_some());
+        assert_eq!(suggested_quality(5), None);
+        assert_eq!(suggested_quality(8), None, "4 cores with 8 threads");
+        assert_eq!(suggested_quality(0), None, "not read");
+        assert_eq!(
+            serde_json::to_value(suggested_quality(4)).unwrap()["quality"],
+            "light",
+            "as the page names it"
+        );
+    }
+
+    #[test]
+    fn light_and_the_other_qualities_are_kept_in_the_settings() {
+        let s = ObsSetup {
+            quality: Quality::Light,
+            clip_seconds: 90,
+            ..Default::default()
+        };
+        let text = serde_json::to_string(&s).unwrap();
+        assert!(text.contains(r#""quality":"light""#), "{text}");
+        assert_eq!(serde_json::from_str::<ObsSetup>(&text).unwrap(), s);
+        for (q, want) in [
+            ("smooth", Quality::Smooth),
+            ("sharp", Quality::Sharp),
+            ("native", Quality::Native),
+            ("custom", Quality::Custom),
+        ] {
+            let t: ObsSetup = serde_json::from_str(&format!(r#"{{"quality":"{q}"}}"#)).unwrap();
+            assert_eq!(t.quality, want, "{q} keeps its quality");
+        }
     }
 
     #[test]
