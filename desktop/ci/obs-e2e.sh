@@ -73,13 +73,13 @@ else
   SERVER_URL=""
 fi
 
-say "the app's settings: the OBS that came with it, a 20 s clip, the Save hotkey"
+say "the app's settings: the OBS that came with it, a 20 s clip at Light, the Save hotkey"
 cat > "$ROOT/config/settings.json" <<JSON
 {
   "server_url": "$SERVER_URL",
   "device_name": "xvfb obs",
   "obs": { "bundled": true, "start_replay": true,
-           "setup": { "done": true, "clip_seconds": 20, "quality": "smooth", "encoder": "obs_x264", "game": false,
+           "setup": { "done": true, "clip_seconds": 20, "quality": "light", "encoder": "obs_x264", "game": false,
                       "screen": { "width": 1280, "height": 800, "hz": 30 }, "format": "mkv",
                       "mic": "micsink.monitor", "noise": "rnnoise", "gate": true, "own_tracks": true } },
   "clips_dir": "$ROOT/clips",
@@ -133,9 +133,10 @@ say "what the app wrote for OBS"
 grep -q '^RecRB=true$' "$OBSCONF/basic/profiles/reel/basic.ini" || fail "the profile has no replay buffer"
 grep -q '^RecRBTime=20$' "$OBSCONF/basic/profiles/reel/basic.ini" || fail "the replay buffer is not 20 s"
 grep -q "^RecFilePath=$ROOT/clips$" "$OBSCONF/basic/profiles/reel/basic.ini" || fail "OBS records elsewhere than the clips folder"
+grep -q '^FPSType=1$' "$OBSCONF/basic/profiles/reel/basic.ini" && grep -q '^FPSInt=30$' "$OBSCONF/basic/profiles/reel/basic.ini" || fail "the profile's frame rate is not Light's 30: $(grep '^FPS' "$OBSCONF/basic/profiles/reel/basic.ini" | tr '\n' ' ')"
 python3 -c 'import json,sys; c=json.load(open(sys.argv[1])); ids={s["id"] for s in c["sources"]} | {c.get("DesktopAudioDevice1", {}).get("id")}; assert {"scene","xshm_input","pulse_output_capture"} <= ids, ids' "$OBSCONF/basic/scenes/reel.json" || fail "the scene collection"
 python3 -c 'import json,sys; w=json.load(open(sys.argv[1])); assert w["server_port"]==4466 and w["auth_required"] and len(w["server_password"])==43' "$OBSCONF/plugin_config/obs-websocket/config.json" || fail "the WebSocket settings"
-ok "the profile (a 20 s replay buffer into the clips folder), the scene (the screen), the WebSocket (port 4466, a 43-character password)"
+ok "the profile (a 20 s replay buffer into the clips folder at 30 frames a second), the scene (the screen), the WebSocket (port 4466, a 43-character password)"
 
 say "OBS connects, hidden"
 wait_for 60 "the app to connect to OBS" log_has "obs connected"
@@ -146,6 +147,9 @@ buffer() { ws GetReplayBufferStatus '{}' 2>/dev/null | sed -n 's/.*"outputActive
 buffer_is() { [ "$(buffer)" = "$1" ]; }
 newest_obs_log() { ls -t "$OBSCONF"/logs/*.txt | head -1; }
 sh "$HERE/check-obs-requests.sh" 4466 "$PW" || fail "the protocol"
+VIDEO=$(ws GetVideoSettings '{}' | cut -d' ' -f2-) || fail "OBS did not answer GetVideoSettings"
+echo "$VIDEO" | python3 -c 'import json, sys; v = json.load(sys.stdin); assert (v["outputWidth"], v["outputHeight"], v["fpsNumerator"], v["fpsDenominator"]) == (1280, 800, 30, 1), v' || fail "OBS's video is not Light's: $VIDEO"
+ok "OBS reports Light's video: 1280x800, the 800 lines of the screen, at 30/1 frames a second"
 wait_for 20 "the app to read the microphone's filters" log_has "the microphone's filters in OBS"
 FILTERS=$(cat "$LOG"/reel-desktop.log* | grep "the microphone's filters in OBS" | tail -1)
 echo "$FILTERS" | grep -q "Noise suppression (noise_suppress_filter_v2)" && echo "$FILTERS" | grep -q "Noise gate (noise_gate_filter)" || fail "the microphone's filters: $FILTERS"
@@ -175,7 +179,9 @@ sleep 4
 ok "the key to the save's sound: $SOUND ms, once, as OBS took the save; OBS had written the replay at $WRITTEN ms"
 SAVED=$(cat "$LOG"/reel-desktop.log* | grep "obs saved a replay" | tail -1 | sed -n 's/.*path=\(.*\) obs saved a replay$/\1/p; s/.*obs saved a replay path=\(.*\)$/\1/p')
 [ -n "$SAVED" ] || fail "no path in the log"
-ok "saved: $SAVED"
+RATE=$(ffprobe -v error -select_streams v:0 -show_entries stream=r_frame_rate -of csv=p=0 "$SAVED") || fail "ffprobe did not read the replay"
+python3 -c 'import sys; n, d = map(int, sys.argv[1].split("/")); assert abs(n / d - 30) < 0.5' "$RATE" || fail "the replay's frame rate is $RATE, not Light's 30"
+ok "saved: $SAVED, its video at $RATE frames a second"
 TITLES=$(ffprobe -v error -select_streams a -show_entries stream_tags=title -of csv=p=0 "$SAVED" | paste -sd '|')
 [ "$TITLES" = "Full mix|Microphone|Desktop" ] || fail "the replay's audio tracks: '$TITLES'"
 ok "the replay carries each source on a track of its own, named: $TITLES"
