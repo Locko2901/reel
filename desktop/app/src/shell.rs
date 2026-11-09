@@ -22,8 +22,9 @@ pub const OFFLINE_PAGE: &str = "offline.html";
 pub const SETUP_PAGE: &str = "setup.html";
 
 /// The only commands a reel page inside the app may call.
-const REMOTE_PERMISSIONS: [&str; 8] = [
+const REMOTE_PERMISSIONS: [&str; 9] = [
     "allow-app-status",
+    "allow-app-page-error",
     "allow-app-share-last",
     "allow-app-save-clip",
     "allow-app-save-and-share",
@@ -32,6 +33,32 @@ const REMOTE_PERMISSIONS: [&str; 8] = [
     "allow-app-open-settings",
     "allow-app-download-open",
 ];
+
+/// Every page's uncaught errors, unhandled rejections and scripts that did not load go to the
+/// app's Log; installed before the page's own scripts, so a page that never starts tells why.
+/// The app's own pages are not granted the command.
+const PAGE_ERRORS: &str = r#"(() => {
+  if (!/^https?:$/.test(location.protocol) || location.hostname === 'tauri.localhost') return;
+  let sent = 0, leaving = false;
+  addEventListener('pagehide', () => { leaving = true; });
+  addEventListener('pageshow', () => { leaving = false; });
+  const send = (message, stack) => {
+    const t = window.__TAURI__, call = t && t.core && t.core.invoke;
+    if (leaving || !call || ++sent > 20) return;
+    call('app_page_error', { message: String(message).slice(0, 1000), stack: String(stack || '').slice(0, 4000), path: location.pathname }).catch(() => {});
+  };
+  addEventListener('error', (e) => {
+    if (e.target instanceof HTMLScriptElement) { send(`a script did not load: ${e.target.src}`); return; }
+    if (e.target !== window) return;
+    send(e.message || (e.error && e.error.message) || 'an error', e.error && e.error.stack);
+  }, true);
+  addEventListener('unhandledrejection', (e) => {
+    const r = e.reason, words = String((r && r.message) || r);
+    // the notification plugin asks for its permission on every page, not granted to these
+    if (words.startsWith('notification.is_permission_granted not allowed')) return;
+    send(`unhandled rejection: ${words}`, r && r.stack);
+  });
+})();"#;
 
 /// What the window shows; Offline is the app's page for a server out of reach.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -209,7 +236,7 @@ fn library(app: &AppHandle, first: Url) -> WebviewBuilder<tauri::Wry> {
     let handle = app.clone();
     WebviewBuilder::new(LIBRARY, WebviewUrl::External(first))
         .initialization_script(format!(
-            "window.__REEL_DESKTOP__ = {{ version: \"{}\" }};",
+            "window.__REEL_DESKTOP__ = {{ version: \"{}\" }};\n{PAGE_ERRORS}",
             reel_desktop_core::version_line()
         ))
         .on_navigation(move |url| {
