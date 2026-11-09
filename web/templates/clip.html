@@ -115,7 +115,7 @@
     {% endif %}
     {% if ready %}
     <div class="panel">
-      <header><h2>Versions</h2><span class="desc">{% if who.standalone %}each one plays and downloads on its own; the library shows the current one{% else %}each one plays, downloads and shares on its own; links follow the current one unless pinned{% endif %}</span></header>
+      <header><h2>Versions</h2><span class="desc">{% if who.standalone %}each one plays and opens on its own; the library shows the current one{% else %}each one plays, downloads and shares on its own; links follow the current one unless pinned{% endif %}</span></header>
       <div class="body flush versions" id="versions">
         {% for v in versions %}
         <div class="v" data-rid="{{ v.id }}" data-url="{{ v.url }}" data-poster="{{ v.poster }}" data-label="{{ v.label }}">
@@ -124,7 +124,8 @@
           {% if v.ready %}
           <span class="acts">
             <button class="small play-version" type="button" data-rid="{{ v.id }}">Play</button>
-            <a class="btn small" href="{{ v.download_url }}">Download</a>
+            <a class="btn small" href="{{ v.download_url }}"{% if who.standalone %} data-in-library{% endif %}>Download</a>
+            {% if who.standalone %}<button class="small" type="button" data-library-file="{{ v.id }}" hidden>Open</button><button class="small" type="button" data-library-file="{{ v.id }}" data-reveal hidden>Show in folder</button>{% endif %}
             {% if can_edit %}{% if !who.standalone %}<button class="small share-version" type="button" data-rid="{{ v.id }}">Share</button>{% endif %}
             {% if !v.current %}<button class="small make-current" type="button" data-rid="{{ v.id }}">Make current</button>{% endif %}
             {% if v.deletable %}<button class="danger small delete-version" type="button" data-rid="{{ v.id }}">Delete</button>{% endif %}{% endif %}
@@ -188,8 +189,9 @@
         <button id="send-link" type="button" hidden><svg class="icon" viewBox="0 0 16 16"><path d="M12 5a2 2 0 1 0 0-4 2 2 0 0 0 0 4ZM4 10a2 2 0 1 0 0-4 2 2 0 0 0 0 4Zm8 5a2 2 0 1 0 0-4 2 2 0 0 0 0 4ZM5.7 7.1l4.6-2.3M5.7 8.9l4.6 2.3"/></svg>Send to an app <span class="muted">the link</span></button>
         <p class="hint" id="send-link-hint" hidden>The newest live link of this clip goes to the app you pick, which plays it in its preview where it can. Nothing is encoded. Without one, a link is made with the defaults.</p>
         {% endif %}
-        <div class="row">
+        <div class="row{% if who.standalone %} wrap{% endif %}">
           <a class="btn grow" id="download-btn" href="/media/clips/{{ id }}/download" download data-download="/media/clips/{{ id }}/download" data-copy="/media/clips/{{ id }}/discord.mp4"><svg class="icon" viewBox="0 0 16 16"><path d="M8 3v8M4.5 7.5 8 11l3.5-3.5M3 13h10"/></svg>Download</a>
+          {% if who.standalone %}<button class="grow" type="button" data-library-file="current" title="in this PC's own player" hidden><svg class="icon" viewBox="0 0 16 16"><path d="M5 3.5v9l7-4.5z"/></svg>Open</button><button class="grow" type="button" data-library-file="current" data-reveal title="the file selected, ready to drag into a chat" hidden><svg class="icon" viewBox="0 0 16 16"><path d="M2 4h4l1.5 1.5H14V13H2z"/></svg>Show in folder</button>{% endif %}
           <select id="quality" aria-label="Quality">{% for o in qualities %}<option value="{{ o.value }}"{% if o.ready %} data-ready="1"{% endif %}>{{ o.label }}</option>{% endfor %}</select>
         </div>
         <p class="hint" id="download-hint">The limits are chat apps' upload limits, such as Discord's.{% if let Some(u) = original_under %} The original is already under {{ u }} MB, so no copy is offered there.{% endif %}{% for n in copy_notes %} {{ n }}{% endfor %}</p>
@@ -215,7 +217,7 @@
       <header><h2>Details</h2></header>
       <div class="body">
         <dl class="kv">
-          {% for (k, v) in details %}<dt>{{ k }}</dt><dd{% if k == "file" || k == "id" %} class="mono"{% endif %}>{{ v }}{% if k == "original" %}{% if let Some((url, size)) = original_download %} <a class="btn small" href="{{ url }}">Download the original, {{ size }}</a>{% endif %}{% endif %}</dd>{% endfor %}
+          {% for (k, v) in details %}<dt>{{ k }}</dt><dd{% if k == "file" || k == "id" %} class="mono"{% endif %}>{{ v }}{% if k == "original" %}{% if let Some((url, size)) = original_download %} <a class="btn small" href="{{ url }}"{% if who.standalone %} data-in-library{% endif %}>Download the original, {{ size }}</a>{% if who.standalone %}<button class="small" type="button" data-library-file="raw" hidden>Open</button> <button class="small" type="button" data-library-file="raw" data-reveal hidden>Show in folder</button>{% endif %}{% endif %}{% endif %}</dd>{% endfor %}
         </dl>
       </div>
     </div>

@@ -64,7 +64,7 @@ pub enum Target {
 }
 
 /// The nearest folder of `p` that is there, with links resolved, and the rest of `p` after it.
-fn real(p: &Path) -> PathBuf {
+pub(crate) fn real(p: &Path) -> PathBuf {
     let mut rest = Vec::new();
     let mut at = p.to_path_buf();
     loop {
@@ -113,7 +113,7 @@ fn same(a: &Path, b: &Path) -> bool {
 }
 
 /// `p` is `dir` or inside it.
-fn inside(p: &Path, dir: &Path) -> bool {
+pub(crate) fn inside(p: &Path, dir: &Path) -> bool {
     key(p).starts_with(key(dir))
 }
 

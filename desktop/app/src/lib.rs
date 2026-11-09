@@ -2,6 +2,7 @@
 mod commands;
 mod downloads;
 mod encoders;
+mod files;
 mod hotkey;
 mod library;
 #[cfg(target_os = "linux")]
@@ -162,6 +163,7 @@ pub fn run() {
             commands::app_recording_pause_set,
             commands::app_open_settings,
             commands::app_download_open,
+            files::app_library_open,
             commands::view_show,
             commands::view_get,
             commands::offline_retry,

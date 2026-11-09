@@ -97,6 +97,7 @@ const COMMANDS: &[&str] = &[
     "app_recording_pause_set",
     "app_open_settings",
     "app_download_open",
+    "app_library_open",
     "offline_retry",
     "page_shape_get",
     "page_section",

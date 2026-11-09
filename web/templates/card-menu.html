@@ -4,6 +4,7 @@
   {% if !who.standalone %}<button role="menuitem" tabindex="-1" class="item" type="button" data-act="link"><span>Copy link</span><span class="note"></span></button>{% endif %}
   <button role="menuitem" tabindex="-1" class="item" type="button" data-act="star">Star</button>
   <a role="menuitem" tabindex="-1" data-act="download" href="" download>Download</a>
+  {% if who.standalone %}<button role="menuitem" tabindex="-1" class="item" type="button" data-act="open-file" hidden>Open the file</button><button role="menuitem" tabindex="-1" class="item" type="button" data-act="show-file" hidden>Show in folder</button>{% endif %}
   <button role="menuitem" tabindex="-1" class="item" type="button" data-act="rename">Rename</button>
   <button role="menuitem" tabindex="-1" class="item" type="button" data-act="sets">Collections</button>
   <button role="menuitem" tabindex="-1" class="item danger" type="button" data-act="delete"><span>Delete</span><span class="note"></span></button>

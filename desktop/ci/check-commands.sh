@@ -11,10 +11,10 @@ fi
 echo "every process goes through reel_core::proc"
 
 # Tauri refuses a command without a permission, so a button calling it would do nothing.
-handler=$(sed -n '/generate_handler!\[/,/\]/p' desktop/app/src/lib.rs | grep -o 'commands::[a-z_]*' | sed 's/commands:://' | sort)
+handler=$(sed -n '/generate_handler!\[/,/\]/p' desktop/app/src/lib.rs | grep -oE '^ +[a-z_]+::[a-z_]+,' | sed 's/.*:://; s/,//' | sort)
 listed=$(sed -n '/^const COMMANDS/,/^];/p' desktop/app/build.rs | grep -o '"[a-z_]*"' | tr -d '"' | sort)
 granted=$(grep -o '"allow-[a-z-]*"' desktop/app/capabilities/default.json | tr -d '"' | sed 's/^allow-//; s/-/_/g' | sort)
-remote=$(sed -n '/^const REMOTE_PERMISSIONS/,/^];/p' desktop/app/src/shell.rs | grep -o '"allow-[a-z-]*"' | tr -d '"' | sed 's/^allow-//; s/-/_/g' | sort)
+remote=$(grep -o '"allow-[a-z-]*"' desktop/app/src/shell.rs | tr -d '"' | sed 's/^allow-//; s/-/_/g' | sort)
 missing=$(printf '%s\n' "$handler" | grep -vxF "$listed" || true)
 stale=$(printf '%s\n' "$listed" | grep -vxF "$handler" || true)
 ungranted=$(printf '%s\n' "$listed" | grep -vxF "$granted" | grep -vxF "$remote" || true)

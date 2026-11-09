@@ -34,6 +34,9 @@ const REMOTE_PERMISSIONS: [&str; 9] = [
     "allow-app-download-open",
 ];
 
+/// What the library on this PC may ask besides: its files open where they are.
+const STANDALONE_PERMISSIONS: [&str; 1] = ["allow-app-library-open"];
+
 /// Every page's uncaught errors, unhandled rejections and scripts that did not load go to the
 /// app's Log; installed before the page's own scripts, so a page that never starts tells why.
 /// The app's own pages are not granted the command.
@@ -184,11 +187,20 @@ pub fn allow_origin(app: &AppHandle, base_url: &str) {
     for p in REMOTE_PERMISSIONS {
         cap = cap.permission(p);
     }
+    let own = app.try_state::<Runtime>().is_some_and(|rt| {
+        rt.is_standalone() && origin_of(&rt.library_base()).as_deref() == Some(origin.as_str())
+    });
+    if own {
+        for p in STANDALONE_PERMISSIONS {
+            cap = cap.permission(p);
+        }
+    }
     match app.add_capability(cap) {
         Ok(()) => tracing::info!(
             %origin,
+            own,
             "the server's pages may call the app's {} commands",
-            REMOTE_PERMISSIONS.len()
+            REMOTE_PERMISSIONS.len() + if own { STANDALONE_PERMISSIONS.len() } else { 0 }
         ),
         Err(e) => tracing::warn!(%origin, error = %e, "the server's pages got no capability"),
     }

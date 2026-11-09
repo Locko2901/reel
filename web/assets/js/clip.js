@@ -5,6 +5,7 @@ import { markNativePlay, rememberPlayback } from './playback.js';
 import { playerKeys } from './player-keys.js';
 import { backLink, goBack } from './back.js';
 import { animMade } from './anim-made.js';
+import { filesHere, libraryFiles, openFile } from './app-files.js';
 
 function bindText(id) {
   const title = $('#title'), desc = $('#description');
@@ -544,7 +545,7 @@ function trimEditor(id, video, duration, fps, titleField) {
     else if (e.key === 'o') { setEnd(video.currentTime); }
     else if (e.key === 'e') { e.preventDefault(); titleField.focus(); titleField.select(); }
     else if (e.key === 'c') { const live = liveLink(); if (live) live.click(); else $('#new-link')?.click(); }
-    else if (e.key === 'd') { location.href = `/media/clips/${id}/download`; }
+    else if (e.key === 'd') { if (!openFile(id, 'current', false)) location.href = `/media/clips/${id}/download`; }
   });
   render();
   const submit = async () => {
@@ -699,6 +700,10 @@ function sendPanel(root, id, titleField) {
   const original = () => quality.value === 'original';
   const copyUrl = () => `${dlBtn.dataset.copy}?limit=${quality.value}`;
   const chosen = () => quality.options[quality.selectedIndex];
+  const inPlace = filesHere() ? $$('[data-library-file]', dlBtn.parentElement) : [];
+  const swap = () => { if (!inPlace.length) return; dlBtn.hidden = original(); inPlace.forEach((b) => { b.hidden = !original(); }); };
+  quality.addEventListener('change', swap);
+  swap();
   async function status() {
     if (original()) return { ready: true, url: dlBtn.dataset.download, size: null };
     const head = await fetch(copyUrl(), { method: 'HEAD' });
@@ -808,6 +813,7 @@ export function clip() {
   bindDelete(id);
   bindDiscard(id);
   bindShares(id);
+  libraryFiles(id);
   if (!ready || !video) return;
   bindVersions(id, video);
   if ($('#edit')) {
