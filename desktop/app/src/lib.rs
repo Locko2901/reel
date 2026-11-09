@@ -10,6 +10,7 @@ mod linux;
 mod media;
 mod notify;
 mod obsbox;
+mod page_errors;
 #[cfg(target_os = "linux")]
 mod portal;
 mod runtime;
@@ -153,6 +154,7 @@ pub fn run() {
             commands::open_library,
             commands::open_page,
             commands::app_status,
+            commands::app_page_error,
             commands::app_share_last,
             commands::app_save_clip,
             commands::app_save_and_share,

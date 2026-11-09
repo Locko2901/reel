@@ -58,6 +58,8 @@ pub struct OfflineLine {
     pub words: String,
     pub code: String,
     pub retry_line: String,
+    /// The server answered and its page stopped at an error: no advice about the connection.
+    pub page_error: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Default)]

@@ -125,6 +125,9 @@ pub struct Inner {
     pub page_alive: bool,
     /// When the page last called the app, which it does every two seconds while it shows.
     pub last_call: Option<std::time::Instant>,
+    /// The first error a server page reported since the navigation it belongs to, in a line.
+    pub page_error: Option<(u64, String)>,
+    pub page_errors: crate::page_errors::Limit,
     /// The URL the app itself asked the webview to load, watched already; a navigation
     /// that is not this one came from a link or the history and is watched when seen.
     pub asked: Option<String>,
@@ -180,6 +183,8 @@ pub struct Offline {
     pub title: String,
     pub words: String,
     pub code: String,
+    /// The server answered; the page reported an error and never reached the app.
+    pub page_error: bool,
     pub attempt: u32,
     pub next_try: std::time::Instant,
 }
@@ -194,6 +199,7 @@ pub struct Unreachable {
 
 /// How long a page gets to announce itself after a navigation before the app probes.
 const LIFE_WAIT: Duration = Duration::from_secs(8);
+const NO_LIFE: &str = "no sign of life from the page after the server answered";
 
 fn error_chain(e: &dyn std::error::Error) -> String {
     let mut parts = vec![e.to_string()];
@@ -438,6 +444,8 @@ impl Runtime {
             nav_nonce: 0,
             page_alive: false,
             last_call: None,
+            page_error: None,
+            page_errors: Default::default(),
             asked: None,
             shape: None,
             bundled: detect_bundled(&app),
@@ -570,6 +578,7 @@ impl Runtime {
             title: o.title.clone(),
             words: o.words.clone(),
             code: o.code.clone(),
+            page_error: o.page_error,
             retry_line: {
                 let secs = o
                     .next_try
@@ -595,6 +604,8 @@ impl Runtime {
                 "recording paused".to_string(),
                 "the replay buffer is stopped".to_string(),
             )
+        } else if let Some(o) = g.offline.as_ref().filter(|o| o.page_error) {
+            ("error", "the page had an error".to_string(), o.code.clone())
         } else if let Some(o) = &g.offline {
             (
                 "error",
@@ -3986,11 +3997,35 @@ impl Runtime {
                 Ok(()) => Unreachable {
                     title: "The server answers, but its page did not load here".into(),
                     words: "The app reached the server, but the window did not get its page. This can be a name or certificate problem on the path the window takes, or a reel older than 1.0.1 whose pages do not know the app.".into(),
-                    code: "no sign of life from the page after the server answered".into(),
+                    code: NO_LIFE.into(),
                 },
             };
             rt.go_offline(nonce, why);
         });
+    }
+
+    /// A server page's error into the Log, a few a minute; the first of a navigation is kept
+    /// for the offline page, should that page never reach the app.
+    pub fn page_error(&self, message: &str, stack: &str, path: &str) {
+        let origin = shell::origin_of(&self.library_base());
+        let e = crate::page_errors::shape(message, stack, path, origin.as_deref());
+        let (log, left_out) = {
+            let mut g = self.lock();
+            let nonce = g.nav_nonce;
+            if g.page_error.as_ref().is_none_or(|(n, _)| *n != nonce) {
+                g.page_error = Some((nonce, e.message.clone()));
+            }
+            g.page_errors.take(std::time::Instant::now())
+        };
+        if left_out > 0 {
+            tracing::warn!(
+                left_out,
+                "page errors left out of the Log in the minute before"
+            );
+        }
+        if log {
+            tracing::warn!(path = %e.path, error = %e.message, stack = %e.stack, "page error");
+        }
     }
 
     fn page_alive(&self) {
@@ -4045,22 +4080,40 @@ impl Runtime {
             }
             let attempt = g.offline.as_ref().map(|o| o.attempt + 1).unwrap_or(0);
             let wait = Duration::from_secs((10u64 << attempt.min(3)).min(60));
-            let (title, words) = if g.settings.mode == Mode::Standalone {
+            let page_error = g
+                .page_error
+                .take()
+                .filter(|(n, _)| *n == nonce && why.code == NO_LIFE)
+                .map(|(_, line)| line);
+            let standalone = g.settings.mode == Mode::Standalone;
+            let is_page_error = page_error.is_some();
+            let (title, words, code) = if let Some(line) = page_error {
+                (
+                    "The page stopped at an error".to_string(),
+                    format!(
+                        "{} answered, but the library's page stopped at an error before it reached the app. The app tries again by itself; the error is in Settings, Log.",
+                        if standalone { "reel on this PC" } else { "The server" }
+                    ),
+                    line,
+                )
+            } else if standalone {
                 (
                     "reel on this PC does not answer".to_string(),
                     "The library's pages did not open in the window. The app tries again by itself; Settings, Log says why.".to_string(),
+                    why.code.clone(),
                 )
             } else {
-                (why.title.clone(), why.words.clone())
+                (why.title.clone(), why.words.clone(), why.code.clone())
             };
+            tracing::warn!(%title, %code, attempt, "cannot reach the server");
             g.offline = Some(Offline {
                 title,
                 words,
-                code: why.code.clone(),
+                code,
+                page_error: is_page_error,
                 attempt,
                 next_try: std::time::Instant::now() + wait,
             });
-            tracing::warn!(title = %why.title, code = %why.code, attempt, "cannot reach the server");
         }
         if !shell::owner_busy(&self.app) {
             shell::go(&self.app, shell::View::Offline, None);
