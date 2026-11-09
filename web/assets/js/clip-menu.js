@@ -1,5 +1,6 @@
 import { $, $$, api, copyWhenReady, focusOnOpen, settings, toast } from './lib.js';
 import { setStar } from './star.js';
+import { filesHere, openFile } from './app-files.js';
 
 const handheld = () => matchMedia('(pointer: coarse) and (hover: none)').matches;
 const narrow = () => matchMedia('(max-width: 600px)').matches;
@@ -181,7 +182,8 @@ export function clipMenu() {
     $('#card-menu-title').textContent = $('.card-title', card).textContent.trim();
     item('open').href = `/clips/${id}`;
     item('download').href = `/media/clips/${id}/download`;
-    item('download').hidden = !ready;
+    item('download').hidden = !ready || filesHere();
+    for (const act of ['open-file', 'show-file']) { const i = item(act); if (i) i.hidden = !ready || !filesHere(); }
     const link = item('link');
     if (link) {
       link.hidden = !ready || (!edit && card.dataset.shared === '0');
@@ -257,6 +259,7 @@ export function clipMenu() {
     } else if (act === 'link') await shareLink(c, title);
     else if (act === 'rename') renameDialog(c);
     else if (act === 'sets') setsDialog(c);
+    else if (act === 'open-file' || act === 'show-file') openFile(c.dataset.id, 'current', act === 'show-file');
   });
   for (const id of ['#rename-dialog', '#sets-dialog']) $(id)?.addEventListener('close', () => { if (button?.isConnected) button.focus(); });
 }

@@ -44,6 +44,12 @@ shot() { # shot <name>: the window, or the screen
   -c:v libx264 -pix_fmt yuv420p -c:a aac -shortest "$W/clip.mp4"
 FAKE_NOTIFY_ACTIONS=1 python3 /work/desktop/ci/fake-notifications.py > "$W/notifications.txt" 2>&1 &
 PIDS="$PIDS $!"
+# Open hands a file to xdg-open: this one writes down what it was handed
+mkdir -p "$W/bin"
+printf '#!/bin/sh\nprintf "%%s\\n" "$*" >> "%s/opened.txt"\n' "$W" > "$W/bin/xdg-open"
+chmod +x "$W/bin/xdg-open"
+export PATH="$W/bin:$PATH"
+opened() { grep -c . "$W/opened.txt" 2>/dev/null || true; }
 
 D="$W/new"
 L="$D/data/logs"
@@ -133,6 +139,21 @@ WIN=$(window)
 xdotool windowmove "$WIN" 0 0 windowsize "$WIN" 1280 820 2>/dev/null || true
 sleep 2
 shot "4-library"
+b=$(logged "a library file shown from its page")
+n=$(opened)
+# the card's menu, then Open, Star and Open the file with the keys
+# shellcheck disable=SC2086
+xdotool mousemove ${REEL_CARD_MORE:-305 353} click 1
+sleep 1
+shot "4-card-menu"
+xdotool key Down Down Down Return
+waitmore "a library file shown from its page" 15 "a card's Open the file did nothing" "$b"
+for _ in $(seq 1 20); do [ "$(opened)" -gt "$n" ] && break; sleep 0.5; done
+case "$(tail -n 1 "$W/opened.txt" 2>/dev/null)" in
+  */library/"$LOCAL"/master.mp4) ;;
+  *) fail "a card's Open the file handed \"$(tail -n 1 "$W/opened.txt" 2>/dev/null)\" to the system" ;;
+esac
+ok "a card's menu in the library: Open the file opens the current version where it is (shot)"
 # shellcheck disable=SC2086
 xdotool mousemove ${REEL_CHIP:-1190 24} click 1
 sleep 1
@@ -152,6 +173,50 @@ waitlog "recording paused by the user paused=false" 10 "Resume recording did not
 waitlog "library loaded at=127.0.0.1/clips/$LOCAL" 20 "Open did not open the clip"
 sleep 3
 shot "6-clip"
+# Open and Show in folder on the clip's page: the current version, the file in the library
+VERSION=$(find "$D" -path "*/library/$LOCAL/master.mp4" | head -1)
+[ -f "$VERSION" ] || fail "no version of the clip in the library: $(find "$D" -path "*$LOCAL*" | head -5)"
+python3 /work/desktop/ci/fake-filemanager.py > "$W/files.txt" 2>&1 &
+FM=$!
+PIDS="$PIDS $FM"
+for _ in $(seq 1 20); do grep -q "file manager up" "$W/files.txt" && break; sleep 0.5; done
+b=$(logged "a library file shown from its page")
+n=$(opened)
+xdotool key d
+waitmore "a library file shown from its page" 15 "d on the clip page did not open its file" "$b"
+for _ in $(seq 1 20); do [ "$(opened)" -gt "$n" ] && break; sleep 0.5; done
+[ "$(tail -n 1 "$W/opened.txt")" = "$VERSION" ] || fail "Open handed \"$(tail -n 1 "$W/opened.txt" 2>/dev/null)\" to the system, not $VERSION"
+ok "d on the clip page: the current version opens in the PC's player, the file in the library itself"
+b=$(logged "a library file shown from its page")
+# shellcheck disable=SC2086
+xdotool mousemove ${REEL_SHOW_IN_FOLDER:-1150 369} click 1
+waitmore "a library file shown from its page" 15 "Show in folder did nothing" "$b"
+for _ in $(seq 1 20); do grep -q "^show " "$W/files.txt" && break; sleep 0.5; done
+grep -qx "show file://$VERSION" "$W/files.txt" || fail "the file manager was asked: $(grep -v 'up$' "$W/files.txt" | tr '\n' ' ')"
+shot "6-clip-open"
+ok "Show in folder: the file manager selects the file (ShowItems)"
+kill "$FM" 2>/dev/null || true
+sleep 1
+b=$(logged "a library file shown from its page")
+n=$(opened)
+# shellcheck disable=SC2086
+xdotool mousemove ${REEL_SHOW_IN_FOLDER:-1150 369} click 1
+waitmore "a library file shown from its page" 15 "Show in folder without a file manager did nothing" "$b"
+for _ in $(seq 1 20); do [ "$(opened)" -gt "$n" ] && break; sleep 0.5; done
+[ "$(tail -n 1 "$W/opened.txt")" = "$(dirname "$VERSION")" ] || fail "without a file manager, Show in folder handed \"$(tail -n 1 "$W/opened.txt" 2>/dev/null)\" to the system"
+ok "Show in folder without a file manager: its folder opens"
+mv "$VERSION" "$W/away.mp4"
+b=$(logged "a library file did not open")
+xdotool key d
+waitmore "a library file did not open" 15 "a missing file was not refused" "$b"
+cat "$L"/reel-desktop.log* | grep "a library file did not open" | tail -1 | grep -q "moved or deleted outside reel" || fail "a missing file's words: $(cat "$L"/reel-desktop.log* | grep 'a library file did not open' | tail -1)"
+sleep 1
+shot "6-clip-missing"
+mv "$W/away.mp4" "$VERSION"
+xdotool mousemove 1000 700 click --repeat 8 5
+sleep 1
+shot "6-clip-below"
+ok "a file moved away outside reel: refused with words, in the page's toast (shot)"
 "$APP" --section=status > /dev/null 2>&1 || true
 sleep 2
 shot "7-this-app-status"

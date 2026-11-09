@@ -3301,6 +3301,38 @@ async fn the_standalone_library_offers_nothing_of_a_servers() {
         front.contains(r#"id="app-save" type="button" aria-label="Save clip" hidden"#),
         "the header has a slot for the app's Save clip"
     );
+    let (_, page) = ask(&env, "GET", &format!("/clips/{id}"), None).await;
+    let master = clip.master_id.clone().expect("a master");
+    for (what, mark) in [
+        (
+            "Send: Open",
+            r#"data-library-file="current" title="in this PC's own player" hidden"#.to_string(),
+        ),
+        (
+            "Send: Show in folder",
+            r#"data-library-file="current" data-reveal title"#.into(),
+        ),
+        (
+            "Versions: Open",
+            format!(r#"data-library-file="{master}" hidden>Open</button>"#),
+        ),
+        (
+            "Versions: Show in folder",
+            format!(r#"data-library-file="{master}" data-reveal hidden>Show in folder</button>"#),
+        ),
+        (
+            "Versions: Download, hidden in the app",
+            "data-in-library>Download</a>".into(),
+        ),
+        ("Send: Download, for a copy", r#"id="download-btn""#.into()),
+    ] {
+        assert!(page.contains(&mark), "the clip page in standalone, {what}");
+    }
+    assert!(
+        front.contains(r#"data-act="open-file" hidden>Open the file</button>"#)
+            && front.contains(r#"data-act="show-file" hidden>Show in folder</button>"#),
+        "a card's menu opens the file in standalone"
+    );
     let (_, sharing) = ask(&env, "GET", "/settings/sharing", None).await;
     assert!(sharing.contains("Copies under a size") && sharing.contains("Limit list"));
     assert_eq!(
@@ -8642,6 +8674,10 @@ async fn the_download_select_offers_the_original_and_only_the_limits_it_does_not
     assert!(
         page.contains("<option value=\"original\" data-ready=\"1\">original as it is, "),
         "the original first, with its size"
+    );
+    assert!(
+        !page.contains("data-library-file") && !page.contains("data-in-library"),
+        "a server's page downloads: Open and Show in folder are the library on a PC's"
     );
     assert!(
         !page.contains("Under 1 MB") && !page.contains("Under 10 MB"),
