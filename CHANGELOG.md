@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.13.1](https://github.com/Locko2901/reel/compare/v1.13.0...v1.13.1) (2026-11-09)
+
+
+### Bug Fixes
+
+* a clip too quiet to measure opens its editor and says so ([32318db](https://github.com/Locko2901/reel/commit/32318db30246ff6b2610fb65e041afb9fa7f722e))
+* a part of a page that fails no longer stops the rest of the page ([7abe9f1](https://github.com/Locko2901/reel/commit/7abe9f1de65691f51eb8d2e48185e9c71a5902eb))
+* a settings file written by a newer version of the desktop app still loads ([7fc45c1](https://github.com/Locko2901/reel/commit/7fc45c17a0a568f8fc33d205ebdde6b7bb94f3c8))
+* errors on the library's pages go to the desktop app's Log ([842dcff](https://github.com/Locko2901/reel/commit/842dcff8d9e1aabe092042ba5942af07a6d46010))
+
 ## [1.13.0](https://github.com/Locko2901/reel/compare/v1.12.2...v1.13.0) (2026-11-08)
 
 
