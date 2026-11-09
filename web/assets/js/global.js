@@ -66,9 +66,5 @@ function freshOnReturn() {
   addEventListener('pageshow', (e) => { if (e.persisted && $('#grid, .trash-table')) location.reload(); });
 }
 
-bindCopyAndRevoke();
-freshOnReturn();
-header();
-switches();
-jobsCount();
-globalKeys();
+/** What every page has, for reel.js to start. */
+export const everyPage = [bindCopyAndRevoke, freshOnReturn, header, switches, jobsCount, globalKeys];
