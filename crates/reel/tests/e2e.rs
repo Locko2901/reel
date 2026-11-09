@@ -11474,6 +11474,140 @@ async fn a_boost_on_a_loud_clip_stays_under_the_ceiling() {
     assert!(master_path.exists());
 }
 
+#[tokio::test(flavor = "multi_thread")]
+async fn a_clip_too_quiet_to_measure_keeps_its_level_when_normalised() {
+    let Some(env) = start_with(AuthMode::Single, vec![], |c| c.media.normalize_new = true).await
+    else {
+        return;
+    };
+    // about -69 dBTP, every 400 ms block under the -70 LUFS gate
+    let faint = Synth {
+        tone_db: -52.0,
+        ..Synth::small(6.0, "faint")
+    };
+    env.synth("a faint hiss.mp4", faint).await;
+    let clip = env.wait_ready(Duration::from_secs(90)).await;
+    env.wait_no_jobs(Duration::from_secs(120)).await;
+    let rendition = |id: String| {
+        let env = &env;
+        async move { env.store().rendition(&id).await.unwrap().unwrap() }
+    };
+    let master = rendition(clip.master_id.clone().unwrap()).await;
+    assert!(master.audio_measured_at.is_some(), "measured at ingest");
+    let peak = master.audio_peak.expect("a faint tone has a peak");
+    assert!((-75.0..-60.0).contains(&peak), "{peak}");
+    assert_eq!(master.audio_loudness, None, "too quiet to measure");
+
+    let first = rendition(clip.current_id.clone().unwrap()).await;
+    assert_ne!(first.id, master.id, "Normalise new clips made a version");
+    let master_path = env.ctx.config().abs(master.path.as_deref().unwrap());
+    let before = mean_volume(&env.ctx.ff, &master_path, 0).await;
+    let first_path = env.ctx.config().abs(first.path.as_deref().unwrap());
+    let after = mean_volume(&env.ctx.ff, &first_path, 0).await;
+    assert!(
+        (after - before).abs() <= 0.5,
+        "the first version keeps the level: {before} to {after}"
+    );
+
+    sqlx::query("UPDATE rendition SET audio_peak = NULL, audio_loudness = NULL, audio_measured_at = NULL WHERE id = ?")
+        .bind(&master.id)
+        .execute(env.store().pool())
+        .await
+        .unwrap();
+    let level: serde_json::Value = env
+        .client
+        .get(format!("{}/api/renditions/{}/level", env.base, master.id))
+        .send()
+        .await
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+    assert_eq!(level["audio"], true);
+    assert!(level["loudness"].is_null(), "{level}");
+    assert!(
+        (level["peak"].as_f64().unwrap() - peak).abs() < 0.05,
+        "{level}"
+    );
+
+    let page = env
+        .client
+        .get(format!("{}/clips/{}", env.base, clip.id))
+        .send()
+        .await
+        .unwrap()
+        .text()
+        .await
+        .unwrap();
+    let block = page
+        .split(r#"<script type="application/json" id="level-json">"#)
+        .nth(1)
+        .and_then(|rest| rest.split("</script>").next())
+        .expect("the editor's JSON");
+    let json: serde_json::Value = serde_json::from_str(block).unwrap();
+    assert_eq!(json["measured"], true);
+    assert!(
+        json["loudness"].is_null() && json["peak"].as_f64().is_some(),
+        "{json}"
+    );
+    assert!(
+        page.contains(r#"id="normalize-why""#),
+        "a place by the switch for why it is off"
+    );
+    assert!(
+        page.contains("too quiet to normalise, video copied"),
+        "the first version says it kept its level"
+    );
+
+    let norm = cut_with(
+        &env,
+        &clip.id,
+        serde_json::json!({ "end": 4.0, "normalize": true }),
+    )
+    .await;
+    assert!(norm
+        .recipe
+        .as_deref()
+        .unwrap()
+        .contains("\"loudness\":-16.0"));
+    let norm_path = env.ctx.config().abs(norm.path.as_deref().unwrap());
+    let normalised = mean_volume(&env.ctx.ff, &norm_path, 0).await;
+    assert!(
+        (normalised - before).abs() <= 0.5,
+        "normalise asked, the level kept: {before} to {normalised}"
+    );
+    assert!(norm.audio_measured_at.is_some() && norm.audio_loudness.is_none());
+    assert!(
+        (norm.audio_peak.unwrap() - peak).abs() <= 1.0,
+        "{:?} against {peak}",
+        norm.audio_peak
+    );
+    let route = sqlx::query_scalar::<_, Option<String>>(
+        "SELECT route FROM job WHERE kind = 'cut' AND rendition_id = ?",
+    )
+    .bind(&norm.id)
+    .fetch_one(env.store().pool())
+    .await
+    .unwrap();
+    assert_eq!(
+        route.as_deref(),
+        Some("video copied, audio too quiet to normalise"),
+        "the job says what it did"
+    );
+
+    let up = cut_with(&env, &clip.id, serde_json::json!({ "gain_db": 6.0 })).await;
+    let louder = mean_volume(
+        &env.ctx.ff,
+        &env.ctx.config().abs(up.path.as_deref().unwrap()),
+        0,
+    )
+    .await;
+    assert!(
+        (louder - before - 6.0).abs() <= 0.5,
+        "the volume works as usual: {before} to {louder}"
+    );
+}
+
 async fn band_volume(ff: &Ffmpeg, path: &std::path::Path, track: usize, freq: u32) -> f64 {
     let log = ff
         .analyse(&[

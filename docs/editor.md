@@ -106,6 +106,13 @@ plays your change live on the original (cuts are made from it, so the player mov
 original when you trim or change the sound), but without the limiter, so a big boost may crackle
 in the browser and not in the cut.
 
+A sound too quiet to measure, such as a faint hiss, has a peak but no loudness: all of it stays
+under the -70 LUFS gate loudness is measured by. The line gives its peak and says it is too
+quiet for its loudness to be measured, and **normalise** is off for it, with the reason next to
+the switch; the volume and the tracks work as usual. A cut asked to normalise such a sound (an
+older version edited again, or [Normalise new clips](configuration.md#normalise-new-clips))
+keeps it at its level, and the version says **too quiet to normalise**.
+
 A change of the sound alone never encodes the video again: without a trim, or with the start on
 a keyframe, the line says **video copied**, and only the audio is encoded again.
 
@@ -232,7 +239,8 @@ Under **The montage**:
 - **Fill the frame**: a clip of another shape fills the frame and what is over is cut off,
   instead of black bars around it.
 - **Every clip at one loudness** (on): every clip's sound is brought to the same loudness, the
-  [Loudness target](configuration.md#loudness-target); off, each keeps its own.
+  [Loudness target](configuration.md#loudness-target); off, each keeps its own. A clip too quiet
+  to measure keeps its own either way.
 
 ### Render it
 

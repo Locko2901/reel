@@ -307,7 +307,8 @@ async fn render_audio(
             .run_with(&a, len.max(0.1), None, cancel.as_ref())
             .await?;
         let what = match recipe.loudness {
-            Some(t) => format!("audio to {t:.0} LUFS"),
+            Some(t) if measured.is_some() => format!("audio to {t:.0} LUFS"),
+            Some(_) => "audio too quiet to normalise".to_string(),
             None if recipe.gain_db != 0.0 => {
                 format!("audio {}", reel_core::format::gain(recipe.gain_db))
             }

@@ -68,7 +68,8 @@
             <span class="ctl-group"><input type="number" id="gain-num" class="in-num" min="-20" max="20" step="0.5" value="0" aria-label="Volume in dB"><span class="unit">dB</span></span>
             <button class="quiet" id="gain-reset" type="button" disabled>Reset</button>
           </span>
-          <label class="toggle">normalise loudness to {{ loudness_target }} LUFS <button type="button" class="switch" role="switch" aria-checked="false" id="normalize"><i></i></button></label>
+          <label class="toggle">normalise loudness to {{ loudness_target }} LUFS <button type="button" class="switch" role="switch" aria-checked="false" id="normalize" aria-describedby="normalize-why"><i></i></button></label>
+          <span class="faint small" id="normalize-why" hidden></span>
         </div>
         {% if tracks.len() > 1 %}
         <div class="tracks" id="tracks">

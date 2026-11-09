@@ -215,7 +215,28 @@ impl CutRecipe {
         self.describe(self.start.unwrap_or(0.0) + cut_len)
     }
 
+    /// `describe_cut` of a cut whose normalising found the audio too quiet to measure and left
+    /// it at its level.
+    pub fn describe_cut_too_quiet(&self, cut_len: f64) -> String {
+        let as_made = CutRecipe {
+            loudness: None,
+            ..self.clone()
+        };
+        let mut parts = as_made.parts(self.start.unwrap_or(0.0) + cut_len);
+        parts.push("too quiet to normalise".into());
+        parts.join(", ")
+    }
+
     pub fn describe(&self, duration: f64) -> String {
+        let parts = self.parts(duration);
+        if parts.is_empty() {
+            "unchanged".into()
+        } else {
+            parts.join(", ")
+        }
+    }
+
+    fn parts(&self, duration: f64) -> Vec<String> {
         let mut parts = Vec::new();
         if self.start.is_some() || self.end.is_some() {
             let s = self.start.unwrap_or(0.0);
@@ -247,11 +268,7 @@ impl CutRecipe {
         } else if self.gain_db != 0.0 {
             parts.push(crate::format::gain(self.gain_db));
         }
-        if parts.is_empty() {
-            "unchanged".into()
-        } else {
-            parts.join(", ")
-        }
+        parts
     }
 }
 
@@ -790,6 +807,15 @@ mod tests {
         .settled();
         assert_eq!(loud.gain_db, 0.0);
         assert_eq!(loud.describe(10.0), "loudness to -16 LUFS");
+        assert_eq!(loud.describe_cut_too_quiet(10.0), "too quiet to normalise");
+        let trimmed = CutRecipe {
+            start: Some(2.0),
+            ..loud.clone()
+        };
+        assert_eq!(
+            trimmed.describe_cut_too_quiet(3.0),
+            "0:02.00 to 0:05.00, too quiet to normalise"
+        );
         assert!(CutRecipe::default().is_noop());
     }
 

@@ -214,11 +214,13 @@ function bindPoster(id, video) {
 
 function audioEditor(id, video, root, toMaster, onChange) {
   let info = {}; try { info = JSON.parse($('#level-json').textContent) || {}; } catch {}
-  const mute = $('#mute'), range = $('#gain'), num = $('#gain-num'), reset = $('#gain-reset'), norm = $('#normalize'), vol = $('#vol'), line = $('#level-line');
+  const mute = $('#mute'), range = $('#gain'), num = $('#gain-num'), reset = $('#gain-reset'), norm = $('#normalize'), normWhy = $('#normalize-why'), vol = $('#vol'), line = $('#level-line');
   const rows = $$('#tracks [data-track]').map((row, i) => ({ i, row, name: $('.track-name', row).textContent, mute: $('button[role="switch"]', row), range: $('input[type="range"]', row), num: $('input[type="number"]', row), vol: $('.vol', row), gain: 0 }));
   const multi = rows.length > 1;
   let gainDb = 0, graph = null, failed = '', applying = false;
-  const silent = () => info.measured && info.peak == null;
+  const silent = () => info.measured && !Number.isFinite(info.peak);
+  // a peak, but every 400 ms block under the loudness gate (-70 LUFS)
+  const tooQuiet = () => info.measured && Number.isFinite(info.peak) && !Number.isFinite(info.loudness);
   const playing = () => rows.filter(r => !isOn(r.mute));
   const asItWas = () => rows.every(r => isOn(r.mute) === (r.i !== 0) && r.gain === 0);
   const changed = () => info.audio && !isOn(mute) && (gainDb !== 0 || isOn(norm) || (multi && !asItWas()));
@@ -272,7 +274,7 @@ function audioEditor(id, video, root, toMaster, onChange) {
     set(graph.own, graph.tracks && on ? 0 : 1);
     let value = 1;
     if (on) {
-      const db = isOn(norm) ? (info.loudness != null ? levelling() : 0) : gainDb;
+      const db = isOn(norm) ? (Number.isFinite(info.loudness) ? levelling() : 0) : gainDb;
       value = isOn(mute) ? 0 : Math.pow(10, db / 20);
     }
     set(graph.master, value);
@@ -282,7 +284,10 @@ function audioEditor(id, video, root, toMaster, onChange) {
     if (failed) return `The audio could not be measured: ${failed}`;
     if (!info.measured) return "Measuring the original's audio.";
     if (silent()) return "The original's audio is silent.";
-    let text = `${multi ? 'Its loudest track peaks' : 'The original peaks'} at ${level(info.peak, 'dBTP')} and plays at ${level(info.loudness, 'LUFS')}: room for ${dB(room())} before it clips.`;
+    const plays = tooQuiet()
+      ? (multi ? 'every track is too quiet for its loudness to be measured' : 'is too quiet for its loudness to be measured')
+      : `plays at ${level(info.loudness, 'LUFS')}`;
+    let text = `${multi ? 'Its loudest track peaks' : 'The original peaks'} at ${level(info.peak, 'dBTP')} and ${plays}: room for ${dB(room())} before it clips.`;
     if (isOn(mute)) return `${text} Muted, the cut has no audio.`;
     if (multi && !playing().length) return `${text} No track plays, the cut has no audio.`;
     if (isOn(norm)) {
@@ -293,10 +298,16 @@ function audioEditor(id, video, root, toMaster, onChange) {
     return text;
   }
   function update() {
+    const unmeasurable = silent() || tooQuiet();
+    if (unmeasurable && isOn(norm)) setOn(norm, false);
     const off = !info.audio || isOn(mute) || isOn(norm);
     range.disabled = off; num.disabled = off; reset.disabled = off || gainDb === 0;
     vol.classList.toggle('off', off);
-    norm.disabled = !info.audio || isOn(mute) || silent();
+    norm.disabled = !info.audio || isOn(mute) || unmeasurable;
+    if (normWhy) {
+      normWhy.textContent = silent() ? 'off: the audio is silent' : tooQuiet() ? 'off: too quiet to measure its loudness' : '';
+      normWhy.hidden = !info.audio || !unmeasurable;
+    }
     for (const r of rows) {
       const quiet = isOn(mute) || isOn(r.mute);
       r.mute.disabled = isOn(mute);
