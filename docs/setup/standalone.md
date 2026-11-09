@@ -5,8 +5,9 @@ its window, with the same pages a server has: the editor, montages, collections,
 copies under a size for chats with an upload limit. Nothing leaves the PC, and there is no server
 to run and no account to make.
 
-To send a clip, you download it and drag the file into the chat. Share links need a server, which
-you can [add at any time](#add-a-server-later).
+To send a clip, you drag its file into the chat: **Show in folder** has it selected, or a copy under
+the chat's upload limit downloads. Share links need a server, which you can
+[add at any time](#add-a-server-later).
 
 ## 1. Install the app
 
@@ -43,16 +44,32 @@ app, with a key that changes at each start ([Privacy](../privacy.md#the-library-
    OBS, set a key under Settings, **Hotkeys**, or use OBS's own **Save Replay** hotkey. The "clip
    captured" sound plays.
 2. A second or two later the notification "Clip in the library" appears. Click **Open**.
-3. On the clip's page, under **Send**, pick the original or a size under your chat's upload limit,
-   then press **Download**.
-4. A note at the bottom of the page says where the file went. Press **Show in folder** and drag the
-   file into the chat.
+3. On the clip's page, under **Send**, press **Show in folder**: the folder opens with the file
+   selected. Drag it into the chat.
+4. For a chat with a lower upload limit, pick a size under it in the list instead and press
+   **Download**. A note at the bottom of the page says where the copy went, with **Show in folder**.
 
 A clip OBS saves in H.264 with AAC sound, up to 1440p and 50 Mbit/s, goes into the library as it
 is, never encoded again.
 
 In standalone, the tray and the window offer **Save clip**, and the hotkeys **Save a clip**, alone.
 Save and share, Share the last clip and Copy link make links, and links need a server.
+
+### The files are on this PC
+
+A clip's files are in the library already, so the window opens them where they are instead of
+downloading a copy:
+
+- **Open** plays the file in the PC's own player. **Show in folder** opens its folder with the file
+  selected: Explorer on Windows, your file manager on Linux (or the folder alone, where the file
+  manager cannot select a file).
+- They are under **Send** for the version as it is, on each row under **Versions**, in **Details**
+  for the raw file reel kept, and in a clip's menu in the library (**Open the file**). `d` on a
+  clip's page opens its current version.
+- A copy under a size, an animated GIF or WebP and the zip of picked clips are made to be sent:
+  they download to your Downloads folder, as on a server.
+- A file moved or deleted outside reel does not open, and the page says so. Move it back, or delete
+  the clip.
 
 ## How it treats the PC while you play
 

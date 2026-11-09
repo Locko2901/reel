@@ -26,9 +26,9 @@ R2's free tier covers what reel puts there with the default limit.
 
 No, but you need one for links. Out of the box the app runs reel by
 itself, with the library on your PC ([Standalone](setup/standalone.md)):
-to send a clip, download it, or a copy under a chat's upload limit, and
-drag the file into the chat. A share link is a page on the internet, and
-that takes a server the internet can reach
+to send a clip, show its file in its folder, or download a copy under a
+chat's upload limit, and drag the file into the chat. A share link is a
+page on the internet, and that takes a server the internet can reach
 ([The server](setup/server.md)). You can add one any time later, and the
 clips you have can go up to it then.
 
