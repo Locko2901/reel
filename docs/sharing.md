@@ -261,6 +261,10 @@ limit.
    dropped meanwhile.
 3. Drag the finished download from the browser's download bubble into the chat.
 
+In the desktop app on its own ([standalone](setup/standalone.md#the-files-are-on-this-pc)), the
+file is on the PC already: **Send** has **Open** and **Show in folder** for the version as it is
+instead of **Download**, and a copy under a size downloads as above.
+
 ![The Send panel](img/send-panel.png)
 
 A copy is made once per version and limit, and kept: the next time it is ready at once, and the
@@ -277,7 +281,8 @@ oldest going first.
 
 **Download** on a row under **Versions** gives that version's file as it is. When the server
 kept the raw file a re-encoded clip came from ([Keep originals](configuration.md#keep-originals)),
-**Details** has **Download the original** for it.
+**Details** has **Download the original** for it. In standalone, both are **Open** and **Show in
+folder**.
 
 ### An animated GIF or WebP
 

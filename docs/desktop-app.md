@@ -48,7 +48,7 @@ The app runs in one of two modes, set under Settings, **Server**, **Mode**:
 | | **standalone** | **connected** |
 |---|---|---|
 | The library | on this PC, inside the app | on your server |
-| Sending a clip | download it, or a copy under a size, and drag the file into the chat | paste a share link, copied with one key |
+| Sending a clip | **Show in folder**, or download a copy under a size, and drag the file into the chat | paste a share link, copied with one key |
 | What you need | the app alone | a reel server, paired with the app |
 | Hotkeys | **Save a clip** | **Save a clip**, **Save and share**, **Share the last clip**, **Upload the last clip** |
 
@@ -135,7 +135,9 @@ the app's own included.
 A download in the window (a clip's or a version's **Download**, a copy under a size, an animated
 picture, **Download** on a link's page, the zip of picked clips) goes to your Downloads folder. A
 note at the bottom of the page shows its name, size and progress, then where it was saved, with
-**Show in folder** and **Open**, or why it failed.
+**Show in folder** and **Open**, or why it failed. In standalone, a file already in the library is
+not downloaded: **Open** and **Show in folder** take it where it is
+([The files are on this PC](setup/standalone.md#the-files-are-on-this-pc)).
 
 When the server cannot be reached, the window shows the app's own page instead: what went wrong
 in words (for example "No answer from the server" or "The connection is not trusted"), **Retry**,

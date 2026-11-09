@@ -288,7 +288,7 @@ clip):
 | `f` | fullscreen |
 | `e` | edit the title |
 | `c` | copy the newest live link under **Share**, or open **New link** when there is none |
-| `d` | download the current version |
+| `d` | download the current version; in standalone, open it in the PC's own player |
 | `s` | star the clip, or unstar it |
 
 With a handle focused (click it or tab to it), the left and right arrows move it by a frame, and
