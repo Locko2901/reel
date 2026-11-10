@@ -310,9 +310,6 @@ pub fn run() {
             if !hidden || wizard || first_run {
                 let base = if standalone { "" } else { server_url.as_str() };
                 shell::build(app.handle(), base)?;
-                if !base.is_empty() {
-                    app.state::<Runtime>().inner().go_library("/");
-                }
             }
             if wizard {
                 shell::show(app.handle(), shell::View::Setup, None);

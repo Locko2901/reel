@@ -335,11 +335,16 @@ pub async fn page_shape_get(rt: State<'_, Runtime>) -> R<Value> {
     Ok(rt.page_shape().await)
 }
 
-/// Logs which section the app's page opened.
+/// Logs which section the app's page opened; one chosen there keeps the window there when reel
+/// on this PC comes up.
 #[tauri::command]
-pub fn page_section(section: String) -> R<()> {
+pub fn page_section(rt: State<'_, Runtime>, section: String, chosen: Option<bool>) -> R<()> {
+    let chosen = chosen.unwrap_or(false);
     if crate::shell::section_ok(&section) {
-        tracing::info!(section = %section, "app page");
+        tracing::info!(section = %section, chosen, "app page");
+    }
+    if chosen {
+        rt.library_let_go();
     }
     Ok(())
 }
