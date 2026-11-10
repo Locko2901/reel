@@ -155,7 +155,7 @@ function sections() {
   history.scrollRestoration = 'manual';
   const root = $('#settings'), body = $('#sections-body');
   const known = (id) => APP_SECTIONS.some(([k]) => k === id);
-  const open = (id, push) => {
+  const open = (id, push, chosen = true) => {
     if (!known(id)) id = 'status';
     current = id;
     if (id === 'library') capAsk();
@@ -169,7 +169,7 @@ function sections() {
     if (id === 'log') loadLog();
     invoke('obs_meters', { on: id === 'obs' }).catch(() => {});
     if (id === 'obs' && settings && settings.obs.bundled) invoke('obs_read').then((r) => doneInObs(r, false, true)).catch(() => {});
-    invoke('page_section', { section: id }).catch(() => {});
+    invoke('page_section', { section: id, chosen }).catch(() => {});
   };
   document.addEventListener('click', (e) => {
     const a = e.target.closest('nav.sections a[data-app-section]');
@@ -178,11 +178,13 @@ function sections() {
     open(a.dataset.appSection, true);
   });
   window.addEventListener('popstate', () => open(location.hash.replace('#', '') || 'status', false));
-  open(location.hash.replace('#', '') || 'status', false);
+  open(location.hash.replace('#', '') || 'status', false, false);
   window.openSection = (id) => open(id, true);
   const filter = $('#settings-filter');
+  let searched = false;
   filter?.addEventListener('input', () => {
     const q = filter.value.trim().toLowerCase();
+    if (q && !searched) { searched = true; invoke('page_section', { section: current, chosen: true }).catch(() => {}); }
     if (!q) { open(current, false); return; }
     let hits = 0;
     $$('.group', body).forEach(g => g.hidden = false);

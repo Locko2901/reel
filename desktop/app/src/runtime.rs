@@ -48,9 +48,8 @@ pub struct Inner {
     pub settings: Settings,
     /// A new install: no settings file was there at this start.
     pub fresh: bool,
-    /// Standalone: the window was asked for the library before the local reel was up; it goes
-    /// there once it is.
-    pub library_wanted: bool,
+    /// Standalone: the page of the library the window is to show.
+    pub library_wanted: Wanted,
     pub ledger: Ledger,
     pub tokens: TokenStore,
     pub api: Option<Api>,
@@ -195,6 +194,46 @@ pub struct Unreachable {
     pub title: String,
     pub words: String,
     pub code: String,
+}
+
+/// Standalone: the page of the library the window is to show, from the ask until that page
+/// reaches the app or a settings view or section is opened. Until then the app's page on is one
+/// the app put there, not one the user chose. Asked and taken under the lock that holds reel on
+/// this PC, so that its start and an ask cannot pass each other.
+#[derive(Debug, Default)]
+pub struct Wanted(Option<String>);
+
+#[derive(Debug, PartialEq, Eq)]
+pub enum Ask {
+    /// reel on this PC is up: the window goes there now.
+    Go,
+    /// reel on this PC is not up: the window goes there once it is.
+    Wait,
+}
+
+impl Wanted {
+    pub fn ask(&mut self, path: &str, up: bool) -> Ask {
+        self.0 = Some(path.to_string());
+        if up {
+            Ask::Go
+        } else {
+            Ask::Wait
+        }
+    }
+
+    /// reel on this PC is up: the page asked for meanwhile, if any.
+    pub fn up(&self) -> Option<String> {
+        self.0.clone()
+    }
+
+    pub fn waits(&self) -> bool {
+        self.0.is_some()
+    }
+
+    /// The library's page reached the app, or a settings section was opened.
+    pub fn done(&mut self) -> Option<String> {
+        self.0.take()
+    }
 }
 
 /// How long a page gets to announce itself after a navigation before the app probes.
@@ -385,7 +424,7 @@ impl Runtime {
             paths,
             settings,
             fresh,
-            library_wanted: false,
+            library_wanted: Wanted::default(),
             ledger,
             tokens,
             api,
@@ -3156,20 +3195,18 @@ impl Runtime {
             match Local::start(&s).await {
                 Ok(local) => {
                     let local = Arc::new(local);
-                    let url = local.url.clone();
-                    {
+                    let wanted = {
                         let mut g = rt.lock();
                         g.local_line = format!("reel on {} with {}", local.addr, local.backend);
                         local.hold(g.paused_fullscreen);
                         g.local = Some(local.clone());
-                    }
+                        (g.settings.mode == Mode::Standalone).then(|| g.library_wanted.up())
+                    };
                     rt.watch_library(local);
-                    let _ = url;
-                    if rt.is_standalone() {
-                        if std::mem::take(&mut rt.lock().library_wanted) {
-                            rt.go_library("/");
-                        } else {
-                            rt.library_changed();
+                    if let Some(wanted) = wanted {
+                        match wanted {
+                            Some(path) => rt.go_library(&path),
+                            None => rt.library_changed(),
                         }
                         rt.take_in_found();
                     }
@@ -3892,28 +3929,53 @@ impl Runtime {
         }
     }
 
-    /// Takes the webview to a page of the server and watches for its first `app_status` call;
-    /// without one the app probes the server and shows its own page.
+    /// Takes the webview to a page of the library and watches for its first `app_status` call;
+    /// without one the app probes the server and shows its own page. In standalone the page
+    /// waits for reel on this PC when it is not up yet.
     pub fn go_library(&self, path: &str) {
-        let base = self.library_base();
-        if base.is_empty() {
-            if self.is_standalone() {
-                self.lock().library_wanted = true;
-            }
-            return;
-        }
-        // no window yet: it goes to the library when it is made
-        if self.app.get_webview(shell::LIBRARY).is_none() {
-            return;
-        }
-        let page = self.library_page(path);
-        let nonce = {
+        let window = self.app.get_webview(shell::LIBRARY).is_some();
+        let to = {
             let mut g = self.lock();
-            g.nav_nonce += 1;
-            g.page_alive = false;
-            g.asked = Some(page.clone());
-            g.nav_nonce
+            let target = if g.settings.mode == Mode::Standalone {
+                let local = g.local.clone();
+                match g.library_wanted.ask(path, local.is_some()) {
+                    Ask::Go => local.map(|l| (l.url.clone(), l.page(path))),
+                    Ask::Wait => {
+                        tracing::info!(
+                            path,
+                            "the library is asked for: it waits for reel on this PC"
+                        );
+                        None
+                    }
+                }
+            } else {
+                let base = g.settings.server_url.clone();
+                (!base.is_empty()).then(|| {
+                    let page = shell::library_url(&base, path).to_string();
+                    (base, page)
+                })
+            };
+            match target {
+                Some(_) if !window => {
+                    tracing::info!(
+                        path,
+                        "the library is asked for: no window, it opens there when made"
+                    );
+                    None
+                }
+                Some((base, page)) => {
+                    g.nav_nonce += 1;
+                    g.page_alive = false;
+                    g.asked = Some(page.clone());
+                    Some((base, page, g.nav_nonce))
+                }
+                None => None,
+            }
         };
+        let Some((base, page, nonce)) = to else {
+            return;
+        };
+        tracing::info!(path, "the library is asked for: the window goes there");
         shell::navigate(&self.app, &base, &page);
         self.watch(nonce, base);
     }
@@ -3921,11 +3983,27 @@ impl Runtime {
     /// The library is another one now: its front page loads.
     fn library_changed(&self) {
         if shell::owner_busy(&self.app) {
+            tracing::info!(
+                view = shell::current(&self.app).name(),
+                "the library is ready; the window stays on the app's page it is on"
+            );
             self.lock().offline = None;
             self.push_status();
         } else {
             self.go_library("/");
         }
+    }
+
+    /// Whether the window is on its way to the library, so that the app's page on is not one
+    /// the user chose.
+    pub fn library_waits(&self) -> bool {
+        let g = self.lock();
+        g.settings.mode == Mode::Standalone && g.library_wanted.waits()
+    }
+
+    /// A settings view or section was opened: reel on this PC coming up leaves the window there.
+    pub fn library_let_go(&self) {
+        self.lock().library_wanted.done();
     }
 
     /// The webview starts a navigation: a server page reached from a link or the history gets
@@ -3974,8 +4052,20 @@ impl Runtime {
                     .app
                     .get_webview(shell::LIBRARY)
                     .and_then(|w| w.url().ok());
-                if at.as_ref().map(shell::is_local).unwrap_or(false) {
-                    return;
+                // WebView2 keeps the page it leaves until the next one commits
+                if shell::shows_app_page(at.as_ref()) {
+                    if waited < LIFE_WAIT {
+                        continue;
+                    }
+                    let started = {
+                        let mut g = rt.lock();
+                        if g.nav_nonce != nonce {
+                            return;
+                        }
+                        g.asked.take().is_none()
+                    };
+                    tracing::warn!(at = ?at.map(|u| u.to_string()), started, "a navigation to the library did not leave the app's own page");
+                    break;
                 }
                 let foreign = at
                     .as_ref()
@@ -4033,6 +4123,7 @@ impl Runtime {
             let mut g = self.lock();
             g.page_alive = true;
             g.last_call = Some(std::time::Instant::now());
+            g.library_wanted.done();
             g.offline.take().is_some()
         };
         if back {
@@ -4514,4 +4605,57 @@ fn track_names(
     bundled
         .filter(|_| o.bundled && o.setup.own_tracks)
         .map(|b| o.setup.track_names(b.platform))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// reel on this PC as `start_local` sees it under the lock: up, and what was asked meanwhile.
+    fn reel_comes_up(up: &mut bool, wanted: &Wanted) -> Option<String> {
+        *up = true;
+        wanted.up()
+    }
+
+    #[test]
+    fn an_ask_before_reel_on_this_pc_is_up_waits_and_goes_when_it_is() {
+        let (mut up, mut wanted) = (false, Wanted::default());
+        assert_eq!(wanted.ask("/", up), Ask::Wait);
+        assert_eq!(reel_comes_up(&mut up, &wanted).as_deref(), Some("/"));
+        assert_eq!(wanted.ask("/", up), Ask::Go);
+    }
+
+    #[test]
+    fn an_ask_after_reel_on_this_pc_is_up_goes_at_once() {
+        let (mut up, mut wanted) = (false, Wanted::default());
+        assert_eq!(reel_comes_up(&mut up, &wanted), None);
+        assert_eq!(wanted.ask("/", up), Ask::Go);
+    }
+
+    #[test]
+    fn a_section_opened_while_the_library_waits_keeps_the_window_there() {
+        let (mut up, mut wanted) = (false, Wanted::default());
+        wanted.ask("/", up);
+        assert!(wanted.waits());
+        assert_eq!(wanted.done().as_deref(), Some("/"));
+        assert_eq!(reel_comes_up(&mut up, &wanted), None);
+    }
+
+    #[test]
+    fn the_wait_ends_when_the_library_reaches_the_app() {
+        let mut wanted = Wanted::default();
+        wanted.ask("/clips/A1", true);
+        assert!(wanted.waits());
+        wanted.done();
+        assert!(!wanted.waits());
+        assert_eq!(wanted.up(), None);
+    }
+
+    #[test]
+    fn the_last_page_asked_for_is_the_one_that_opens() {
+        let mut wanted = Wanted::default();
+        wanted.ask("/", false);
+        wanted.ask("/clips/A1", false);
+        assert_eq!(wanted.up().as_deref(), Some("/clips/A1"));
+    }
 }

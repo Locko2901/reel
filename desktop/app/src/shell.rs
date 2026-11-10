@@ -115,6 +115,12 @@ pub fn is_local(url: &Url) -> bool {
     url.scheme() == "tauri" || url.host_str() == Some("tauri.localhost")
 }
 
+/// Whether the webview shows the app's own page or none yet: WebView2 reads about:blank until
+/// its first page commits.
+pub fn shows_app_page(url: Option<&Url>) -> bool {
+    url.is_none_or(|u| is_local(u) || !matches!(u.scheme(), "http" | "https"))
+}
+
 fn page_of(url: &Url) -> Option<View> {
     if !is_local(url) {
         return None;
@@ -188,7 +194,8 @@ pub fn allow_origin(app: &AppHandle, base_url: &str) {
     }
 }
 
-/// The window with its webview, hidden until something shows it.
+/// The window with its webview, hidden until something shows it, made for the library: it asks
+/// for it at once, and a settings view shown on it lets that go.
 pub fn build(app: &AppHandle, server_url: &str) -> tauri::Result<Window> {
     app.manage(Granted(Mutex::new(HashSet::new())));
     app.manage(crate::downloads::Downloads::default());
@@ -229,11 +236,17 @@ pub fn build(app: &AppHandle, server_url: &str) -> tauri::Result<Window> {
     crate::downloads::attach(&webview);
     #[cfg(target_os = "linux")]
     crate::media::attach(&webview);
+    // not read back from the webview: on Windows its first page has not even started here
+    if let Some(rt) = app.try_state::<Runtime>() {
+        rt.go_library("/");
+    }
     Ok(window)
 }
 
 fn library(app: &AppHandle, first: Url) -> WebviewBuilder<tauri::Wry> {
     let handle = app.clone();
+    let opening = std::sync::atomic::AtomicBool::new(true);
+    let first_page = first.to_string();
     WebviewBuilder::new(LIBRARY, WebviewUrl::External(first))
         .initialization_script(format!(
             "window.__REEL_DESKTOP__ = {{ version: \"{}\" }};\n{PAGE_ERRORS}",
@@ -241,8 +254,14 @@ fn library(app: &AppHandle, first: Url) -> WebviewBuilder<tauri::Wry> {
         ))
         .on_navigation(move |url| {
             tracing::info!(to = %where_to(url), "library goes to");
-            if let Some(rt) = handle.try_state::<Runtime>() {
-                rt.navigating(url);
+            // WebView2 starts the first page after the library may have been asked for: it
+            // overtakes nothing, so it ends no watch
+            let own_first = opening.swap(false, std::sync::atomic::Ordering::SeqCst)
+                && url.as_str() == first_page;
+            if !own_first {
+                if let Some(rt) = handle.try_state::<Runtime>() {
+                    rt.navigating(url);
+                }
             }
             true
         })
@@ -290,9 +309,18 @@ pub fn current(app: &AppHandle) -> View {
         .unwrap_or(View::Library)
 }
 
-/// Whether the user is on the app's settings or setup, which loading the library never interrupts.
+/// Whether the user is on the app's settings or setup, which loading the library never
+/// interrupts; the page the app shows while the window waits for the library is not theirs.
 pub fn owner_busy(app: &AppHandle) -> bool {
-    matches!(current(app), View::Settings | View::Setup)
+    busy(
+        current(app),
+        app.try_state::<Runtime>()
+            .is_some_and(|rt| rt.library_waits()),
+    )
+}
+
+fn busy(on: View, library_waits: bool) -> bool {
+    matches!(on, View::Settings | View::Setup) && !library_waits
 }
 
 /// Whether the webview shows one of the app's own pages, the only ones that get its events.
@@ -363,9 +391,6 @@ pub fn ensure(app: &AppHandle) -> Option<Window> {
     match build(app, &base) {
         Ok(w) => {
             tracing::info!("the window and its webview are made again");
-            if !base.is_empty() {
-                rt.go_library("/");
-            }
             Some(w)
         }
         Err(e) => {
@@ -390,6 +415,11 @@ pub fn show(app: &AppHandle, view: View, section: Option<&str>) {
     let Some(window) = ensure(app) else {
         return;
     };
+    if matches!(view, View::Settings | View::Setup) {
+        if let Some(rt) = app.try_state::<Runtime>() {
+            rt.library_let_go();
+        }
+    }
     let view = if view == View::Library && !has_server(app) {
         View::Settings
     } else {
@@ -439,9 +469,14 @@ pub fn reopen(rt: &Runtime, place: &reel_desktop_core::update_steps::Place) {
         Some(View::Setup) => show(&rt.app, View::Setup, None),
         _ => {
             let path = place.path.as_deref().filter(|p| p.starts_with('/'));
-            match path.map(|p| rt.open_library(p)) {
-                Some(Ok(())) => {}
-                _ => show(&rt.app, View::Library, None),
+            match path.map(|p| (p, rt.open_library(p))) {
+                Some((_, Ok(()))) => {}
+                // reel on this PC still starts: the page waits for it
+                Some((p, Err(_))) => {
+                    show(&rt.app, View::Library, None);
+                    rt.go_library(p);
+                }
+                None => show(&rt.app, View::Library, None),
             }
         }
     }
@@ -587,5 +622,40 @@ pub mod audio {
                 }
             }
         });
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn url(s: &str) -> Url {
+        s.parse().expect("a url")
+    }
+
+    #[test]
+    fn a_webview_before_its_first_page_commits_shows_the_app_page() {
+        assert!(shows_app_page(None));
+        assert!(shows_app_page(Some(&url("about:blank"))));
+        assert!(shows_app_page(Some(&url(
+            "tauri://localhost/index.html#status"
+        ))));
+        assert!(shows_app_page(Some(&url(
+            "http://tauri.localhost/index.html#status"
+        ))));
+        assert!(!shows_app_page(Some(&url("http://127.0.0.1:49152/"))));
+        assert!(!shows_app_page(Some(&url(
+            "https://clips.example.com/clips/A1"
+        ))));
+    }
+
+    #[test]
+    fn the_page_shown_while_the_library_waits_is_not_the_users() {
+        assert!(busy(View::Settings, false));
+        assert!(busy(View::Setup, false));
+        assert!(!busy(View::Settings, true));
+        assert!(!busy(View::Setup, true));
+        assert!(!busy(View::Library, false));
+        assert!(!busy(View::Offline, false));
     }
 }
