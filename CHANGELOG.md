@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.14.0](https://github.com/Locko2901/reel/compare/v1.13.1...v1.14.0) (2026-11-10)
+
+
+### Features
+
+* a Light quality records at 1080p and 30 frames a second, and a first setup picks it on a PC with 4 logical processors or fewer ([bee8a1e](https://github.com/Locko2901/reel/commit/bee8a1ee6fdb870f9c79135bf83a9f6cfb3f9041))
+* in standalone, a clip's file opens on this PC or shows in its folder instead of downloading ([6d61700](https://github.com/Locko2901/reel/commit/6d61700afeb30a755afbf03f5277157c213b7cce))
+
+
+### Bug Fixes
+
+* the standalone app's window goes to the library once reel on this PC is up, instead of staying on Settings, Status ([d0abf15](https://github.com/Locko2901/reel/commit/d0abf15ac80d885ef447e5d123a7f7ee660a42d3))
+
 ## [1.13.1](https://github.com/Locko2901/reel/compare/v1.13.0...v1.13.1) (2026-11-09)
 
 
