@@ -251,6 +251,66 @@ xdotool key Escape 2>/dev/null || true
 stop
 ok "the tray's menu drawn (shot)"
 
+# A start with the window, the setup done, while reel on this PC is not up yet: its library is on
+# a drive that is not there. The window shows the library once reel answers, without a click.
+D="$W/late"
+L="$D/data/logs"
+mkdir -p "$D/config" "$W/drive" "$W/rec-late"
+cp -a "$W/here/data/library" "$W/drive/library"
+cat > "$D/config/settings.json" <<JSON
+{
+  "mode": "standalone",
+  "standalone": { "hwaccel": "none", "cap_gb": 0, "cap_keeps_unsent": true, "copies_on_hardware": false, "library_dir": "$W/drive/library" },
+  "obs": { "enabled": false },
+  "clips_dir": "$W/rec-late",
+  "startup": { "autostart": false, "elevated": false },
+  "log_level": "debug"
+}
+JSON
+mv "$W/drive" "$W/drive-away"
+export REEL_DESKTOP_DIR="$D"
+start
+waitlog "standalone: reel on this PC waits for its library" 30 "reel on this PC did not wait for its library"
+waitlog 'window shows view="library"' 30 "a start with the window showed no window"
+waitlog "the library is asked for: it waits for reel on this PC" 10 "the start did not ask for the library"
+sleep 3
+[ "$(logged "the server's page reached the app")" -eq 0 ] || fail "the library opened while reel on this PC was not up"
+shot "12-start-waits"
+mv "$W/drive-away" "$W/drive"
+waitlog "standalone: reel serves on the loopback" 60 "reel on this PC did not start once its library was back"
+waitlog "the server's page reached the app" 30 "the window stayed on the app's page after reel on this PC answered"
+sleep 1
+shot "13-start-library"
+stop
+ok "a start with the window while reel on this PC is not up: the library once it answers, no click (shots)"
+mv "$W/drive" "$W/drive-away"
+b=$(logged 'window shows view="library"')
+r=$(logged "the server's page reached the app")
+up=$(logged "standalone: reel serves on the loopback")
+st=$(logged "app page section=status chosen=false")
+start
+waitmore 'window shows view="library"' 30 "the second start with the window showed no window" "$b"
+waitmore "app page section=status chosen=false" 20 "the app's page did not open on Status" "$st"
+sleep 2
+WIN=$(window)
+[ -n "$WIN" ] || fail "no window"
+xdotool windowmove "$WIN" 0 0 windowsize "$WIN" 1280 820 2>/dev/null || true
+sleep 1
+# Hotkeys in the page's list of sections
+# shellcheck disable=SC2086
+xdotool mousemove ${REEL_NAV_HOTKEYS:-58 260} click 1
+sleep 1
+shot "14-start-hotkeys"
+waitlog "app page section=hotkeys chosen=true" 10 "Hotkeys was not opened by the click (shot 14)"
+mv "$W/drive-away" "$W/drive"
+waitmore "standalone: reel serves on the loopback" 60 "reel on this PC did not start once its library was back" "$up"
+waitlog "the library is ready; the window stays on the app's page it is on view=\"settings\"" 10 "reel on this PC coming up did not say the window stays"
+sleep 3
+[ "$(logged "the server's page reached the app")" -eq "$r" ] || fail "reel on this PC coming up took the window away from Hotkeys, opened by hand"
+shot "15-start-hotkeys-kept"
+stop
+ok "Hotkeys opened by hand while reel on this PC is not up: the window stays there when it answers (shot)"
+
 # A server's pages in the window: a part that throws, then a page whose script is missing.
 D="$W/pages"
 L="$D/data/logs"
