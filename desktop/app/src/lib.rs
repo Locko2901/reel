@@ -15,6 +15,7 @@ mod page_errors;
 #[cfg(target_os = "linux")]
 mod portal;
 mod runtime;
+mod session;
 mod setup;
 mod shell;
 mod standalone;
@@ -28,13 +29,16 @@ use runtime::Runtime;
 use tauri::{Manager, RunEvent, WindowEvent};
 
 /// The flags a desktop's own shortcut passes to the running app, as the hotkeys do.
-pub const ACTIONS: [&str; 7] = [
+pub const ACTIONS: [&str; 10] = [
     "--save-and-share",
     "--share-last",
     "--upload-last",
     "--save",
     "--pause-recording",
     "--resume-recording",
+    "--record-session",
+    "--start-session",
+    "--stop-session",
     "--start-obs",
 ];
 
@@ -161,6 +165,7 @@ pub fn run() {
             commands::app_save_and_share,
             commands::app_pause_set,
             commands::app_recording_pause_set,
+            commands::app_session_set,
             commands::app_open_settings,
             commands::app_download_open,
             files::app_library_open,
@@ -175,6 +180,7 @@ pub fn run() {
             commands::open_folder,
             commands::pause_set,
             commands::recording_pause_set,
+            commands::session_set,
             commands::upload_now,
             commands::obs_show,
             commands::obs_again,
@@ -246,6 +252,10 @@ pub fn run() {
                             let now = rt.lock().recording_paused;
                             rt.set_recording_paused(!now);
                         }
+                        "session" => rt.record(
+                            session::Ask::Toggle,
+                            reel_desktop_core::session::By::Tray,
+                        ),
                         "library" => shell::show(app, shell::View::Library, None),
                         other => {
                             if let Some(id) = other.strip_prefix("copy:") {

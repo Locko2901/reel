@@ -7,22 +7,26 @@ use std::sync::{Arc, Mutex};
 
 pub const SAVE_WAV: &[u8] = include_bytes!("../../assets/sounds/save.wav");
 pub const UPLOADED_WAV: &[u8] = include_bytes!("../../assets/sounds/uploaded.wav");
+pub const SESSION_WAV: &[u8] = include_bytes!("../../assets/sounds/session.wav");
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Cue {
     Captured,
     Uploaded,
     LinkCopied,
+    /// A session recording starts, or still runs.
+    Session,
 }
 
 impl Cue {
-    pub const ALL: [Cue; 3] = [Cue::Captured, Cue::Uploaded, Cue::LinkCopied];
+    pub const ALL: [Cue; 4] = [Cue::Captured, Cue::Uploaded, Cue::LinkCopied, Cue::Session];
 
     pub fn name(&self) -> &'static str {
         match self {
             Cue::Captured => "captured",
             Cue::Uploaded => "uploaded",
             Cue::LinkCopied => "link_copied",
+            Cue::Session => "session",
         }
     }
 
@@ -34,6 +38,18 @@ impl Cue {
         match self {
             Cue::Captured => SAVE_WAV,
             Cue::Uploaded | Cue::LinkCopied => UPLOADED_WAV,
+            Cue::Session => SESSION_WAV,
+        }
+    }
+}
+
+impl crate::settings::SoundSettings {
+    pub fn of(&self, cue: Cue) -> &CueSettings {
+        match cue {
+            Cue::Captured => &self.captured,
+            Cue::Uploaded => &self.uploaded,
+            Cue::LinkCopied => &self.link_copied,
+            Cue::Session => &self.session,
         }
     }
 }
@@ -327,6 +343,18 @@ mod tests {
         assert_eq!(spec.sample_rate, 44_100);
         let muted = samples(&scaled_wav(UPLOADED_WAV, 0.0).unwrap());
         assert!(muted.iter().all(|s| *s == 0));
+        for cue in Cue::ALL {
+            let spec = hound::WavReader::new(Cursor::new(cue.bundled()))
+                .unwrap()
+                .spec();
+            assert_eq!(
+                (spec.channels, spec.sample_rate, spec.bits_per_sample),
+                (2, 44_100, 16),
+                "{}",
+                cue.name()
+            );
+            assert_eq!(Cue::parse(cue.name()), Some(cue));
+        }
         assert!(scaled_wav(b"not a wav", 1.0).is_err());
     }
 

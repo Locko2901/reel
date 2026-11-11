@@ -18,6 +18,7 @@ pub struct UploadMeta {
     pub title: Option<String>,
     pub keep_last: Option<u64>,
     pub audio_names: Option<Vec<String>>,
+    pub kind: Option<String>,
 }
 
 #[derive(Clone)]
@@ -304,6 +305,7 @@ pub async fn upload_file(
         title: meta.title.clone(),
         keep_last: meta.keep_last,
         audio_names: meta.audio_names.clone(),
+        kind: meta.kind.clone(),
     };
     let mut backoff = Backoff::new(ctl.retry_base, ctl.retry_max);
     let pacer = Pacer::new(ctl.bandwidth_kbit);

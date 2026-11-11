@@ -20,6 +20,7 @@ pub mod obsproc;
 pub mod readback;
 pub mod screens;
 pub mod secrets;
+pub mod session;
 pub mod settings;
 pub mod shape;
 pub mod uninstall;

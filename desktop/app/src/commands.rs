@@ -1,6 +1,7 @@
 use crate::runtime::Runtime;
 use crate::status::Status;
 use reel_desktop_core::cues::Cue;
+use reel_desktop_core::session::By;
 use reel_desktop_core::settings::Settings;
 use serde_json::{json, Value};
 use tauri::{AppHandle, State};
@@ -126,12 +127,9 @@ pub async fn obs_test(host: String, port: u16, password: String) -> R<Value> {
 pub fn cue_preview(rt: State<'_, Runtime>, cue: String) -> R<Value> {
     let cue = Cue::parse(&cue).ok_or_else(|| format!("{cue} is not a cue"))?;
     let g = rt.lock();
-    let s = match cue {
-        Cue::Captured => &g.settings.sounds.captured,
-        Cue::Uploaded => &g.settings.sounds.uploaded,
-        Cue::LinkCopied => &g.settings.sounds.link_copied,
-    };
-    g.player.preview(cue, s).map_err(|e| e.to_string())?;
+    g.player
+        .preview(cue, g.settings.sounds.of(cue))
+        .map_err(|e| e.to_string())?;
     Ok(json!({ "line": format!("played through {}", g.player.backend().name()) }))
 }
 
@@ -307,6 +305,17 @@ pub fn app_recording_pause_set(
     Ok(rt.app_status(library_page(&webview, &rt)))
 }
 
+/// Record from a reel page's header: starts a session recording or stops it, once OBS answered.
+#[tauri::command]
+pub async fn app_session_set(
+    webview: tauri::Webview,
+    rt: State<'_, Runtime>,
+    on: bool,
+) -> R<Value> {
+    rt.record_now(session_ask(on), By::Window).await?;
+    Ok(rt.app_status(library_page(&webview, &rt)))
+}
+
 /// Show in folder and Open on a download's toast: only a file this run downloaded, and Open
 /// only for a video or a picture, so no page can start a program it downloaded.
 #[tauri::command]
@@ -415,6 +424,20 @@ pub fn pause_set(rt: State<'_, Runtime>, paused: bool) -> Status {
 pub fn recording_pause_set(rt: State<'_, Runtime>, paused: bool) -> Status {
     rt.set_recording_paused(paused);
     rt.status()
+}
+
+#[tauri::command]
+pub async fn session_set(rt: State<'_, Runtime>, on: bool) -> R<Status> {
+    rt.record_now(session_ask(on), By::Window).await?;
+    Ok(rt.status())
+}
+
+fn session_ask(on: bool) -> crate::session::Ask {
+    if on {
+        crate::session::Ask::Start
+    } else {
+        crate::session::Ask::Stop
+    }
 }
 
 /// The microphone with filters in the user's own OBS, read from its scene collection, never

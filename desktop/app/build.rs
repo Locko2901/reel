@@ -8,7 +8,7 @@ fn copy_assets() -> std::io::Result<()> {
     std::fs::create_dir_all(out.join("fonts"))?;
     std::fs::copy(web.join("reel.css"), out.join("reel.css"))?;
     std::fs::create_dir_all(out.join("js"))?;
-    for js in ["switch.js", "walk.js"] {
+    for js in ["switch.js", "walk.js", "record.js"] {
         std::fs::copy(web.join("js").join(js), out.join("js").join(js))?;
         println!(
             "cargo:rerun-if-changed={}",
@@ -61,6 +61,7 @@ const COMMANDS: &[&str] = &[
     "open_folder",
     "pause_set",
     "recording_pause_set",
+    "session_set",
     "upload_now",
     "obs_show",
     "obs_again",
@@ -97,6 +98,7 @@ const COMMANDS: &[&str] = &[
     "app_save_and_share",
     "app_pause_set",
     "app_recording_pause_set",
+    "app_session_set",
     "app_open_settings",
     "app_download_open",
     "app_library_open",

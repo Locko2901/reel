@@ -36,6 +36,12 @@ const DOUBLE_TAP: Duration = Duration::from_secs(1);
 /// asked to close while it still starts takes no close and is ended after the grace.
 const LINGER: Duration = Duration::from_secs(3);
 
+/// When a session recording started and the game it was of.
+pub(crate) struct SessionFile {
+    pub recorded: jiff::Timestamp,
+    pub game: Option<String>,
+}
+
 /// A clip the server has whole and is still working on.
 pub struct Processing {
     pub clip_id: String,
@@ -73,6 +79,12 @@ pub struct Inner {
     pub paused_fullscreen: bool,
     /// Pause recording, for this run only: a start of the app records again.
     pub recording_paused: bool,
+    /// A session recording that runs, once OBS said so.
+    pub session: Option<reel_desktop_core::session::Recording>,
+    /// A session recording asked of OBS that OBS has not confirmed yet.
+    pub session_asked: Option<crate::session::Asked>,
+    /// Since when OBS has not answered while a session recording ran.
+    pub session_lost: Option<std::time::Instant>,
     pub preparing: Option<String>,
     pub processing: Vec<Processing>,
     pub last_error: Option<String>,
@@ -456,6 +468,9 @@ impl Runtime {
             paused_by_user: false,
             paused_fullscreen: false,
             recording_paused: false,
+            session: None,
+            session_asked: None,
+            session_lost: None,
             preparing: None,
             processing: Vec::new(),
             last_error: None,
@@ -579,14 +594,9 @@ impl Runtime {
         self.lock().api.clone()
     }
 
-    fn cue(&self, cue: Cue) {
+    pub(crate) fn cue(&self, cue: Cue) {
         let g = self.lock();
-        let s = match cue {
-            Cue::Captured => &g.settings.sounds.captured,
-            Cue::Uploaded => &g.settings.sounds.uploaded,
-            Cue::LinkCopied => &g.settings.sounds.link_copied,
-        };
-        g.player.play(cue, s);
+        g.player.play(cue, g.settings.sounds.of(cue));
     }
 
     /// OBS took a save: its sound plays now, not once the replay is written seconds later.
@@ -645,8 +655,24 @@ impl Runtime {
             .as_ref()
             .map(|b| b.line())
             .and_then(|l| crate::status::obs_trouble(&l.state).map(|w| (w, l.line)));
+        let session = crate::session::line(
+            g.session.as_ref(),
+            g.session_asked.as_ref(),
+            g.session_lost.is_some(),
+        );
         let (state, word, line) = if let Some(((state, word), line)) = obs_trouble {
             (state, word.to_string(), line)
+        } else if let Some(s) = &session {
+            (
+                "recording",
+                if s.starting {
+                    "starting a session recording"
+                } else {
+                    "recording a session"
+                }
+                .to_string(),
+                s.line.clone(),
+            )
         } else if g.recording_paused {
             (
                 "paused",
@@ -853,6 +879,8 @@ impl Runtime {
             paused_by_user: g.paused_by_user,
             paused_fullscreen: g.paused_fullscreen,
             recording_paused: g.recording_paused,
+            session,
+            record: Default::default(),
             obs: g.obs.clone(),
             bundled: g.bundled.is_some(),
             obs_box: g.obs_box.as_ref().map(|b| b.line()),
@@ -960,7 +988,11 @@ impl Runtime {
             )
             .map(|v| {
                 let kind = reel_desktop_core::update_steps::Kind::here(g.bundled.is_some());
-                let (title, words) = reel_desktop_core::update_steps::ask(&v, kind);
+                let (title, words) = reel_desktop_core::update_steps::ask(
+                    &v,
+                    kind,
+                    crate::session::holds_install(&g),
+                );
                 crate::status::UpdateAsk {
                     version: v,
                     title,
@@ -972,7 +1004,12 @@ impl Runtime {
             update_before: g.update.as_ref().map(|u| {
                 let kind = reel_desktop_core::update_steps::Kind::here(g.bundled.is_some());
                 let on_quit = g.settings.updates == UpdateMode::OnQuit && g.update_bytes.is_some();
-                reel_desktop_core::update_steps::before(&u.version, kind, on_quit)
+                reel_desktop_core::update_steps::before(
+                    &u.version,
+                    kind,
+                    on_quit,
+                    crate::session::holds_install(&g),
+                )
             }),
             update_check: g
                 .local
@@ -1001,6 +1038,7 @@ impl Runtime {
         drop(g);
         st.library = self.library_line();
         st.panel = crate::status::panel(&st);
+        st.record = self.session_action();
         st
     }
 
@@ -1027,6 +1065,8 @@ impl Runtime {
             "state_line": st.state_line,
             "paused": st.paused_by_user,
             "recording_paused": st.recording_paused,
+            "session": st.session,
+            "record": st.record,
             "obs_connected": st.obs.connected,
             "obs_line": st.obs.line,
             "can_share": can_share,
@@ -1370,7 +1410,7 @@ impl Runtime {
         s.hotkeys
             .all()
             .into_iter()
-            .filter(|h| !here || h.action == hotkey::Action::Save)
+            .filter(|h| !here || matches!(h.action, hotkey::Action::Save | hotkey::Action::Record))
             .map(|h| (h, !(obs_saves && h.action == hotkey::Action::Save)))
             .collect()
     }
@@ -1398,6 +1438,10 @@ impl Runtime {
             hotkey::Action::SaveShare => rt.save_and_share(),
             hotkey::Action::UploadLast => rt.upload_last(),
             hotkey::Action::Save => rt.save_clip(),
+            hotkey::Action::Record => rt.record(
+                crate::session::Ask::Toggle,
+                reel_desktop_core::session::By::Hotkey,
+            ),
         });
         let mut g = self.lock();
         g.hotkeys_paused = false;
@@ -1420,6 +1464,12 @@ impl Runtime {
             }
             line
         };
+        if problems.is_empty() && !s.hotkeys.record.trim().is_empty() {
+            g.hotkey_line.push_str(&format!(
+                ", {} starts and stops a session recording",
+                s.hotkeys.record.trim()
+            ));
+        }
         if !problems.is_empty() {
             tracing::warn!(problems = ?problems, "hotkeys");
         }
@@ -1451,9 +1501,14 @@ impl Runtime {
                 "Upload the last clip",
                 s.hotkeys.upload_last.clone(),
             ),
+            (
+                "record-session",
+                "Start or stop a session recording",
+                s.hotkeys.record.clone(),
+            ),
         ];
         if s.mode == Mode::Standalone {
-            shortcuts.retain(|(id, _, _)| *id == "save");
+            shortcuts.retain(|(id, _, _)| matches!(*id, "save" | "record-session"));
         }
         let rt = self.clone();
         let data_dir = self.lock().paths.data_dir.clone();
@@ -1504,6 +1559,22 @@ impl Runtime {
             "save" => self.save_clip(),
             "pause-recording" => self.set_recording_paused(true),
             "resume-recording" => self.set_recording_paused(false),
+            "record-session" => self.record(
+                crate::session::Ask::Toggle,
+                if name.starts_with("--") {
+                    reel_desktop_core::session::By::Flag
+                } else {
+                    reel_desktop_core::session::By::Hotkey
+                },
+            ),
+            "start-session" => self.record(
+                crate::session::Ask::Start,
+                reel_desktop_core::session::By::Flag,
+            ),
+            "stop-session" => self.record(
+                crate::session::Ask::Stop,
+                reel_desktop_core::session::By::Flag,
+            ),
             "start-obs" => self.start_obs_again(),
             other => tracing::warn!(action = other, "no such action"),
         }
@@ -1513,7 +1584,10 @@ impl Runtime {
     pub fn run_action_when_ready(&self, name: &'static str) {
         let rt = self.clone();
         tauri::async_runtime::spawn(async move {
-            let needs_obs = matches!(name, "--save-and-share" | "--save");
+            let needs_obs = matches!(
+                name,
+                "--save-and-share" | "--save" | "--record-session" | "--start-session"
+            );
             for _ in 0..30 {
                 tokio::time::sleep(Duration::from_secs(1)).await;
                 if !needs_obs || rt.lock().obs.connected {
@@ -2534,6 +2608,7 @@ impl Runtime {
                                 }
                             }
                         }
+                        rt.session_obs_gone();
                         rt.push_status();
                     }
                     ObsEvent::Meters { levels } => {
@@ -2563,19 +2638,22 @@ impl Runtime {
                             });
                         }
                     }
-                    ObsEvent::RecordState { active, saved } => {
+                    ObsEvent::RecordState {
+                        active,
+                        started,
+                        saved,
+                    } => {
                         if let Some(st) = rt.lock().obs_state.as_mut() {
                             st.recording = active;
                         }
                         tracing::info!(active, "obs recording");
-                        if let Some(path) = saved {
-                            let p = PathBuf::from(&path);
+                        if let Some(path) = &saved {
                             tracing::info!(path = %path, "obs saved a file");
-                            let size = std::fs::metadata(&p).map(|m| m.len()).unwrap_or(0);
-                            rt.on_found(&p, size, false, "obs");
                         }
+                        rt.session_state(active, started, saved);
                         rt.push_status();
                     }
+                    ObsEvent::RecordFile { path } => rt.session_split(path),
                     ObsEvent::ReplayBufferSaved { path } => {
                         let p = PathBuf::from(&path);
                         tracing::info!(path = %path, "obs saved a replay");
@@ -2629,7 +2707,7 @@ impl Runtime {
 
     /// Sends one command to the OBS loop and waits for its answer; the words of an error
     /// are the Test button's, with the detail after them.
-    async fn obs_command<T>(
+    pub(crate) async fn obs_command<T>(
         &self,
         make: impl FnOnce(oneshot::Sender<Result<T, ObsError>>) -> ObsCommand,
     ) -> Result<T, String> {
@@ -2676,6 +2754,7 @@ impl Runtime {
                 Ok(None) => {}
                 Err(e) => tracing::warn!(error = %e, "OBS state not read"),
             }
+            rt.session_on_connect().await;
         });
     }
 
@@ -2795,20 +2874,62 @@ impl Runtime {
     }
 
     pub fn on_found(&self, path: &Path, size: u64, backlog: bool, via: &str) {
+        let recording = {
+            let g = self.lock();
+            g.session
+                .as_ref()
+                .and_then(|r| r.file.as_deref())
+                .is_some_and(|f| f == path)
+        };
+        if recording {
+            tracing::info!(path = %path.display(), via, "the session recording's file: taken as a recording once it ends");
+            return;
+        }
+        self.found_as(path, size, backlog, via, None);
+    }
+
+    /// A session recording's file, titled by its start and its game when they are known.
+    pub(crate) fn on_found_recording(&self, path: &Path, size: u64, meta: Option<SessionFile>) {
+        self.found_as(path, size, false, "obs", Some(meta));
+    }
+
+    fn found_as(
+        &self,
+        path: &Path,
+        size: u64,
+        backlog: bool,
+        via: &str,
+        recording: Option<Option<SessionFile>>,
+    ) {
         let mode;
         let is_new;
         {
             let mut g = self.lock();
             let known = g.ledger.get(path).is_some();
             is_new = !known;
+            if recording.is_some() {
+                if known {
+                    tracing::info!(path = %path.display(), "the session recording's file was found already; it is marked as a recording");
+                }
+                let _ = g.ledger.found(path, size);
+                let _ = g.ledger.set_recording(path);
+            }
             if !known {
-                let game = g.obs_game.clone().or_else(|| {
-                    g.foreground
-                        .foreground_process()
-                        .and_then(|p| gaming::game_name(&p.exe_name, &p.title))
-                });
-                let now = jiff::Timestamp::now();
-                let title = if backlog {
+                let given = recording.as_ref().and_then(|r| r.as_ref());
+                let game = match given {
+                    Some(f) => f.game.clone(),
+                    None => g.obs_game.clone().or_else(|| {
+                        g.foreground
+                            .foreground_process()
+                            .and_then(|p| gaming::game_name(&p.exe_name, &p.title))
+                    }),
+                };
+                let now = given
+                    .map(|f| f.recorded)
+                    .unwrap_or_else(jiff::Timestamp::now);
+                // a recording the app did not see start is named by its file, as OBS names it by its start
+                let unknown_start = backlog || matches!(recording, Some(None));
+                let title = if unknown_start {
                     None
                 } else {
                     Some(gaming::clip_title(game.as_deref(), now))
@@ -2816,11 +2937,11 @@ impl Runtime {
                 if let Err(e) = g.ledger.found(path, size) {
                     tracing::warn!(error = %e, "ledger");
                 }
-                let recorded = if backlog { None } else { Some(now) };
+                let recorded = if unknown_start { None } else { Some(now) };
                 let _ = g
                     .ledger
                     .set_meta(path, game.clone(), title.clone(), recorded);
-                tracing::info!(path = %path.display(), size, via, backlog, game = ?game, "clip found");
+                tracing::info!(path = %path.display(), size, via, backlog, game = ?game, recording = recording.is_some(), "clip found");
             }
             mode = g.settings.upload.mode;
         }
@@ -2958,8 +3079,10 @@ impl Runtime {
                     recorded_at: rec.recorded_at.map(|t| t.to_string()),
                     game: rec.game.clone(),
                     title: rec.title.clone(),
-                    keep_last: Some(g.settings.upload.keep_last).filter(|s| *s > 0),
+                    keep_last: Some(g.settings.upload.keep_last)
+                        .filter(|s| *s > 0 && !rec.recording),
                     audio_names: track_names(g.bundled.as_ref(), &g.settings),
+                    kind: rec.recording.then(|| "recording".to_string()),
                 },
                 g.settings.upload.bandwidth_kbit,
                 g.settings.upload.chunk_mb,
@@ -3038,12 +3161,25 @@ impl Runtime {
                 // a Save and share's clip has its link copied next, with that sound
                 if !shared {
                     self.cue(Cue::Uploaded);
+                    let recording = self.lock().ledger.get(path).is_some_and(|c| c.recording);
                     if self.is_standalone() {
                         // Upload to the server from the local library: no link here
                         notify::show(
                             &self.app,
-                            "Clip uploaded",
+                            if recording {
+                                "Session recording uploaded"
+                            } else {
+                                "Clip uploaded"
+                            },
                             &format!("{title} is on the server too."),
+                        );
+                    } else if recording {
+                        notify::show_clip(
+                            &self.app,
+                            "Session recording uploaded",
+                            &format!("{title} is on the server."),
+                            &out.clip_id,
+                            true,
                         );
                     } else {
                         let hk = self.settings().hotkeys.share_last;
@@ -3332,7 +3468,7 @@ impl Runtime {
             }
             return;
         };
-        let (title, recorded, game, keep_last, names) = {
+        let (title, recorded, game, keep_last, names, recording) = {
             let g = self.lock();
             let keep_last = Some(g.settings.upload.keep_last as f64).filter(|s| *s > 0.0);
             let names = track_names(g.bundled.as_ref(), &g.settings);
@@ -3341,19 +3477,25 @@ impl Runtime {
                     c.title.clone(),
                     c.recorded_at.map(|t| t.to_string()),
                     c.game.clone(),
-                    keep_last,
+                    keep_last.filter(|_| !c.recording),
                     names,
+                    c.recording,
                 ),
-                None => (None, None, None, keep_last, names),
+                None => (None, None, None, keep_last, names, false),
             }
         };
         let rt = self.clone();
         let p = path.to_path_buf();
         tauri::async_runtime::spawn(async move {
-            let id = match local
-                .ingest(&p, title, recorded, game, keep_last, names)
-                .await
-            {
+            let new = standalone::Taken {
+                title,
+                recorded_at: recorded,
+                game,
+                keep_last,
+                audio_names: names,
+                recording,
+            };
+            let id = match local.ingest(&p, new).await {
                 Ok(id) => id,
                 Err(e) => {
                     let _ = rt
@@ -3374,7 +3516,12 @@ impl Runtime {
                 match local.ctx.store.clip(&id).await {
                     Ok(Some(c)) if c.state == "ready" => {
                         rt.cue(Cue::Uploaded);
-                        notify::show_clip(&rt.app, "Clip in the library", &c.title, &id, false);
+                        let what = if recording {
+                            "Session recording in the library"
+                        } else {
+                            "Clip in the library"
+                        };
+                        notify::show_clip(&rt.app, what, &c.title, &id, false);
                         tracing::info!(clip = %id, "standalone: the clip is published");
                         shell::reload_library_if_home(&rt.app);
                         break;
@@ -3388,7 +3535,10 @@ impl Runtime {
                         rt.lock().last_error = Some(format!("{}: {why}", c.title));
                         break;
                     }
-                    Ok(Some(_)) if start.elapsed() < Duration::from_secs(600) => {}
+                    // a recording of hours is hashed and copied, and waits while a game has the screen
+                    Ok(Some(_))
+                        if start.elapsed()
+                            < Duration::from_secs(if recording { 12 * 3600 } else { 600 }) => {}
                     _ => break,
                 }
             }

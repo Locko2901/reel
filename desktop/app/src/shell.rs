@@ -22,7 +22,7 @@ pub const OFFLINE_PAGE: &str = "offline.html";
 pub const SETUP_PAGE: &str = "setup.html";
 
 /// The only commands a reel page inside the app may call.
-const REMOTE_PERMISSIONS: [&str; 9] = [
+const REMOTE_PERMISSIONS: [&str; 10] = [
     "allow-app-status",
     "allow-app-page-error",
     "allow-app-share-last",
@@ -30,6 +30,7 @@ const REMOTE_PERMISSIONS: [&str; 9] = [
     "allow-app-save-and-share",
     "allow-app-pause-set",
     "allow-app-recording-pause-set",
+    "allow-app-session-set",
     "allow-app-open-settings",
     "allow-app-download-open",
 ];
