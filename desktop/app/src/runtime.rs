@@ -3065,6 +3065,16 @@ impl Runtime {
             if !matches!(rec.state, ClipState::Queued) {
                 return;
             }
+            let limit = g.who.as_ref().and_then(|w| w.upload_max_bytes);
+            if let Some(max) = limit.filter(|max| rec.size > *max) {
+                let reason = over_the_limit(rec.size, max);
+                let _ = g.ledger.mark_failed(path, &reason);
+                drop(g);
+                tracing::warn!(path = %path.display(), error = %reason, "upload failed");
+                notify::show(&self.app, "Upload failed", &reason);
+                self.push_status();
+                return;
+            }
             let _ = g.ledger.mark_uploading(path, None);
             let waited = g.waited.contains_key(path).then(|| {
                 let (tx, rx) = watch::channel(false);
@@ -4781,6 +4791,17 @@ impl reel_desktop_core::lane::Program for Steps {
 }
 
 /// A copy in Program Files without the second task, whose OBS keeps its own tray icon.
+/// Why a file goes to no server: its size over the server's limit for an upload.
+fn over_the_limit(size: u64, max: u64) -> String {
+    // the server's limit is whole GB of 1024 MB each, as Windows counts a file's size too
+    let gb = |b: u64| format!("{:.1} GB", b as f64 / (1u64 << 30) as f64);
+    format!(
+        "{} is over the server's limit of {} for an upload, so it stays on this PC; an admin raises the limit under Settings, Imports on the server",
+        gb(size),
+        gb(max)
+    )
+}
+
 fn in_tray(copy: Option<&reel_desktop_core::bundled::Bundled>) -> bool {
     copy.is_some_and(|c| {
         c.exe.is_file()
@@ -4841,6 +4862,14 @@ mod tests {
     fn reel_comes_up(up: &mut bool, wanted: &Wanted) -> Option<String> {
         *up = true;
         wanted.up()
+    }
+
+    #[test]
+    fn an_upload_over_the_servers_limit_says_so_in_the_servers_numbers() {
+        assert_eq!(
+            super::over_the_limit(11_250_000_000, 8 << 30),
+            "10.5 GB is over the server's limit of 8.0 GB for an upload, so it stays on this PC; an admin raises the limit under Settings, Imports on the server"
+        );
     }
 
     #[test]

@@ -631,7 +631,7 @@ An upload bigger than this is refused; the proxy in front has a limit of its own
 - Under Settings: Imports, Upload
 - In `config.toml`: `upload_max_gb` under `[import]`
 - Environment: `REEL_UPLOAD_MAX_GB`
-- Accepts: a whole number, 1 to 64 GB
+- Accepts: a whole number, 1 to 1000 GB
 - Default: `8`
 
 ## Notifications

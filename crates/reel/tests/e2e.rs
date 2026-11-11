@@ -10596,6 +10596,63 @@ async fn a_clip_is_in_the_library_before_its_loop_and_filmstrip() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn a_long_videos_strip_comes_from_seeks_and_is_as_wide_as_a_clips() {
+    let Some(env) = start(AuthMode::Single, vec![]).await else {
+        return;
+    };
+    let dir = env._dir.path().join("long");
+    std::fs::create_dir_all(&dir).unwrap();
+    let long = dir.join("long.mp4");
+    let make: Vec<String> = [
+        "-f",
+        "lavfi",
+        "-i",
+        "testsrc2=size=160x90:rate=4",
+        "-t",
+        "720",
+        "-c:v",
+        "libx264",
+        "-preset",
+        "ultrafast",
+        "-g",
+        "40",
+        "-pix_fmt",
+        "yuv420p",
+        "-f",
+        "mp4",
+    ]
+    .iter()
+    .map(|a| a.to_string())
+    .collect();
+    env.ctx
+        .ff
+        .run_to_with(&make, &long, 720.0, None, None)
+        .await
+        .unwrap();
+    let strip = dir.join("strip.jpg");
+    let at = std::time::Instant::now();
+    env.ctx
+        .ff
+        .run_to_with(
+            &reel_media::args::filmstrip(&long, 720.0, 12),
+            &strip,
+            0.0,
+            None,
+            None,
+        )
+        .await
+        .unwrap();
+    let took = at.elapsed();
+    let probe = env.ctx.ff.probe(&strip).await.unwrap();
+    assert_eq!(
+        (probe.width, probe.height),
+        (12 * 320, 180),
+        "twelve frames side by side, 320 wide each"
+    );
+    assert!(took < Duration::from_secs(30), "{took:?}");
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn the_cap_on_a_server_spares_collections_and_takes_linked_clips_last() {
     let (target, got) = mock_receiver().await;
     let Some(env) = start_with(AuthMode::Single, vec![], move |c| {

@@ -487,15 +487,16 @@ impl Ffmpeg {
         };
         let never = CancellationToken::new();
         let cancel = cancel.unwrap_or(&never);
+        let limit = limit_for(self.timeout, duration);
         let outcome = {
-            let deadline = tokio::time::sleep(self.timeout);
+            let deadline = tokio::time::sleep(limit);
             tokio::pin!(deadline, waited);
             loop {
                 tokio::select! {
                     r = &mut waited => break Some(Ok(r)),
                     _ = cancel.cancelled() => break None,
                     _ = &mut deadline => {
-                        let at = started + self.timeout + told.paused();
+                        let at = started + limit + told.paused();
                         if tokio::time::Instant::now() >= at {
                             break Some(Err(()));
                         }
@@ -524,7 +525,7 @@ impl Ffmpeg {
             Ok(Err(e)) => Err(MediaError::Io(e)),
             Err(_) => Err(MediaError::Timeout {
                 tool: "ffmpeg".into(),
-                minutes: self.timeout.as_secs() / 60,
+                minutes: limit.as_secs() / 60,
             }),
         }
     }
@@ -557,6 +558,16 @@ impl Ffmpeg {
         }
         tokio::fs::rename(&part, output).await?;
         Ok(())
+    }
+}
+
+/// A run's time limit: the job timeout, or four times the length of the video it works on, so
+/// hours of a session recording are not cut off as a hung ffmpeg would be.
+pub fn limit_for(timeout: Duration, duration: f64) -> Duration {
+    if duration.is_finite() && duration > 0.0 {
+        timeout.max(Duration::from_secs_f64(duration * 4.0))
+    } else {
+        timeout
     }
 }
 

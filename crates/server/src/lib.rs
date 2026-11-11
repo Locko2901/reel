@@ -41,6 +41,7 @@ pub struct AppState {
     pub provider: Option<std::sync::Arc<accounts::Provider>>,
     pub setup_done: std::sync::Arc<std::sync::atomic::AtomicBool>,
     pub uploads_busy: std::sync::Arc<tokio::sync::Mutex<std::collections::HashSet<String>>>,
+    pub hashing: std::sync::Arc<routes::pieces::Hashing>,
     pub links_making: std::sync::Arc<routes::api::LinksMaking>,
     pub zips: std::sync::Arc<routes::zips::Pending>,
     /// The standalone library's key, which only the app is handed.
@@ -110,6 +111,7 @@ impl AppState {
             uploads_busy: std::sync::Arc::new(tokio::sync::Mutex::new(
                 std::collections::HashSet::new(),
             )),
+            hashing: Default::default(),
             links_making: Default::default(),
             zips: Default::default(),
             app_key,

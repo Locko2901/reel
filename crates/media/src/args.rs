@@ -1005,7 +1005,14 @@ pub fn hover_loop(input: &Path, at: f64, seconds: f64) -> Vec<String> {
     ]
 }
 
+/// Over this many seconds, the strip's frames come from a seek each instead of from decoding
+/// the whole video.
+pub const STRIP_SEEKS_OVER: f64 = 600.0;
+
 pub fn filmstrip(input: &Path, duration: f64, frames: u32) -> Vec<String> {
+    if duration > STRIP_SEEKS_OVER {
+        return filmstrip_by_seeks(input, duration, frames);
+    }
     let fps = frames as f64 / duration.max(0.5);
     vec![
         s("-i"),
@@ -1021,6 +1028,35 @@ pub fn filmstrip(input: &Path, duration: f64, frames: u32) -> Vec<String> {
         s("-f"),
         s("image2"),
     ]
+}
+
+/// The strip of a long video: each frame from a seek of its own, side by side as `tile` puts them.
+fn filmstrip_by_seeks(input: &Path, duration: f64, frames: u32) -> Vec<String> {
+    let mut a = Vec::new();
+    let mut graph = String::new();
+    let mut stack = String::new();
+    for i in 0..frames {
+        let at = duration * (f64::from(i) + 0.5) / f64::from(frames);
+        a.extend([s("-ss"), format!("{at:.3}"), s("-i"), p(input)]);
+        graph.push_str(&format!(
+            "[{i}:v:0]trim=end_frame=1,setpts=PTS-STARTPTS,scale=320:-2,format=yuvj420p[f{i}];"
+        ));
+        stack.push_str(&format!("[f{i}]"));
+    }
+    graph.push_str(&format!("{stack}hstack=inputs={frames}[strip]"));
+    a.extend([
+        s("-filter_complex"),
+        graph,
+        s("-map"),
+        s("[strip]"),
+        s("-frames:v"),
+        s("1"),
+        s("-q:v"),
+        s("4"),
+        s("-f"),
+        s("image2"),
+    ]);
+    a
 }
 
 /// A one-second encode through the backend, software decode, the frames as a real encode
@@ -1102,6 +1138,43 @@ pub fn hw_decode_test(hw: HwBackend, device: &str, decoder: &str, sample: &Path)
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_long_videos_strip_seeks_for_each_frame_and_a_short_ones_is_decoded() {
+        let input = Path::new("/l/a.mp4");
+        let short = filmstrip(input, 20.0, 12);
+        assert_eq!(short.iter().filter(|a| *a == "-i").count(), 1);
+        assert!(short.iter().any(|a| a.starts_with("fps=")));
+        let long = filmstrip(input, 3.0 * 3600.0, 12);
+        assert_eq!(long.iter().filter(|a| *a == "-i").count(), 12);
+        let seeks: Vec<f64> = long
+            .windows(2)
+            .filter(|w| w[0] == "-ss")
+            .map(|w| w[1].parse().unwrap())
+            .collect();
+        assert_eq!(seeks.len(), 12);
+        assert_eq!((seeks[0], seeks[11]), (450.0, 10350.0));
+        assert!(long
+            .iter()
+            .any(|a| a.ends_with("[f10][f11]hstack=inputs=12[strip]")));
+        assert_eq!(
+            long.iter().filter(|a| a.contains("fps=")).count(),
+            0,
+            "no frame is decoded for the frame rate's sake"
+        );
+    }
+
+    #[test]
+    fn a_runs_limit_grows_with_the_video_it_works_on() {
+        use crate::ffmpeg::limit_for;
+        use std::time::Duration;
+        let hour = Duration::from_secs(3600);
+        assert_eq!(limit_for(hour, 20.0), hour);
+        assert_eq!(limit_for(hour, 3.0 * 3600.0), 12 * hour);
+        for odd in [0.0, -1.0, f64::NAN, f64::INFINITY] {
+            assert_eq!(limit_for(hour, odd), hour, "{odd}");
+        }
+    }
 
     fn enc(hw: HwBackend, decoder: Option<&str>) -> Encoder {
         Encoder {

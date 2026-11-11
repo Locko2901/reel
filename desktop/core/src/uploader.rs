@@ -290,6 +290,8 @@ pub async fn upload_file(
             .map(|n| n.to_string_lossy().into_owned())
             .unwrap_or_else(|| "clip.mkv".into())
     });
+    // the hash reads the whole file, hours of a session recording: not while a game has the screen
+    wait_while_paused(ctl, &tx, 0, total).await?;
     let ptx = tx.clone();
     let sha = tokio::select! {
         _ = ctl.cancel.cancelled() => return Err(UploadError::Cancelled),
