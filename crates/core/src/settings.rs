@@ -280,7 +280,7 @@ pub static DEFS: &[Def] = &[
     def("share.discord_limits_mb", "REEL_DISCORD_LIMITS_MB", Section::Sharing, "Copies under a size", "Limit list", "the limits the picker offers, in MB; chat apps' upload limits are the point of them: Discord takes 20 MB without Nitro, 50 with Nitro Basic and 500 with Nitro, and some apps still stop at 10", Kind::List),
     def("share.download_default", "REEL_SHARE_DOWNLOAD_DEFAULT", Section::Sharing, "New links", "Allow the download", "whether a new link's page offers the full file, until changed in the link dialog", Kind::Bool),
     def("share.expiry_default", "REEL_SHARE_EXPIRY_DEFAULT", Section::Sharing, "New links", "Expire", "what a new link's expiry starts on in the dialog", Kind::Select(EXPIRIES)),
-    def("import.upload_max_gb", "REEL_UPLOAD_MAX_GB", Section::Imports, "Upload", "Upload size limit", "an upload bigger than this is refused; the proxy in front has a limit of its own", int(1, 64, "GB")),
+    def("import.upload_max_gb", "REEL_UPLOAD_MAX_GB", Section::Imports, "Upload", "Upload size limit", "an upload bigger than this is refused; the proxy in front has a limit of its own", int(1, 1000, "GB")),
     def("notify.kind", "REEL_NOTIFY_KIND", Section::Notifications, "Where", "Send to", "off, an ntfy topic, or a webhook that takes JSON", Kind::Select(&["off", "ntfy", "webhook"])),
     def("notify.ntfy_url", "REEL_NTFY_URL", Section::Notifications, "Where", "ntfy server", "the server's address, such as https://ntfy.example.org; a new address clears the token below, which is then entered again for that server", Kind::Url),
     def("notify.ntfy_topic", "REEL_NTFY_TOPIC", Section::Notifications, "Where", "ntfy topic", "the topic reel posts to", Kind::Text),
