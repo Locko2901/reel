@@ -333,7 +333,7 @@ export function header(page) {
       <dt>Server</dt><dd id="part-server"><i class="dot ok"></i><span><b></b> <span class="muted"></span></span></dd>
       <dt>Versions</dt><dd id="part-versions"><i class="dot"></i><span><b></b> <span class="muted"></span></span></dd>
     </dl>
-    <div class="pop-actions"><label class="toggle">Pause recording <button type="button" class="switch" role="switch" aria-checked="false" id="app-recording"><i></i></button></label><label class="toggle" data-panel="pause">Pause uploads <button type="button" class="switch" role="switch" aria-checked="false" id="app-pause"><i></i></button></label><a class="btn small quiet" href="#" data-page="/status">Status page</a><a class="btn small quiet" href="#" id="ver-updates">Updates</a></div>
+    <div class="pop-actions"><label class="toggle">Pause clips <button type="button" class="switch" role="switch" aria-checked="false" id="app-recording"><i></i></button></label><label class="toggle" data-panel="pause">Pause uploads <button type="button" class="switch" role="switch" aria-checked="false" id="app-pause"><i></i></button></label><a class="btn small quiet" href="#" data-page="/status">Status page</a><a class="btn small quiet" href="#" id="ver-updates">Updates</a></div>
   </div>
   <button class="avatar" id="user-btn" type="button" title="" aria-label="Menu" aria-haspopup="menu" aria-expanded="false"></button>
   <div class="menu" id="user-menu" role="menu" hidden>

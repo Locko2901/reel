@@ -75,18 +75,18 @@ how to add a server later.
   for your user; on Linux an entry in your desktop's autostart.
 - **In the tray.** Double-click reel's icon to open the library. Its menu has the app's state,
   **Last clips** (each with **Open** and **Copy link**), **Save clip**, **Save and share**,
-  **Record a session**, **Pause recording**, **Share the last clip**, **Pause uploads**, **Open library**, **Open
+  **Record a session**, **Pause clips**, **Share the last clip**, **Pause uploads**, **Open library**, **Open
   settings**, on Windows with the OBS that came with reel **Open OBS** or **Hide OBS**, and
   **Quit**. When an update is ready, **Install reel** with the new version is there too. In
   standalone the menu keeps what makes sense on one PC: the state, **Last clips** (each with
-  **Open**), **Save clip**, **Record a session**, **Pause recording**, **Open library**, **Open settings**, OBS's entry
+  **Open**), **Save clip**, **Record a session**, **Pause clips**, **Open library**, **Open settings**, OBS's entry
   and **Quit**, with **Pause uploads** once a server is paired. For a tray whose icons are all one
   colour, Settings, Startup, **Tray icon** shows reel's mark alone in white or in black. On Linux,
   reel's own OBS has a tray icon of its own, which opens its window.
-- **Pause recording**, in the tray and in the status chip of the window, stops OBS's replay
+- **Pause clips**, in the tray and in the status chip of the window, stops OBS's replay
   buffer: OBS no longer encodes, and the buffer gives back its memory. OBS stays open, so **Resume
-  recording** starts the buffer again at once. While paused, the tray, its icon's tooltip and the
-  chip say **recording paused**, **Save clip** and **Save and share** are off and say why, and the
+  clips** starts the buffer again at once. While paused, the tray, its icon's tooltip and the
+  chip say **clips paused**, **Save clip** and **Save and share** are off and say why, and the
   Save hotkey saves nothing but says so. The pause lasts until you resume, or until the app starts
   again: a new start always records.
 - **The window.** Closing it (the X) ends the window and the WebView that draws it; the app goes
@@ -121,9 +121,9 @@ parts to the header:
 - **Share the last clip** (connected), next to them, copies the link of the newest clip, as the
   hotkey does.
 - **The status chip** is a dot and a word for what the app is doing: **idle**, **uploading**,
-  **paused**, **recording paused**, **recording a session**, **preparing the link**, **not paired**, **cannot reach the server**, **no replay
+  **paused**, **clips paused**, **recording a session**, **preparing the link**, **not paired**, **cannot reach the server**, **no replay
   saved**, **error**, or the step of the work on a clip. Click it for a line each about the
-  **App**, **OBS** and the **Server**, the **Versions**, the **Pause recording** and **Pause
+  **App**, **OBS** and the **Server**, the **Versions**, the **Pause clips** and **Pause
   uploads** switches, **Status page** and **Updates**. In standalone the third line is the **Library**: on this PC, where it
   lives, and whether reel on this PC runs. Its dot turns red only for a check of the PC's own (its
   room, ffmpeg, the database), and **Pause uploads** shows once a server is paired.

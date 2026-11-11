@@ -39,7 +39,7 @@
       <dt class="browser-part">Version</dt><dd class="browser-part" id="part-version"><i class="dot {{ who.version_dot }}"></i><span><b>{{ who.version }}</b> <span class="muted">{{ who.version_line }}</span></span></dd>
       <dt class="app-part" hidden>Versions</dt><dd class="app-part" id="part-versions" hidden><i class="dot"></i><span><b></b> <span class="muted"></span></span></dd>
     </dl>
-    <div class="pop-actions"><label class="toggle app-part" hidden>Pause recording <button type="button" class="switch" role="switch" aria-checked="false" id="app-recording"><i></i></button></label><label class="toggle app-part{% if who.standalone %} app-paired{% endif %}" hidden>Pause uploads <button type="button" class="switch" role="switch" aria-checked="false" id="app-pause"><i></i></button></label><a class="btn small quiet" href="/status">Status page</a><a class="btn small quiet app-part" href="#" id="ver-updates" hidden>Updates</a></div>
+    <div class="pop-actions"><label class="toggle app-part" hidden>Pause clips <button type="button" class="switch" role="switch" aria-checked="false" id="app-recording"><i></i></button></label><label class="toggle app-part{% if who.standalone %} app-paired{% endif %}" hidden>Pause uploads <button type="button" class="switch" role="switch" aria-checked="false" id="app-pause"><i></i></button></label><a class="btn small quiet" href="/status">Status page</a><a class="btn small quiet app-part" href="#" id="ver-updates" hidden>Updates</a></div>
   </div>
   <button class="avatar" id="user-btn" type="button" title="{{ who.name }}" aria-label="Menu" aria-haspopup="menu" aria-expanded="false">{{ who.initial }}</button>
   <div class="menu" id="user-menu" role="menu" hidden>

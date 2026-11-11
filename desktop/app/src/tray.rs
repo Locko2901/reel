@@ -105,9 +105,9 @@ pub fn items(st: &Status) -> Vec<Item> {
     out.push(act(
         "recording",
         if st.recording_paused {
-            "Resume recording"
+            "Resume clips"
         } else {
-            "Pause recording"
+            "Pause clips"
         },
         true,
     ));
@@ -472,7 +472,7 @@ mod tests {
     }
 
     #[test]
-    fn pause_recording_sits_with_the_saves_and_paused_greys_them_with_its_reason() {
+    fn pause_clips_sits_with_the_saves_and_paused_greys_them_with_its_reason() {
         for mode in ["connected", "standalone"] {
             let mut st = status(mode, true, "https://clips.example.org");
             let got = entries(&st);
@@ -480,12 +480,12 @@ mod tests {
                 got.iter().position(|(i, _, _)| i == id).unwrap()
             };
             let pause = &got[at(&got, "recording")];
-            assert_eq!((pause.1.as_str(), pause.2), ("Pause recording", true));
+            assert_eq!((pause.1.as_str(), pause.2), ("Pause clips", true));
             assert!(at(&got, "recording") > at(&got, "save"), "{got:?}");
             assert!(on(&st, "save"));
 
             st.recording_paused = true;
-            st.state_word = "recording paused".into();
+            st.state_word = "clips paused".into();
             st.state_line = "the replay buffer is stopped".into();
             let (save, share) =
                 crate::status::save_actions(true, true, true, None, true, mode == "standalone");
@@ -493,16 +493,16 @@ mod tests {
             st.save_share = share;
             let got = entries(&st);
             let resume = &got[at(&got, "recording")];
-            assert_eq!((resume.1.as_str(), resume.2), ("Resume recording", true));
+            assert_eq!((resume.1.as_str(), resume.2), ("Resume clips", true));
             assert!(!on(&st, "save"), "Save clip is greyed");
             if mode == "connected" {
                 assert!(!on(&st, "save-share"), "and Save and share");
             }
-            assert_eq!(got[at(&got, "save-why")].1, "Recording is paused");
-            assert_eq!(got[0].1, "recording paused: the replay buffer is stopped");
+            assert_eq!(got[at(&got, "save-why")].1, "Clips are paused");
+            assert_eq!(got[0].1, "clips paused: the replay buffer is stopped");
             assert_eq!(
                 st.tooltip(),
-                "reel: recording paused, the replay buffer is stopped"
+                "reel: clips paused, the replay buffer is stopped"
             );
         }
     }
@@ -524,7 +524,7 @@ mod tests {
             assert!(
                 at(&got, "session") > at(&got, "save")
                     && at(&got, "session") < at(&got, "recording"),
-                "with the saves, before Pause recording: {got:?}"
+                "with the saves, before Pause clips: {got:?}"
             );
             st.record = Action {
                 ok: false,

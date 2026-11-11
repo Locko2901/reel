@@ -81,7 +81,7 @@ pub struct Status {
     pub state_line: String,
     pub paused_by_user: bool,
     pub paused_fullscreen: bool,
-    /// Pause recording: the replay buffer is stopped on purpose until Resume recording.
+    /// Pause clips: the replay buffer is stopped on purpose until Resume clips.
     pub recording_paused: bool,
     /// A session recording that runs or starts.
     pub session: Option<crate::session::Line>,
@@ -324,7 +324,7 @@ pub fn save_actions(
     (Action::from(save), Action::from(share))
 }
 
-pub const RECORDING_PAUSED: &str = "recording is paused";
+pub const RECORDING_PAUSED: &str = "clips are paused";
 
 /// The app's state and its word while reel's own OBS is in trouble, by the OBS's state.
 pub fn obs_trouble(box_state: &str) -> Option<(&'static str, &'static str)> {
@@ -645,19 +645,16 @@ mod tests {
     }
 
     #[test]
-    fn paused_recording_greys_both_saves_and_says_why_first() {
+    fn paused_clips_grey_both_saves_and_say_why_first() {
         let running = ObsState {
             replay_active: true,
             ..ObsState::default()
         };
         let (save, share) = save_actions(true, true, true, Some(&running), true, false);
-        assert_eq!((save.ok, save.why.as_str()), (false, "recording is paused"));
+        assert_eq!((save.ok, save.why.as_str()), (false, "clips are paused"));
         assert_eq!(share, save);
         let (save, _) = save_actions(true, false, false, None, false, true);
-        assert_eq!(
-            save.why, "recording is paused",
-            "before what else is missing"
-        );
+        assert_eq!(save.why, "clips are paused", "before what else is missing");
     }
 
     #[test]
