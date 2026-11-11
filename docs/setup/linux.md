@@ -63,7 +63,7 @@ A reel server you run offers both under Settings, Devices: **reel for Linux, the
     video without a copy). reel is then in the menu, and `reel-desktop` starts it from a terminal.
 
 When it worked, reel's icon is in the tray and the window opens: on **reel's own OBS** when OBS is
-installed (the setup, step 3), else on Settings, **OBS**. On a desktop without a tray
+installed (the setup, step 3), else on the setup for your own OBS (step 4). On a desktop without a tray
 (GNOME without the AppIndicator extension) the app runs all the same and says so under Settings,
 **Status**; starting it again opens its window.
 
@@ -113,25 +113,29 @@ well.
 
 ### Use my own OBS
 
-reel connects to your OBS as in the next step; nothing of reel's runs inside OBS.
+The setup goes on with the steps for your own OBS, as in the next step; nothing of reel's runs
+inside OBS.
 
 ## 4. Your own OBS
 
-With **Use my own OBS**, start OBS once, then look at the panel **What reel needs from OBS** at the
-top of Settings, **OBS**. It checks two things for as long as the app runs, and says in words what
-to do about each:
+With **Use my own OBS**, or at the first start without OBS installed where reel looks (an OBS
+built or run another way), the setup for your own OBS has five short steps, the same as reel
+light's on Windows: [Your own OBS](own-obs.md#2-the-setup) walks through them with pictures.
+Start OBS first.
 
-1. **OBS's WebSocket**: in OBS, open **Tools**, **WebSocket Server Settings**, tick **Enable
-   WebSocket server**, leave the port at 4455, and press **Show Connect Info** for the **Server
-   Password**. Paste it into **Password** in the app. When it worked, the line says "on" with OBS's
-   version.
+1. **Your OBS**: in OBS, open **Tools**, **WebSocket Server Settings**, tick **Enable WebSocket
+   server**, leave the port at 4455, and press **Show Connect Info** for the **Server Password**.
+   Paste it into **Password** in the setup. When it worked, **What reel found** lists OBS's
+   version, its profile, the replay buffer and the recording folder.
 2. **The replay buffer**: with **Start the replay buffer** on (the default), reel turns OBS's
-   replay buffer on and starts it by itself. When it worked, the line says "running, it keeps the
-   last 60 s" (or your length).
+   replay buffer on and starts it by itself. When it worked, **What reel needs from OBS** says
+   "running, it keeps the last 60 s" (or your length). It goes on checking, at the top of
+   Settings, **OBS**, for as long as the app runs.
+3. **Hotkeys**, **Where clips go**, **New versions** and **Done**, as on Windows.
 
 The recording format and the encoder are OBS's: any H.264 encoder (VAAPI, NVENC or x264) with AAC
-audio keeps clips as they are, never encoded again. [Your own OBS](own-obs.md), steps 2 and 3, has
-the same settings with OBS's pictures; they are the same on Linux.
+audio keeps clips as they are, never encoded again. [Your own OBS](own-obs.md#3-obss-settings-later)
+has the same settings; they are the same on Linux.
 
 OBS from Flathub works the same way: its WebSocket is reachable on 127.0.0.1 from outside the
 sandbox.

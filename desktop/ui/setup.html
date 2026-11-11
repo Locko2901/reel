@@ -27,8 +27,39 @@
         <div class="panel">
           <div class="body flush">
             <div class="srow"><div class="slabel"><b>Set it up for me</b><span class="shelp" id="choose-bundled-help">recommended: reel starts the OBS that came with it, hidden, with the app, and writes its settings from these steps; anything can be changed in OBS itself later</span></div><div class="sctl"><button class="primary" id="choose-bundled" type="button">Set it up</button></div></div>
-            <div class="srow"><div class="slabel"><b>Use my own OBS</b><span class="shelp" id="choose-own-help">for an OBS set up already: reel connects to it over its WebSocket, as reel light does. Discord turns on its Streamer Mode while it sees your OBS running; its Streamer Mode settings, Automatically Enable/Disable, turn that off</span></div><div class="sctl"><button id="choose-own" type="button">Use my own</button></div></div>
+            <div class="srow"><div class="slabel"><b>Use my own OBS</b><span class="shelp" id="choose-own-help">for an OBS set up already: reel connects to it over its WebSocket, as reel light does, set up in <span class="own-count">five</span> short steps. Discord turns on its Streamer Mode while it sees your OBS running; its Streamer Mode settings, Automatically Enable/Disable, turn that off</span></div><div class="sctl"><button id="choose-own" type="button">Use my own</button></div></div>
             <div class="srow"><div class="slabel"><b>Later</b><span class="shelp">the app opens on its own pages; Settings, OBS has this setup whenever you want it</span></div><div class="sctl"><button class="quiet" id="choose-later" type="button">Skip for now</button></div></div>
+          </div>
+        </div>
+      </section>
+
+      <section data-step="obs" hidden>
+        <h1>Your OBS</h1>
+        <p class="intro">reel connects to the OBS you run, over the WebSocket server that OBS 28 and later have built in: OBS tells reel the moment it saves a replay, and reel reads where it writes it. In OBS, open Tools, WebSocket Server Settings and tick Enable WebSocket server; Show Connect Info there has the port and the password.</p>
+        <div class="panel">
+          <div class="body flush">
+            <div class="srow"><div class="slabel"><b>Host</b><span class="shelp">127.0.0.1 when OBS runs on this PC</span></div><div class="sctl"><input type="text" class="in-path mono" id="obs-host" aria-label="Host"></div></div>
+            <div class="srow"><div class="slabel"><b>Port</b><span class="shelp">Server Port in OBS's WebSocket Server Settings, 4455 unless changed there</span></div><div class="sctl"><input type="number" class="in-num" id="obs-port" min="1" max="65535" aria-label="Port"></div></div>
+            <div class="srow"><div class="slabel"><b>Password</b><span class="shelp">Server Password in Show Connect Info, while Enable Authentication is on</span></div><div class="sctl"><input type="password" class="in-text" id="obs-password" aria-label="Password" autocomplete="off"></div></div>
+          </div>
+        </div>
+        <div class="panel">
+          <header><h2>What reel found</h2><span class="desc" id="obs-test-line" role="status"></span><div class="actions"><button class="small" id="obs-test" type="button">Test</button></div></header>
+          <div class="body"><dl class="kv wide" id="obs-found"></dl><p id="obs-test-words" hidden></p><p class="muted small" id="obs-test-detail" hidden></p></div>
+        </div>
+      </section>
+
+      <section data-step="needs" hidden>
+        <h1>The replay buffer</h1>
+        <p class="intro">reel saves clips from OBS's replay buffer: the last minutes, kept in memory and written to a file when you save. It needs the buffer on in OBS's profile, and running. What reel changes in OBS, it asks OBS for over the WebSocket; it never writes OBS's files.</p>
+        <div class="panel">
+          <header><h2>What reel needs from OBS</h2><span class="desc">checked as long as the app runs</span></header>
+          <div class="body"><dl class="kv wide" id="needs"></dl></div>
+        </div>
+        <div class="panel">
+          <div class="body flush">
+            <div class="srow"><div class="slabel"><b>Start the replay buffer</b><span class="shelp">when OBS is open and its replay buffer is off, reel turns it on in OBS's profile and starts it, though not while OBS records; off, you start it in OBS</span></div><div class="sctl"><button type="button" class="switch" role="switch" aria-checked="true" id="start-replay" aria-label="Start the replay buffer"><i></i></button></div></div>
+            <div class="srow wide" id="replay-row"><div class="slabel"><b>Clip length</b><span class="shelp" id="replay-help"></span></div><div class="sctl" id="replay-ctl"><span class="ctl-group"><input type="number" class="in-num" id="replay-n" min="1" max="3600" aria-label="Clip length in seconds"><span class="unit">s</span></span><span class="err" id="replay-err" hidden></span></div></div>
           </div>
         </div>
       </section>
@@ -139,6 +170,7 @@
             <div class="srow" data-key="hotkeys.save" data-kind="hotkey"><div class="slabel"><b>Save a clip</b><span class="shelp" id="hotkey-save-help">OBS saves the replay, and it goes up as any clip does</span></div><div class="sctl"><button type="button" class="hotkey" aria-label="Hotkey: Save a clip"></button><span class="why" aria-live="polite" hidden></span><span class="err" hidden></span></div></div>
           </div>
         </div>
+        <p class="small" id="hotkeys-own" hidden>OBS's own Save Replay key, under its Settings, Hotkeys, saves a clip as well: OBS saves, and reel takes the clip in. Pick a key here that OBS does not use.</p>
       </section>
 
       <section data-step="where" hidden>
@@ -166,7 +198,7 @@
 
       <section data-step="done" hidden>
         <h1>Done</h1>
-        <p class="intro">That is the setup. Finish starts OBS with it, hidden; the hotkeys work from then on.</p>
+        <p class="intro" id="done-intro">That is the setup. Finish starts OBS with it, hidden; the hotkeys work from then on.</p>
         <div class="notice warn" id="finish-note" role="status" hidden><span class="grow" id="finish-note-line"></span></div>
         <div class="panel">
           <header><h2>Summary</h2></header>

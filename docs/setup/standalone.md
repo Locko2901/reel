@@ -21,8 +21,9 @@ A new install starts standalone, so there is usually nothing to do:
 
 - **reel** on Windows, and **Set it up for me** on Linux: the setup's last step, **Where clips
   go**, has **This PC only** chosen already. Press **Next**, then **Finish**.
-- **reel light**, or your own OBS on Linux: the window opens on Settings, **OBS**. Connect your OBS as
-  in [Your own OBS](own-obs.md), steps 2 to 4 (on Linux, [Linux](linux.md), step 4).
+- **reel light**, or your own OBS on Linux: the setup for your own OBS has **This PC only** chosen
+  on its **Where clips go** too ([Your own OBS](own-obs.md#2-the-setup)). Press **Next** to
+  **Done**, then **Finish**.
 - An app that was paired with a server keeps that through an update. To switch it, open Settings,
   **Server** and set **Mode** to **standalone**.
 
@@ -141,8 +142,9 @@ first, and pick that one. The copy's `README.txt` says the same.
 Under Settings, **Startup**, **Updates**, **Check now** asks GitHub for the newest release.
 Settings, **Advanced**, **Check for updates** asks by itself while it is on: a minute after the
 start, then every six hours by the clock (once a day with **New versions** off). The setup's
-**Look for new versions on GitHub**, on its **New versions** step, is the same switch, on unless you
-switch it off there; without the setup, as in reel light, it is off until you turn it on. When a
+**Look for new versions on GitHub**, on its **New versions** step (reel light's setup has it too), is
+the same switch, on unless you switch it off there; with the setup skipped, or on an app set up
+before the setup asked, it is off until you turn it on. When a
 newer reel is out, **Install reel** and the release's notes appear there and in the tray menu. The
 app takes the installer of its own package from the release (reel, reel light or the AppImage),
 checks its signature, and puts it in place; your settings and your library stay. On Windows, reel

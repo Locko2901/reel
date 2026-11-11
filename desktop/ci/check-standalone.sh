@@ -82,6 +82,60 @@ stop
 unset REEL_OBS_EXE
 ok "Set it up keeps standalone, the default of Where clips go (shots: the choice, the first step, Where clips go, New versions)"
 
+# reel light: no OBS here, so a new install opens the setup for an OBS of one's own, against
+# the stand-in OBS with a password on a port of its own; a start after Finish opens no setup.
+D="$W/light"
+L="$D/data/logs"
+export REEL_DESKTOP_DIR="$D"
+mkdir -p "$W/rec-light"
+/target/debug/examples/fake_obs --port 4496 --dir "$W/rec-light" --clip "$W/clip.mp4" --password standin-pass --profile Gaming > "$W/fake-obs-light.out" 2>&1 &
+PIDS="$PIDS $!"
+start
+waitlog "no OBS installed here" 30 "the app found an OBS to run: no reel light path"
+waitlog 'window shows view="setup"' 30 "reel light's setup did not open on a new install"
+sleep 3
+shot "light-1-obs-nothing-answers"
+grep -q '"own_setup_due": true' "$D/config/settings.json" || fail "the new install's settings do not hold its setup as still to come"
+# shellcheck disable=SC2086
+xdotool mousemove ${REEL_LIGHT_PORT:-1070 319} click 1 key ctrl+a type 4496
+xdotool key Tab
+# shellcheck disable=SC2086
+xdotool mousemove ${REEL_LIGHT_PASSWORD:-987 401} click 1 type standin-pass
+xdotool key Tab
+for _ in $(seq 1 20); do grep -q "GetProfileList" "$W/fake-obs-light.out" && break; sleep 0.5; done
+grep -q "GetProfileList" "$W/fake-obs-light.out" || fail "the setup's test did not read the stand-in OBS's profile ($(tail -n 3 "$W/fake-obs-light.out" | tr '\n' '|'))"
+sleep 1
+shot "light-1-obs"
+[ "$(logged 'obs connected')" -eq 0 ] || fail "the app connected before the step was left"
+ok "reel light, a new install: its setup opens on Your OBS; the test reads the stand-in OBS with its password and profile (shots)"
+for at in "113:light-2-needs" "145:light-3-hotkeys" "177:light-4-where" "209:light-5-new-versions" "241:light-6-done"; do
+  xdotool mousemove 233 "${at%%:*}" click 1
+  [ "${at#*:}" != light-2-needs ] || waitlog "obs connected" 30 "leaving Your OBS did not connect the app to the stand-in OBS"
+  sleep 2
+  shot "${at#*:}"
+done
+grep -q '"port": 4496' "$D/config/settings.json" && grep -q '"password": "standin-pass"' "$D/config/settings.json" || fail "the connection was not saved as the step was left"
+ok "the connection is saved as Your OBS is left, and the app connects; The replay buffer, Hotkeys, Where clips go, New versions and Done (shots)"
+# shellcheck disable=SC2086
+xdotool mousemove ${REEL_LIGHT_FINISH:-495 439} click 1
+waitlog 'window shows view="library"' 30 "Finish did not open the library"
+grep -q '"own_setup_due": false' "$D/config/settings.json" || fail "Finish did not mark reel light's setup finished"
+grep -q '"save": "Alt+F10"' "$D/config/settings.json" || fail "Finish did not save Save a clip on Alt+F10"
+grep -q '"done": false' "$D/config/settings.json" || fail "reel light's setup marked the setup of the package with OBS done"
+sleep 3
+shot "light-7-library"
+stop
+# as a settings file of a version before the setup for an OBS of one's own reads
+python3 -c 'import json,sys; f=sys.argv[1]; s=json.load(open(f)); del s["obs"]["own_setup_due"]; json.dump(s, open(f, "w"), indent=2)' "$D/config/settings.json"
+b=$(logged 'window shows view="library"')
+s=$(logged 'window shows view="setup"')
+start
+waitmore 'window shows view="library"' 30 "a start after the setup showed no library" "$b"
+sleep 2
+[ "$(logged 'window shows view="setup"')" -eq "$s" ] || fail "a start of reel light set up before opened the setup"
+stop
+ok "Finish: the setup finished, Save a clip on Alt+F10, the library; a start of an install set up before opens no setup"
+
 D="$W/here"
 L="$D/data/logs"
 mkdir -p "$D/config" "$W/rec"

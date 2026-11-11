@@ -13,7 +13,7 @@ nothing here can.
 | What | Linux | Wine | Else |
 |---|---|---|---|
 | WebSocket: Hello, Identify with the password, `GetVersion` | connects with the password; the version logged | connects; the version is the pin's | the authentication string against the protocol's (`obs.rs`) |
-| The 25 request types of the code | each in `availableRequests` | each in `availableRequests` | `obs-requests.sh --check` in `make desktop-check` |
+| The 26 request types of the code | each in `availableRequests` | each in `availableRequests` | `obs-requests.sh --check` in `make desktop-check` |
 | WebSocket settings: port 4466, a password, no alerts | `config.json` checked | the app connects with them | `bundled.rs` |
 | `--multi`, its own settings folder | beside the user's OBS, whose files stay the same to the byte | | |
 | `--portable`, `portable_mode.txt` | | the install's layout; the app finds its OBS | `check-installers.sh` |
@@ -24,7 +24,7 @@ nothing here can.
 | The profile: video, audio, the replay buffer's time, size and folder, the format, tracks and their names | written and read back; changed in OBS and kept; Simple mode stands | an update keeps it | `bundled.rs`, `readback.rs` |
 | `SaveReplayBuffer`, `ReplayBufferSaved` | the Save hotkey saves, the path arrives, the clip is 15 to 25 s | | by hand, a game's clip |
 | A setting changed in the app: the bundled OBS started again on its files; the user's own OBS told over the WebSocket (`SetProfileParameter`, `SetRecordDirectory`, `StopReplayBuffer`, `StartReplayBuffer`) | the bundled: `--format` and `--clip-length` reach the next replay, in Simple mode too | | the user's own: `obs.rs` (`apply` over a profile, the folder's fallback) |
-| The user's own OBS (its WebSocket on 4455, its files never written) | | | `e2e.sh` and the other checks against the stand-in OBS; by hand |
+| The user's own OBS (its WebSocket on 4455, its profile's name with `GetProfileList`, its files never written) | | | `e2e.sh`, `check-standalone.sh` (reel light's setup, with a password and a profile) and the other checks against the stand-in OBS; by hand |
 | Formats: mkv, hybrid MP4 | both saved and read | | |
 | x264 | the replays above | | |
 | NVENC, AMF, Quick Sync, VAAPI | | | no GPU on a runner: by hand |

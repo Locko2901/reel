@@ -31,51 +31,67 @@ What you need:
 
 3. At the end, press **Open reel**. The app, called reel in the Start menu and in Apps like the
    one with OBS, starts in the tray (the corner by the clock) and opens
-   its window on Settings, **OBS**. **Close** leaves it for later: reel is in the Start
+   its window on its setup. **Close** leaves it for later: reel is in the Start
    menu.
 
-A new install keeps the library on this PC ([Standalone](standalone.md)), so OBS is all there is
-left to connect. An app that was set up before keeps what it had.
+## 2. The setup
 
-## 2. Turn on OBS's WebSocket
+Five short steps (four with a server), each with a default, so pressing **Next** through them
+gives a working setup once OBS answers. reel reads what it needs from OBS over OBS's WebSocket,
+and what it changes in OBS it asks OBS for the same way; it never writes OBS's files. Start OBS
+before you begin.
 
-OBS tells the app over its WebSocket the moment it saves a replay.
+1. **Your OBS**: where reel finds OBS's WebSocket. In OBS, open **Tools**, **WebSocket Server
+   Settings**, tick **Enable WebSocket server**, leave **Server Port** at 4455 and **Enable
+   Authentication** on, press **Show Connect Info** and copy the **Server Password**. In the
+   setup, leave **Host** `127.0.0.1` and **Port** `4455`, and paste the **Password**. The setup
+   tests at once and after each change (**Test** tries again). When it worked, **What reel found**
+   lists OBS's version, the profile in use, the replay buffer (on or off, running or not, how
+   much it keeps), the recording folder and what a replay is recorded as. When it did not, it
+   says what to turn on in OBS, or that OBS wants the password. **Next** saves the connection,
+   and the app connects.
 
-1. In OBS, open **Tools**, **WebSocket Server Settings**.
-2. Tick **Enable WebSocket server**. Leave **Server Port** at 4455 and **Enable Authentication** on.
-3. Press **Show Connect Info**, copy the **Server Password**, and press **OK**.
-4. In the app, under Settings, **OBS**, find the **obs-websocket** panel. Leave **Connect to OBS**
-   on and **Host** `127.0.0.1`, **Port** `4455`, paste the **Password**, and press **Test**.
-5. When it worked, Test says "OBS 32.x.x with obs-websocket 5.x.x" (your versions), and **What OBS
-   is set to** fills in: the output mode, the recording folder, the format, the encoder and the
-   replay buffer.
+2. **The replay buffer**: reel saves clips from OBS's replay buffer, the last minutes kept in
+   memory and written to a file when you save. **What reel needs from OBS** checks the WebSocket
+   and the replay buffer for as long as the app runs, and says in words what to do about either.
+   **Start the replay buffer** is on: when OBS is open and its replay buffer is off, reel turns it
+   on in OBS's profile and starts it (not while OBS records); off, you start it in OBS. **Clip
+   length** shows how much OBS's replay buffer keeps; a length picked here is set in OBS's
+   profile, and a running replay buffer starts again with it.
+
+3. **Hotkeys**: **Save a clip** is Alt+F10. To change it, click the field and press the keys.
+   OBS's own **Save Replay** key (in OBS, **Settings**, **Hotkeys**) saves a clip as well: OBS
+   saves, and the app takes the clip in. Pick a key here that OBS does not use. With a server (the
+   next step), **Save and share** shows here too.
+4. **Where clips go**: **This PC only** is chosen already: the library on this PC
+   ([Standalone](standalone.md)). For a server, see [Add a server for links](#add-a-server-for-links).
+   **Clips folder** is OBS's recording folder, as OBS says; a folder picked here is set in OBS.
+5. **New versions**: the same step as in [All in one](all-in-one.md#3-the-setup): **Look for new
+   versions on GitHub** is on, and switched off only **Check now** asks. With a server this step
+   is not there.
+6. **Done** shows a summary. Press **Finish**, and the window opens on your library.
+
+**Skip for now**, on every step, leaves the setup for later: the app opens on Settings, **OBS**,
+and **Run the setup**, in its **obs-websocket** panel, opens it again. An app that was set up
+before an update opens as it did, without the setup.
+
+## 3. OBS's settings, later
+
+Settings, **OBS** has what the setup set and more: the **obs-websocket** panel (the connection
+and **Start the replay buffer**), **What OBS is set to**, and **Change in OBS**, which sets the
+recording folder, the replay length, the format and the bitrate in OBS for you.
 
 ![Settings, OBS, connected to OBS](img/app-settings-obs.png)
 
-The panel **What reel needs from OBS**, at the top of the page, keeps checking the WebSocket and
-the replay buffer for as long as the app runs, and says in words what to do about either.
+For the recording format, pick **Hybrid MP4** or **MKV** in OBS: both survive a crash of OBS. For
+the encoder, any **H.264** one works (NVENC, AMF, Quick Sync or x264). Clips in H.264 up to 1440p
+and 50 Mbit/s, with AAC audio (OBS's default), go into the library as they are, never encoded
+again.
 
 reel never starts or ends your OBS. While it is closed, or after it crashed, the OBS line under
 Settings, **Status** says what reel waits for ("waiting for OBS at 127.0.0.1:4455: it is not
 running, or its WebSocket server is off"), and reel connects again within a few seconds of OBS
 being back, with the replay buffer started again when **Start the replay buffer** is on.
-
-## 3. The replay buffer
-
-reel saves clips from OBS's replay buffer: the last minute or so, kept in memory and written to a
-file when you save.
-
-1. In OBS, open **Settings**, **Output**. In the Simple output mode, under **Replay Buffer**, tick
-   **Enable Replay Buffer** and set **Maximum Replay Time** (60 s is a good start). In the Advanced
-   mode it is the **Replay Buffer** tab.
-2. For the recording format, pick **Hybrid MP4** or **MKV**: both survive a crash of OBS. For the
-   encoder, any **H.264** one works (NVENC, AMF, Quick Sync or x264). Clips in H.264 up to 1440p
-   and 50 Mbit/s, with AAC audio (OBS's default), go into the library as they are, never encoded
-   again.
-
-With **Start the replay buffer** on (the default), the app turns OBS's replay buffer on and starts
-it whenever it finds it off. It can also change the recording folder, the replay length, the
-format and the bitrate for you: Settings, OBS, **Change in OBS**.
 
 The clips folder follows OBS's recording folder unless you turn **Follow OBS** off under Settings,
 **Clips folder** (**Clips folder and cache** when connected). The app watches that folder as a
@@ -86,24 +102,16 @@ safety net too, so a clip saved while OBS and the app were not talking is still 
     runs whenever you play. To keep Streamer Mode off: in Discord, **User Settings**, **Streamer
     Mode** (in newer versions under **Appearance**), turn off **Automatically Enable/Disable**.
 
-## 4. Hotkeys
-
-You can save a clip two ways, and use both:
-
-- **OBS's own**: in OBS, **Settings**, **Hotkeys**, **Save Replay**. OBS saves, and the app takes
-  the clip in.
-- **The app's**: Settings, **Hotkeys**, **Save a clip** (no key until you set one). Click the field
-  and press the keys. A combination another program holds is refused with a reason, and the field
-  keeps what it had.
+The app's keys are under Settings, **Hotkeys** later: click a field and press the keys. A
+combination another program holds is refused with a reason, and the field keeps what it had. With
+a server, the page has three more keys: **Save and share**, **Share the last clip** and **Upload
+the last clip** ([Hotkeys](../desktop-app.md#hotkeys)).
 
 ![Settings, Hotkeys](img/app-settings-hotkeys.png)
 
-With a server, the page has three more keys: **Save and share**, **Share the last clip** and
-**Upload the last clip** ([Hotkeys](../desktop-app.md#hotkeys)).
+## 4. The first clip
 
-## 5. The first clip
-
-1. Play a game and press your **Save a clip** key, or OBS's **Save Replay**. The "clip captured"
+1. Play a game and press **Alt+F10** (Save a clip), or OBS's **Save Replay**. The "clip captured"
    sound plays.
 2. A moment later the notification "Clip in the library" appears. Click **Open** to see the clip.
 3. To send it, open **Send** on the clip's page, download the original or a copy under your chat's
@@ -121,15 +129,19 @@ With a server of your own ([The server](server.md)), every clip goes up as you s
 
     ![Pair a device on the server](img/server-pair-a-device.png)
 
-2. In the app, open Settings, **Server**. Under **A server, later**, enter the **Server URL**
-   (`https://clips.example.com`) and a **Device name** for this PC (how it shows on the server).
-3. Under **Pairing**, enter the **Pairing code** and press **Pair**. When it worked, **Pairing**
-   says "paired", and **This device** names this PC, your user and your server.
+2. In the setup, on **Where clips go**, pick **A reel server**, enter the **Server URL**
+   (`https://clips.example.com`) and the **Pairing code**, and press **Pair**. The setup moves on
+   to **Done**, whose summary names your server; press **Finish**.
+3. Set up already? In the app, open Settings, **Server**. Under **A server, later**, enter the
+   **Server URL** and a **Device name** for this PC (how it shows on the server). Under
+   **Pairing**, enter the **Pairing code** and press **Pair**. When it worked, **Pairing** says
+   "paired", and **This device** names this PC, your user and your server.
 
     ![Paired](img/app-settings-server.png)
 
-4. Set **Mode** to **connected**, so new clips go to the server. Clips already in the library on
-   this PC can go up from Settings, **Status**, each with **Upload to the server**.
+4. With the app set up already, set **Mode** to **connected**, so new clips go to the server.
+   Clips already in the library on this PC can go up from Settings, **Status**, each with
+   **Upload to the server**.
 
 The window now shows your server's library; with reel's own accounts it asks you to sign in once,
 inside the window. The device's token is kept in the Windows Credential Manager, never in a file.

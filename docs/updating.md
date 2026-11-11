@@ -136,9 +136,10 @@ GitHub, and it asks only while you let it:
   start, then once a day. While **New versions** is not off, the app asks
   again whenever the last answer is six hours old by the clock, so a new
   version reaches it within hours, also on a PC that sleeps at night. The
-  setup's **Look for new versions on GitHub** (its **New versions** step)
-  is the same switch and is on unless you switch it off there;
-  without the setup, as in reel light, it is off until you turn it on.
+  setup's **Look for new versions on GitHub** (its **New versions** step,
+  in reel light's setup too) is the same switch and is on unless you
+  switch it off there; with the setup skipped, or on an app set up
+  before the setup asked, it is off until you turn it on.
 
 When a newer reel is out, the update goes as it does for a paired app:
 the app takes the installer of its own package from the release (reel

@@ -1,9 +1,9 @@
 //! A stand-in OBS for the end to end run; `fail-next`, `write-ms` and `next-clip` steer its saves.
 //! Usage: fake_obs --port 4455 --dir <record folder> --clip <file to hand out as the replay>
-//! [--config <XDG_CONFIG_HOME>]. With --config it logs its encoders as OBS does (`encoders` in
-//! the record folder, x264 without), and its replay buffer runs only with an encoder `starts`
-//! names (all listed ones without); with one it does not list it never answers, as OBS held by
-//! its "Missing Encoders" dialog.
+//! [--config <XDG_CONFIG_HOME>] [--password <its WebSocket's>] [--profile <name>]. With --config
+//! it logs its encoders as OBS does (`encoders` in the record folder, x264 without), and its
+//! replay buffer runs only with an encoder `starts` names (all listed ones without); with one it
+//! does not list it never answers, as OBS held by its "Missing Encoders" dialog.
 use futures_util::{SinkExt, StreamExt};
 use serde_json::{json, Value};
 use std::path::PathBuf;
@@ -85,6 +85,9 @@ async fn main() {
         Some(c) => start_as_obs(std::path::Path::new(&c), &dir),
         None => true,
     };
+    let password = opt("--password");
+    let profile = opt("--profile").unwrap_or_else(|| "Untitled".into());
+    let (salt, challenge) = ("standin-salt", "standin-challenge");
     let listener = tokio::net::TcpListener::bind(("127.0.0.1", port))
         .await
         .expect("the port");
@@ -97,14 +100,25 @@ async fn main() {
         let Ok(mut ws) = tokio_tungstenite::accept_async(stream).await else {
             continue;
         };
-        let _ = ws
-            .send(send(
-                json!({ "op": 0, "d": { "obsWebSocketVersion": "5.5.2", "rpcVersion": 1 } }),
-            ))
-            .await;
-        let Some(Ok(_identify)) = ws.next().await else {
+        let mut hello =
+            json!({ "op": 0, "d": { "obsWebSocketVersion": "5.5.2", "rpcVersion": 1 } });
+        if password.is_some() {
+            hello["d"]["authentication"] = json!({ "challenge": challenge, "salt": salt });
+        }
+        let _ = ws.send(send(hello)).await;
+        let Some(Ok(identify)) = ws.next().await else {
             continue;
         };
+        if let Some(pw) = &password {
+            let given = serde_json::from_str::<Value>(identify.to_text().unwrap_or("{}"))
+                .ok()
+                .and_then(|v| v["d"]["authentication"].as_str().map(String::from));
+            if given != Some(reel_desktop_core::obs::auth_string(pw, salt, challenge)) {
+                println!("fake obs: a wrong password or none");
+                let _ = ws.close(None).await;
+                continue;
+            }
+        }
         let _ = ws
             .send(send(json!({ "op": 2, "d": { "negotiatedRpcVersion": 1 } })))
             .await;
@@ -134,6 +148,9 @@ async fn main() {
             let mut event = None;
             let data = match kind.as_str() {
                 "GetVersion" => json!({ "obsVersion": "31.0.0", "obsWebSocketVersion": "5.5.2" }),
+                "GetProfileList" => {
+                    json!({ "currentProfileName": profile, "profiles": [profile] })
+                }
                 "GetRecordDirectory" => json!({ "recordDirectory": dir.to_string_lossy() }),
                 "GetReplayBufferStatus" => json!({ "outputActive": runs }),
                 "GetCurrentProgramScene" => {
