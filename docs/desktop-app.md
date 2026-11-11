@@ -227,10 +227,10 @@ releases, and you see each step:
   **Check now** under Settings, Startup, **Updates** asks at once. **New versions** there decides
   what happens with a version found without it: **ask, then install** (the default) asks in a
   notification with **Install now** and **Later**, and at the top of the window's pages while it is
-  open (standalone also on the library), and offers it in the tray menu and on the Updates panel,
-  with the release notes. **Later** asks again a day later, or at the next start; **install when
-  the app quits** downloads it and installs it when you quit from the tray; **off** offers it only
-  on **Check now**.
+  open (the library too, on this PC or on your server), and offers it in the tray menu and on the
+  Updates panel, with the release notes. **Later** asks again a day later, or at the next start;
+  **install when the app quits** downloads it and installs it when you quit from the tray; **off**
+  offers it only on **Check now**.
 - **Before you press Install**, the panel says what happens next and about how long it takes.
   On Windows: reel closes, its installer shows its progress in a small window, and reel opens
   again by itself, in about a minute with reel and half a minute with reel light. A

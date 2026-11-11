@@ -97,7 +97,7 @@ one.
 By default the app asks first: a notification says "reel 1.10.1 is
 ready to install" with **Install now** and **Later**, and while the
 window is open the same question sits at the top of its pages (the app's
-own, and standalone also the library). **Later** asks again a day later,
+own, and the library, on this PC or on your server). **Later** asks again a day later,
 or at the next start; **Check now** asks at once. **Install reel
 1.10.1** also appears in the tray menu and under Settings, Startup,
 **Updates**, which says what Install does before you press it. The app
