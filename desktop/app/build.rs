@@ -87,6 +87,7 @@ const COMMANDS: &[&str] = &[
     "update_check",
     "update_install",
     "update_answer",
+    "update_check_set",
     "open_releases",
     "uninstall",
     "app_status",

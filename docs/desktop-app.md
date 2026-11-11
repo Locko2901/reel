@@ -221,7 +221,8 @@ releases, and you see each step:
   version, and the app takes it only as that version and only when it is newer than its own.
 - **When.** Paired, the app asks its server 45 seconds after it starts, then every six hours.
   Standalone, it asks GitHub only when you ask: **Check now**, or by itself when Settings,
-  **Advanced**, **Check for updates** is on: a minute after the start, then every six hours by the
+  **Advanced**, **Check for updates** is on (the setup's **Look for new versions on GitHub** leaves
+  it on unless you switch it off there): a minute after the start, then every six hours by the
   clock, once a day with **New versions** off ([What leaves your PC](privacy.md#what-leaves-your-pc)).
   **Check now** under Settings, Startup, **Updates** asks at once. **New versions** there decides
   what happens with a version found without it: **ask, then install** (the default) asks in a

@@ -74,9 +74,13 @@ grep -q '"bundled": true' "$D/config/settings.json" && grep -q '"mode": "standal
 xdotool mousemove ${REEL_SETUP_WHERE:-233 273} click 1
 sleep 2
 shot "3-new-install-where"
+# shellcheck disable=SC2086
+xdotool mousemove ${REEL_SETUP_NEW_VERSIONS:-233 305} click 1
+sleep 2
+shot "4-new-install-new-versions"
 stop
 unset REEL_OBS_EXE
-ok "Set it up keeps standalone, the default of Where clips go (shots: the choice, the first step, Where clips go)"
+ok "Set it up keeps standalone, the default of Where clips go (shots: the choice, the first step, Where clips go, New versions)"
 
 D="$W/here"
 L="$D/data/logs"

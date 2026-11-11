@@ -150,6 +150,8 @@ pub struct Status {
     pub update_notes: Option<String>,
     /// What installing the update does, said before it does (Settings, Startup).
     pub update_before: Option<String>,
+    /// Standalone: Settings, Advanced, Check for updates of the library on this PC, once it is up.
+    pub update_check: Option<bool>,
     /// When the server was last asked, in milliseconds since 1970, for the page's clock.
     pub update_checked_at: Option<u64>,
     /// The version this one replaced at its first start after an update.

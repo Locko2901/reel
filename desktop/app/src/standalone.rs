@@ -134,6 +134,31 @@ impl Local {
         })
     }
 
+    /// Settings, Advanced, Check for updates of this library, as the app's setup leaves it. Off
+    /// is standalone's own default, so off takes the library's row away.
+    pub async fn set_update_check(&self, on: bool) -> anyhow::Result<()> {
+        const KEY: &str = "advanced.update_check";
+        let was = self.ctx.config().advanced.update_check;
+        if on {
+            self.ctx.store.set_setting(KEY, "true").await?;
+        } else {
+            self.ctx.store.delete_setting(KEY).await?;
+        }
+        self.ctx
+            .reload()
+            .await
+            .map_err(|e| anyhow::anyhow!("the settings were not read again: {e}"))?;
+        if was != on {
+            let (old, new) = (was.to_string(), on.to_string());
+            self.ctx
+                .store
+                .add_setting_history(KEY, Some(&old), Some(&new), "the app's setup")
+                .await?;
+        }
+        tracing::info!(on, was, "standalone: the setup set Check for updates");
+        Ok(())
+    }
+
     /// This run's key, for the app's own requests that are not its window's.
     pub fn key(&self) -> &str {
         self.state

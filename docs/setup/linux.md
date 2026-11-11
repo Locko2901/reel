@@ -9,7 +9,7 @@ none inside, only the OBS you install.
 You pick one of two ways with OBS:
 
 - **Set it up for me**: reel runs the OBS installed on this PC a second time, with settings of its
-  own (its own profile, scenes, WebSocket and replay buffer), and sets it up in seven steps. Your
+  own (its own profile, scenes, WebSocket and replay buffer), and sets it up in eight steps. Your
   own OBS and its settings stay exactly as they are, and both can run at once: stream or record
   with yours while reel's keeps the replay buffer.
 - **Use my own OBS**: reel connects to your OBS over its WebSocket and uses its replay buffer.
@@ -77,10 +77,11 @@ example "the OBS installed on this PC (/usr/bin/obs)" or "OBS from Flathub".
 
 ### Set it up for me
 
-The same seven steps as on Windows, each with a default, so pressing **Next** through them gives a
-working setup; [All in one](all-in-one.md) walks through them with pictures. The last step,
-**Where clips go**, has **This PC only** chosen: the library on this PC
-([Standalone](standalone.md)). What differs on Linux:
+The same eight steps as on Windows, each with a default, so pressing **Next** through them gives a
+working setup; [All in one](all-in-one.md) walks through them with pictures. **Where clips go**
+has **This PC only** chosen: the library on this PC ([Standalone](standalone.md)); **New
+versions**, after it, looks for new versions on GitHub unless you switch it off. What differs on
+Linux:
 
 - **What to capture**: the screen. On X11, reel's OBS takes it directly. On Wayland it takes it
   through PipeWire: the first time OBS starts, the desktop asks which screen to share. Pick it, and
