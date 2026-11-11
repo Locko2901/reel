@@ -66,7 +66,8 @@ before you begin.
 3. **Hotkeys**: **Save a clip** is Alt+F10. To change it, click the field and press the keys.
    OBS's own **Save Replay** key (in OBS, **Settings**, **Hotkeys**) saves a clip as well: OBS
    saves, and the app takes the clip in. Pick a key here that OBS does not use. With a server (the
-   next step), **Save and share** shows here too.
+   next step), **Save and share** shows here too. **Record a session**, Alt+F9, starts and stops
+   a [session recording](../desktop-app.md#recording-a-whole-session).
 4. **Where clips go**: **This PC only** is chosen already: the library on this PC
    ([Standalone](standalone.md)). For a server, see [Add a server for links](#add-a-server-for-links).
    **Clips folder** is OBS's recording folder, as OBS says; a folder picked here is set in OBS.

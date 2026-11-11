@@ -13,7 +13,7 @@ nothing here can.
 | What | Linux | Wine | Else |
 |---|---|---|---|
 | WebSocket: Hello, Identify with the password, `GetVersion` | connects with the password; the version logged | connects; the version is the pin's | the authentication string against the protocol's (`obs.rs`) |
-| The 26 request types of the code | each in `availableRequests` | each in `availableRequests` | `obs-requests.sh --check` in `make desktop-check` |
+| The 28 request types of the code | each in `availableRequests` | each in `availableRequests` | `obs-requests.sh --check` in `make desktop-check` |
 | WebSocket settings: port 4466, a password, no alerts | `config.json` checked | the app connects with them | `bundled.rs` |
 | `--multi`, its own settings folder | beside the user's OBS, whose files stay the same to the byte | | |
 | `--portable`, `portable_mode.txt` | | the install's layout; the app finds its OBS | `check-installers.sh` |
@@ -36,7 +36,7 @@ nothing here can.
 | Volumes and mute (`SetInputVolume`, `GetInputVolume`, `GetInputMute`) | changed in OBS, read back, kept | | |
 | The microphone's filters: RNNoise, Speex, the gate (`CreateSourceFilter`, `RemoveSourceFilter`, `GetSourceFilterList`) | from the scene file; then the app's own requests set Speex, none, RNNoise and the gate | | `bundled.rs` (`SetSourceFilterEnabled`, the order); NVIDIA's (an RTX card): by hand |
 | The kinds probed (`GetSourceFilterKindList`, `GetInputKindList`) | the probe runs | | `runtime.rs` |
-| A recording stopped (`RecordStateChanged` with its file) | `StartRecord` and `StopRecord` in OBS: the app takes the file | | `obs.rs` |
+| A session recording: `StartRecord`, `StopRecord`, `GetRecordStatus`; `RecordStateChanged` with its file at the start and at the stop; `RecordFileChanged` when OBS splits it | started from the command line beside the running replay buffer, on its encoder (OBS starts no second one), a replay saved during it, the reminder at the minute the setting asks for, stopped by the hotkey: the file taken as a recording, as long as it ran; OBS killed mid recording: the file kept and taken; Quit while recording: stopped first, the file whole; `StartRecord` and `StopRecord` in OBS by hand: followed as a session recording started in OBS | | `obs.rs` (the events as OBS 33 sends them), `session.rs` (the reminders, a start's rules, the disk's room), `check-standalone.sh` (Record in the window, the tray, the hotkey, a start OBS refuses, against the stand-in OBS); a split recording and the user's own OBS: by hand |
 | A scene, an input or a scene item changed (the game read again) | | | `obs.rs` (the subscription) |
 | The meters (`InputVolumeMeters`, while a page shows them) | | | `obs.rs` (the levels in dB); by hand, that they move |
 | reel's hotkeys | Alt+F10 saves | | `check-standalone.sh` (a key changed); Windows': by hand |
@@ -56,5 +56,6 @@ audio on Game and Discord on its own track); the screen without a game, and the 
 and the microphone from the setup's lists; the microphone's noise suppression (RNNoise, Speex,
 and NVIDIA's on an RTX card) and the gate; each GPU encoder the setup offers on that PC, its
 test and a saved clip; Capture games that run as administrator (the copy, the task, OBS's own
-Save hotkey); OBS hidden, Show OBS and Hide OBS, and no question about safe mode after Quit, an
+Save hotkey); a session recording in a game, started and stopped with its hotkey, its reminder
+heard in full screen; OBS hidden, Show OBS and Hide OBS, and no question about safe mode after Quit, an
 update or OBS ended.
