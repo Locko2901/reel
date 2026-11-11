@@ -133,9 +133,11 @@ error appears.
    asks ([What leaves your PC](../privacy.md#what-leaves-your-pc)). With a server this step is
    not there: the server brings the app's updates.
 
+    ![New versions](img/app-setup-8-new-versions.png)
+
 9. **Done** shows a summary. Press **Finish**.
 
-    ![Done, the summary](img/app-setup-8-done.png)
+    ![Done, the summary](img/app-setup-9-done.png)
 
 When it worked, OBS starts with your setup, hidden (no window, no second tray icon), and the window
 opens on your library. From now on OBS starts and stops with the app. If one part could not be
