@@ -21,7 +21,7 @@ downloads, the app on Windows and on Linux, and the server.
   app runs while you are logged in and stops when you quit it), no
   telemetry. The app talks to your server and to OBS on the same PC,
   nothing else; standalone, it asks GitHub for a newer release only when
-  you press **Check now** or turn on the daily check. The server asks
+  you press **Check now** or turn on **Check for updates**. The server asks
   GitHub once a day whether a newer release is out (Settings, Advanced,
   **Check for updates** turns that off), and fetches the app's installers
   of its own version from the release while they are missing (Settings,

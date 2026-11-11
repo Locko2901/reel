@@ -68,6 +68,8 @@ pub struct Ctx {
     pub shutdown: CancellationToken,
     pub cancels: Arc<tokio::sync::Mutex<std::collections::HashMap<String, CancellationToken>>>,
     pub updates: Arc<RwLock<updates::UpdateState>>,
+    /// Held while the releases are read, so a second read waits for it instead.
+    pub update_read: Arc<tokio::sync::Mutex<()>>,
     pub started_at: jiff::Timestamp,
     /// The disks under the Disk warning now, by device: a note when one falls under it.
     pub disk_low: Arc<std::sync::Mutex<std::collections::HashSet<u64>>>,
@@ -100,6 +102,7 @@ impl Ctx {
             shutdown: CancellationToken::new(),
             cancels: Arc::new(tokio::sync::Mutex::new(std::collections::HashMap::new())),
             updates: Arc::new(RwLock::new(updates::UpdateState::default())),
+            update_read: Arc::default(),
             started_at: jiff::Timestamp::now(),
             disk_low: Arc::default(),
             hold_heavy: Arc::new(std::sync::atomic::AtomicBool::new(false)),

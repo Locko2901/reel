@@ -129,14 +129,17 @@ GitHub, and it asks only when you ask:
 - **Check now** under Settings, Startup, **Updates** asks for the newest
   release when you press it.
 - Settings, **Advanced**, **Check for updates** (off in standalone until
-  you turn it on) asks once a day.
+  you turn it on) asks a minute after the start, then once a day. While
+  **New versions** is not off, the app asks again whenever the last
+  answer is six hours old by the clock, so a new version reaches it
+  within hours, also on a PC that sleeps at night.
 
 When a newer reel is out, the update goes as it does for a paired app:
 the app takes the installer of its own package from the release (reel
 for reel, reel light for reel light, the AppImage for the AppImage),
 checks its signature against the key built into it, and **Install**
 puts it in place. **New versions** in the same panel decides what a
-newer release found by the daily check does; **Check now** offers one
+newer release found by **Check for updates** does; **Check now** offers one
 either way. Until the release job has put the installers on a new
 release, the panel says the release has none for this app yet.
 

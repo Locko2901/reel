@@ -87,8 +87,18 @@ pub async fn check_once(ctx: &Ctx) -> UpdateState {
 }
 
 /// The repository's latest release from GitHub's API at `api`; the request carries reel's
-/// version and nothing else.
+/// version and nothing else. One read at a time: an ask while a read runs gets its answer.
 pub async fn check_at(ctx: &Ctx, api: &str) -> UpdateState {
+    let _reading = match ctx.update_read.try_lock() {
+        Ok(held) => held,
+        Err(_) => {
+            tracing::info!(
+                "the releases are being read already: this ask takes that read's answer"
+            );
+            let _done = ctx.update_read.lock().await;
+            return ctx.updates.read().await.clone();
+        }
+    };
     let repo = ctx.config().advanced.update_repo.clone();
     let url = format!("{}/repos/{repo}/releases/latest", api.trim_end_matches('/'));
     let client = reqwest::Client::builder()

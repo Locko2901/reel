@@ -139,8 +139,9 @@ first, and pick that one. The copy's `README.txt` says the same.
 ## New versions
 
 Nothing asks by itself. Under Settings, **Startup**, **Updates**, **Check now** asks
-GitHub for the newest release; Settings, **Advanced**, **Check for updates** asks once a day
-instead, when you turn it on. When a newer reel is out, **Install reel** and the release's notes
+GitHub for the newest release; Settings, **Advanced**, **Check for updates** asks by itself
+instead, when you turn it on: a minute after the start, then every six hours by the clock (once a
+day with **New versions** off). When a newer reel is out, **Install reel** and the release's notes
 appear there and in the tray menu. The app takes the installer of its own package from the
 release (reel, reel light or the AppImage), checks its signature, and puts it in place; your
 settings and your library stay. On Windows, reel closes, its installer shows its progress in a

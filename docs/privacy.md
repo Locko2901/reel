@@ -172,7 +172,10 @@ PC, and the app talks only to OBS on the same PC, over OBS's WebSocket on
 `127.0.0.1`. Nothing leaves the PC, and no update check runs by itself.
 **Check now** under Settings, Startup asks GitHub's public releases for
 the newest version when you press it, and Settings, **Advanced**, **Check
-for updates** turns a daily check on.
+for updates** turns on a check a minute after the start and then once a
+day. While **New versions** is not off, the app asks again whenever the
+last answer is six hours old by the clock, so a new version reaches it
+within hours, also on a PC that sleeps at night.
 
 When that check finds a newer reel, the app reads the signature of its
 installer from the same release, and downloads the installer itself when

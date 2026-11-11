@@ -443,7 +443,7 @@ pub fn help_in(d: &Def, standalone: bool) -> &'static str {
         "media.copy_audio" => "the copies under a size keep the source audio untouched when it is AAC (copy), else AAC at the source rate up to 320; a number forces that AAC rate; only when the video would fall below a watchable floor is the audio stepped down, and the copy says so",
         "media.x264_preset" => "the two-pass libx264 of the copies under a size, when Copies on the GPU is off; slow is about half the speed of medium and worth it at these sizes; faster presets trade quality for time",
         "import.upload_max_gb" => "an upload bigger than this is refused",
-        "advanced.update_check" => "once a day, the newest release of the repository and nothing else; a newer reel for this app is offered under Startup, to install",
+        "advanced.update_check" => "a minute after the start, then every six hours by the clock while New versions under Startup is not off (once a day when it is): the newest release of the repository and nothing else; a newer reel for this app is offered under Startup, to install",
         _ => d.help,
     }
 }

@@ -219,9 +219,12 @@ pub fn panel(st: &Status) -> Panel {
 
 /// Standalone's line about new versions while no update is offered: what reel on this PC's
 /// read of the releases found.
+/// `six_hourly`: the app reads the releases again once a read is six hours old (New versions
+/// not off), else reel on this PC reads them once a day.
 pub fn release_line(
     running: bool,
     check_on: bool,
+    six_hourly: bool,
     latest: Option<&str>,
     error: Option<&str>,
     current: &str,
@@ -235,9 +238,10 @@ pub fn release_line(
             format!("reel {v} is out; Check now offers it to install")
         }
         (Some(v), None) => format!("up to date: {v} is the newest release"),
-        (None, None) if check_on => {
-            "the newest release is read a minute after reel on this PC starts, then once a day".into()
-        }
+        (None, None) if check_on => format!(
+            "the newest release is read a minute after reel on this PC starts, then {}",
+            if six_hourly { "every six hours" } else { "once a day" }
+        ),
         (None, None) => {
             "not asked yet: Check now asks GitHub for the newest release, and nothing asks by itself".into()
         }
@@ -628,32 +632,45 @@ mod tests {
     #[test]
     fn standalone_says_what_the_release_check_read_and_asks_no_server() {
         assert_eq!(
-            release_line(true, true, Some("1.10.0"), None, "1.9.0"),
+            release_line(true, true, false, Some("1.10.0"), None, "1.9.0"),
             "reel 1.10.0 is out; Check now offers it to install"
         );
         assert_eq!(
-            release_line(true, true, Some("1.9.0"), None, "1.9.0"),
+            release_line(true, true, false, Some("1.9.0"), None, "1.9.0"),
             "up to date: 1.9.0 is the newest release"
         );
         assert_eq!(
-            release_line(true, true, Some("1.9.0"), Some("timed out"), "1.9.0"),
+            release_line(true, true, false, Some("1.9.0"), Some("timed out"), "1.9.0"),
             "the releases could not be read: timed out",
             "a read that failed says so, not the read before it"
         );
         assert_eq!(
-            release_line(true, true, None, Some("GitHub answered 503"), "1.9.0"),
+            release_line(
+                true,
+                true,
+                false,
+                None,
+                Some("GitHub answered 503"),
+                "1.9.0"
+            ),
             "the releases could not be read: GitHub answered 503"
         );
-        assert!(release_line(true, true, None, None, "1.9.0").contains("once a day"));
+        assert!(release_line(true, true, false, None, None, "1.9.0").ends_with("then once a day"));
+        assert!(
+            release_line(true, true, true, None, None, "1.9.0").ends_with("then every six hours"),
+            "New versions not off: the app reads again once a read is six hours old"
+        );
         assert_eq!(
-            release_line(true, false, None, None, "1.9.0"),
+            release_line(true, false, false, None, None, "1.9.0"),
             "not asked yet: Check now asks GitHub for the newest release, and nothing asks by itself",
             "the default: nothing asked by itself"
         );
-        assert!(release_line(false, true, None, None, "1.9.0").ends_with("on the releases page"));
+        assert!(
+            release_line(false, true, false, None, None, "1.9.0").ends_with("on the releases page")
+        );
         for line in [
-            release_line(true, true, Some("1.10.0"), None, "1.9.0"),
-            release_line(false, true, None, None, "1.9.0"),
+            release_line(true, true, false, Some("1.10.0"), None, "1.9.0"),
+            release_line(false, true, false, None, None, "1.9.0"),
         ] {
             assert!(
                 !line.contains("server") && !line.contains("paired"),
