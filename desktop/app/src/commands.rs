@@ -248,8 +248,17 @@ pub async fn open_page(rt: State<'_, Runtime>, path: String) -> R<()> {
 }
 
 #[tauri::command]
-pub fn app_status(rt: State<'_, Runtime>) -> R<Value> {
-    Ok(rt.app_status())
+pub fn app_status(webview: tauri::Webview, rt: State<'_, Runtime>) -> R<Value> {
+    Ok(rt.app_status(library_page(&webview, &rt)))
+}
+
+fn library_page(webview: &tauri::Webview, rt: &Runtime) -> bool {
+    let url = webview.url().ok();
+    crate::shell::library_page_of(
+        webview.label(),
+        url.as_ref().map(|u| u.as_str()),
+        &rt.library_base(),
+    )
 }
 
 /// An uncaught error, an unhandled rejection or a script that did not load on a server page.
@@ -283,15 +292,19 @@ pub fn app_save_and_share(rt: State<'_, Runtime>) -> R<()> {
 }
 
 #[tauri::command]
-pub fn app_pause_set(rt: State<'_, Runtime>, paused: bool) -> R<Value> {
+pub fn app_pause_set(webview: tauri::Webview, rt: State<'_, Runtime>, paused: bool) -> R<Value> {
     rt.set_paused(paused);
-    Ok(rt.app_status())
+    Ok(rt.app_status(library_page(&webview, &rt)))
 }
 
 #[tauri::command]
-pub fn app_recording_pause_set(rt: State<'_, Runtime>, paused: bool) -> R<Value> {
+pub fn app_recording_pause_set(
+    webview: tauri::Webview,
+    rt: State<'_, Runtime>,
+    paused: bool,
+) -> R<Value> {
     rt.set_recording_paused(paused);
-    Ok(rt.app_status())
+    Ok(rt.app_status(library_page(&webview, &rt)))
 }
 
 /// Show in folder and Open on a download's toast: only a file this run downloaded, and Open
@@ -657,13 +670,26 @@ pub async fn update_answer(rt: State<'_, Runtime>, install: bool) -> R<()> {
     crate::updates::answer(&rt, install, "the window, on the app's page").await
 }
 
-/// The update's question on the library on this PC, the only one of reel's pages granted it.
+/// The update's question on the library the app shows: on this PC, or on the server it is
+/// paired with.
 #[tauri::command]
-pub async fn app_update_answer(rt: State<'_, Runtime>, install: bool) -> R<()> {
-    if !rt.is_standalone() {
-        return Err("the server's pages do not answer the update's question".into());
+pub async fn app_update_answer(
+    webview: tauri::Webview,
+    rt: State<'_, Runtime>,
+    install: bool,
+) -> R<()> {
+    if !library_page(&webview, &rt) {
+        tracing::warn!(
+            "the update's question answered from another page than the library's: refused"
+        );
+        return Err("only the library's own page answers the update's question".into());
     }
-    crate::updates::answer(&rt, install, "the window, on the library").await
+    let from = if rt.is_standalone() {
+        "the window, on the library"
+    } else {
+        "the window, on the server's library"
+    };
+    crate::updates::answer(&rt, install, from).await
 }
 
 #[tauri::command]

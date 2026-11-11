@@ -37,7 +37,7 @@ export function renderVersions(v, line) {
   if (row) row.textContent = `${v.app}, ${v.kind}${v.obs ? ` (OBS ${v.obs})` : ''}; its updater: ${line || 'not asked yet'}`;
 }
 
-// The update's question, which the app sends only to the library on this PC: Install now, Later.
+// The update's question, which the app sends only to the library's own page: Install now, Later.
 function renderAsk(a) {
   const bar = $('#update-ask');
   if (!bar) return;

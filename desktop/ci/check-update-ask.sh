@@ -4,6 +4,9 @@
 # Install now from the window, the notification and its link starts the install, Later does not,
 # and a link without this run's value does nothing. The release's AppImage is signed with the
 # tests' key, so the release key built into the app refuses it and nothing is replaced.
+# Paired, against REEL_E2E_SERVER: the server's library asks too. Only a server newer than the app
+# offers it an update, with the app's AppImage and its .sig in the server's app-updates folder; a
+# server as new as the app offers none, and that part is left out with a note.
 set -eu
 APP="${1:-/target/debug/reel-desktop}"
 SHOTS="${REEL_SHOTS_OUT:-}"
@@ -193,5 +196,77 @@ ok "Install now on the library: the install starts"
 ! grep -q "panicked" "$W"/app*.out || fail "a thread panicked"
 grep -h "the update's question answered\|the app asks to install\|an update link without" "$L"/reel-desktop.log* | sed 's/^[^ ]* *[A-Z]* /     /'
 ok "nothing replaced the AppImage; every request to the release carried reel's user agent"
+stop
+
+SERVER="${REEL_E2E_SERVER:-}"
+APP_VERSION=$(sed -n 's/^ *"version": *"\([^"]*\)".*/\1/p' /work/desktop/app/tauri.conf.json | head -1)
+SERVER_VERSION=""
+[ -z "$SERVER" ] || SERVER_VERSION=$(curl -fsS --max-time 5 "$SERVER/healthz" 2>/dev/null | sed -n 's/.*"version":"\([^"]*\)".*/\1/p' || true)
+newer() { [ "$1" != "$2" ] && [ "$(printf '%s\n%s\n' "$1" "$2" | sort -V | tail -1)" = "$1" ]; }
+if [ -z "$SERVER_VERSION" ] || ! newer "$SERVER_VERSION" "$APP_VERSION"; then
+  echo "note the paired part needs a server newer than this app ($APP_VERSION) with its AppImage: ${SERVER:-no server} runs ${SERVER_VERSION:-nothing that answers}; left out"
+  echo "the update's question: all checks passed"
+  exit 0
+fi
+USER_NAME="${REEL_E2E_USER:-sam}"
+PASSWORD="${REEL_E2E_PASSWORD:?the password of the demo admin}"
+HOST=$(echo "$SERVER" | sed -E 's#https?://([^/]+).*#\1#; s#:[0-9]+$##')
+JAR="$W/jar"
+curl -fsS -c "$JAR" -o /dev/null "$SERVER/signin"
+curl -fsS -b "$JAR" -c "$JAR" -o /dev/null -H 'Sec-Fetch-Site: same-origin' \
+  --data-urlencode "name=$USER_NAME" --data-urlencode "password=$PASSWORD" --data-urlencode "remember=on" "$SERVER/signin"
+CODE=$(curl -fsS -b "$JAR" -H 'Sec-Fetch-Site: same-origin' -X POST "$SERVER/api/devices/pair-code" | sed -n 's/.*"code":"\([^"]*\)".*/\1/p')
+TOKEN=$(curl -fsS -X POST -H 'content-type: application/json' -d "{\"code\":\"$CODE\",\"name\":\"update question\"}" "$SERVER/api/device/pair" | sed -n 's/.*"token":"\([^"]*\)".*/\1/p')
+[ ${#TOKEN} -eq 43 ] || fail "no token from $SERVER"
+D="$W/paired"
+L="$D/data/logs"
+mkdir -p "$D/config" "$D/data" "$W/clips-paired"
+printf '%s' "$TOKEN" > "$D/config/token"
+chmod 600 "$D/config/token"
+printf '{"server_url":"%s","obs":{"enabled":false},"clips_dir":"%s","clips_follow_obs":false,"startup":{"autostart":false,"elevated":false},"log_level":"info"}' \
+  "$SERVER" "$W/clips-paired" > "$D/config/settings.json"
+export REEL_DESKTOP_DIR="$D"
+start
+waitmore "library loaded at=$HOST/signin" 60 "the server's sign-in page in the window" 0
+size 1280 820
+xdotool windowactivate --sync "$(window)" 2>/dev/null || true
+# shellcheck disable=SC2086
+xdotool mousemove ${REEL_SIGNIN:-640 328} click 1
+xdotool type --delay 30 "$USER_NAME"
+xdotool key Tab
+xdotool type --delay 30 "$PASSWORD"
+xdotool key Return
+waitmore "library loaded at=$HOST/\$" 30 "the server's library after the sign-in" 0
+waitmore "the app asks to install the update" 120 "the paired app did not ask" 0
+grep -h "an update of the app is ready" "$L"/reel-desktop.log* | grep -q 'from="the server"' || fail "the update did not come from the server"
+xdotool mousemove 640 880
+sleep 4
+shot "update-ask-server-library-1280x820-dark"
+size 720 820
+shot "update-ask-server-library-720x820-dark"
+size 1280 820
+sleep 2
+ok "paired with $SERVER ($SERVER_VERSION): the server offered its version, and the app asked (shots of the server's library)"
+installs=$(logged "installing the update")
+fails=$(logged "the update did not download")
+# shellcheck disable=SC2086
+xdotool mousemove ${REEL_ASK_INSTALL:-1155 86} click 1
+waitmore "the update.s question answered: Install now.* from=\"the window, on the server's library\"" 20 "Install now on the server's library" 0
+waitmore "installing the update" 30 "Install now on the server's library did not start the install" "$installs"
+waitmore "the update did not download" 30 "the server's AppImage was not refused" "$fails"
+ok "Install now on the server's library: the install starts, and the release key refuses the tests' AppImage"
+installs=$(logged "installing the update")
+xdotool mousemove 640 880
+sleep 4
+# shellcheck disable=SC2086
+xdotool mousemove ${REEL_ASK_LATER:-1224 86} click 1
+waitmore "the update.s question answered: Later.* from=\"the window, on the server's library\"" 20 "Later on the server's library" 0
+sleep 2
+[ "$(logged "installing the update")" -eq "$installs" ] || fail "Later on the server's library started the install"
+xdotool mousemove 640 880
+sleep 3
+shot "update-ask-server-library-after-later-1280x820-dark"
+! grep -q "panicked" "$W"/app*.out || fail "a thread panicked"
+ok "Later on the server's library: answered, nothing installed"
 stop
 echo "the update's question: all checks passed"

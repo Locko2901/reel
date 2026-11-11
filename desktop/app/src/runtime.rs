@@ -1012,8 +1012,9 @@ impl Runtime {
         tray::refresh(&self.app, &st);
     }
 
-    /// What a reel page inside the app may know: no URL, no path, no setting value.
-    pub fn app_status(&self) -> serde_json::Value {
+    /// What a reel page inside the app may know: no URL, no path, no setting value. `own`: the
+    /// library's own page, which alone may answer the update's question.
+    pub fn app_status(&self, own: bool) -> serde_json::Value {
         static FIRST: std::sync::Once = std::sync::Once::new();
         FIRST.call_once(|| tracing::info!("the server's page reached the app"));
         self.page_alive();
@@ -1037,8 +1038,7 @@ impl Runtime {
             "version": st.version,
             "versions": st.versions,
             "update_line": st.update_line,
-            // only the library on this PC is granted the answer
-            "update_ask": st.update_ask.as_ref().filter(|_| st.mode == "standalone"),
+            "update_ask": st.update_ask.as_ref().filter(|_| own),
         })
     }
 

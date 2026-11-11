@@ -34,9 +34,33 @@ const REMOTE_PERMISSIONS: [&str; 9] = [
     "allow-app-download-open",
 ];
 
-/// What the library on this PC may ask besides: its files open where they are, and the answer
-/// to the update's question.
-const STANDALONE_PERMISSIONS: [&str; 2] = ["allow-app-library-open", "allow-app-update-answer"];
+/// What the library the app shows may ask besides, on this PC or on the server it is paired
+/// with: the answer to the update's question.
+const LIBRARY_PERMISSIONS: [&str; 1] = ["allow-app-update-answer"];
+
+/// What the library on this PC may ask besides: its files open where they are.
+const STANDALONE_PERMISSIONS: [&str; 1] = ["allow-app-library-open"];
+
+/// What an origin's pages are granted: the remote commands, and the library's own once it is
+/// the library the app shows now (`base`).
+fn grants(origin: &str, standalone: bool, base: &str) -> Vec<&'static str> {
+    let mut all = REMOTE_PERMISSIONS.to_vec();
+    if origin_of(base).as_deref() == Some(origin) {
+        all.extend(LIBRARY_PERMISSIONS);
+        if standalone {
+            all.extend(STANDALONE_PERMISSIONS);
+        }
+    }
+    all
+}
+
+/// Whether a command comes from the library's own page: the library's webview, on the origin of
+/// the library the app shows now. A grant is never taken back, so a command of the library's
+/// asks this too.
+pub fn library_page_of(label: &str, url: Option<&str>, base: &str) -> bool {
+    let here = origin_of(base);
+    label == LIBRARY && here.is_some() && url.and_then(origin_of) == here
+}
 
 /// Every page's uncaught errors, unhandled rejections and scripts that did not load go to the
 /// app's Log; installed before the page's own scripts, so a page that never starts tells why.
@@ -185,23 +209,21 @@ pub fn allow_origin(app: &AppHandle, base_url: &str) {
         .local(false)
         .webview(LIBRARY)
         .remote(format!("{origin}/*"));
-    for p in REMOTE_PERMISSIONS {
+    let (standalone, base) = app
+        .try_state::<Runtime>()
+        .map(|rt| (rt.is_standalone(), rt.library_base()))
+        .unwrap_or_default();
+    let granted = grants(&origin, standalone, &base);
+    let own = granted.len() > REMOTE_PERMISSIONS.len();
+    let count = granted.len();
+    for p in granted {
         cap = cap.permission(p);
-    }
-    let own = app.try_state::<Runtime>().is_some_and(|rt| {
-        rt.is_standalone() && origin_of(&rt.library_base()).as_deref() == Some(origin.as_str())
-    });
-    if own {
-        for p in STANDALONE_PERMISSIONS {
-            cap = cap.permission(p);
-        }
     }
     match app.add_capability(cap) {
         Ok(()) => tracing::info!(
             %origin,
             own,
-            "the server's pages may call the app's {} commands",
-            REMOTE_PERMISSIONS.len() + if own { STANDALONE_PERMISSIONS.len() } else { 0 }
+            "the server's pages may call the app's {count} commands"
         ),
         Err(e) => tracing::warn!(%origin, error = %e, "the server's pages got no capability"),
     }
@@ -644,6 +666,77 @@ mod tests {
 
     fn url(s: &str) -> Url {
         s.parse().expect("a url")
+    }
+
+    #[test]
+    fn the_update_answer_is_granted_to_the_library_the_app_shows_and_opening_files_to_this_pcs_alone(
+    ) {
+        let answer = "allow-app-update-answer";
+        let open = "allow-app-library-open";
+        let server = "https://clips.example.com";
+        let paired = grants(server, false, "https://clips.example.com/");
+        assert!(
+            paired.contains(&answer) && !paired.contains(&open),
+            "{paired:?}"
+        );
+        assert!(REMOTE_PERMISSIONS.iter().all(|p| paired.contains(p)));
+        let other = grants("https://other.example.com", false, server);
+        assert_eq!(
+            other,
+            REMOTE_PERMISSIONS.to_vec(),
+            "another server's pages: the remote commands alone"
+        );
+        let here = grants("http://127.0.0.1:41234", true, "http://127.0.0.1:41234");
+        assert!(here.contains(&answer) && here.contains(&open), "{here:?}");
+        assert!(
+            !grants("http://127.0.0.1:41235", true, "http://127.0.0.1:41234").contains(&answer),
+            "an earlier run's port"
+        );
+        assert!(
+            !grants(server, true, "http://127.0.0.1:41234").contains(&answer),
+            "the server's pages while the app runs standalone"
+        );
+        assert_eq!(grants(server, false, ""), REMOTE_PERMISSIONS.to_vec());
+    }
+
+    #[test]
+    fn only_the_librarys_own_page_answers_the_question() {
+        let base = "https://clips.example.com";
+        assert!(library_page_of(
+            LIBRARY,
+            Some("https://clips.example.com/clips/01J"),
+            base
+        ));
+        assert!(library_page_of(
+            LIBRARY,
+            Some("http://127.0.0.1:41234/"),
+            "http://127.0.0.1:41234"
+        ));
+        assert!(
+            !library_page_of(LIBRARY, Some("https://old.example.com/"), base),
+            "a server the app was paired with before keeps its grant, not the answer"
+        );
+        assert!(!library_page_of(
+            LIBRARY,
+            Some("http://clips.example.com/"),
+            base
+        ));
+        assert!(!library_page_of(
+            LIBRARY,
+            Some("https://clips.example.com:8443/"),
+            base
+        ));
+        assert!(!library_page_of(
+            "other",
+            Some("https://clips.example.com/"),
+            base
+        ));
+        assert!(!library_page_of(LIBRARY, None, base));
+        assert!(!library_page_of(
+            LIBRARY,
+            Some("https://clips.example.com/"),
+            ""
+        ));
     }
 
     #[test]

@@ -278,8 +278,9 @@ desktop-standalone: desktop-linux ## Standalone in the app under Xvfb, where a n
 	$(DESKTOP_RUN) -w /work -e XVFB_SCREEN=1280x900 -e REEL_SHOTS_OUT $(DESKTOP_IMAGE) /work/desktop/ci/xvfb.sh run sh /work/desktop/ci/check-standalone.sh
 
 .PHONY: desktop-update-ask
-desktop-update-ask: desktop-linux ## The update's question under Xvfb: Install now and Later from the window and the notification, a release on the loopback
-	$(DESKTOP_RUN) -w /work -e XVFB_SCREEN=1280x900 -e REEL_SHOTS_OUT $(DESKTOP_IMAGE) /work/desktop/ci/xvfb.sh run sh /work/desktop/ci/check-update-ask.sh
+desktop-update-ask: desktop-linux ## The update's question under Xvfb: standalone from a release on the loopback; paired from a demo newer than the app (REEL_E2E_*)
+	$(DESKTOP_RUN) -w /work -e XVFB_SCREEN=1280x900 -e REEL_SHOTS_OUT -e REEL_E2E_SERVER=$(REEL_E2E_SERVER) -e REEL_E2E_USER=$(REEL_E2E_USER) \
+	  -e REEL_E2E_PASSWORD="$(REEL_E2E_PASSWORD)" $(DESKTOP_IMAGE) /work/desktop/ci/xvfb.sh run sh /work/desktop/ci/check-update-ask.sh
 
 .PHONY: desktop-encoder-test
 ENCODER_SHOTS ?= shots/encoder-test
