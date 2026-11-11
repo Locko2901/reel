@@ -645,6 +645,12 @@ pub async fn update_install(rt: State<'_, Runtime>) -> R<()> {
     crate::updates::install_now(&rt).await
 }
 
+/// The setup's Look for new versions on GitHub.
+#[tauri::command]
+pub async fn update_check_set(rt: State<'_, Runtime>, on: bool) -> R<()> {
+    rt.set_update_check(on).await
+}
+
 /// The update's question on the app's own pages: Install now or Later.
 #[tauri::command]
 pub async fn update_answer(rt: State<'_, Runtime>, install: bool) -> R<()> {

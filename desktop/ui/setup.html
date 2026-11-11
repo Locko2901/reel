@@ -23,7 +23,7 @@
 
       <section data-step="choose">
         <h1 id="choose-title">reel's own OBS</h1>
-        <p class="intro" id="choose-intro">OBS came with this app, as its makers publish it, to keep the replay buffer reel saves clips from. reel can run it for you, hidden, and set it up in seven short steps, each with a default: Next, Next, Done gives a working setup, and everything stays changeable under This app, OBS.</p>
+        <p class="intro" id="choose-intro">OBS came with this app, as its makers publish it, to keep the replay buffer reel saves clips from. reel can run it for you, hidden, and set it up in <span class="steps-count">eight</span> short steps, each with a default: Next, Next, Done gives a working setup, and everything stays changeable under This app, OBS.</p>
         <div class="panel">
           <div class="body flush">
             <div class="srow"><div class="slabel"><b>Set it up for me</b><span class="shelp" id="choose-bundled-help">recommended: reel starts the OBS that came with it, hidden, with the app, and writes its settings from these steps; anything can be changed in OBS itself later</span></div><div class="sctl"><button class="primary" id="choose-bundled" type="button">Set it up</button></div></div>
@@ -150,6 +150,16 @@
             <div class="srow" id="server-row"><div class="slabel"><b>Server URL</b><span class="shelp">such as https://clips.example.com</span></div><div class="sctl"><input type="text" class="in-path mono" id="server-url" aria-label="Server URL"></div></div>
             <div class="srow" id="pair-row"><div class="slabel"><b>Pairing code</b><span class="shelp">on the server: Settings, Devices, Pair a device</span></div><div class="sctl"><input type="text" class="in-short mono" id="pair-code" placeholder="abcd-2345" aria-label="Pairing code" autocomplete="off"><button class="primary" id="pair-btn" type="button">Pair</button><span class="err" id="pair-err" hidden></span></div></div>
             <div class="srow"><div class="slabel"><b>Clips folder</b><span class="shelp" id="clips-dir-help">where OBS writes the clips; reel takes each one into the library on this PC</span></div><div class="sctl"><span class="ctl-group in-path"><input type="text" class="mono" id="clips-dir" aria-label="Clips folder"><button type="button" id="clips-browse">Browse</button></span></div></div>
+          </div>
+        </div>
+      </section>
+
+      <section data-step="look" hidden>
+        <h1>New versions</h1>
+        <p class="intro">reel can look for a newer version by itself. When one is out, it asks before it installs it: in a notification and at the top of the window, with Install now and Later.</p>
+        <div class="panel">
+          <div class="body flush">
+            <div class="srow" id="look-row"><div class="slabel"><b>Look for new versions on GitHub</b><span class="shelp">one request for the newest release of reel's repository, with reel's version and nothing else: a minute after reel on this PC starts, then every six hours by the clock, once a day with New versions off; Settings, Advanced, Check for updates changes it later</span></div><div class="sctl"><button type="button" class="switch" role="switch" aria-checked="true" id="look" aria-label="Look for new versions on GitHub"><i></i></button></div></div>
           </div>
         </div>
       </section>

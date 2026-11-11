@@ -53,8 +53,8 @@ Devices, **reel, for Windows**.
 
 The first page offers three ways:
 
-- **Set it up for me** (recommended): press **Set it up**. Seven short steps follow, each with a
-  sensible default, so pressing **Next** through them gives a working setup. Everything stays
+- **Set it up for me** (recommended): press **Set it up**. Eight short steps follow (seven with a
+  server), each with a sensible default, so pressing **Next** through them gives a working setup. Everything stays
   changeable later under Settings, **OBS**.
 - **Use my own OBS**: for an OBS you have set up already. The app connects to it as in
   [Your own OBS](own-obs.md).
@@ -127,7 +127,13 @@ error appears.
 
     ![Where clips go](img/app-setup-7-where.png)
 
-8. **Done** shows a summary. Press **Finish**.
+8. **New versions**: **Look for new versions on GitHub** is on. The app then asks GitHub for
+   reel's newest release, with reel's version and nothing else, a minute after the start and
+   then every six hours, and asks you before it installs one; switched off, only **Check now**
+   asks ([What leaves your PC](../privacy.md#what-leaves-your-pc)). With a server this step is
+   not there: the server brings the app's updates.
+
+9. **Done** shows a summary. Press **Finish**.
 
     ![Done, the summary](img/app-setup-8-done.png)
 

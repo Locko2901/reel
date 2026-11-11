@@ -108,6 +108,8 @@ pub struct Inner {
     /// This run's value in the links of the update's question, which a web page cannot know.
     pub update_value: String,
     pub update_checked_at: Option<std::time::SystemTime>,
+    /// The setup's Look for new versions on GitHub, made before reel on this PC was up.
+    pub update_check_pending: Option<bool>,
     /// The version this one replaced, at its first start after an update.
     pub updated_from: Option<String>,
     /// Standalone mode: reel in this process, once it is up.
@@ -479,6 +481,7 @@ impl Runtime {
             update_later: None,
             update_value: reel_core::ids::new_token(),
             update_checked_at: None,
+            update_check_pending: None,
             updated_from: None,
             local: None,
             local_line: String::new(),
@@ -971,6 +974,10 @@ impl Runtime {
                 let on_quit = g.settings.updates == UpdateMode::OnQuit && g.update_bytes.is_some();
                 reel_desktop_core::update_steps::before(&u.version, kind, on_quit)
             }),
+            update_check: g
+                .local
+                .as_ref()
+                .map(|l| l.ctx.config().advanced.update_check),
             update_checked_at: g
                 .update_checked_at
                 .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
@@ -3221,13 +3228,21 @@ impl Runtime {
             match Local::start(&s).await {
                 Ok(local) => {
                     let local = Arc::new(local);
-                    let wanted = {
+                    let (wanted, look) = {
                         let mut g = rt.lock();
                         g.local_line = format!("reel on {} with {}", local.addr, local.backend);
                         local.hold(g.paused_fullscreen);
                         g.local = Some(local.clone());
-                        (g.settings.mode == Mode::Standalone).then(|| g.library_wanted.up())
+                        (
+                            (g.settings.mode == Mode::Standalone).then(|| g.library_wanted.up()),
+                            g.update_check_pending.take(),
+                        )
                     };
+                    if let Some(on) = look {
+                        if let Err(e) = local.set_update_check(on).await {
+                            tracing::warn!(error = %e, "the setup's Check for updates was not set");
+                        }
+                    }
                     rt.watch_library(local);
                     if let Some(wanted) = wanted {
                         match wanted {
@@ -3935,6 +3950,34 @@ impl Runtime {
     }
 
     /// The library webview's base: the local reel in standalone, the server otherwise.
+    /// The setup's Look for new versions on GitHub: Settings, Advanced, Check for updates in the
+    /// library on this PC, now or once reel on this PC is up.
+    pub async fn set_update_check(&self, on: bool) -> Result<(), String> {
+        let local = {
+            let mut g = self.lock();
+            if g.settings.mode != Mode::Standalone {
+                return Err("the app takes its updates from its server".into());
+            }
+            match g.local.clone() {
+                Some(local) => local,
+                None => {
+                    g.update_check_pending = Some(on);
+                    tracing::info!(
+                        on,
+                        "the setup's Check for updates waits for reel on this PC"
+                    );
+                    return Ok(());
+                }
+            }
+        };
+        local
+            .set_update_check(on)
+            .await
+            .map_err(|e| format!("Check for updates was not set: {e}"))?;
+        self.push_status();
+        Ok(())
+    }
+
     pub fn library_base(&self) -> String {
         let g = self.lock();
         if g.settings.mode == Mode::Standalone {

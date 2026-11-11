@@ -202,6 +202,7 @@ pub fn run() {
             commands::update_check,
             commands::update_install,
             commands::update_answer,
+            commands::update_check_set,
             commands::app_update_answer,
             commands::open_releases,
         ])

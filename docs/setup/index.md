@@ -9,7 +9,7 @@ Pick the guide for your PC. Each one ends with your first clip in the library.
 
 | Your PC | Guide |
 |---|---|
-| Windows, without OBS, or with an OBS you would rather leave alone | [All in one](all-in-one.md): **reel** brings its own OBS and sets it up in seven short steps |
+| Windows, without OBS, or with an OBS you would rather leave alone | [All in one](all-in-one.md): **reel** brings its own OBS and sets it up in eight short steps |
 | Windows, with OBS set up the way you like it | [Your own OBS](own-obs.md): **reel light** connects to your OBS |
 | Linux | [Linux](linux.md): the AppImage or the `.deb`, with the OBS you installed |
 

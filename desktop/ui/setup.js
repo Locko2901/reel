@@ -8,8 +8,11 @@ import { bindObsBar, renderObsBar } from './obsbar.js';
 import { bindAsk, renderAsk } from './ask.js';
 import { audioPlan, meterIn, renderLevelRows, wordsInto } from './sources.js';
 
-const GUIDED = [['length', 'Clip length'], ['quality', 'Quality'], ['encoder', 'Encoder'], ['capture', 'What to capture'], ['audio', 'Audio'], ['hotkeys', 'Hotkeys'], ['where', 'Where clips go'], ['done', 'Done']];
-const steps = () => GUIDED;
+const GUIDED = [['length', 'Clip length'], ['quality', 'Quality'], ['encoder', 'Encoder'], ['capture', 'What to capture'], ['audio', 'Audio'], ['hotkeys', 'Hotkeys'], ['where', 'Where clips go'], ['look', 'New versions'], ['done', 'Done']];
+// New versions is standalone's: a paired app takes its updates from its server.
+const steps = () => (settings && settings.mode !== 'standalone' ? GUIDED.filter(([k]) => k !== 'look') : GUIDED);
+const COUNT = { 7: 'seven', 8: 'eight' };
+const stepsCount = () => COUNT[steps().length - 1] || String(steps().length - 1);
 const QUALITY = { light: 'Light: 1080p30', smooth: 'Smooth: 1080p60', sharp: 'Sharp: 1440p60', native: 'Native: your screen', custom: 'As set in OBS' };
 const FORMAT = { hybrid_mp4: 'hybrid MP4', mkv: 'MKV' };
 let settings = null;
@@ -18,6 +21,11 @@ let screens = [];
 let encoders = null;
 let suggested = null;
 let step = 'choose';
+// Look for new versions on GitHub: on in a first setup; a setup run again shows the library's
+// own Check for updates and writes it only when it is changed here.
+let look = null;
+const lookOn = () => look ?? (setup().done ? !!(status && status.update_check) : true);
+const lookWords = () => (lookOn() ? 'looked for on GitHub a minute after reel on this PC starts, then every six hours' : 'only when you press Check now, under Settings, Startup');
 let seen = new Set();
 const setup = () => settings.obs.setup;
 
@@ -60,6 +68,12 @@ function renderSteps() {
     a.append(n, w);
     nav.append(a);
   });
+}
+
+function stepLine() {
+  const at = steps().findIndex(([k]) => k === step);
+  $('#back').hidden = at <= 0;
+  $('#step-line').textContent = at >= 0 ? `step ${at + 1} of ${steps().length}` : '';
 }
 
 async function video() {
@@ -515,6 +529,10 @@ function fillHotkey(row) {
   keycaps($('button.hotkey', row), v);
 }
 
+function renderLook() {
+  setOn($('#look'), lookOn());
+}
+
 function renderWhere() {
   const local = settings.mode === 'standalone';
   pressed($('#where-seg'), 'where', local ? 'local' : 'server');
@@ -549,17 +567,20 @@ async function renderDone() {
     ['Clips go to', settings.mode === 'standalone' ? 'this PC only: the library in the app, on this PC' : (status && status.paired ? (status.server_name || status.server_url) : `${settings.server_url || 'no server yet'}, not paired yet`)],
     ['Clips folder', settings.clips_dir],
   ];
+  const here = settings.mode === 'standalone';
+  if (here) rows.push(['New versions', lookWords()]);
   if (s.elevated) rows.push(['Games run as administrator', 'OBS from a copy in Program Files that only an administrator can change, started with the highest rights by a task at sign-in; Windows asks once, at Finish']);
   const kv = $('#summary');
   kv.replaceChildren();
   for (const [k, val] of rows) {
     const dt = document.createElement('dt'); dt.textContent = k;
     const dd = document.createElement('dd'); dd.textContent = val;
+    if (k === 'New versions') dd.id = 'summary-look';
     kv.append(dt, dd);
   }
 }
 
-const RENDER = { length: renderLength, quality: renderQuality, encoder: renderEncoders, capture: renderCapture, audio: renderAudio, hotkeys: renderHotkeys, where: renderWhere, done: renderDone };
+const RENDER = { length: renderLength, quality: renderQuality, encoder: renderEncoders, capture: renderCapture, audio: renderAudio, hotkeys: renderHotkeys, where: renderWhere, look: renderLook, done: renderDone };
 
 function go(id) {
   if (step === 'audio' && id !== 'audio') invoke('obs_meters', { on: false }).catch(() => {});
@@ -568,10 +589,8 @@ function go(id) {
   $('#wizard').dataset.step = id;
   $$('section[data-step]').forEach((s) => { s.hidden = s.dataset.step !== id; });
   $('#footer').hidden = id === 'choose';
-  const at = steps().findIndex(([k]) => k === id);
-  $('#back').hidden = at <= 0;
   $('#next').textContent = id === 'done' ? 'Finish' : 'Next';
-  $('#step-line').textContent = at >= 0 ? `step ${at + 1} of ${steps().length}` : '';
+  stepLine();
   $('#finish-err').hidden = true;
   devicesTried = 0;
   renderSteps();
@@ -608,6 +627,8 @@ async function finish() {
 async function saveAndLeave() {
   const err = $('#finish-err');
   const wantElevated = !!setup().elevated;
+  const lookWrite = settings.mode === 'standalone' && (!setup().done || look !== null);
+  const lookWanted = lookOn();
   settings.obs.bundled = true;
   settings.obs.setup_later = false;
   setup().done = true;
@@ -620,6 +641,7 @@ async function saveAndLeave() {
     } else { failed(err, why); setup().done = false; return; }
   }
   invoke('obs_meters', { on: false }).catch(() => {});
+  if (lookWrite) await invoke('update_check_set', { on: lookWanted }).catch((e) => toast(String(e.message || e), 'err'));
   const ready = settings.mode === 'standalone' || (status && status.paired);
   const to = { view: ready ? 'library' : 'settings', section: ready ? null : 'server' };
   if (wantElevated && !settings.obs.setup.elevated) {
@@ -677,6 +699,11 @@ function bind() {
   $('#encoders-again').onclick = testEncoders;
   $('#encoder').onchange = () => { setup().encoder = $('#encoder').value; };
   $('#game').addEventListener('change', () => { setup().game = isOn($('#game')); });
+  $('#look').addEventListener('change', () => {
+    look = isOn($('#look'));
+    const line = $('#summary-look');
+    if (line) line.textContent = lookWords();
+  });
   $('#elevated').addEventListener('change', () => { setup().elevated = isOn($('#elevated')); });
   $('#screen').onchange = () => { const sc = screens.find((x) => x.id === $('#screen').value); if (sc) setup().screen = sc; };
   $('#desktop-audio').onchange = () => {
@@ -730,7 +757,7 @@ function bind() {
   recordersOffOnLeave();
   $('#where-seg').addEventListener('click', (e) => {
     const b = e.target.closest('button[data-where]');
-    if (b) { settings.mode = b.dataset.where === 'local' ? 'standalone' : 'connected'; renderWhere(); }
+    if (b) { settings.mode = b.dataset.where === 'local' ? 'standalone' : 'connected'; renderWhere(); renderSteps(); stepLine(); }
   });
   $('#server-url').onchange = () => { settings.server_url = $('#server-url').value.trim(); };
   $('#clips-dir').onchange = () => { settings.clips_dir = $('#clips-dir').value.trim(); };
@@ -807,8 +834,9 @@ async function main() {
     }
   });
   setInterval(renderObsNotice, 1000);
+  $$('.steps-count').forEach((n) => { n.textContent = stepsCount(); });
   if (linux()) {
-    $('#choose-intro').textContent = `reel found ${status.obs_which} and can run it a second time with settings of its own (its own profile, scenes, WebSocket and replay buffer), set up in seven short steps, each with a default. Your own OBS and its settings stay as they are, and both can run at once.`;
+    $('#choose-intro').textContent = `reel found ${status.obs_which} and can run it a second time with settings of its own (its own profile, scenes, WebSocket and replay buffer), set up in ${stepsCount()} short steps, each with a default. Your own OBS and its settings stay as they are, and both can run at once.`;
     $('#setup-of').textContent = 'setup of reel\'s own OBS';
     $('#choose-own-help').textContent = 'for an OBS set up already: reel connects to it over its WebSocket and uses its replay buffer. Discord turns on its Streamer Mode while it sees your OBS running; its Streamer Mode settings, Automatically Enable/Disable, turn that off';
     if (status.discord_note) $('#choose-intro').textContent += ` ${status.discord_note}`;
