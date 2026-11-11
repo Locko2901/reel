@@ -77,7 +77,7 @@ pub struct Inner {
     pub waited_running: HashMap<PathBuf, watch::Sender<bool>>,
     pub paused_by_user: bool,
     pub paused_fullscreen: bool,
-    /// Pause recording, for this run only: a start of the app records again.
+    /// Pause clips, for this run only: a start of the app records again.
     pub recording_paused: bool,
     /// A session recording that runs, once OBS said so.
     pub session: Option<reel_desktop_core::session::Recording>,
@@ -676,7 +676,7 @@ impl Runtime {
         } else if g.recording_paused {
             (
                 "paused",
-                "recording paused".to_string(),
+                "clips paused".to_string(),
                 "the replay buffer is stopped".to_string(),
             )
         } else if let Some(o) = g.offline.as_ref().filter(|o| o.page_error) {
@@ -2829,8 +2829,8 @@ impl Runtime {
         }
     }
 
-    /// The replay buffer as Pause recording and the setting "start the replay buffer" want it:
-    /// stopped while recording is paused, else started when it is off and OBS is not recording.
+    /// The replay buffer as Pause clips and the setting "start the replay buffer" want it:
+    /// stopped while clips are paused, else started when it is off and OBS is not recording.
     pub async fn ensure_replay_buffer(&self, st: &ObsState) {
         if self.lock().encoder_trial.is_some() {
             return;
@@ -2845,7 +2845,7 @@ impl Runtime {
 
     async fn stop_replay_buffer(&self) {
         match self.obs_command(ObsCommand::StopReplayBuffer).await {
-            Ok(()) => tracing::info!("the replay buffer was stopped: recording is paused"),
+            Ok(()) => tracing::info!("the replay buffer was stopped: clips are paused"),
             Err(e) => tracing::warn!(error = %e, "the replay buffer did not stop"),
         }
         let _ = self.obs_state(true).await;
@@ -3635,16 +3635,16 @@ impl Runtime {
         });
     }
 
-    /// A save while recording is paused saves nothing and says so.
+    /// A save while clips are paused saves nothing and says so.
     fn recording_is_paused(&self) -> bool {
         if !self.lock().recording_paused {
             return false;
         }
-        tracing::info!("no replay saved: recording is paused");
+        tracing::info!("no replay saved: clips are paused");
         notify::show(
             &self.app,
             "No replay saved",
-            "Recording is paused; Resume recording in the tray or in the app's window records again.",
+            "Clips are paused: Resume clips in the tray or in the app's window starts the replay buffer again.",
         );
         true
     }
@@ -3972,10 +3972,10 @@ impl Runtime {
         self.push_status();
     }
 
-    /// Pause recording stops OBS's replay buffer and keeps it stopped, which gives back its
-    /// encoder and its memory; Resume recording starts it again.
+    /// Pause clips stops OBS's replay buffer and keeps it stopped, which gives back its
+    /// encoder and its memory; Resume clips starts it again.
     pub fn set_recording_paused(&self, paused: bool) {
-        tracing::info!(paused, "recording paused by the user");
+        tracing::info!(paused, "clips paused by the user");
         {
             let mut g = self.lock();
             g.recording_paused = paused;

@@ -12,7 +12,7 @@ pub struct Proc {
 }
 
 /// Starts OBS hidden: Windows gives the start's show state to the first window a program shows.
-/// Starts OBS; without `replay` it leaves its replay buffer off, as while recording is paused.
+/// Starts OBS; without `replay` it leaves its replay buffer off, as while clips are paused.
 pub fn spawn(b: &Bundled, replay: bool) -> std::io::Result<Proc> {
     sys::spawn(b, replay)
 }

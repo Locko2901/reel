@@ -512,23 +512,23 @@ filters() { # filters <noise> <gate|no-gate>: the requests the app builds for th
 [ "$(filters rnnoise gate)" = "noise_suppress_filter_v2:rnnoise:True noise_gate_filter::True" ] || fail "RNNoise and the gate, as the app asks for them: $(filters rnnoise gate)"
 ok "the microphone's filters as the app's requests set them in OBS: Speex alone, none, then RNNoise and the gate again"
 
-say "Pause recording stops OBS's replay buffer and a save while paused saves nothing; Resume starts it"
+say "Pause clips stops OBS's replay buffer and a save while paused saves nothing; Resume clips starts it"
 wait_for 20 "the replay buffer to run before the pause" buffer_is true
 "$APP" --pause-recording >>"$ROOT/app.out" 2>&1 || true
 wait_for 20 "the replay buffer to stop" buffer_is false
-log_has "the replay buffer was stopped: recording is paused" || fail "the app did not say why the buffer stopped"
+log_has "the replay buffer was stopped: clips are paused" || fail "the app did not say why the buffer stopped"
 n=$(log_n "obs saved a replay")
 xdotool key --clearmodifiers alt+F10
-wait_for 10 "the Save hotkey to say that recording is paused" log_has "no replay saved: recording is paused"
+wait_for 10 "the Save hotkey to say that clips are paused" log_has "no replay saved: clips are paused"
 sleep 3
 [ "$(log_n "obs saved a replay")" -eq "$n" ] || fail "a save while recording was paused saved a replay"
 buffer_is false || fail "the buffer runs again while paused: $(buffer)"
 P=$(obs_pid)
 c=$(log_n "obs connected")
 kill -9 "$P"
-wait_for 30 "OBS to be started again while recording is paused" reel_obs_not "$P"
+wait_for 30 "OBS to be started again while clips are paused" reel_obs_not "$P"
 P=$(obs_pid)
-! tr '\0' ' ' <"/proc/$P/cmdline" | grep -q -- --startreplaybuffer || fail "OBS was started with its replay buffer while recording is paused: $(tr '\0' ' ' <"/proc/$P/cmdline")"
+! tr '\0' ' ' <"/proc/$P/cmdline" | grep -q -- --startreplaybuffer || fail "OBS was started with its replay buffer while clips are paused: $(tr '\0' ' ' <"/proc/$P/cmdline")"
 wait_for 60 "the app to connect again while paused" sh -c "[ \$(cat $LOG/reel-desktop.log* | grep -c 'obs connected') -gt $c ]"
 sleep 5
 buffer_is false || fail "the replay buffer runs after OBS was started again while paused: $(buffer)"
@@ -536,7 +536,7 @@ buffer_is false || fail "the replay buffer runs after OBS was started again whil
 ok "killed while paused: started again without --startreplaybuffer, the buffer stayed stopped (OBS's own log has no Replay Buffer Start)"
 "$APP" --resume-recording >>"$ROOT/app.out" 2>&1 || true
 wait_for 20 "the replay buffer to run again" buffer_is true
-ok "Pause recording: OBS's replay buffer stopped (outputActive false), the Save hotkey saved nothing and said why; Resume recording: it runs again"
+ok "Pause clips: OBS's replay buffer stopped (outputActive false), the Save hotkey saved nothing and said why; Resume clips: it runs again"
 
 n=$(log_n "the bundled OBS started")
 "$APP" --clip-length=25 >>"$ROOT/app.out" 2>&1 || true

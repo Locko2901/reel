@@ -218,16 +218,16 @@ xdotool mousemove ${REEL_CHIP:-1190 24} click 1
 sleep 1
 shot "5-chip"
 xdotool key Escape
-python3 /work/desktop/ci/fake-sni.py click "Pause recording" > /dev/null || fail "the tray has no Pause recording"
-waitlog "recording paused by the user paused=true" 10 "Pause recording did not pause"
+python3 /work/desktop/ci/fake-sni.py click "Pause clips" > /dev/null || fail "the tray has no Pause clips"
+waitlog "clips paused by the user paused=true" 10 "Pause clips did not pause"
 sleep 3
 # shellcheck disable=SC2086
 xdotool mousemove ${REEL_CHIP:-1190 24} click 1
 sleep 1
-shot "5-chip-recording-paused"
+shot "5-chip-clips-paused"
 xdotool key Escape
-python3 /work/desktop/ci/fake-sni.py click "Resume recording" > /dev/null || fail "the tray has no Resume recording"
-waitlog "recording paused by the user paused=false" 10 "Resume recording did not resume"
+python3 /work/desktop/ci/fake-sni.py click "Resume clips" > /dev/null || fail "the tray has no Resume clips"
+waitlog "clips paused by the user paused=false" 10 "Resume clips did not resume"
 # A session recording from the window's Record: the tray and the chip say so, Stop in the window
 # ends it, and the recording is in the library as one.
 for _ in $(seq 1 20); do python3 /work/desktop/ci/fake-sni.py menu > "$W/menu-rec.txt"; grep -qx -- "- idle" "$W/menu-rec.txt" && break; sleep 0.5; done

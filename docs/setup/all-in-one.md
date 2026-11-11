@@ -207,7 +207,7 @@ as well.
   ...; reel's OBS starts once it is closed"), so two captures never run at once.
 - **If OBS crashes**, also when its crash dialog keeps it open, or stops answering for 20
   seconds, the app ends it and starts it again, a little later each time, with the replay buffer
-  as it was: running, or stopped while recording is paused. An OBS that stops again right after
+  as it was: running, or stopped while clips are paused. An OBS that stops again right after
   it starts (twice in a row, or once right after the encoder changed) with an encoder no replay
   was saved with yet counts against that encoder: reel changes it back, as the next point says,
   and says OBS stopped right after it started with it. With the encoder of the last replay it is

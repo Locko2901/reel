@@ -91,7 +91,7 @@ pub struct ObsBox {
 /// What the app sets for the supervisor's next starts.
 #[derive(Clone, Default)]
 struct Flags {
-    /// Recording is paused: OBS starts without its replay buffer.
+    /// Clips are paused: OBS starts without its replay buffer.
     paused: Arc<AtomicBool>,
     /// The starts try an encoder: an exit counts toward neither the fall back nor the tries.
     trial: Arc<AtomicBool>,
@@ -190,7 +190,7 @@ impl ObsBox {
         let _ = self.tx.send(Cmd::Again);
     }
 
-    /// Whether recording is paused, for the next start of OBS.
+    /// Whether clips are paused, for the next start of OBS.
     pub fn paused(&self, yes: bool) {
         self.flags.paused.store(yes, Ordering::Relaxed);
     }
