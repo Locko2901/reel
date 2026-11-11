@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.15.0](https://github.com/Locko2901/reel/compare/v1.14.0...v1.15.0) (2026-11-11)
+
+
+### Features
+
+* a new version asks to be installed, with Install now and Later on its notification and at the top of the window ([21d7775](https://github.com/Locko2901/reel/commit/21d77752dd79c8608879bd6e34f2a1061c5084c3))
+* the library of a paired server asks to install a new version too, with Install now and Later ([69b8103](https://github.com/Locko2901/reel/commit/69b81037f18217e83dedc9b49e83019a35680ec1))
+* the standalone setup asks whether to look for new versions on GitHub, on unless switched off ([cd367f1](https://github.com/Locko2901/reel/commit/cd367f1601597d97acc9801b324b08ab0d151560))
+
+
+### Bug Fixes
+
+* a standalone app with Check for updates on hears of a new release within hours, also after the PC slept ([a3ae5fa](https://github.com/Locko2901/reel/commit/a3ae5fac3ab9b3b4173a33b626ae289381eae229))
+
 ## [1.14.0](https://github.com/Locko2901/reel/compare/v1.13.1...v1.14.0) (2026-11-10)
 
 
