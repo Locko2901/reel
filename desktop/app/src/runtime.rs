@@ -347,7 +347,7 @@ fn relative(ts: jiff::Timestamp) -> String {
     }
 }
 
-/// Standalone: the newest release the local reel's daily check read, and whether it is newer.
+/// Standalone: the newest release the local reel last read, and whether it is newer.
 fn standalone_release(g: &Inner, current: &str) -> (Option<String>, bool) {
     let Some(state) = g
         .local
@@ -369,6 +369,7 @@ fn standalone_update_line(g: &Inner, current: &str) -> String {
     crate::status::release_line(
         local.is_some(),
         local.is_some_and(|l| l.ctx.config().advanced.update_check),
+        g.settings.updates != UpdateMode::Off,
         state
             .as_ref()
             .and_then(|u| u.latest.as_ref().map(|r| r.version.as_str())),

@@ -25,7 +25,7 @@ const EVERY: Duration = Duration::from_secs(6 * 3600);
 
 /// 45 s after the start, then every six hours by the wall clock: a timer stops while the PC
 /// sleeps, so a long one comes days late on a PC that sleeps at night. Standalone also looks
-/// within a minute of each read of the releases by reel on this PC.
+/// within a minute of each read of the releases by reel on this PC, and once that read is old.
 pub fn spawn_checks(rt: Runtime) {
     tauri::async_runtime::spawn(async move {
         tokio::time::sleep(Duration::from_secs(45)).await;
@@ -35,7 +35,7 @@ pub fn spawn_checks(rt: Runtime) {
             }
             loop {
                 tokio::time::sleep(Duration::from_secs(60)).await;
-                if new_read(&rt).await {
+                if new_read(&rt).await || read_is_old(&rt).await {
                     break;
                 }
                 let last = rt.lock().update_checked_at;
@@ -456,6 +456,47 @@ async fn ready(rt: &Runtime, s: &Settings, update: tauri_plugin_updater::Update,
 /// When reel on this PC made the read of the releases the app last looked at.
 static ACTED_ON: Mutex<Option<String>> = Mutex::new(None);
 
+/// How old reel on this PC's read of the releases may be before the app's check reads again.
+const READ_AGAIN: jiff::SignedDuration = jiff::SignedDuration::from_secs(6 * 3600);
+
+/// Whether the app's check reads the releases again: Check for updates on, New versions not
+/// off, and the last read six hours old by the wall clock, or stamped after now (the clock went
+/// back). Before any read it waits: reel on this PC reads a minute after it starts.
+fn read_again(
+    check_on: bool,
+    mode: UpdateMode,
+    read_at: Option<&str>,
+    now: jiff::Timestamp,
+) -> bool {
+    if !check_on || mode == UpdateMode::Off {
+        return false;
+    }
+    let Some(at) = read_at else {
+        return false;
+    };
+    reel_core::format::parse(at).is_none_or(|t| {
+        let age = now.duration_since(t);
+        age.is_negative() || age >= READ_AGAIN
+    })
+}
+
+async fn read_is_old(rt: &Runtime) -> bool {
+    let s = rt.settings();
+    if s.mode != Mode::Standalone {
+        return false;
+    }
+    let Some(local) = rt.lock().local.clone() else {
+        return false;
+    };
+    let at = local.ctx.updates.read().await.checked_at.clone();
+    read_again(
+        local.ctx.config().advanced.update_check,
+        s.updates,
+        at.as_deref(),
+        jiff::Timestamp::now(),
+    )
+}
+
 async fn new_read(rt: &Runtime) -> bool {
     if rt.settings().mode != Mode::Standalone {
         return false;
@@ -485,8 +526,9 @@ fn not_offered(version: &str, why: NotOffered) -> String {
     }
 }
 
-/// Standalone: the newest release as reel on this PC last read it, which Check now reads again,
-/// and this app's installer on it, offered by reel on this PC as a server offers one.
+/// Standalone: the newest release as reel on this PC last read it, which Check now reads again
+/// and a check reads again once it is old, and this app's installer on it, offered by reel on
+/// this PC as a server offers one.
 async fn check_release(rt: &Runtime, by_hand: bool, s: &Settings) -> Result<(), String> {
     rt.lock().update_checked_at = Some(SystemTime::now());
     let local = rt.lock().local.clone();
@@ -494,8 +536,34 @@ async fn check_release(rt: &Runtime, by_hand: bool, s: &Settings) -> Result<(), 
         set_line(rt, "");
         return Ok(());
     };
+    let read_at = local.ctx.updates.read().await.checked_at.clone();
     if by_hand {
         reel_pipeline::updates::check_once(&local.ctx).await;
+    } else if read_again(
+        local.ctx.config().advanced.update_check,
+        s.updates,
+        read_at.as_deref(),
+        jiff::Timestamp::now(),
+    ) {
+        tracing::info!(
+            read_at = read_at.as_deref().unwrap_or_default(),
+            "reel on this PC read the releases six hours ago or more: the update check reads them again"
+        );
+        let again = reel_pipeline::updates::check_once(&local.ctx).await;
+        match &again.error {
+            Some(e) => tracing::warn!(
+                error = %e,
+                "the releases were not read again; the next try is in six hours, or now with Check now"
+            ),
+            None => tracing::info!(
+                newest = again
+                    .latest
+                    .as_ref()
+                    .map(|r| r.version.as_str())
+                    .unwrap_or_default(),
+                "the releases were read again"
+            ),
+        }
     }
     let read = local.ctx.updates.read().await.clone();
     *ACTED_ON.lock().unwrap_or_else(|e| e.into_inner()) = read.checked_at.clone();
@@ -1203,6 +1271,65 @@ mod tests {
     fn a_build_named_after_a_commit_never_updates_itself() {
         assert!(super::test_build("1.2.0-dev.e58080a"));
         assert!(!super::test_build("1.2.0"));
+    }
+
+    #[test]
+    fn the_releases_are_read_again_once_the_last_read_is_six_hours_old_by_the_wall_clock() {
+        use reel_desktop_core::settings::UpdateMode::{Ask, Off, OnQuit};
+        // reel on an office PC read the releases at 10:08; a release went out at 10:10
+        let at = |t: &str| -> jiff::Timestamp { t.parse().unwrap() };
+        let read = Some("2026-11-11T10:08:00.250Z");
+        let again = |on, mode, read: Option<&str>, now| super::read_again(on, mode, read, at(now));
+        assert!(!again(true, Ask, read, "2026-11-11T16:07:59Z"));
+        assert!(again(true, Ask, read, "2026-11-11T16:08:01Z"));
+        assert!(
+            again(true, OnQuit, read, "2026-11-13T08:30:00Z"),
+            "a PC that slept two nights reads again at its first check"
+        );
+        assert!(
+            again(true, Ask, read, "2026-11-11T09:00:00Z"),
+            "a read stamped after now: the clock went back"
+        );
+        assert!(again(true, Ask, Some("not a time"), "2026-11-11T10:09:00Z"));
+        assert!(
+            !again(true, Ask, None, "2026-11-11T10:09:00Z"),
+            "before the first read: reel on this PC reads a minute after it starts"
+        );
+        assert!(
+            !again(true, Off, read, "2026-11-20T00:00:00Z"),
+            "New versions off reads nothing more than reel on this PC does"
+        );
+        assert!(
+            !again(false, Ask, read, "2026-11-20T00:00:00Z"),
+            "Check for updates off: nothing asks GitHub by itself"
+        );
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn a_read_of_the_releases_while_one_runs_takes_that_reads_answer() {
+        let gh = StandIn::start(RELEASE, Vec::new()).await;
+        let dir = tempfile::tempdir().unwrap();
+        let local = standalone_read(&gh.base, dir.path()).await;
+        let reads = || {
+            gh.asked
+                .lock()
+                .unwrap()
+                .iter()
+                .filter(|(path, ..)| path.ends_with("/releases/latest"))
+                .count()
+        };
+        assert_eq!(reads(), 1);
+        let (first, second) = tokio::join!(
+            reel_pipeline::updates::check_at(&local.ctx, &gh.base),
+            reel_pipeline::updates::check_at(&local.ctx, &gh.base),
+        );
+        assert_eq!(reads(), 2, "two asks at once, one read");
+        assert_eq!(first.checked_at, second.checked_at);
+        assert_eq!(
+            second.latest.map(|r| r.version).as_deref(),
+            Some(RELEASE),
+            "the second ask has the first one's answer"
+        );
     }
 
     fn decoded(b64: &str) -> String {
