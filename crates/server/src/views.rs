@@ -129,6 +129,8 @@ pub struct Card {
     /// Whether the user may rename, share and delete it: its owner or an admin.
     pub can_edit: bool,
     pub starred: bool,
+    /// A session recording: its length shows with the recording's dot.
+    pub recording: bool,
 }
 
 /// One item of a card's line, with the class a phone orders it by (none for the time).
@@ -188,6 +190,7 @@ pub fn card(row: &ClipRow) -> Card {
         }
     }
     match c.source.as_str() {
+        _ if c.is_recording() => meta.push(Meta::new("from", "session recording")),
         "imported" => meta.push(Meta::new("from", "imported")),
         "cut" => meta.push(Meta::new("from", "cut from a clip")),
         "montage" => meta.push(Meta::new("from", "a montage")),
@@ -207,6 +210,7 @@ pub fn card(row: &ClipRow) -> Card {
         sets: String::new(),
         can_edit: false,
         starred: false,
+        recording: c.is_recording(),
         id: c.id.clone(),
         when: when.clone(),
         duration_s: row.duration.unwrap_or(0.0).round() as i64,

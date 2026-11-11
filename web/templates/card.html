@@ -4,7 +4,7 @@
     {% if let Some(p) = c.poster %}<img src="{{ p }}" alt="" loading="lazy">{% endif %}
     {% if c.state == "processing" %}<span class="flag st-active">{% if c.progress > 0 %}encoding {{ c.progress }}%{% else %}waiting{% endif %}</span><span class="progress"><i style="width:{{ c.progress }}%"></i></span>
     {% else if c.state == "failed" %}<span class="flag st-err">failed</span>
-    {% else if !c.duration.is_empty() %}<span class="dur">{{ c.duration }}</span>{% endif %}
+    {% else if !c.duration.is_empty() %}<span class="dur{% if c.recording %} rec{% endif %}">{{ c.duration }}</span>{% endif %}
   </div>
   <div class="card-title ellipsis">{{ c.title }}</div>
   <div class="card-meta">

@@ -3,6 +3,8 @@ import { isOn, setOn } from './switch.js';
 import { setPart, worst } from './header.js';
 import { appDownloads } from './app-downloads.js';
 import { mouseWalk } from './walk.js';
+import { recordControl } from './record.js';
+import { toast } from './lib.js';
 const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
 
@@ -47,7 +49,7 @@ function renderAsk(a) {
   $('#update-ask-words').textContent = a.words;
 }
 
-export const APP_DOT = { error: 'err', unpaired: 'err', paused: 'warn', uploading: 'active', working: 'active', preparing: 'active', idle: 'ok' };
+export const APP_DOT = { error: 'err', unpaired: 'err', paused: 'warn', uploading: 'active', working: 'active', preparing: 'active', recording: 'active', idle: 'ok' };
 
 export function appShell() {
   const call = invoke();
@@ -55,13 +57,16 @@ export function appShell() {
   document.documentElement.dataset.app = 'desktop';
   appDownloads();
   $$('.browser-part').forEach(el => el.hidden = true);
-  $$('.app-part:not(.app-paired), #app-share, #app-save, #app-save-share, .sections .app-link').forEach(el => el.hidden = false);
+  $$('.app-part:not(.app-paired), #app-share, #app-save, #app-save-share, #app-record, .sections .app-link').forEach(el => el.hidden = false);
   if (!document.body.hasAttribute('data-standalone')) $$('#sections-body .section-line').forEach(l => l.append(' Kept on the server: the same for every PC and browser.'));
   const chipDot = $('#chip-dot'), chipWord = $('#chip-word');
   const serverState = ['ok', 'warn', 'err'].find(c => chipDot?.classList.contains(c)) || 'ok';
   const pause = $('#app-pause'), recording = $('#app-recording'), share = $('#app-share');
+  const record = $('#app-record') ? recordControl($('#app-record'), $('#menu-record'),
+    (on) => call('app_session_set', { on }), (why) => toast(why, 'err')) : () => {};
   const render = (st) => {
     if (!st) return;
+    record(st);
     const app = APP_DOT[st.state] || 'ok';
     setPart('part-app', app, st.state_word || st.state, st.state_line || '');
     setPart('part-obs', st.obs_connected ? 'ok' : 'neutral', st.obs_connected ? 'connected' : 'off', st.obs_line || '');

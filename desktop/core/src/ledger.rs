@@ -55,6 +55,8 @@ pub struct ClipRecord {
     pub local_clip_id: Option<String>,
     /// The library's own master, uploaded to a server: never a cache candidate.
     pub keep: bool,
+    /// A session recording, not a saved replay.
+    pub recording: bool,
 }
 
 impl Default for ClipRecord {
@@ -76,6 +78,7 @@ impl Default for ClipRecord {
             deduped: false,
             local_clip_id: None,
             keep: false,
+            recording: false,
         }
     }
 }
@@ -273,11 +276,18 @@ impl Ledger {
         })
     }
 
+    pub fn set_recording(&mut self, path: &Path) -> anyhow::Result<bool> {
+        self.change(path, |c| c.recording = true)
+    }
+
+    /// The last saved replay the server confirmed; a session recording is not "the last clip".
     pub fn last_confirmed(&self) -> Option<&ClipRecord> {
         self.clips
             .iter()
             .filter(|c| {
-                c.clip_id.is_some() && matches!(c.state, ClipState::Confirmed | ClipState::Deleted)
+                c.clip_id.is_some()
+                    && !c.recording
+                    && matches!(c.state, ClipState::Confirmed | ClipState::Deleted)
             })
             .max_by_key(|c| (c.confirmed_at, c.found_at))
     }
@@ -369,6 +379,30 @@ mod tests {
             .cache_entries()
             .iter()
             .any(|e| e.uploaded && e.confirmed_at.is_some()));
+    }
+
+    #[test]
+    fn a_session_recording_is_kept_as_one_and_is_not_the_last_clip_to_share() {
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("ledger.json");
+        let mut l = Ledger::load(&file).unwrap();
+        let replay = dir.path().join("Replay 2026-11-11 21-00-00.mkv");
+        let session = dir.path().join("2026-11-11 20-00-00.mkv");
+        l.found(&replay, 1).unwrap();
+        l.mark_confirmed(&replay, "REPLAY", false).unwrap();
+        l.found(&session, 11_000_000_000).unwrap();
+        assert!(l.set_recording(&session).unwrap());
+        l.mark_confirmed(&session, "SESSION", false).unwrap();
+        let back = Ledger::load(&file).unwrap();
+        assert!(back.get(&session).unwrap().recording);
+        assert!(!back.get(&replay).unwrap().recording);
+        assert_eq!(
+            back.last_confirmed().and_then(|c| c.clip_id.as_deref()),
+            Some("REPLAY"),
+            "confirmed after it, but a recording"
+        );
+        let older: Ledger = serde_json::from_str(r#"{"clips":[{"path":"/c/a.mkv","name":"a.mkv","size":1,"found_at":"2026-11-01T10:00:00Z","state":"found"}]}"#).unwrap();
+        assert!(!older.clips[0].recording, "a ledger from before");
     }
 
     #[test]

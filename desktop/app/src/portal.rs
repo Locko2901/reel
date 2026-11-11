@@ -14,6 +14,7 @@ pub fn what(id: &str) -> &'static str {
         "save-and-share" => "saves the replay and shares it",
         "save" => "saves a clip",
         "upload-last" => "uploads the last clip",
+        "record-session" => "starts and stops a session recording",
         _ => "does nothing known",
     }
 }

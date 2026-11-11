@@ -150,6 +150,10 @@ async fn process(
     if !input.exists() {
         return Err(anyhow!("input file is gone: {}", input.display()));
     }
+    // hours of a session recording are read three times and copied once: not under a game
+    if clip.is_recording() {
+        ctx.wait_while_held(job).await?;
+    }
     let hash = match &clip.source_hash {
         Some(h) => h.clone(),
         None => {
@@ -268,7 +272,7 @@ async fn process(
         Some(first) => {
             // the original's poster and loudness come in the derive job, its preview behind the
             // links' work, and none with external storage on, since nothing serves it
-            if !ctx.config().external_on() {
+            if !ctx.config().external_on() && !clip.is_recording() {
                 ensure_embed_at(ctx, &master, PRIORITY_DERIVE).await?;
             }
             first
@@ -276,7 +280,10 @@ async fn process(
         None => {
             let poster_time = derived::poster_default(ctx, &out, mprobe.duration).await?;
             crate::level::measure_quietly(ctx, &master).await;
-            ensure_preview(ctx, &master).await?;
+            // a preview copy of hours is a long encode for a link that may never be made
+            if !clip.is_recording() {
+                ensure_preview(ctx, &master).await?;
+            }
             (master_id.clone(), poster_time)
         }
     };

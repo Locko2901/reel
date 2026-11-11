@@ -82,9 +82,9 @@ impl Store {
     }
 
     pub async fn insert_upload(&self, u: &DeviceUpload) -> Result<()> {
-        sqlx::query("INSERT INTO device_upload (id, device_id, user_id, file_name, size, sha256, received, state, recorded_at, game, title, created_at, updated_at, finished_at, clip_id, error, keep_last, audio_names) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
+        sqlx::query("INSERT INTO device_upload (id, device_id, user_id, file_name, size, sha256, received, state, recorded_at, game, title, created_at, updated_at, finished_at, clip_id, error, keep_last, audio_names, kind) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
             .bind(&u.id).bind(&u.device_id).bind(&u.user_id).bind(&u.file_name).bind(u.size).bind(&u.sha256).bind(u.received).bind(&u.state)
-            .bind(&u.recorded_at).bind(&u.game).bind(&u.title).bind(&u.created_at).bind(&u.updated_at).bind(&u.finished_at).bind(&u.clip_id).bind(&u.error).bind(u.keep_last).bind(&u.audio_names)
+            .bind(&u.recorded_at).bind(&u.game).bind(&u.title).bind(&u.created_at).bind(&u.updated_at).bind(&u.finished_at).bind(&u.clip_id).bind(&u.error).bind(u.keep_last).bind(&u.audio_names).bind(&u.kind)
             .execute(&self.pool).await?;
         Ok(())
     }

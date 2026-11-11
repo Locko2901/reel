@@ -1,4 +1,6 @@
 //! A stand-in OBS for the end to end run; `fail-next`, `write-ms` and `next-clip` steer its saves.
+//! A recording's file is the one `record-clip` names, else the clip, written when it stops;
+//! `fail-record` refuses the next start.
 //! Usage: fake_obs --port 4455 --dir <record folder> --clip <file to hand out as the replay>
 //! [--config <XDG_CONFIG_HOME>] [--password <its WebSocket's>] [--profile <name>]. With --config
 //! it logs its encoders as OBS does (`encoders` in the record folder, x264 without), and its
@@ -93,6 +95,9 @@ async fn main() {
         .expect("the port");
     println!("fake obs listening on {port}");
     let mut saved = 0u32;
+    let recording: std::sync::Arc<std::sync::Mutex<Option<(PathBuf, std::time::Instant)>>> =
+        Default::default();
+    let mut recorded = 0u32;
     loop {
         let Ok((stream, _)) = listener.accept().await else {
             continue;
@@ -164,7 +169,58 @@ async fn main() {
                     "capture_mode": "window",
                     "window": "VALORANT  #3A ranked:UnrealWindow:VALORANT-Win64-Shipping.exe",
                 } }),
-                "GetRecordStatus" => json!({ "outputActive": false }),
+                "GetRecordStatus" => match recording.lock().unwrap().as_ref() {
+                    Some((_, at)) => {
+                        json!({ "outputActive": true, "outputDuration": at.elapsed().as_millis() as u64, "outputBytes": 1000 })
+                    }
+                    None => json!({ "outputActive": false, "outputDuration": 0, "outputBytes": 0 }),
+                },
+                "StartRecord"
+                    if recording.lock().unwrap().is_some() || dir.join("fail-record").exists() =>
+                {
+                    let _ = std::fs::remove_file(dir.join("fail-record"));
+                    let refused = json!({ "op": 7, "d": { "requestType": kind, "requestId": id, "requestStatus": { "result": false, "code": 500, "comment": "The output is already active, or could not start." } } });
+                    let _ = out.send(send(refused));
+                    continue;
+                }
+                "StartRecord" => {
+                    recorded += 1;
+                    let file = dir.join(format!("Session fake {recorded}.mp4"));
+                    *recording.lock().unwrap() = Some((file.clone(), std::time::Instant::now()));
+                    let state = |active: bool, state: &str, path: Option<&PathBuf>| {
+                        send(
+                            json!({ "op": 5, "d": { "eventType": "RecordStateChanged", "eventIntent": 64, "eventData": { "outputActive": active, "outputState": state, "outputPath": path.map(|p| p.to_string_lossy()) } } }),
+                        )
+                    };
+                    let _ = out.send(state(false, "OBS_WEBSOCKET_OUTPUT_STARTING", None));
+                    let _ = out.send(state(true, "OBS_WEBSOCKET_OUTPUT_STARTED", Some(&file)));
+                    println!("fake obs: recording {}", file.display());
+                    json!({})
+                }
+                "StopRecord" => {
+                    let Some((file, _)) = recording.lock().unwrap().take() else {
+                        let refused = json!({ "op": 7, "d": { "requestType": kind, "requestId": id, "requestStatus": { "result": false, "code": 501, "comment": "The output is not active." } } });
+                        let _ = out.send(send(refused));
+                        continue;
+                    };
+                    let part = dir.join(format!(".session {recorded}.part"));
+                    let from = std::fs::read_to_string(dir.join("record-clip"))
+                        .ok()
+                        .map(|t| PathBuf::from(t.trim()))
+                        .unwrap_or_else(|| clip.clone());
+                    if std::fs::copy(&from, &part).is_ok() {
+                        let _ = std::fs::rename(&part, &file);
+                    }
+                    let state = |active: bool, state: &str, path: Option<&PathBuf>| {
+                        send(
+                            json!({ "op": 5, "d": { "eventType": "RecordStateChanged", "eventIntent": 64, "eventData": { "outputActive": active, "outputState": state, "outputPath": path.map(|p| p.to_string_lossy()) } } }),
+                        )
+                    };
+                    let _ = out.send(state(false, "OBS_WEBSOCKET_OUTPUT_STOPPING", None));
+                    let _ = out.send(state(false, "OBS_WEBSOCKET_OUTPUT_STOPPED", Some(&file)));
+                    println!("fake obs: recording stopped, {}", file.display());
+                    json!({ "outputPath": file.to_string_lossy() })
+                }
                 "GetVideoSettings" => {
                     json!({ "baseWidth": 1280, "baseHeight": 720, "outputWidth": 1280, "outputHeight": 720, "fpsNumerator": 30, "fpsDenominator": 1 })
                 }

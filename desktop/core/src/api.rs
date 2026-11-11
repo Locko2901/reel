@@ -91,6 +91,9 @@ pub struct NewUpload {
     /// The audio tracks' names in the file's order, where the file may not carry them.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub audio_names: Option<Vec<String>>,
+    /// "recording" for a session recording; none for a clip.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub kind: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]

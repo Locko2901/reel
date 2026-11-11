@@ -58,10 +58,16 @@ pub enum ObsEvent {
     ReplayBufferState {
         active: bool,
     },
-    /// A recording started or stopped; `saved` is its file once stopped.
+    /// A recording started or stopped; `started` is the file it writes once started, `saved`
+    /// its file once stopped.
     RecordState {
         active: bool,
+        started: Option<String>,
         saved: Option<String>,
+    },
+    /// OBS split the recording: it writes to `path` now, the file before is whole.
+    RecordFile {
+        path: String,
     },
     /// The program scene or an input changed; the game the clips are of is read again.
     SceneChanged,
@@ -94,6 +100,10 @@ pub enum ObsCommand {
     StopReplayBuffer(oneshot::Sender<Result<(), ObsError>>),
     RecordDirectory(oneshot::Sender<Result<String, ObsError>>),
     ReplayBufferActive(oneshot::Sender<Result<bool, ObsError>>),
+    StartRecord(oneshot::Sender<Result<(), ObsError>>),
+    /// The file OBS wrote, when it says.
+    StopRecord(oneshot::Sender<Result<Option<String>, ObsError>>),
+    RecordStatus(oneshot::Sender<Result<RecordStatus, ObsError>>),
     State(oneshot::Sender<Result<ObsState, ObsError>>),
     Apply(ObsChange, oneshot::Sender<Result<Vec<String>, ObsError>>),
     /// The choices of an input's list property: the audio devices, the monitors.
@@ -153,6 +163,14 @@ pub struct ObsState {
     pub base: (u32, u32),
     pub output: (u32, u32),
     pub fps: f64,
+}
+
+/// Whether OBS records, and for how long by its own clock.
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub struct RecordStatus {
+    pub active: bool,
+    pub duration_ms: u64,
+    pub bytes: u64,
 }
 
 /// What the app may change in OBS; each field is only touched when set.
@@ -447,11 +465,21 @@ impl Session {
             "ReplayBufferStateChanged" => Some(ObsEvent::ReplayBufferState {
                 active: d["eventData"]["outputActive"].as_bool()?,
             }),
-            "RecordStateChanged" => Some(ObsEvent::RecordState {
-                active: d["eventData"]["outputActive"].as_bool()?,
-                saved: (d["eventData"]["outputState"] == "OBS_WEBSOCKET_OUTPUT_STOPPED")
-                    .then(|| d["eventData"]["outputPath"].as_str().map(str::to_string))
-                    .flatten(),
+            "RecordStateChanged" => {
+                let state = &d["eventData"]["outputState"];
+                let path = || d["eventData"]["outputPath"].as_str().map(str::to_string);
+                Some(ObsEvent::RecordState {
+                    active: d["eventData"]["outputActive"].as_bool()?,
+                    started: (state == "OBS_WEBSOCKET_OUTPUT_STARTED")
+                        .then(path)
+                        .flatten(),
+                    saved: (state == "OBS_WEBSOCKET_OUTPUT_STOPPED")
+                        .then(path)
+                        .flatten(),
+                })
+            }
+            "RecordFileChanged" => Some(ObsEvent::RecordFile {
+                path: d["eventData"]["newOutputPath"].as_str()?.to_string(),
             }),
             "CurrentProgramSceneChanged"
             | "InputSettingsChanged"
@@ -657,8 +685,26 @@ impl Session {
     }
 
     pub async fn recording(&mut self) -> Result<bool, ObsError> {
+        Ok(self.record_status().await?.active)
+    }
+
+    pub async fn record_status(&mut self) -> Result<RecordStatus, ObsError> {
         let v = self.request("GetRecordStatus", json!({})).await?;
-        Ok(v["outputActive"].as_bool().unwrap_or(false))
+        Ok(RecordStatus {
+            active: v["outputActive"].as_bool().unwrap_or(false),
+            duration_ms: v["outputDuration"].as_u64().unwrap_or(0),
+            bytes: v["outputBytes"].as_u64().unwrap_or(0),
+        })
+    }
+
+    pub async fn start_record(&mut self) -> Result<(), ObsError> {
+        self.request("StartRecord", json!({})).await.map(|_| ())
+    }
+
+    /// Stops the recording; OBS 30 and later answer with its file.
+    pub async fn stop_record(&mut self) -> Result<Option<String>, ObsError> {
+        let v = self.request("StopRecord", json!({})).await?;
+        Ok(v["outputPath"].as_str().map(str::to_string))
     }
 
     /// One value of the profile's basic.ini, None when the key is not set.
@@ -954,6 +1000,9 @@ pub async fn run(
                             Some(ObsCommand::StopReplayBuffer(reply)) => { let _ = reply.send(session.stop_replay_buffer().await); }
                             Some(ObsCommand::RecordDirectory(reply)) => { let _ = reply.send(session.record_directory().await); }
                             Some(ObsCommand::ReplayBufferActive(reply)) => { let _ = reply.send(session.replay_buffer_active().await); }
+                            Some(ObsCommand::StartRecord(reply)) => { let _ = reply.send(session.start_record().await); }
+                            Some(ObsCommand::StopRecord(reply)) => { let _ = reply.send(session.stop_record().await); }
+                            Some(ObsCommand::RecordStatus(reply)) => { let _ = reply.send(session.record_status().await); }
                             Some(ObsCommand::State(reply)) => { let _ = reply.send(session.state().await); }
                             Some(ObsCommand::Apply(change, reply)) => { let _ = reply.send(session.apply(&change).await); }
                             Some(ObsCommand::Items { input, property, reply }) => { let _ = reply.send(session.items(&input, &property).await); }
@@ -1001,7 +1050,10 @@ mod tests {
         let category = |event: &str| match event {
             "CurrentProgramSceneChanged" => Some(4),
             "InputSettingsChanged" => Some(8),
-            "ReplayBufferSaved" | "ReplayBufferStateChanged" | "RecordStateChanged" => Some(64),
+            "ReplayBufferSaved"
+            | "ReplayBufferStateChanged"
+            | "RecordStateChanged"
+            | "RecordFileChanged" => Some(64),
             "SceneItemEnableStateChanged" => Some(128),
             "InputVolumeMeters" => Some(1 << 16),
             _ => None,
@@ -1065,6 +1117,72 @@ mod tests {
         );
         assert_eq!(game_of_window("Zen:MozillaWindowClass:zen.exe"), None);
         assert_eq!(game_of_window("no colons here"), None);
+    }
+
+    #[test]
+    fn a_recording_names_its_file_when_it_starts_when_it_splits_and_when_it_stops() {
+        let event = |kind: &str, data: Value| {
+            Session::event_of(
+                &json!({ "op": 5, "d": { "eventType": kind, "eventIntent": 64, "eventData": data } }),
+            )
+        };
+        let state = |active: bool, state: &str, path: Option<&str>| {
+            event(
+                "RecordStateChanged",
+                json!({ "outputActive": active, "outputState": state, "outputPath": path }),
+            )
+        };
+        // the events OBS 33.0.1 sent in the run with the real OBS
+        assert_eq!(
+            state(false, "OBS_WEBSOCKET_OUTPUT_STARTING", None),
+            Some(ObsEvent::RecordState {
+                active: false,
+                started: None,
+                saved: None
+            })
+        );
+        assert_eq!(
+            state(
+                true,
+                "OBS_WEBSOCKET_OUTPUT_STARTED",
+                Some("/clips/2026-11-11 08-36-45.mkv")
+            ),
+            Some(ObsEvent::RecordState {
+                active: true,
+                started: Some("/clips/2026-11-11 08-36-45.mkv".into()),
+                saved: None
+            })
+        );
+        assert_eq!(
+            state(
+                false,
+                "OBS_WEBSOCKET_OUTPUT_STOPPED",
+                Some("/clips/2026-11-11 08-36-45.mkv")
+            ),
+            Some(ObsEvent::RecordState {
+                active: false,
+                started: None,
+                saved: Some("/clips/2026-11-11 08-36-45.mkv".into())
+            })
+        );
+        assert_eq!(
+            state(true, "OBS_WEBSOCKET_OUTPUT_STARTED", None),
+            Some(ObsEvent::RecordState {
+                active: true,
+                started: None,
+                saved: None
+            }),
+            "an obs-websocket that names no file at the start"
+        );
+        assert_eq!(
+            event(
+                "RecordFileChanged",
+                json!({ "newOutputPath": "/clips/2026-11-11 09-36-45.mkv" })
+            ),
+            Some(ObsEvent::RecordFile {
+                path: "/clips/2026-11-11 09-36-45.mkv".into()
+            })
+        );
     }
 
     #[test]
@@ -1172,12 +1290,13 @@ mod tests {
             stopping,
             ObsEvent::RecordState {
                 active: false,
+                started: None,
                 saved: None
             }
         );
         let stopped = s.next_event().await.unwrap();
         assert!(
-            matches!(stopped, ObsEvent::RecordState { active: false, saved: Some(ref path) } if path.ends_with("21-20-00.mkv")),
+            matches!(stopped, ObsEvent::RecordState { active: false, saved: Some(ref path), .. } if path.ends_with("21-20-00.mkv")),
             "obs-websocket 5 names the file in RecordStateChanged once stopped: {stopped:?}"
         );
         let seen = server.await.unwrap();

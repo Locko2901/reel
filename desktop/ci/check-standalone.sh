@@ -121,6 +121,7 @@ xdotool mousemove ${REEL_LIGHT_FINISH:-495 439} click 1
 waitlog 'window shows view="library"' 30 "Finish did not open the library"
 grep -q '"own_setup_due": false' "$D/config/settings.json" || fail "Finish did not mark reel light's setup finished"
 grep -q '"save": "Alt+F10"' "$D/config/settings.json" || fail "Finish did not save Save a clip on Alt+F10"
+grep -q '"record": "Alt+F9"' "$D/config/settings.json" || fail "Finish did not keep Record a session on Alt+F9"
 grep -q '"done": false' "$D/config/settings.json" || fail "reel light's setup marked the setup of the package with OBS done"
 sleep 3
 shot "light-7-library"
@@ -134,7 +135,7 @@ waitmore 'window shows view="library"' 30 "a start after the setup showed no lib
 sleep 2
 [ "$(logged 'window shows view="setup"')" -eq "$s" ] || fail "a start of reel light set up before opened the setup"
 stop
-ok "Finish: the setup finished, Save a clip on Alt+F10, the library; a start of an install set up before opens no setup"
+ok "Finish: the setup finished, Save a clip on Alt+F10, Record a session on Alt+F9, the library; a start of an install set up before opens no setup"
 
 D="$W/here"
 L="$D/data/logs"
@@ -227,6 +228,63 @@ shot "5-chip-recording-paused"
 xdotool key Escape
 python3 /work/desktop/ci/fake-sni.py click "Resume recording" > /dev/null || fail "the tray has no Resume recording"
 waitlog "recording paused by the user paused=false" 10 "Resume recording did not resume"
+# A session recording from the window's Record: the tray and the chip say so, Stop in the window
+# ends it, and the recording is in the library as one.
+for _ in $(seq 1 20); do python3 /work/desktop/ci/fake-sni.py menu > "$W/menu-rec.txt"; grep -qx -- "- idle" "$W/menu-rec.txt" && break; sleep 0.5; done
+grep -qx "Record a session" "$W/menu-rec.txt" || fail "the tray has no Record a session: $(tr '\n' '|' < "$W/menu-rec.txt")"
+# the page reads the state every 2 s: the header as it is once idle again
+sleep 3
+"$FFMPEG" -v error -f lavfi -i "testsrc2=duration=6:size=1280x720:rate=30" -f lavfi -i "sine=frequency=550:sample_rate=48000:duration=6" \
+  -c:v libx264 -pix_fmt yuv420p -c:a aac -shortest "$W/session.mp4"
+echo "$W/session.mp4" > "$W/rec/record-clip"
+b=$(logged "standalone: the clip is published")
+# shellcheck disable=SC2086
+xdotool mousemove ${REEL_RECORD:-1098 24} click 1
+waitlog "session recording started from the window" 20 "the window's Record did not start a session recording"
+sleep 4
+shot "16-recording"
+python3 /work/desktop/ci/fake-sni.py menu > "$W/menu-rec.txt"
+grep -qx -- "- recording a session: under a minute, started from the window" "$W/menu-rec.txt" && grep -qx "Stop the session recording (under a minute)" "$W/menu-rec.txt" || fail "the tray while recording: $(tr '\n' '|' < "$W/menu-rec.txt")"
+grep -qx "Save clip" "$W/menu-rec.txt" || fail "Save clip is greyed while recording"
+# shellcheck disable=SC2086
+xdotool mousemove ${REEL_CHIP_RECORDING:-1140 24} click 1
+sleep 1
+shot "16-recording-chip"
+xdotool key Escape
+xdotool windowsize "$WIN" 720 820 2>/dev/null || true
+sleep 2
+shot "16-recording-720"
+xdotool windowsize "$WIN" 1280 820 2>/dev/null || true
+sleep 2
+ok "Record in the window: OBS records; the button shows the clock and Stop, the tray says \"recording a session\" and offers Stop (shots)"
+# shellcheck disable=SC2086
+xdotool mousemove ${REEL_RECORD_STOP:-1000 24} click 1
+waitlog "session recording stopped from the window after" 20 "Stop in the window did not stop the session recording"
+for _ in $(seq 1 180); do [ "$(logged 'standalone: the clip is published')" -gt "$b" ] && break; sleep 0.5; done
+[ "$(logged 'standalone: the clip is published')" -gt "$b" ] || fail "the session recording did not go into the library"
+wait_said "Session recording in the library" 20 "no Session recording in the library notification" 0
+cat "$L"/reel-desktop.log* | grep "clip found" | grep "Session fake" | grep -q "recording=true" || fail "the session recording was not found as one"
+"$APP" --page=/ > /dev/null 2>&1 || true
+sleep 4
+shot "17-library-recording"
+ok "Stop in the window: the recording goes into the library as a session recording (shot)"
+b=$(logged "session recording started by the hotkey")
+xdotool key --clearmodifiers alt+F9
+waitmore "session recording started by the hotkey" 20 "Alt+F9 did not start a session recording" "$b"
+sleep 2
+xdotool key --clearmodifiers alt+F9
+waitlog "session recording stopped by the hotkey after" 20 "Alt+F9 did not stop the session recording"
+ok "Record a session's hotkey, Alt+F9 by default: starts one and stops it"
+sleep 2
+touch "$W/rec/fail-record"
+b=$(logged "session recording did not start")
+# shellcheck disable=SC2086
+xdotool mousemove ${REEL_RECORD:-1098 24} click 1
+waitmore "session recording did not start" 20 "a start OBS refused said nothing" "$b"
+cat "$L"/reel-desktop.log* | grep "session recording did not start" | tail -1 | grep -q "(asked from the window): OBS did not start recording: OBS answered but refused the request." || fail "the refusal's words: $(cat "$L"/reel-desktop.log* | grep 'session recording did not start' | tail -1)"
+sleep 1
+shot "18-record-refused"
+ok "a start OBS refuses: the window says why, in a toast (shot)"
 "$APP" "reel-desktop://open/$LOCAL" > /dev/null 2>&1 || true
 waitlog "library loaded at=127.0.0.1/clips/$LOCAL" 20 "Open did not open the clip"
 sleep 3
@@ -289,10 +347,10 @@ b=$(logged "hotkeys off while a field listens")
 xdotool mousemove ${REEL_SAVE_FIELD:-1137 289} click 1
 for _ in $(seq 1 20); do [ "$(logged 'hotkeys off while a field listens')" -gt "$b" ] && break; sleep 0.5; done
 [ "$(logged 'hotkeys off while a field listens')" -gt "$b" ] || fail "Save a clip's field did not listen"
-xdotool key --clearmodifiers alt+F9
-waitlog "hotkey free.*Alt+F9" 10 "Alt+F9 was not taken for Save a clip: $(cat "$L"/reel-desktop.log* | grep -m1 'hotkey refused' || true)"
-for _ in $(seq 1 20); do grep -q '"save": "Alt+F9"' "$D/config/settings.json" && break; sleep 0.5; done
-grep -q '"save": "Alt+F9"' "$D/config/settings.json" || fail "Alt+F9 was not saved for Save a clip"
+xdotool key --clearmodifiers alt+F8
+waitlog "hotkey free.*Alt+F8" 10 "Alt+F8 was not taken for Save a clip: $(cat "$L"/reel-desktop.log* | grep -m1 'hotkey refused' || true)"
+for _ in $(seq 1 20); do grep -q '"save": "Alt+F8"' "$D/config/settings.json" && break; sleep 0.5; done
+grep -q '"save": "Alt+F8"' "$D/config/settings.json" || fail "Alt+F8 was not saved for Save a clip"
 shot "10-hotkey-recorded"
 sleep 1
 # Another clip than the tray's: the library drops a file it has already
@@ -301,18 +359,18 @@ sleep 1
 echo "$W/clip2.mp4" > "$W/rec/next-clip"
 b=$(logged "standalone: the clip is published")
 asked=$(logged "save: OBS saves the replay")
-xdotool key --clearmodifiers alt+F9
+xdotool key --clearmodifiers alt+F8
 for _ in $(seq 1 20); do [ "$(logged 'save: OBS saves the replay')" -gt "$asked" ] && break; sleep 0.5; done
-[ "$(logged 'save: OBS saves the replay')" -gt "$asked" ] || fail "Alt+F9 did nothing: $(cat "$L"/reel-desktop.log* | grep -i 'hotkey' | tail -5)"
+[ "$(logged 'save: OBS saves the replay')" -gt "$asked" ] || fail "Alt+F8 did nothing: $(cat "$L"/reel-desktop.log* | grep -i 'hotkey' | tail -5)"
 for _ in $(seq 1 180); do [ "$(logged 'standalone: the clip is published')" -gt "$b" ] && break; sleep 0.5; done
-[ "$(logged 'standalone: the clip is published')" -gt "$b" ] || fail "Alt+F9 did not save a clip"
-ok "Save a clip's hotkey changed on the Hotkeys page, from the setup's Alt+F10 to Alt+F9: saved, and it saves a clip"
+[ "$(logged 'standalone: the clip is published')" -gt "$b" ] || fail "Alt+F8 did not save a clip"
+ok "Save a clip's hotkey changed on the Hotkeys page, from the setup's Alt+F10 to Alt+F8: saved, and it saves a clip"
 # Too quiet to measure: a peak, and a loudness under the gate all through
 "$FFMPEG" -v error -f lavfi -i "testsrc2=duration=3:size=1280x720:rate=30" -f lavfi -i "anoisesrc=color=pink:amplitude=0.0008:r=48000:duration=3" \
   -c:v libx264 -pix_fmt yuv420p -c:a aac -b:a 160k -ac 2 -shortest "$W/quiet.mp4"
 echo "$W/quiet.mp4" > "$W/rec/next-clip"
 b=$(logged "standalone: the clip is published")
-xdotool key --clearmodifiers alt+F9
+xdotool key --clearmodifiers alt+F8
 for _ in $(seq 1 180); do [ "$(logged 'standalone: the clip is published')" -gt "$b" ] && break; sleep 0.5; done
 [ "$(logged 'standalone: the clip is published')" -gt "$b" ] || fail "the quiet clip was not saved"
 QUIET=$(cat "$L"/reel-desktop.log* | sed -n 's/.*standalone: the clip is published.* clip=\([0-9A-Z]*\).*/\1/p' | sed -n "$((b + 1))p")

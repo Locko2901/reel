@@ -12,12 +12,12 @@ fn like_literal(q: &str) -> String {
 
 impl Store {
     pub async fn insert_clip(&self, c: &Clip) -> Result<()> {
-        sqlx::query("INSERT INTO clip (id, title, description, state, source, source_name, recorded_at, created_at, published_at, master_id, current_id, poster_time, original_path, original_probe, plan_reason, error, deleted_at, source_clip_id, recorded_source, owner_id, source_hash, device_id, game, uploaded_at, uploaded_to, others_footage) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
+        sqlx::query("INSERT INTO clip (id, title, description, state, source, source_name, recorded_at, created_at, published_at, master_id, current_id, poster_time, original_path, original_probe, plan_reason, error, deleted_at, source_clip_id, recorded_source, owner_id, source_hash, device_id, game, uploaded_at, uploaded_to, others_footage, kind) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
             .bind(&c.id).bind(&c.title).bind(&c.description).bind(&c.state).bind(&c.source).bind(&c.source_name)
             .bind(&c.recorded_at).bind(&c.created_at).bind(&c.published_at).bind(&c.master_id).bind(&c.current_id)
             .bind(c.poster_time).bind(&c.original_path).bind(&c.original_probe).bind(&c.plan_reason).bind(&c.error).bind(&c.deleted_at).bind(&c.source_clip_id).bind(&c.recorded_source).bind(&c.owner_id)
             .bind(&c.source_hash).bind(&c.device_id).bind(&c.game).bind(&c.uploaded_at).bind(&c.uploaded_to)
-            .bind(c.others_footage)
+            .bind(c.others_footage).bind(&c.kind)
             .execute(&self.pool).await?;
         Ok(())
     }
@@ -282,7 +282,8 @@ impl Store {
              COALESCE((SELECT SUM(r.size) FROM rendition r WHERE r.clip_id = c.id AND r.state = 'ready' AND r.kind IN ('master', 'cut', 'embed')), 0) AS bytes, \
              EXISTS (SELECT 1 FROM share s WHERE s.clip_id = c.id AND s.revoked_at IS NULL AND (s.expires_at IS NULL OR s.expires_at > ?)) AS linked, \
              EXISTS (SELECT 1 FROM collection_clip cc JOIN collection k ON k.id = cc.collection_id WHERE cc.clip_id = c.id) AS in_set, \
-             EXISTS (SELECT 1 FROM star st WHERE st.clip_id = c.id) AS starred \
+             EXISTS (SELECT 1 FROM star st WHERE st.clip_id = c.id) AS starred, \
+             c.kind IS 'recording' AS recording \
              FROM clip c WHERE c.deleted_at IS NULL AND c.state = 'ready' \
              ORDER BY COALESCE(c.recorded_at, c.created_at) ASC, c.created_at ASC",
         )

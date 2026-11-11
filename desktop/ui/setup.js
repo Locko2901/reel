@@ -706,7 +706,7 @@ async function renderDone() {
 function commonSummary() {
   const folder = obsFolder();
   const rows = [
-    ['Hotkeys', settings.mode === 'standalone' ? `Save a clip ${settings.hotkeys.save || 'none'}` : `Save and share ${settings.hotkeys.save_share || 'none'}, Save ${settings.hotkeys.save || 'none'}`],
+    ['Hotkeys', `${settings.mode === 'standalone' ? `Save a clip ${settings.hotkeys.save || 'none'}` : `Save and share ${settings.hotkeys.save_share || 'none'}, Save ${settings.hotkeys.save || 'none'}`}, Record a session ${settings.hotkeys.record || 'none'}`],
     ['Clips go to', settings.mode === 'standalone' ? 'this PC only: the library in the app, on this PC' : (status && status.paired ? (status.server_name || status.server_url) : `${settings.server_url || 'no server yet'}, not paired yet`)],
     ['Clips folder', folder ? `${folder}, OBS's recording folder` : settings.clips_dir],
   ];

@@ -3343,6 +3343,7 @@ async fn the_standalone_library_offers_nothing_of_a_servers() {
             "app clips Clips folder",
             "app upload New clips",
             "app hotkeys",
+            "app session Session recording",
             "app sounds",
             "head Library",
             "section storage",
@@ -11127,6 +11128,7 @@ async fn the_apps_parts_in_the_header_stay_hidden_in_a_browser() {
             "app clips Clips folder and cache",
             "app upload",
             "app hotkeys",
+            "app session Session recording",
             "app sounds",
             "head Library",
             "section storage",
@@ -14705,6 +14707,108 @@ async fn with_keep_last_the_link_comes_first_and_the_original_after() {
     assert!(
         master.audio_measured_at.is_some(),
         "and measured the original's loudness"
+    );
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_session_recording_from_the_app_is_kept_whole_marked_and_gets_no_preview_by_itself() {
+    let Some(env) = start_with(AuthMode::Single, vec![], |c| {
+        c.share.embed_mb = 1;
+    })
+    .await
+    else {
+        return;
+    };
+    let (token, _) = pair(&env, "pc").await;
+    let pc = env._dir.path().join("pc");
+    std::fs::create_dir_all(&pc).unwrap();
+    let session = env
+        .synth_at(
+            &pc,
+            "2026-11-11 20-00-00.mp4",
+            Synth::h264_1080p(12.0, "session"),
+        )
+        .await;
+    let (s, v) = upload_whole(
+        &env,
+        &token,
+        &session,
+        4_000_000,
+        serde_json::json!({ "kind": "recording", "keep_last": 5, "game": "Valorant",
+            "title": "Valorant, Nov 11, 20:00", "recorded_at": "2026-11-11T19:00:00Z" }),
+    )
+    .await;
+    assert_eq!(s, 200, "{v}");
+    let id = v["clip_id"].as_str().unwrap().to_string();
+    env.wait_clip(
+        |c| c.id == id && c.state == "ready",
+        Duration::from_secs(120),
+    )
+    .await;
+    env.wait_no_jobs(Duration::from_secs(180)).await;
+    let clip = env.store().clip(&id).await.unwrap().unwrap();
+    assert_eq!(clip.kind.as_deref(), Some("recording"));
+    assert!(clip.is_recording());
+    let renditions = env.store().renditions_of(&id).await.unwrap();
+    assert_eq!(
+        clip.current_id, clip.master_id,
+        "a recording is kept whole: no last seconds cut"
+    );
+    assert!(
+        !renditions
+            .iter()
+            .any(|r| r.kind == "cut" || r.kind == "embed"),
+        "no cut and no preview copy of hours made by itself: {:?}",
+        renditions.iter().map(|r| &r.kind).collect::<Vec<_>>()
+    );
+    let page = env
+        .client
+        .get(format!("{}/clips/{id}", env.base))
+        .send()
+        .await
+        .unwrap()
+        .text()
+        .await
+        .unwrap();
+    assert!(
+        page.contains("<span>session recording</span>"),
+        "the clip page says so"
+    );
+    let library = env
+        .client
+        .get(format!("{}/", env.base))
+        .send()
+        .await
+        .unwrap()
+        .text()
+        .await
+        .unwrap();
+    assert!(
+        library.contains(r#"<span class="dur rec">0:12</span>"#),
+        "the card's length with the recording's mark"
+    );
+    assert!(library.contains(r#"<span class="from">session recording</span>"#));
+    let other = env
+        .synth_at(&pc, "replay.mp4", Synth::small(3.0, "replay"))
+        .await;
+    let (s, v) = upload_whole(
+        &env,
+        &token,
+        &other,
+        4_000_000,
+        serde_json::json!({ "kind": "montage" }),
+    )
+    .await;
+    assert_eq!(s, 200, "{v}");
+    let plain = env
+        .store()
+        .clip(v["clip_id"].as_str().unwrap())
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        plain.kind, None,
+        "only a recording is a kind a device gives"
     );
 }
 

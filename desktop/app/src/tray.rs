@@ -88,6 +88,20 @@ pub fn items(st: &Status) -> Vec<Item> {
     if let Some(w) = why {
         out.push(Item::Line("save-why".into(), w));
     }
+    out.push(match &st.session {
+        Some(s) if s.starting => {
+            Item::Line("session".into(), "Starting the session recording".into())
+        }
+        Some(s) if s.stopping => {
+            Item::Line("session".into(), "Stopping the session recording".into())
+        }
+        Some(s) => act(
+            "session",
+            format!("Stop the session recording ({})", s.length),
+            true,
+        ),
+        None => act("session", "Record a session", st.record.ok),
+    });
     out.push(act(
         "recording",
         if st.recording_paused {
@@ -174,7 +188,7 @@ fn submenu(
     Ok(sub)
 }
 
-fn capital(s: &str) -> String {
+pub(crate) fn capital(s: &str) -> String {
     let mut c = s.chars();
     c.next()
         .map(|f| f.to_uppercase().chain(c).collect())
@@ -194,8 +208,13 @@ macro_rules! tray_pngs {
 }
 
 /// The tray's icon for its size: on Windows 16, 20, 24 or 32 px by the display's scale; on
-/// Linux 64 px, which the desktop scales to its panel.
+/// Linux 64 px, which the desktop scales to its panel. The kind is kept for the recording's dot.
 pub fn icon(app: &AppHandle, kind: TrayIcon) -> tauri::Result<Image<'static>> {
+    ICON.lock().unwrap_or_else(|e| e.into_inner()).0 = kind;
+    plain(app, kind)
+}
+
+fn plain(app: &AppHandle, kind: TrayIcon) -> tauri::Result<Image<'static>> {
     let set = match kind {
         TrayIcon::Colour => tray_pngs!("colour"),
         TrayIcon::White => tray_pngs!("white"),
@@ -220,15 +239,75 @@ pub fn icon(app: &AppHandle, kind: TrayIcon) -> tauri::Result<Image<'static>> {
     Image::from_bytes(set[at])
 }
 
+/// The icon's kind and whether it shows the recording's dot, as last set.
+static ICON: std::sync::Mutex<(TrayIcon, bool)> = std::sync::Mutex::new((TrayIcon::Colour, false));
+
 pub fn set_icon(app: &AppHandle, kind: TrayIcon) {
-    if let Some(tray) = app.tray_by_id(TRAY_ID) {
-        match icon(app, kind) {
-            Ok(i) => {
-                let _ = tray.set_icon(Some(i));
+    let dot = {
+        let mut set = ICON.lock().unwrap_or_else(|e| e.into_inner());
+        set.0 = kind;
+        set.1
+    };
+    draw(app, kind, dot);
+}
+
+fn draw(app: &AppHandle, kind: TrayIcon, dot: bool) {
+    let Some(tray) = app.tray_by_id(TRAY_ID) else {
+        return;
+    };
+    match plain(app, kind) {
+        Ok(i) => {
+            let i = if dot { with_dot(&i) } else { i };
+            let _ = tray.set_icon(Some(i));
+        }
+        Err(e) => tracing::warn!(error = %e, "tray icon"),
+    }
+}
+
+/// The recording's red, as the window's.
+const RED: [u8; 3] = [0xe5, 0x48, 0x4d];
+/// reel's surface: a ring around the dot, so it reads on a light tray and on the colour icon.
+const RING: [u8; 3] = [0x0d, 0x0b, 0x10];
+
+/// The icon with a red dot in its lower right corner: a session recording runs.
+pub fn with_dot(icon: &Image<'_>) -> Image<'static> {
+    let (w, h) = (icon.width(), icon.height());
+    let mut px = icon.rgba().to_vec();
+    dot(&mut px, w, h);
+    Image::new_owned(px, w, h)
+}
+
+fn dot(px: &mut [u8], w: u32, h: u32) {
+    let size = w.min(h) as f32;
+    let r = size * 0.22;
+    let ring = (size / 16.0).max(1.0);
+    let (cx, cy) = (w as f32 - r - ring, h as f32 - r - ring);
+    for y in 0..h {
+        for x in 0..w {
+            let d = ((x as f32 + 0.5 - cx).powi(2) + (y as f32 + 0.5 - cy).powi(2)).sqrt();
+            let outer = (r + ring + 0.5 - d).clamp(0.0, 1.0);
+            if outer <= 0.0 {
+                continue;
             }
-            Err(e) => tracing::warn!(error = %e, "tray icon"),
+            let at = ((y * w + x) * 4) as usize;
+            over(&mut px[at..at + 4], RING, outer);
+            over(&mut px[at..at + 4], RED, (r + 0.5 - d).clamp(0.0, 1.0));
         }
     }
+}
+
+/// `rgb` at coverage `a` over a straight alpha RGBA pixel.
+fn over(p: &mut [u8], rgb: [u8; 3], a: f32) {
+    if a <= 0.0 {
+        return;
+    }
+    let below = p[3] as f32 / 255.0;
+    let out = a + below * (1.0 - a);
+    for c in 0..3 {
+        let v = (rgb[c] as f32 * a + p[c] as f32 * below * (1.0 - a)) / out;
+        p[c] = v.round().clamp(0.0, 255.0) as u8;
+    }
+    p[3] = (out * 255.0).round() as u8;
 }
 
 pub fn refresh(app: &AppHandle, st: &Status) {
@@ -240,6 +319,16 @@ pub fn refresh(app: &AppHandle, st: &Status) {
         *shown = line;
     }
     drop(shown);
+    let recording = st.session.as_ref().is_some_and(|s| !s.starting);
+    let redraw = {
+        let mut set = ICON.lock().unwrap_or_else(|e| e.into_inner());
+        let changed = set.1 != recording;
+        set.1 = recording;
+        changed.then_some(set.0)
+    };
+    if let Some(kind) = redraw {
+        draw(app, kind, recording);
+    }
     let _ = writer(app).send((items(st), st.tooltip()));
 }
 
@@ -416,6 +505,111 @@ mod tests {
                 "reel: recording paused, the replay buffer is stopped"
             );
         }
+    }
+
+    #[test]
+    fn a_session_recording_starts_and_stops_from_the_tray_which_says_for_how_long() {
+        for mode in ["connected", "standalone"] {
+            let mut st = status(mode, true, "https://clips.example.org");
+            st.record = Action {
+                ok: true,
+                why: String::new(),
+            };
+            let got = entries(&st);
+            let at = |got: &[(String, String, bool)], id: &str| {
+                got.iter().position(|(i, _, _)| i == id).unwrap()
+            };
+            let record = &got[at(&got, "session")];
+            assert_eq!((record.1.as_str(), record.2), ("Record a session", true));
+            assert!(
+                at(&got, "session") > at(&got, "save")
+                    && at(&got, "session") < at(&got, "recording"),
+                "with the saves, before Pause recording: {got:?}"
+            );
+            st.record = Action {
+                ok: false,
+                why: "OBS is not connected".into(),
+            };
+            assert!(!on(&st, "session"), "greyed while it cannot start");
+
+            st.session = Some(crate::session::Line {
+                since_ms: 1,
+                line: "1 h 12 min, started by the hotkey".into(),
+                length: "1 h 12 min".into(),
+                ..Default::default()
+            });
+            st.state_word = "recording a session".into();
+            st.state_line = "1 h 12 min, started by the hotkey".into();
+            let got = entries(&st);
+            let stop = &got[at(&got, "session")];
+            assert_eq!(
+                (stop.1.as_str(), stop.2),
+                ("Stop the session recording (1 h 12 min)", true)
+            );
+            assert_eq!(
+                got[0].1,
+                "recording a session: 1 h 12 min, started by the hotkey"
+            );
+            assert_eq!(
+                st.tooltip(),
+                "reel: recording a session, 1 h 12 min, started by the hotkey"
+            );
+            assert!(on(&st, "save"), "a replay still saves while it records");
+
+            st.session.as_mut().unwrap().stopping = true;
+            assert!(items(&st).iter().any(
+                |i| matches!(i, Item::Line(id, l) if id == "session" && l == "Stopping the session recording")
+            ));
+            st.session = Some(crate::session::Line {
+                starting: true,
+                ..Default::default()
+            });
+            assert!(items(&st).iter().any(
+                |i| matches!(i, Item::Line(id, l) if id == "session" && l == "Starting the session recording")
+            ));
+        }
+    }
+
+    #[test]
+    fn the_recording_dot_is_red_in_the_corner_ringed_and_leaves_the_rest() {
+        for size in [16u32, 20, 24, 32, 64] {
+            let mut px = vec![0u8; (size * size * 4) as usize];
+            for p in px.chunks_mut(4) {
+                p.copy_from_slice(&[242, 130, 216, 255]);
+            }
+            dot(&mut px, size, size);
+            let at = |x: u32, y: u32| {
+                let i = ((y * size + x) * 4) as usize;
+                [px[i], px[i + 1], px[i + 2], px[i + 3]]
+            };
+            let r = size as f32 * 0.22;
+            let ring = (size as f32 / 16.0).max(1.0);
+            let c = (size as f32 - r - ring) as u32;
+            assert_eq!(
+                at(c, c),
+                [RED[0], RED[1], RED[2], 255],
+                "{size} px: the dot's middle"
+            );
+            assert_eq!(
+                at(1, 1),
+                [242, 130, 216, 255],
+                "{size} px: the mark is left as it was"
+            );
+            let edge = (size as f32 - ring / 2.0 - 0.5).round() as u32;
+            let e = at(edge, c);
+            assert!(
+                e[0] < 120 && e[1] < 120,
+                "{size} px: a dark ring outside the red: {e:?}"
+            );
+        }
+        let mut clear = vec![0u8; 16 * 16 * 4];
+        dot(&mut clear, 16, 16);
+        assert_eq!(
+            clear[3], 0,
+            "a transparent corner of the icon stays transparent"
+        );
+        let c = ((12 * 16 + 12) * 4) as usize;
+        assert_eq!(clear[c + 3], 255, "the dot is opaque on a transparent icon");
     }
 
     #[test]

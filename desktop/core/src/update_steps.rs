@@ -112,18 +112,28 @@ pub fn how_long(kind: Kind) -> &'static str {
     }
 }
 
+/// What Install does first: close reel, or wait for a session recording to stop.
+fn closes(recording: bool) -> &'static str {
+    if recording {
+        "waits for the session recording to stop, then closes reel"
+    } else {
+        "closes reel"
+    }
+}
+
 /// What happens when the update is installed, said where it is offered (Settings, Startup).
-pub fn before(version: &str, kind: Kind, quit: bool) -> String {
+pub fn before(version: &str, kind: Kind, quit: bool, recording: bool) -> String {
     let long = how_long(kind);
+    let closes = closes(recording);
     match (kind, quit) {
         (Kind::AppImage, false) => format!(
-            "Install closes reel, puts reel {version} in place of this AppImage and opens it again by itself, in {long}."
+            "Install {closes}, puts reel {version} in place of this AppImage and opens it again by itself, in {long}."
         ),
         (Kind::AppImage, true) => format!(
             "reel {version} takes the place of this AppImage when you quit reel, and opens when you next start it."
         ),
         (Kind::Windows { .. }, false) => format!(
-            "Install closes reel, its installer shows its progress, and reel {version} opens again by itself, in {long}."
+            "Install {closes}, its installer shows its progress, and reel {version} opens again by itself, in {long}."
         ),
         (Kind::Windows { .. }, true) => format!(
             "reel {version} installs when you quit reel: its installer shows its progress, then reel stays closed until you open it."
@@ -133,11 +143,12 @@ pub fn before(version: &str, kind: Kind, quit: bool) -> String {
 
 /// The question while an update waits for the click, title and words: the notification's with
 /// Install now and Later, and the window's.
-pub fn ask(version: &str, kind: Kind) -> (String, String) {
+pub fn ask(version: &str, kind: Kind, recording: bool) -> (String, String) {
     (
         format!("reel {version} is ready to install"),
         format!(
-            "Install now closes reel, and reel {version} opens again by itself in {}. Later asks again in a day.",
+            "Install now {}, and reel {version} opens again by itself in {}. Later asks again in a day.",
+            closes(recording),
             how_long(kind)
         ),
     )
@@ -227,32 +238,53 @@ mod tests {
     #[test]
     fn before_an_update_the_app_says_reel_closes_the_installer_shows_and_reel_opens_again() {
         assert_eq!(
-            before("1.10.0", WIN, false),
+            before("1.10.0", WIN, false, false),
             "Install closes reel, its installer shows its progress, and reel 1.10.0 opens again by itself, in about half a minute."
         );
-        assert!(before("1.10.0", WITH_OBS, false).ends_with("in about a minute."));
+        assert!(before("1.10.0", WITH_OBS, false, false).ends_with("in about a minute."));
         assert_eq!(
-            before("1.10.0", WIN, true),
+            before("1.10.0", WIN, true, false),
             "reel 1.10.0 installs when you quit reel: its installer shows its progress, then reel stays closed until you open it."
         );
-        assert!(before("1.10.0", Kind::AppImage, false).contains("this AppImage"));
-        assert!(before("1.10.0", Kind::AppImage, false).ends_with("in a few seconds."));
+        assert!(before("1.10.0", Kind::AppImage, false, false).contains("this AppImage"));
+        assert!(before("1.10.0", Kind::AppImage, false, false).ends_with("in a few seconds."));
     }
 
     #[test]
     fn the_question_says_what_install_now_and_later_do() {
         assert_eq!(
-            ask("1.14.1", WITH_OBS),
+            ask("1.14.1", WITH_OBS, false),
             (
                 "reel 1.14.1 is ready to install".to_string(),
                 "Install now closes reel, and reel 1.14.1 opens again by itself in about a minute. Later asks again in a day.".to_string()
             )
         );
-        assert!(ask("1.14.1", WIN).1.contains("in about half a minute."));
-        assert!(ask("1.14.1", Kind::AppImage)
+        assert!(ask("1.14.1", WIN, false)
+            .1
+            .contains("in about half a minute."));
+        assert!(ask("1.14.1", Kind::AppImage, false)
             .1
             .contains("in a few seconds."));
-        assert!(!ask("1.14.1", WIN).1.contains('\n'));
+        assert!(!ask("1.14.1", WIN, false).1.contains('\n'));
+    }
+
+    #[test]
+    fn while_a_session_recording_runs_install_says_it_waits_for_it_to_stop() {
+        assert_eq!(
+            ask("1.15.1", WITH_OBS, true).1,
+            "Install now waits for the session recording to stop, then closes reel, and reel 1.15.1 opens again by itself in about a minute. Later asks again in a day."
+        );
+        assert_eq!(
+            before("1.15.1", WIN, false, true),
+            "Install waits for the session recording to stop, then closes reel, its installer shows its progress, and reel 1.15.1 opens again by itself, in about half a minute."
+        );
+        assert!(before("1.15.1", Kind::AppImage, false, true)
+            .starts_with("Install waits for the session recording to stop, then closes reel, puts reel 1.15.1 in place"));
+        // a quit stops the recording first, so an install on quit says nothing of it
+        assert_eq!(
+            before("1.15.1", WIN, true, true),
+            before("1.15.1", WIN, true, false)
+        );
     }
 
     #[test]

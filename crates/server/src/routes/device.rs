@@ -144,6 +144,9 @@ pub struct NewUpload {
     /// The audio tracks' names in the file's order, for a file that carries none.
     #[serde(default)]
     pub audio_names: Option<Vec<String>>,
+    /// "recording" for a session recording; anything else is a clip.
+    #[serde(default)]
+    pub kind: Option<String>,
 }
 
 fn short(s: Option<String>, max: usize) -> Option<String> {
@@ -361,7 +364,8 @@ pub async fn create_upload(
     u.recorded_at = recorded_at;
     u.game = reel_core::games::clean(short(body.game, 80).as_deref());
     u.title = short(body.title, 200);
-    u.keep_last = keep_last;
+    u.kind = body.kind.filter(|k| k == reel_pipeline::enqueue::RECORDING);
+    u.keep_last = keep_last.filter(|_| u.kind.is_none());
     u.audio_names = body
         .audio_names
         .filter(|n| !n.is_empty() && n.len() <= 16)
@@ -524,6 +528,7 @@ pub async fn finish_upload(
                 .audio_names
                 .as_deref()
                 .and_then(|n| serde_json::from_str(n).ok()),
+            kind: u.kind.as_deref(),
             ..NewClip::new(&target, "device")
         },
     )

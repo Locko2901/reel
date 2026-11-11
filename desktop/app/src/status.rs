@@ -83,6 +83,10 @@ pub struct Status {
     pub paused_fullscreen: bool,
     /// Pause recording: the replay buffer is stopped on purpose until Resume recording.
     pub recording_paused: bool,
+    /// A session recording that runs or starts.
+    pub session: Option<crate::session::Line>,
+    /// Whether a session recording can start now (or stop, while one runs), and why not.
+    pub record: Action,
     pub obs: ObsLine,
     /// The OBS that came with the app is there.
     pub bundled: bool,

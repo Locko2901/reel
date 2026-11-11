@@ -528,6 +528,9 @@ pub async fn clip(
         None => "unknown".into(),
     };
     let mut meta = vec![format!("recorded {recorded_text}")];
+    if clip.is_recording() {
+        meta.insert(0, "session recording".into());
+    }
     let via = match clip.source.as_str() {
         "device" => "the desktop app".to_string(),
         other => other.to_string(),

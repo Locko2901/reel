@@ -44,6 +44,9 @@ pub struct Clip {
     /// Made of another user's footage: a montage of their clips, or a cut of one as its own clip.
     #[sqlx(default)]
     pub others_footage: bool,
+    /// "recording" for a session recording of the desktop app; none for a clip.
+    #[sqlx(default)]
+    pub kind: Option<String>,
 }
 
 impl Clip {
@@ -100,9 +103,17 @@ impl Clip {
             uploaded_to: None,
             deleted_by: None,
             others_footage: false,
+            kind: None,
         }
     }
+
+    pub fn is_recording(&self) -> bool {
+        self.kind.as_deref() == Some(RECORDING)
+    }
 }
+
+/// The kind of a session recording of the desktop app.
+pub const RECORDING: &str = "recording";
 
 #[derive(Debug, Clone, FromRow, Serialize)]
 pub struct ClipRow {
@@ -520,6 +531,8 @@ pub struct DeviceUpload {
     pub keep_last: Option<f64>,
     /// The audio tracks' names as the device gave them, a JSON list.
     pub audio_names: Option<String>,
+    #[sqlx(default)]
+    pub kind: Option<String>,
 }
 
 /// An upload from the browser in pieces; `file_key` is the browser's word for the file (its size
@@ -580,6 +593,7 @@ impl DeviceUpload {
             error: None,
             keep_last: None,
             audio_names: None,
+            kind: None,
         }
     }
 }
@@ -606,6 +620,8 @@ pub struct CapRow {
     /// In a collection someone put it in (a game's does not count).
     pub in_set: bool,
     pub starred: bool,
+    #[sqlx(default)]
+    pub recording: bool,
 }
 
 #[derive(Debug, Clone, FromRow, Serialize)]

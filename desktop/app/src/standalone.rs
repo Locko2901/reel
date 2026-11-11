@@ -189,22 +189,15 @@ impl Local {
     }
 
     /// Hands a clip OBS saved to the local pipeline; the file is taken into the library.
-    pub async fn ingest(
-        &self,
-        path: &Path,
-        title: Option<String>,
-        recorded_at: Option<String>,
-        game: Option<String>,
-        keep_last: Option<f64>,
-        audio_names: Option<Vec<String>>,
-    ) -> anyhow::Result<String> {
+    pub async fn ingest(&self, path: &Path, t: Taken) -> anyhow::Result<String> {
         let mut new = reel_pipeline::enqueue::NewClip::new(path, "desktop");
-        new.audio_names = audio_names;
-        new.title = title;
-        new.recorded_at = recorded_at;
+        new.audio_names = t.audio_names;
+        new.title = t.title;
+        new.recorded_at = t.recorded_at;
         new.recorded_source = Some("desktop");
-        new.game = game;
-        new.keep_last = keep_last;
+        new.game = t.game;
+        new.keep_last = t.keep_last;
+        new.kind = t.recording.then_some(reel_pipeline::enqueue::RECORDING);
         let (clip, _job) = reel_pipeline::enqueue::create_clip_for_file(&self.ctx, new).await?;
         Ok(clip.id)
     }
@@ -255,6 +248,16 @@ impl Local {
         tokio::time::sleep(std::time::Duration::from_secs(1)).await;
         tracing::info!("standalone: reel's database is closed");
     }
+}
+
+/// What the app knows of a clip it hands to the library on this PC.
+pub struct Taken {
+    pub title: Option<String>,
+    pub recorded_at: Option<String>,
+    pub game: Option<String>,
+    pub keep_last: Option<f64>,
+    pub audio_names: Option<Vec<String>>,
+    pub recording: bool,
 }
 
 /// The pinned ffmpeg build, for the Status page.

@@ -58,6 +58,7 @@
     "allow-open-folder",
     "allow-pause-set",
     "allow-recording-pause-set",
+    "allow-session-set",
     "allow-upload-now",
     "allow-obs-show",
     "allow-obs-again",

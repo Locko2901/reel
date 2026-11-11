@@ -105,7 +105,7 @@ fn entry_text(exec: &str, icon: &str) -> String {
 pub fn hotkeys_how() -> String {
     let cmd = command();
     format!(
-        "This is the Linux version: global hotkeys depend on your desktop, so they may not work here, or may need to be set up in the desktop's own keyboard settings. There you can bind a key to {cmd} --save-and-share (or --save, --share-last)."
+        "This is the Linux version: global hotkeys depend on your desktop, so they may not work here, or may need to be set up in the desktop's own keyboard settings. There you can bind a key to {cmd} --save-and-share (or --save, --share-last, --record-session)."
     )
 }
 

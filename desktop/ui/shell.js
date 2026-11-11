@@ -1,6 +1,7 @@
 // reel's header and nav for the app's own pages; links open in this webview, so Back comes back here.
 import { isOn, setOn, switches } from './assets/js/switch.js';
 import { mouseWalk } from './assets/js/walk.js';
+import { recordControl } from './assets/js/record.js';
 
 switches();
 export const tauri = window.__TAURI__ || null;
@@ -27,7 +28,7 @@ function serverHref(path) { return base ? base + path : path; }
 
 export const APP_SECTIONS = [
   ['status', 'Status'], ['server', 'Server'], ['obs', 'OBS'], ['clips', 'Clips folder and cache'], ['upload', 'Upload'],
-  ['hotkeys', 'Hotkeys'], ['sounds', 'Sounds'], ['startup', 'Startup'], ['log', 'Log'],
+  ['hotkeys', 'Hotkeys'], ['session', 'Session recording'], ['sounds', 'Sounds'], ['startup', 'Startup'], ['log', 'Log'],
   ['library', 'Library folder'], ['encoder', 'Encoder'],
 ];
 export const STANDALONE_ONLY = ['library', 'encoder'];
@@ -35,7 +36,7 @@ export const STANDALONE_ONLY = ['library', 'encoder'];
 // standalone alone ('s') or beside a server alone ('p'); crates/server/src/routes/settings.rs
 // groups reel's pages the same way.
 const NAV = [
-  ['Recording', ['a obs', 'a clips', 'a upload', 'a hotkeys', 'a sounds']],
+  ['Recording', ['a obs', 'a clips', 'a upload', 'a hotkeys', 'a session', 'a sounds']],
   ['Library', ['r storage', 'as library', 'r ingest', 'as encoder', 'rs sharing', 'r imports']],
   ['Server', ['a server', 'rp sharing', 'r devices', 'r access', 'r notifications']],
   ['System', ['r general', 'r appearance', 'a startup', 'a status', 'a log', 'r advanced']],
@@ -43,12 +44,14 @@ const NAV = [
 
 const WORST = ['err', 'warn', 'active', 'ok', 'neutral'];
 const worst = (states) => WORST.find(s => states.includes(s)) || 'ok';
-const APP_DOT = { error: 'err', unpaired: 'err', paused: 'warn', waiting: 'warn', changed: 'warn', uploading: 'active', working: 'active', preparing: 'active', idle: 'ok' };
+const APP_DOT = { error: 'err', unpaired: 'err', paused: 'warn', waiting: 'warn', changed: 'warn', uploading: 'active', working: 'active', preparing: 'active', recording: 'active', idle: 'ok' };
 const HEALTH_WORD = { ok: 'ok', warn: 'warning', err: 'error' };
 let serverState = 'ok';
 let serverLine = '';
 // Standalone: the library on this PC, no server.
 let here = false;
+// The header's Record, once the header is mounted.
+let record = () => {};
 const STANDALONE_LABELS = { clips: 'Clips folder', upload: 'New clips' };
 
 function setPart(id, state, word, line) {
@@ -185,6 +188,10 @@ export function bindHeader() {
     goServer(q ? `/?q=${encodeURIComponent(q)}` : '/');
   });
   $('#app-save')?.addEventListener('click', () => runSave('save_clip'));
+  if ($('#app-record')) {
+    record = recordControl($('#app-record'), $('#menu-record'),
+      (on) => invoke('session_set', { on }), (why) => toast(why, 'err'));
+  }
   $('#app-save-share')?.addEventListener('click', () => runSave('save_and_share'));
   $('#menu-save')?.addEventListener('click', () => runSave('save_clip'));
   $('#menu-save-share')?.addEventListener('click', () => runSave('save_and_share'));
@@ -251,6 +258,7 @@ export function renderParts(status) {
   word.className = `chip-word ${app === 'ok' ? '' : app}`;
   setOn($('#app-pause'), !!status.paused_by_user);
   setOn($('#app-recording'), !!status.recording_paused);
+  record(status);
   $('#app-share').disabled = !status.paired;
   saveButtons(status, $('#app-save'), $('#app-save-share'));
   saveButtons(status, $('#menu-save'), $('#menu-save-share'));
@@ -314,6 +322,7 @@ export function header(page) {
   <button class="quiet search-toggle" id="search-toggle" type="button" aria-label="Search" aria-expanded="false"><svg class="icon" viewBox="0 0 16 16"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5 14 14"/></svg></button>
   <a class="btn primary" href="#" data-page="/upload" id="upload-link" aria-label="Upload"><svg class="icon" viewBox="0 0 16 16"><path d="M8 11V3M4.5 6.5 8 3l3.5 3.5M3 13h10"/></svg><span>Upload</span></a>
   <button class="btn app-save" id="app-save" type="button" aria-label="Save clip" disabled><svg class="icon" viewBox="0 0 16 16"><circle cx="8" cy="8" r="5.5"/><circle cx="8" cy="8" r="1.8"/></svg><span>Save clip</span></button>
+  <button class="btn app-record" id="app-record" type="button" aria-label="Record a session" disabled><svg class="icon" viewBox="0 0 16 16"><circle cx="8" cy="8" r="4.5"/></svg><span class="rec-time"></span><span class="rec-word">Record</span></button>
   <button class="btn app-save" id="app-save-share" data-panel="save_share" type="button" aria-label="Save and share" disabled><svg class="icon" viewBox="0 0 16 16"><circle cx="5.5" cy="8" r="4"/><circle cx="5.5" cy="8" r="1.2"/><path d="M11 8h4M13 6l2 2-2 2"/></svg><span>Save and share</span></button>
   <button class="btn app-share" id="app-share" data-panel="share_last" type="button" aria-label="Share the last clip"><svg class="icon" viewBox="0 0 16 16"><path d="M12 5a2 2 0 1 0 0-4 2 2 0 0 0 0 4ZM4 10a2 2 0 1 0 0-4 2 2 0 0 0 0 4Zm8 5a2 2 0 1 0 0-4 2 2 0 0 0 0 4ZM5.7 7.1l4.6-2.3M5.7 8.9l4.6 2.3"/></svg><span>Share the last clip</span></button>
   <button class="chip" id="chip" type="button" aria-haspopup="dialog" aria-expanded="false" aria-label="Status"><i class="dot ok" id="chip-dot"></i><span class="chip-word" id="chip-word"></span></button>
@@ -329,7 +338,7 @@ export function header(page) {
   <button class="avatar" id="user-btn" type="button" title="" aria-label="Menu" aria-haspopup="menu" aria-expanded="false"></button>
   <div class="menu" id="user-menu" role="menu" hidden>
     <div class="menu-head"><b></b> </div>
-    <div class="menu-save"><button class="item" id="menu-save" type="button" role="menuitem" disabled>Save clip</button><button class="item" id="menu-save-share" data-panel="save_share" type="button" role="menuitem" disabled>Save and share</button><p class="menu-note" id="menu-save-why" hidden></p></div>
+    <div class="menu-save"><button class="item" id="menu-save" type="button" role="menuitem" disabled>Save clip</button><button class="item" id="menu-record" type="button" role="menuitem" disabled>Record a session</button><button class="item" id="menu-save-share" data-panel="save_share" type="button" role="menuitem" disabled>Save and share</button><p class="menu-note" id="menu-save-why" hidden></p></div>
     <div class="menu-nav">
       <a href="#" data-page="/" role="menuitem">Library</a>
       <a href="#" data-page="/collections" role="menuitem">Collections</a>

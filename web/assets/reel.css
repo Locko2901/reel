@@ -23,6 +23,7 @@
   --warn: #d9a55b;
   --err: #de6f62;
   --err-tint: rgba(222, 111, 98, 0.08);
+  --rec: #e5484d;
   --overlay: rgba(13, 11, 16, 0.82);
   --shade: rgba(13, 11, 16, 0.75);
   --scrim: rgba(0, 0, 0, 0.55);
@@ -252,11 +253,26 @@ label.toggle { display: inline-flex; align-items: center; gap: var(--s2); cursor
 html[data-app="desktop"] .top .app-share { display: inline-flex; }
 .top .app-save { display: none; }
 html[data-app="desktop"] .top .app-save { display: inline-flex; }
+.top .app-record { display: none; }
+html[data-app="desktop"] .top .app-record { display: inline-flex; }
+.app-record .icon circle { stroke: var(--rec); }
+.app-record.on { border-color: var(--rec); color: var(--text); }
+.app-record.on .icon circle { fill: var(--rec); }
+.app-record .rec-time { font-family: var(--mono); font-size: var(--fs-s); font-variant-numeric: tabular-nums; }
+.app-record .rec-time:empty { display: none; }
 .menu .menu-save { display: none; }
 .menu .menu-note { margin: 0; padding: 2px 10px 6px; color: var(--text-3); font-size: var(--fs-s); max-width: 260px; }
 @media (max-width: 1279px) {
   .top .app-save span { display: none; }
   .top .app-save { min-width: var(--ctl); justify-content: center; }
+  .top .app-record .rec-word { display: none; }
+  .top .app-record { min-width: var(--ctl); }
+}
+/* A paired app's header also holds Save and share and Share the last clip: words from 1600 px. */
+@media (min-width: 1280px) and (max-width: 1599px) {
+  html[data-app="desktop"] .top:has(#app-save-share:not([hidden])) .app-save span { display: none; }
+  html[data-app="desktop"] .top:has(#app-save-share:not([hidden])) .app-save { min-width: var(--ctl); justify-content: center; }
+  html[data-app="desktop"] .top:has(#app-save-share:not([hidden])) .app-record .rec-word { display: none; }
 }
 @media (min-width: 720px) and (max-width: 1023px) {
   html[data-app="desktop"] .top .search { display: none; }
@@ -273,6 +289,7 @@ html[data-app="desktop"] .top .app-save { display: inline-flex; }
 }
 @media (max-width: 600px) {
   html[data-app="desktop"] .top .app-save { display: none; }
+  html[data-app="desktop"] .top .app-record:not(.on) { display: none; }
   html[data-app="desktop"] .menu .menu-save { display: contents; }
 }
 .chip { display: inline-flex; align-items: center; gap: 7px; height: var(--ctl); padding: 0 9px; border: 1px solid transparent; border-radius: var(--radius); color: var(--text-2); font-size: var(--fs-s); max-width: 220px; }
@@ -635,6 +652,7 @@ body.selecting .toast { bottom: calc(var(--s5) + 64px + env(safe-area-inset-bott
   font-size: var(--fs-xs); line-height: 16px;
   padding: 0 5px; background: var(--overlay); color: var(--text); border-radius: var(--radius-s);
 }
+.poster .dur.rec::before { content: ""; display: inline-block; width: 6px; height: 6px; margin: 0 5px 1px 0; border-radius: 50%; background: var(--rec); }
 .poster .flag {
   position: absolute; left: 6px; top: 6px;
   font-size: var(--fs-xs); line-height: 16px; padding: 0 5px;

@@ -209,12 +209,26 @@
             <div class="srow" data-key="hotkeys.save_share" data-kind="hotkey" data-standalone="hide"><div class="slabel"><b>Save and share</b><span class="shelp">OBS saves the replay, the app uploads it (with Keep the last, when set), waits until it embeds, copies the link and plays the cue</span></div><div class="sctl"><button type="button" class="hotkey" aria-label="Hotkey: Save and share"></button><span class="why" aria-live="polite" hidden></span><span class="err" hidden></span></div></div>
             <div class="srow" data-key="hotkeys.save" data-kind="hotkey"><div class="slabel"><b>Save a clip</b><span class="shelp" data-standalone-text="OBS saves the replay, and it goes into the library on this PC; the OBS that came with reel has no hotkeys of its own to reach">OBS saves the replay and it goes up as any clip does; the OBS that came with reel has no hotkeys of its own to reach</span></div><div class="sctl"><button type="button" class="hotkey" aria-label="Hotkey: Save a clip"></button><span class="why" aria-live="polite" hidden></span><span class="err" hidden></span></div></div>
             <div class="srow" data-key="hotkeys.upload_last" data-kind="hotkey" data-standalone="hide"><div class="slabel"><b>Upload the last clip</b><span class="shelp">for the hotkey upload mode; harmless otherwise</span></div><div class="sctl"><button type="button" class="hotkey" aria-label="Hotkey: Upload the last clip"></button><span class="why" aria-live="polite" hidden></span><span class="err" hidden></span></div></div>
+            <div class="srow" data-key="hotkeys.record" data-kind="hotkey"><div class="slabel"><b>Record a session</b><span class="shelp" data-standalone-text="starts a recording of the whole session, and stops it; the recording goes into the library on this PC">starts a recording of the whole session, and stops it; the recording goes up as any clip does once it stops</span></div><div class="sctl"><button type="button" class="hotkey" aria-label="Hotkey: Record a session"></button><span class="why" aria-live="polite" hidden></span><span class="err" hidden></span></div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="group" id="g-session" data-app-section="session" hidden>
+        <p class="section-line" data-standalone-text="A recording of the whole session, from Record until Stop: in the window's header, the tray, or its hotkey under Hotkeys. It goes into the library like a clip.">A recording of the whole session, from Record until Stop: in the window's header, the tray, or its hotkey under Hotkeys. It goes up as any clip does once it stops.</p>
+        <div class="panel" data-cue="session">
+          <header><h2>Reminders</h2><div class="actions"><button class="small" type="button" data-preview="session">Preview</button></div></header>
+          <div class="body flush">
+            <div class="srow" data-key="session.remind_minutes" data-kind="int" data-min="0" data-max="600"><div class="slabel"><b>Remind every</b><span class="shelp">while a session recording runs: the sound below and a notification, counted from its start; 0 is never. The sound reaches a game in full screen, where Windows holds notifications back</span></div><div class="sctl"><span class="ctl-group"><input type="number" class="in-num" min="0" max="600" aria-label="Remind every"><span class="unit">min</span></span><span class="err" hidden></span></div></div>
+            <div class="srow" data-key="sounds.session.enabled" data-kind="bool"><div class="slabel"><b>Play</b><span class="shelp">when a session recording starts, and at each reminder</span></div><div class="sctl"><button type="button" class="switch" role="switch" aria-checked="false" aria-label="Play session recording"><i></i></button><span class="err" hidden></span></div></div>
+            <div class="srow" data-key="sounds.session.volume" data-kind="volume"><div class="slabel"><b>Volume</b></div><div class="sctl"><input type="range" class="in-short" min="0" max="100" aria-label="Volume session recording"><span class="unit vol">100</span><span class="err" hidden></span></div></div>
+            <div class="srow" data-key="sounds.session.file" data-kind="file"><div class="slabel"><b>Sound</b><span class="shelp">empty plays the bundled session.wav</span></div><div class="sctl"><span class="ctl-group in-path"><input type="text" class="mono" aria-label="Sound session recording" placeholder="session.wav (bundled)"><button class="small" type="button" data-browse="sounds.session.file">Browse</button></span><span class="err" hidden></span></div></div>
           </div>
         </div>
       </div>
 
       <div class="group" id="g-sounds" data-app-section="sounds" hidden>
-        <p class="section-line" data-standalone-text="Two cues: a clip was captured, a clip is in the library. WAV files only.">Three cues: a clip was captured, a clip is safe on the server, a link was copied. WAV files only.</p>
+        <p class="section-line" data-standalone-text="Two cues: a clip was captured, a clip is in the library. WAV files only; the session recording's sound is under Session recording.">Three cues: a clip was captured, a clip is safe on the server, a link was copied. WAV files only; the session recording's sound is under Session recording.</p>
         <div class="panel" data-cue="captured">
           <header><h2>Clip captured</h2><div class="actions"><button class="small" type="button" data-preview="captured">Preview</button></div></header>
           <div class="body flush">

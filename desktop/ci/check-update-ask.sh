@@ -3,7 +3,9 @@
 # loopback, and "ask, then install": it asks by itself in a notification and in the window;
 # Install now from the window, the notification and its link starts the install, Later does not,
 # and a link without this run's value does nothing. The release's AppImage is signed with the
-# tests' key, so the release key built into the app refuses it and nothing is replaced.
+# tests' key, so the release key built into the app refuses it and nothing is replaced. With a
+# session recording running (the stand-in OBS), the question says Install now waits for it, and
+# the install goes on once it stops.
 # Paired, against REEL_E2E_SERVER: the server's library asks too. Only a server newer than the app
 # offers it an update, with the app's AppImage and its .sig in the server's app-updates folder; a
 # server as new as the app offers none, and that part is left out with a note.
@@ -196,6 +198,57 @@ ok "Install now on the library: the install starts"
 ! grep -q "panicked" "$W"/app*.out || fail "a thread panicked"
 grep -h "the update's question answered\|the app asks to install\|an update link without" "$L"/reel-desktop.log* | sed 's/^[^ ]* *[A-Z]* /     /'
 ok "nothing replaced the AppImage; every request to the release carried reel's user agent"
+stop
+
+# A session recording holds the install: the question says so, Install now waits, Stop lets it go on.
+mkdir -p "$W/rec"
+/work/desktop/app/binaries/ffmpeg-x86_64-unknown-linux-gnu -v error -f lavfi -i "testsrc2=duration=3:size=640x360:rate=30" \
+  -c:v libx264 -pix_fmt yuv420p "$W/clip.mp4" || fail "no clip for the stand-in OBS"
+OBS_PORT=$(python3 -c 'import socket; s = socket.socket(); s.bind(("127.0.0.1", 0)); print(s.getsockname()[1])')
+/target/debug/examples/fake_obs --port "$OBS_PORT" --dir "$W/rec" --clip "$W/clip.mp4" > "$W/fake-obs.out" 2>&1 &
+PIDS="$PIDS $!"
+python3 - "$D/config/settings.json" "$OBS_PORT" "$W/rec" <<'PY'
+import json, sys
+path, port, rec = sys.argv[1], int(sys.argv[2]), sys.argv[3]
+s = json.load(open(path))
+s["obs"] = {"enabled": True, "host": "127.0.0.1", "port": port, "password": "", "start_replay": False}
+s.update({"clips_dir": rec, "clips_follow_obs": True, "stable_seconds": 2})
+json.dump(s, open(path, "w"))
+PY
+asks=$(logged "the app asks to install the update")
+answers=$(logged 'the update.s question answered: Install now.* from="a reel-desktop link"')
+start
+waitmore "obs connected" 60 "the app did not connect to the stand-in OBS" 0
+again --start-session
+waitmore "session recording started from the command line" 20 "--start-session did not start a session recording" 0
+waitmore "the app asks to install the update" 200 "the app did not ask while recording" "$asks"
+for _ in $(seq 1 20); do [ "$(said "is ready to install: Install now waits for the session recording to stop, then closes reel")" -gt 0 ] && break; sleep 0.5; done
+[ "$(said "is ready to install: Install now waits for the session recording to stop, then closes reel")" -eq 1 ] \
+  || fail "the question while recording does not say that Install now waits: $(last_ask)"
+size 1280 820
+shot "update-ask-library-recording-1280x820-dark"
+ok "asked while a session recording runs: $(last_ask | sed 's/^notification reel: //; s/ \[.*//')"
+installs=$(logged "installing the update")
+fails=$(logged "the update did not download")
+again "$(link_of install)"
+waitmore 'the update.s question answered: Install now.* from="a reel-desktop link"' 20 "Install now from the link while recording" "$answers"
+waitmore "the update waits: the session recording" 20 "Install now did not wait for the session recording" 0
+for _ in $(seq 1 20); do grep -q "reel $VERSION waits for the session recording: It installs once the session recording stops." "$N" && break; sleep 0.5; done
+grep -q "reel $VERSION waits for the session recording: It installs once the session recording stops." "$N" \
+  || fail "Install now while recording did not say that it waits: $(tail -n 1 "$N")"
+again --section=startup
+sleep 6
+shot "update-ask-app-startup-recording-1280x820-dark"
+[ "$(logged "installing the update")" -eq "$installs" ] || fail "the update installed while the session recording ran"
+ok "Install now while recording: it waits and says so ($(tail -n 1 "$N" | sed 's/^notification reel: //; s/ \[.*//'))"
+again --stop-session
+waitmore "session recording stopped from the command line" 20 "--stop-session did not stop the session recording" 0
+waitmore "installing the update" 30 "the install did not go on once the session recording stopped" "$installs"
+waitmore "the update did not download" 30 "the download after the session recording was not refused" "$fails"
+cat "$L"/reel-desktop.log* | grep "session recording stopped from the command line\|installing the update" | tail -n 2 | head -n 1 \
+  | grep -q "session recording stopped" || fail "the install went on before the session recording stopped"
+! grep -q "panicked" "$W"/app*.out || fail "a thread panicked"
+ok "Stop: the session recording's file is whole, then the install goes on (and the release key refuses the tests' AppImage)"
 stop
 
 SERVER="${REEL_E2E_SERVER:-}"

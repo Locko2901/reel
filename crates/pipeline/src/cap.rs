@@ -1,5 +1,6 @@
 //! The library cap: the oldest clips go to the trash, those without a live link first, never
-//! a starred one, one in a collection or, standalone, one on no server.
+//! a starred one, one in a collection or, standalone, one on no server. Session recordings go
+//! before clips, all but the newest, so one long recording does not push out a hundred clips.
 use crate::Ctx;
 use reel_core::format;
 use reel_store::models::CapRow;
@@ -51,8 +52,19 @@ pub fn plan(rows: &[CapRow], cap: u64, keeps_unsent: bool) -> Plan {
         p.holds.add(r.bytes.max(0) as u64);
     }
     p.left = p.holds.bytes;
-    let mut order: Vec<&CapRow> = rows.iter().filter(|r| !r.linked).collect();
-    order.extend(rows.iter().filter(|r| r.linked));
+    let newest_recording = rows.iter().rposition(|r| r.recording);
+    let early = |i: usize, r: &CapRow| r.recording && Some(i) != newest_recording;
+    let mut order: Vec<&CapRow> = Vec::new();
+    for linked in [false, true] {
+        for first in [true, false] {
+            order.extend(
+                rows.iter()
+                    .enumerate()
+                    .filter(|(i, r)| r.linked == linked && early(*i, r) == first)
+                    .map(|(_, r)| r),
+            );
+        }
+    }
     for r in order {
         let bytes = r.bytes.max(0) as u64;
         if r.starred {
@@ -127,8 +139,13 @@ pub fn line(p: &Plan, trash_days: u64) -> String {
     }
     let mut out = format!("{holds}, over the {cap} cap");
     if p.moved.clips > 0 {
+        let recordings = if p.go.iter().any(|r| r.recording) {
+            ", older session recordings before clips"
+        } else {
+            ""
+        };
         out.push_str(&format!(
-            ": at its next run (housekeeping, every 10 minutes) the cap moves {}, {}, {}, to the trash, the oldest first, the ones without a live link before the others. The trash keeps them {trash_days} days; the disk has their room back then.",
+            ": at its next run (housekeeping, every 10 minutes) the cap moves {}, {}, {}, to the trash, the oldest first{recordings}, the ones without a live link before the others. The trash keeps them {trash_days} days; the disk has their room back then.",
             clips(p.moved.clips),
             format::size(p.moved.bytes),
             span(&p.go),
@@ -281,6 +298,7 @@ mod tests {
             linked: false,
             in_set: false,
             starred: false,
+            recording: false,
         }
     }
 
@@ -322,6 +340,55 @@ mod tests {
             vec!["b", "c", "old-linked"],
             "and goes when nothing else is left"
         );
+    }
+
+    #[test]
+    fn older_session_recordings_go_before_clips_and_the_newest_one_by_its_age() {
+        let mut rows = vec![
+            row("clip-1", "2026-01-01T00:00:00Z", 1),
+            row("rec-old", "2026-01-02T00:00:00Z", 11),
+            row("clip-2", "2026-01-03T00:00:00Z", 1),
+            row("clip-3", "2026-01-04T00:00:00Z", 1),
+            row("rec-new", "2026-01-05T00:00:00Z", 11),
+        ];
+        rows[1].recording = true;
+        rows[4].recording = true;
+        let p = plan(&rows, 20 * GB as u64, false);
+        assert_eq!(
+            ids(&p),
+            vec!["rec-old"],
+            "the older recording, not the three clips older than the new one"
+        );
+        assert!(line(&p, 7).contains("the oldest first, older session recordings before clips,"));
+        assert_eq!(
+            ids(&plan(&rows, 13 * GB as u64, false)),
+            vec!["rec-old", "clip-1"],
+            "then the clips by age"
+        );
+        assert_eq!(
+            ids(&plan(&rows, GB as u64, false)),
+            vec!["rec-old", "clip-1", "clip-2", "clip-3", "rec-new"],
+            "the newest recording by its age"
+        );
+        let alone = vec![
+            row("clip-1", "2026-01-01T00:00:00Z", 1),
+            row("rec", "2026-01-02T00:00:00Z", 11),
+        ];
+        let mut alone = alone;
+        alone[1].recording = true;
+        assert_eq!(
+            ids(&plan(&alone, 11 * GB as u64, false)),
+            vec!["clip-1"],
+            "the one recording, just made, is not sent to the trash before the clips"
+        );
+        rows[1].starred = true;
+        assert_eq!(
+            ids(&plan(&rows, 22 * GB as u64, false)),
+            vec!["clip-1", "clip-2", "clip-3"],
+            "a starred recording is spared like a starred clip"
+        );
+        let words = line(&plan(&rows[..4], 30 * GB as u64, false), 7);
+        assert!(!words.contains("session recordings"), "{words}");
     }
 
     #[test]

@@ -528,10 +528,14 @@ fn ask(rt: &Runtime) {
         if g.update_later.take().is_some_and(|(v, _)| v == version) {
             tracing::info!(version, "a day since Later: the question again");
         }
-        (version, g.update_value.clone())
+        (
+            version,
+            g.update_value.clone(),
+            crate::session::holds_install(&g),
+        )
     };
-    let (version, value) = asked;
-    let (title, words) = update_steps::ask(&version, kind(rt));
+    let (version, value, recording) = asked;
+    let (title, words) = update_steps::ask(&version, kind(rt), recording);
     let window = rt
         .app
         .get_window(crate::shell::MAIN)
@@ -809,6 +813,8 @@ fn test_build(version: &str) -> bool {
 /// What an install waits for before reel closes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Busy {
+    /// A session recording, from its start until its file is whole.
+    Session,
     /// A clip on its way to the server, or a share being made.
     Clip,
     Move,
@@ -820,6 +826,7 @@ pub enum Busy {
 impl Busy {
     fn until(self) -> &'static str {
         match self {
+            Busy::Session => "the session recording stops",
             Busy::Clip => "the clip on its way is up",
             Busy::Move => "the library has moved",
             Busy::Use => "the library is taken up",
@@ -829,6 +836,7 @@ impl Busy {
 
     fn what(self) -> &'static str {
         match self {
+            Busy::Session => "the session recording",
             Busy::Clip => "the clip on its way",
             Busy::Move => "the library's move",
             Busy::Use => "taking up the library",
@@ -836,8 +844,18 @@ impl Busy {
         }
     }
 
-    fn library(self) -> bool {
+    /// Holds the install as long as it goes on, so Install says so as it is pressed.
+    fn long(self) -> bool {
         self != Busy::Clip
+    }
+}
+
+/// What holds an install now: a session recording first, as only its Stop ends it.
+fn holding(session: bool, uploading: bool, job: Option<&crate::library::Job>) -> Option<Busy> {
+    if session {
+        Some(Busy::Session)
+    } else {
+        busy(uploading, job)
     }
 }
 
@@ -873,6 +891,20 @@ pub struct Hold {
 }
 
 impl Hold {
+    /// As `look`, with a session recording first: it holds the install for as long as it runs.
+    pub fn look_all(
+        &mut self,
+        now: Instant,
+        session: bool,
+        uploading: bool,
+        job: Option<&crate::library::Job>,
+    ) -> Verdict {
+        if session {
+            return Verdict::Wait(Busy::Session);
+        }
+        self.look(now, uploading, job)
+    }
+
     pub fn look(
         &mut self,
         now: Instant,
@@ -916,6 +948,10 @@ pub fn line_now(line: String, held: Option<&str>, job: Option<&crate::library::J
     }
 }
 
+fn waits_line(version: &str, b: Busy) -> String {
+    format!("reel {version} installs once {}", b.until())
+}
+
 fn gave_up_line(version: &str, b: Busy) -> String {
     format!(
         "reel {version} did not install: {} has not gone on for 10 minutes; Install tries again, and the next start offers it again",
@@ -925,9 +961,31 @@ fn gave_up_line(version: &str, b: Busy) -> String {
 
 fn holder(rt: &Runtime) -> Option<Busy> {
     let g = rt.lock();
-    busy(
+    holding(
+        crate::session::holds_install(&g),
         g.uploading.is_some() || g.share_running,
         g.library_job.as_ref(),
+    )
+}
+
+/// The notification as Install is pressed: what holds it first, or that reel closes now.
+fn pressed(version: &str, first: Option<Busy>, going: &(String, String)) -> (String, String) {
+    let Some(b) = first else {
+        return going.clone();
+    };
+    let stop = match b {
+        Busy::Move => "; the move's Stop lets it install now",
+        Busy::Copy => "; the copy's Stop lets it install now",
+        _ => "",
+    };
+    let what = if b == Busy::Session {
+        b.what()
+    } else {
+        "the library"
+    };
+    (
+        format!("reel {version} waits for {what}"),
+        format!("It installs once {}{stop}.", b.until()),
     )
 }
 
@@ -938,8 +996,9 @@ async fn hold(rt: &Runtime, version: &str) -> Result<(), String> {
     loop {
         let verdict = {
             let g = rt.lock();
-            hold.look(
+            hold.look_all(
                 Instant::now(),
+                crate::session::holds_install(&g),
                 g.uploading.is_some() || g.share_running,
                 g.library_job.as_ref(),
             )
@@ -959,7 +1018,7 @@ async fn hold(rt: &Runtime, version: &str) -> Result<(), String> {
             Verdict::Wait(b) if said != Some(b) => {
                 said = Some(b);
                 tracing::info!(version, "the update waits: {}", b.what());
-                set_line(rt, format!("reel {version} installs once {}", b.until()));
+                set_line(rt, waits_line(version, b));
             }
             Verdict::Wait(_) => {}
         }
@@ -999,21 +1058,9 @@ pub async fn install_now(rt: &Runtime) -> Result<(), String> {
     rt.push_status();
     let version = update.version.clone();
     let going = update_steps::going(&version, kind(rt), false);
-    let first = holder(rt).filter(|b| b.library());
-    if let Some(b) = first {
-        let stop = match b {
-            Busy::Move => "; the move's Stop lets it install now",
-            Busy::Copy => "; the copy's Stop lets it install now",
-            _ => "",
-        };
-        notify::show(
-            &rt.app,
-            &format!("reel {version} waits for the library"),
-            &format!("It installs once {}{stop}.", b.until()),
-        );
-    } else {
-        notify::show(&rt.app, &going.0, &going.1);
-    }
+    let first = holder(rt).filter(|b| b.long());
+    let (title, body) = pressed(&version, first, &going);
+    notify::show(&rt.app, &title, &body);
     hold(rt, &version).await?;
     set_line(rt, format!("installing reel {version}"));
     tracing::info!(version, "installing the update");
@@ -1027,8 +1074,8 @@ pub async fn install_now(rt: &Runtime) -> Result<(), String> {
             words
         })?,
     };
-    // a move begun during the download holds it as well
-    let late = holder(rt).is_some_and(Busy::library);
+    // a move or a session recording begun during the download holds it as well
+    let late = holder(rt).is_some_and(Busy::long);
     hold(rt, &version).await?;
     if first.is_some() || late {
         notify::show(&rt.app, &going.0, &going.1);
@@ -1171,6 +1218,9 @@ pub fn leave(rt: &Runtime, from: &'static str, then: Then) {
     });
     let rt = rt.clone();
     std::thread::spawn(move || {
+        if let Some(what) = rt.session_before_quit() {
+            steps.step(&what);
+        }
         if rt.stop_bundled() {
             steps.step("OBS is stopped");
         }
@@ -1366,6 +1416,56 @@ mod tests {
             Hold::default().look(t0, false, None),
             Verdict::Go,
             "nothing holds it"
+        );
+    }
+
+    #[test]
+    fn a_session_recording_holds_an_install_as_long_as_it_runs_and_install_says_so() {
+        let moving = job("move", "copying", 1);
+        assert_eq!(
+            super::holding(true, true, Some(&moving)),
+            Some(Busy::Session),
+            "first, over a clip and the library"
+        );
+        assert_eq!(super::holding(false, true, Some(&moving)), Some(Busy::Move));
+        assert_eq!(super::holding(false, false, None), None);
+        let t0 = Instant::now();
+        let hours = t0 + Duration::from_secs(5 * 3600);
+        let mut hold = Hold::default();
+        assert_eq!(
+            hold.look_all(t0, true, true, None),
+            Verdict::Wait(Busy::Session)
+        );
+        assert_eq!(
+            hold.look_all(hours, true, false, Some(&moving)),
+            Verdict::Wait(Busy::Session),
+            "no bound: only its Stop ends it"
+        );
+        assert_eq!(hold.look_all(hours, false, false, None), Verdict::Go);
+        // Install now on the question, or Install in the tray or Settings, while it runs
+        let going = (
+            "Updating reel to 1.15.1".to_string(),
+            "reel closes now and opens again by itself in a few seconds.".to_string(),
+        );
+        assert_eq!(
+            super::pressed("1.15.1", Some(Busy::Session), &going),
+            (
+                "reel 1.15.1 waits for the session recording".to_string(),
+                "It installs once the session recording stops.".to_string()
+            )
+        );
+        assert_eq!(
+            super::waits_line("1.15.1", Busy::Session),
+            "reel 1.15.1 installs once the session recording stops"
+        );
+        assert_eq!(super::pressed("1.15.1", None, &going), going);
+        assert_eq!(
+            super::pressed("1.15.1", Some(Busy::Move), &going),
+            (
+                "reel 1.15.1 waits for the library".to_string(),
+                "It installs once the library has moved; the move's Stop lets it install now."
+                    .to_string()
+            )
         );
     }
 

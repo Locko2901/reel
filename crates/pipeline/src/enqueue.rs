@@ -7,6 +7,8 @@ use reel_store::models::*;
 use serde_json::json;
 use std::path::Path;
 
+pub use reel_store::models::RECORDING;
+
 pub struct NewClip<'a> {
     pub input: &'a Path,
     pub source: &'a str,
@@ -24,6 +26,8 @@ pub struct NewClip<'a> {
     pub keep_last: Option<f64>,
     /// The audio tracks' names a device gave, for a file that carries none (an MP4 of OBS's).
     pub audio_names: Option<Vec<String>>,
+    /// `RECORDING` for a session recording; none for a clip.
+    pub kind: Option<&'a str>,
 }
 
 impl<'a> NewClip<'a> {
@@ -43,6 +47,7 @@ impl<'a> NewClip<'a> {
             game: None,
             keep_last: None,
             audio_names: None,
+            kind: None,
         }
     }
 }
@@ -99,6 +104,7 @@ pub async fn create_clip_for_file(ctx: &Ctx, new: NewClip<'_>) -> anyhow::Result
     clip.source_hash = new.source_hash;
     clip.device_id = new.device_id;
     clip.game = new.game.filter(|g| !g.trim().is_empty()).or(parsed.game);
+    clip.kind = new.kind.filter(|k| *k == RECORDING).map(str::to_string);
     ctx.store.insert_clip(&clip).await.context("insert clip")?;
     let payload = json!({ "input": new.input.to_string_lossy(), "source": new.source, "relative": new.relative, "recipe": new.recipe, "keep_last": new.keep_last, "audio_names": new.audio_names });
     // an upload's clip is about to be shared: its ingest runs in the lane, others wait their turn
@@ -707,6 +713,10 @@ pub async fn remake_embeds(ctx: &Ctx) -> anyhow::Result<Remade> {
             .store
             .derived_rendition(&current.id, "embed", None)
             .await?;
+        // a session recording's copy is made when a link asks for one, not for every recording
+        if old.is_none() && row.clip.is_recording() {
+            continue;
+        }
         match &old {
             Some(o) if o.recipe.as_deref() == Some(want.as_str()) => continue,
             Some(o) => {

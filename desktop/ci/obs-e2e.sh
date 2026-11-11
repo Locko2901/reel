@@ -73,7 +73,7 @@ else
   SERVER_URL=""
 fi
 
-say "the app's settings: the OBS that came with it, a 20 s clip at Light, the Save hotkey"
+say "the app's settings: the OBS that came with it, a 20 s clip at Light, the Save and Record hotkeys, a reminder every minute"
 cat > "$ROOT/config/settings.json" <<JSON
 {
   "server_url": "$SERVER_URL",
@@ -85,7 +85,8 @@ cat > "$ROOT/config/settings.json" <<JSON
   "clips_dir": "$ROOT/clips",
   "stable_seconds": 2,
   "cache": { "gb": 5, "days": 14 },
-  "hotkeys": { "share_last": "", "save_share": "", "upload_last": "", "save": "Alt+F10" },
+  "hotkeys": { "share_last": "", "save_share": "", "upload_last": "", "save": "Alt+F10", "record": "Alt+F9" },
+  "session": { "remind_minutes": 1 },
   "startup": { "autostart": false, "elevated": false },
   "log_level": "debug"
 }
@@ -210,7 +211,57 @@ assert 15 <= d <= 25
 PY
 fi
 
-say "OBS killed: started again, connected again, no safe mode question"
+say "a session recording while the replay buffer runs: started from the command line, a replay saved during it, a reminder at the minute the setting asks for, stopped by the hotkey"
+rec_active() { ws GetRecordStatus '{}' 2>/dev/null | grep -q '"outputActive": true'; }
+session_file() { cat "$LOG"/reel-desktop.log* | grep "session recording started $1" | tail -1 | sed -n "s/.*session recording started $1: \(.*\)$/\1/p"; }
+in_ledger_as_recording() { python3 -c 'import json,sys; l=json.load(open(sys.argv[1])); c=[c for c in l["clips"] if c["path"]==sys.argv[2]]; sys.exit(not (c and c[0].get("recording")))' "$ROOT/data/ledger.json" "$1"; }
+seconds_of() { ffprobe -v error -show_entries format=duration -of csv=p=0 "$1"; }
+cues=$(log_n "cue session played")
+replays=$(log_n "obs saved a replay")
+OLOG=$(newest_obs_log)
+OL=$(wc -l < "$OLOG")
+T0=$(date +%s)
+"$APP" --record-session >>"$ROOT/app.out" 2>&1 || true
+wait_for 20 "the session recording to start" log_has "session recording started from the command line"
+rec_active || fail "OBS does not record"
+wait_for 10 "OBS's own log to have the recording's start" sh -c "tail -n +$OL '$OLOG' | grep -q 'Recording Start'"
+! tail -n +"$OL" "$OLOG" | grep -q "x264 encoder" || fail "OBS started an encoder for the recording: $(tail -n +"$OL" "$OLOG" | grep -m3 'x264 encoder')"
+buffer_is true || fail "the replay buffer stopped with the recording's start"
+SESSION=$(session_file "from the command line")
+[ -n "$SESSION" ] && [ "$(dirname "$SESSION")" = "$ROOT/clips" ] || fail "the session recording's file: '$SESSION'"
+wait_for 10 "the start's sound" sh -c "[ \$(cat $LOG/reel-desktop.log* | grep -c 'cue session played') -gt $cues ]"
+wait_for 10 "the tray's line" log_has "line=recording a session: under a minute, started from the command line"
+ok "started from the command line: OBS records into $(basename "$SESSION") beside the running replay buffer, on the buffer's encoder (its own log starts no second x264), the start's sound played, the tray's line says it"
+sleep 8
+own_frames
+xdotool key --clearmodifiers alt+F10
+wait_for 30 "a replay saved during the session recording" sh -c "[ \$(cat $LOG/reel-desktop.log* | grep -c 'obs saved a replay') -gt $replays ]"
+DURING=$(cat "$LOG"/reel-desktop.log* | grep "obs saved a replay" | tail -1 | sed -n 's/.*obs saved a replay path=\(.*\)$/\1/p')
+[ -f "$DURING" ] && [ "$DURING" != "$SESSION" ] || fail "the replay saved during the recording: '$DURING'"
+! in_ledger_as_recording "$DURING" || fail "the replay saved during the recording is marked as a recording"
+rec_active || fail "the save stopped the recording"
+ok "a replay saved during it: $(basename "$DURING"), a clip as any other; the recording goes on"
+wait_for 80 "the reminder at a minute" log_has "session recording reminder: 1 min so far"
+wait_for 10 "the reminder's notification" notified "Still recording a session"
+grep -A1 'string "Still recording a session"' "$ROOT/notifications.txt" | grep -q "1 min so far. Alt+F9, the tray or the window stops it." || fail "the reminder's words: $(grep -A1 'Still recording a session' "$ROOT/notifications.txt" | tail -1)"
+[ "$(log_n "cue session played")" -eq $((cues + 2)) ] || fail "the reminder's sound: $(( $(log_n "cue session played") - cues )) session cues"
+ok "the reminder at 1 min, as the setting asks: its sound and its notification (\"Still recording a session\", \"1 min so far. Alt+F9, the tray or the window stops it.\")"
+xdotool key --clearmodifiers alt+F9
+wait_for 20 "the hotkey to stop it" log_has "session recording stopped by the hotkey after 1 min: $SESSION"
+T1=$(date +%s)
+wait_for 20 "the recording to be taken" in_ledger_as_recording "$SESSION"
+rec_active && fail "OBS still records"
+buffer_is true || fail "the replay buffer stopped with the recording"
+LEN=$(seconds_of "$SESSION")
+python3 -c 'import sys; d, t = float(sys.argv[1]), int(sys.argv[2]); assert t - 8 <= d <= t + 1, (d, t)' "$LEN" "$((T1 - T0))" || fail "the recording is $LEN s long, the session ran $((T1 - T0)) s"
+cat "$LOG"/reel-desktop.log* | grep "clip found" | grep -F "$SESSION" | grep -q "recording=true" || fail "the recording was not found as one"
+ok "stopped by the hotkey: $(basename "$SESSION"), $LEN s of the $((T1 - T0)) s it ran, in the app's ledger as a recording; the replay buffer runs on"
+
+say "OBS killed: started again, connected again, no safe mode question; the session recording it made is kept"
+"$APP" --start-session >>"$ROOT/app.out" 2>&1 || true
+wait_for 20 "a session recording to start before OBS is killed" sh -c "[ \$(cat $LOG/reel-desktop.log* | grep -c 'session recording started from the command line') -ge 2 ]"
+KILLED=$(session_file "from the command line")
+sleep 6
 c=$(log_n "obs connected")
 kill -9 "$FIRST"
 wait_for 30 "OBS to be started again" reel_obs_not "$FIRST"
@@ -223,6 +274,13 @@ ok "connected again, nothing shows"
 wait_for 30 "the replay buffer to run again after the crash" buffer_is true
 log_has "the bundled OBS exited by itself (exit code -1); the end of OBS's own log:" || fail "OBS's own log is not in reel's log after it stopped"
 ok "the replay buffer runs again, as before the crash; reel's log has the end of OBS's own log: $(cat "$LOG"/reel-desktop.log* | grep -A3 "the end of OBS's own log" | tail -1 | cut -c1-100)"
+wait_for 40 "the session recording to end with OBS" log_has "session recording stopped by OBS ending after"
+wait_for 10 "the notification that OBS stopped" notified "OBS stopped during a session recording"
+wait_for 20 "what OBS recorded to be taken" in_ledger_as_recording "$KILLED"
+KEPT=$(seconds_of "$KILLED")
+python3 -c 'import sys; assert float(sys.argv[1]) >= 3' "$KEPT" || fail "the file OBS left: $KEPT s"
+rec_active && fail "the OBS started again records by itself"
+ok "OBS killed mid recording: the notification says so, $(basename "$KILLED") is kept ($KEPT s, read whole) and taken as a recording"
 
 say "a crash loop after an encoder change: OBS stops right after each start until reel changes the encoder back"
 ADV="$OBSCONF/basic/profiles/reel/basic.ini"
@@ -257,13 +315,27 @@ notified "$WORDS" || fail "the notification's words: $(grep -A1 'Encoder changed
 wait_for 20 "the tray's state line" log_has "line=encoder changed back: $WORDS"
 ok "SVT-AV1, tested but no replay saved with it, stopped OBS $(wc -l <"$ROOT/killed.txt") time(s) right after its start; reel went back to x264, the encoder of the last replay, in its settings and OBS's, refused SVT-AV1 until the setup tests it, started OBS (the buffer runs) and said so in a notification and the tray's first line: \"encoder changed back: $WORDS\""
 
-say "the app quits: OBS stops"
+say "the app quits while a session recording runs: it is stopped first and its file kept whole, then OBS stops"
+# the encoder step leaves OBS starting again: a start is refused until the app is connected
+for _ in $(seq 1 12); do
+  [ "$(log_n "session recording started from the command line")" -ge 3 ] && break
+  "$APP" --start-session >>"$ROOT/app.out" 2>&1 || true
+  sleep 5
+done
+[ "$(log_n "session recording started from the command line")" -ge 3 ] || fail "no session recording before the quit: $(cat "$LOG"/reel-desktop.log* | grep 'session recording did not start' | tail -1)"
+QUITTED=$(session_file "from the command line")
+sleep 5
 quit_app
+wait_for 20 "the quit to stop the session recording" log_has "quit: the session recording is stopped and its file taken"
+wait_for 20 "the stop by Quit" log_has "session recording stopped by reel's Quit after"
 wait_for 20 "the app to stop OBS" log_has "stopping the bundled OBS"
 wait_for 20 "OBS to exit" no_reel_obs
 wait_for 20 "the app to exit" sh -c "! kill -0 $APP_PID"
 log_has "the bundled OBS exited" || fail "the app did not see OBS exit"
-ok "OBS exited with the app"
+in_ledger_as_recording "$QUITTED" || fail "the recording stopped by Quit is not in the ledger as one"
+QL=$(seconds_of "$QUITTED")
+python3 -c 'import sys; assert float(sys.argv[1]) >= 3' "$QL" || fail "the recording stopped by Quit: $QL s"
+ok "Quit stopped the session recording before OBS ($(basename "$QUITTED"), $QL s, whole), took it as a recording, then OBS exited with the app"
 trap - EXIT
 
 say "an MP4 drops the tracks' names: the app gives them with the upload"
@@ -422,8 +494,9 @@ ws StopRecord '{}' >/dev/null || fail "OBS did not stop recording"
 wait_for 20 "the app to hear the recording stop" sh -c "[ \$(cat $LOG/reel-desktop.log* | grep -c 'obs saved a file') -gt $n ]"
 REC=$(cat "$LOG"/reel-desktop.log* | grep "obs saved a file" | tail -1 | sed -n 's/.*obs saved a file path=\(.*\)$/\1/p')
 [ -f "$REC" ] && [ "$(dirname "$REC")" = "$ROOT/clips" ] || fail "the recording's file: '$REC'"
-wait_for 20 "the app to take the recording as a clip" sh -c "cat $LOG/reel-desktop.log* | grep 'clip found' | grep -qF '$REC'"
-ok "a recording started and stopped in OBS: the app heard it stop, from OBS's RecordStateChanged, and took $(basename "$REC") as a clip"
+wait_for 20 "the app to take the recording as a clip" sh -c "cat $LOG/reel-desktop.log* | grep 'clip found' | grep -F '$REC' | grep -q 'recording=true'"
+log_has "session recording started in OBS: $REC" && log_has "session recording stopped in OBS after" || fail "a recording made in OBS was not followed as a session recording started there"
+ok "a recording started and stopped in OBS: the app followed it as a session recording started in OBS, heard it stop from OBS's RecordStateChanged, and took $(basename "$REC") as a recording"
 ws GetInputPropertiesListPropertyItems '{"inputName":"Desktop audio","propertyName":"device_id"}' | grep -q '"itemValue"' || fail "OBS lists no device for Desktop audio"
 ws GetInputPropertiesListPropertyItems '{"inputName":"Microphone","propertyName":"device_id"}' >/dev/null || fail "OBS has no device list for Microphone"
 ok "OBS lists the devices of Desktop audio and answers for Microphone's (none here, with no microphone), as the setup asks for them"

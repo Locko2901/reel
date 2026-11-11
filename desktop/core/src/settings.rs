@@ -23,6 +23,7 @@ pub struct Settings {
     pub cache: CacheSettings,
     pub hotkeys: HotkeySettings,
     pub sounds: SoundSettings,
+    pub session: SessionSettings,
     pub startup: StartupSettings,
     /// In colour, or the mark alone in one colour for a tray whose icons are all one colour.
     pub tray_icon: TrayIcon,
@@ -213,6 +214,8 @@ pub struct HotkeySettings {
     pub upload_last: String,
     /// OBS saves the replay, and it goes up as any clip does.
     pub save: String,
+    /// Starts a session recording, and stops the one that runs.
+    pub record: String,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -221,6 +224,7 @@ pub enum HotkeyAction {
     SaveShare,
     UploadLast,
     Save,
+    Record,
 }
 
 /// One hotkey: its setting as the pages name it, its name, what it does and its combination.
@@ -235,7 +239,7 @@ pub struct Hotkey<'a> {
 impl HotkeySettings {
     /// Every hotkey there is, in the order they register: the one list the registration and
     /// the recorder's check both go by.
-    pub fn all(&self) -> [Hotkey<'_>; 4] {
+    pub fn all(&self) -> [Hotkey<'_>; 5] {
         [
             Hotkey {
                 key: "hotkeys.share_last",
@@ -261,6 +265,12 @@ impl HotkeySettings {
                 action: HotkeyAction::Save,
                 combo: &self.save,
             },
+            Hotkey {
+                key: "hotkeys.record",
+                label: "Record a session",
+                action: HotkeyAction::Record,
+                combo: &self.record,
+            },
         ]
     }
 }
@@ -280,6 +290,22 @@ pub struct SoundSettings {
     pub captured: CueSettings,
     pub uploaded: CueSettings,
     pub link_copied: CueSettings,
+    /// A session recording starts, and each reminder while it runs.
+    pub session: CueSettings,
+}
+
+/// A recording of a whole session, started and stopped by hand.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(default)]
+pub struct SessionSettings {
+    /// A sound and a notification every this many minutes while it records; 0 is none.
+    pub remind_minutes: u32,
+}
+
+impl Default for SessionSettings {
+    fn default() -> Self {
+        Self { remind_minutes: 30 }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -310,6 +336,7 @@ impl Default for Settings {
             cache: CacheSettings::default(),
             hotkeys: HotkeySettings::default(),
             sounds: SoundSettings::default(),
+            session: SessionSettings::default(),
             startup: StartupSettings::default(),
             tray_icon: TrayIcon::Colour,
             updates: UpdateMode::Ask,
@@ -363,6 +390,7 @@ impl Default for HotkeySettings {
             save_share: "Ctrl+Alt+Shift+S".into(),
             upload_last: "Ctrl+Alt+U".into(),
             save: String::new(),
+            record: "Alt+F9".into(),
         }
     }
 }
@@ -387,6 +415,7 @@ impl Default for SoundSettings {
                 volume: 0.5,
                 file: None,
             },
+            session: CueSettings::default(),
         }
     }
 }
@@ -715,6 +744,8 @@ mod tests {
         assert_eq!(s.hotkeys.save_share, "Ctrl+Alt+Shift+S");
         assert_eq!(s.hotkeys.upload_last, "Ctrl+Alt+U");
         assert_eq!(s.sounds.link_copied.volume, 0.5);
+        assert_eq!(s.hotkeys.record, "Alt+F9");
+        assert_eq!(s.session.remind_minutes, 30);
         assert!(s.startup.autostart);
         assert_eq!(s.upload.mode, UploadMode::Auto);
         let older: Settings =
@@ -724,6 +755,19 @@ mod tests {
         assert_eq!(older.cache.days, 14, "a missing field takes its default");
         assert_eq!(older.upload.keep_last, 0, "the whole clip unless asked");
         assert_eq!(older.hotkeys.save_share, "Ctrl+Alt+Shift+S");
+        let before: Settings = serde_json::from_str(
+            r#"{"hotkeys":{"save":"Alt+F10"},"sounds":{"captured":{"volume":0.3}}}"#,
+        )
+        .unwrap();
+        assert_eq!(
+            (
+                before.hotkeys.record.as_str(),
+                before.session.remind_minutes
+            ),
+            ("Alt+F9", 30),
+            "a file from before session recordings takes their defaults"
+        );
+        assert!(before.sounds.session.enabled);
         assert_eq!(older.updates, UpdateMode::Ask);
         let quit: Settings = serde_json::from_str(r#"{"updates":"on_quit"}"#).unwrap();
         assert_eq!(quit.updates, UpdateMode::OnQuit);
