@@ -51,6 +51,8 @@ before you begin.
    says what to turn on in OBS, or that OBS wants the password. **Next** saves the connection,
    and the app connects.
 
+    ![Your OBS: connected, and what reel found](img/app-light-1-obs.png)
+
 2. **The replay buffer**: reel saves clips from OBS's replay buffer, the last minutes kept in
    memory and written to a file when you save. **What reel needs from OBS** checks the WebSocket
    and the replay buffer for as long as the app runs, and says in words what to do about either.
@@ -58,6 +60,8 @@ before you begin.
    on in OBS's profile and starts it (not while OBS records); off, you start it in OBS. **Clip
    length** shows how much OBS's replay buffer keeps; a length picked here is set in OBS's
    profile, and a running replay buffer starts again with it.
+
+    ![The replay buffer: what reel needs from OBS](img/app-light-2-replay-buffer.png)
 
 3. **Hotkeys**: **Save a clip** is Alt+F10. To change it, click the field and press the keys.
    OBS's own **Save Replay** key (in OBS, **Settings**, **Hotkeys**) saves a clip as well: OBS
@@ -70,6 +74,8 @@ before you begin.
    versions on GitHub** is on, and switched off only **Check now** asks. With a server this step
    is not there.
 6. **Done** shows a summary. Press **Finish**, and the window opens on your library.
+
+    ![Done, the summary](img/app-light-6-done.png)
 
 **Skip for now**, on every step, leaves the setup for later: the app opens on Settings, **OBS**,
 and **Run the setup**, in its **obs-websocket** panel, opens it again. An app that was set up
