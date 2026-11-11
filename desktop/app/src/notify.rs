@@ -71,6 +71,51 @@ pub fn show_clip(app: &AppHandle, title: &str, body: &str, clip: &str, copy: boo
     }
 }
 
+/// The update's question with Install now and Later, where the desktop's notifications have
+/// buttons; without them it says where to install. `value` is this run's, which the buttons'
+/// links carry.
+pub fn ask(app: &AppHandle, title: &str, body: &str, value: &str) {
+    #[cfg(windows)]
+    {
+        let (app, title, body, value) = (
+            app.clone(),
+            title.to_string(),
+            body.to_string(),
+            value.to_string(),
+        );
+        std::thread::spawn(move || {
+            let xml = reel_desktop_core::links::ask_toast_xml(&title, &body, &value);
+            if let Err(e) = toast(&xml, &app.config().identifier) {
+                tracing::warn!(error = %e, "the update's question with its buttons; without them");
+                by_plugin(
+                    &app,
+                    &title,
+                    reel_desktop_core::update_steps::ASK_WITHOUT_BUTTONS,
+                );
+            }
+        });
+    }
+    #[cfg(target_os = "linux")]
+    {
+        let (app, title, body, value) = (
+            app.clone(),
+            title.to_string(),
+            body.to_string(),
+            value.to_string(),
+        );
+        std::thread::spawn(move || deliver_ask(app, &title, &body, &value));
+    }
+    #[cfg(not(any(windows, target_os = "linux")))]
+    {
+        let _ = (body, value);
+        show(
+            app,
+            title,
+            reel_desktop_core::update_steps::ASK_WITHOUT_BUTTONS,
+        );
+    }
+}
+
 /// A toast as the installed app (its Start menu shortcut carries the identifier), or as
 /// PowerShell from a build folder, as the notification plugin does.
 #[cfg(windows)]
@@ -134,6 +179,51 @@ fn deliver_with_actions(app: AppHandle, title: &str, body: &str, clip: &str, cop
         let _ = app.run_on_main_thread(move || {
             if let Some(rt) = on_main.try_state::<crate::runtime::Runtime>() {
                 rt.run_link(link);
+            }
+        });
+    });
+}
+
+/// The buttons' keys are the links a Windows toast's buttons open, so both go one way.
+#[cfg(target_os = "linux")]
+fn deliver_ask(app: AppHandle, title: &str, body: &str, value: &str) {
+    use reel_desktop_core::links::Link;
+    use tauri::Manager;
+    let actions = notify_rust::get_capabilities()
+        .map(|c| c.iter().any(|x| x == "actions"))
+        .unwrap_or(false);
+    let mut n = notify_rust::Notification::new();
+    n.appname("reel")
+        .summary(title)
+        .body(if actions {
+            body
+        } else {
+            reel_desktop_core::update_steps::ASK_WITHOUT_BUTTONS
+        })
+        .auto_icon()
+        .hint(notify_rust::Hint::SuppressSound(true));
+    if actions {
+        n.action(&Link::Install(value.to_string()).url(), "Install now");
+        n.action(&Link::Later(value.to_string()).url(), "Later");
+    }
+    let handle = match n.show() {
+        Ok(h) => h,
+        Err(e) => {
+            tracing::warn!(error = %e, "notification");
+            return;
+        }
+    };
+    if !actions {
+        return;
+    }
+    handle.wait_for_action(move |action| {
+        let Some(link) = reel_desktop_core::links::parse(action) else {
+            return;
+        };
+        let on_main = app.clone();
+        let _ = app.run_on_main_thread(move || {
+            if let Some(rt) = on_main.try_state::<crate::runtime::Runtime>() {
+                crate::updates::answer_link(&rt, link, "the notification");
             }
         });
     });

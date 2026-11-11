@@ -34,8 +34,9 @@ const REMOTE_PERMISSIONS: [&str; 9] = [
     "allow-app-download-open",
 ];
 
-/// What the library on this PC may ask besides: its files open where they are.
-const STANDALONE_PERMISSIONS: [&str; 1] = ["allow-app-library-open"];
+/// What the library on this PC may ask besides: its files open where they are, and the answer
+/// to the update's question.
+const STANDALONE_PERMISSIONS: [&str; 2] = ["allow-app-library-open", "allow-app-update-answer"];
 
 /// Every page's uncaught errors, unhandled rejections and scripts that did not load go to the
 /// app's Log; installed before the page's own scripts, so a page that never starts tells why.

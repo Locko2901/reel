@@ -201,6 +201,8 @@ pub fn run() {
             commands::uninstall,
             commands::update_check,
             commands::update_install,
+            commands::update_answer,
+            commands::app_update_answer,
             commands::open_releases,
         ])
         .setup(move |app| {

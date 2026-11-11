@@ -361,6 +361,8 @@ html[data-app="desktop"] .top .app-save { display: inline-flex; }
 .notice.ok { border-left-color: var(--ok); }
 .notice.active { border-left-color: var(--accent); }
 .notice.library-away { margin-bottom: var(--s4); }
+.notice.update-ask { position: sticky; top: 48px; z-index: 4; margin-bottom: var(--s3); }
+@media (max-width: 719px), (max-height: 500px) { .notice.update-ask { position: static; } }
 .bar { height: 3px; background: var(--line-2); border-radius: 2px; overflow: hidden; display: block; width: 120px; }
 .bar i { display: block; height: 100%; background: var(--accent); }
 .toast {

@@ -10,7 +10,8 @@ table .bar, #encoders-line .bar { display: inline-block; width: 120px; height: 4
 table .bar i, #encoders-line .bar i { display: block; height: 100%; background: var(--accent); }
 td.acts { white-space: nowrap; }
 td.acts button { margin-left: 4px; }
-.offline-page { display: flex; justify-content: center; padding-top: 48px; }
+.offline-page { display: flex; flex-direction: column; align-items: center; padding-top: 48px; }
+.offline-page .update-ask { width: min(640px, 100%); }
 .panel.offline { width: min(640px, 100%); }
 .offline-words { font-size: var(--fs-l); margin: 0 0 8px; }
 .offline-actions { display: flex; gap: 8px; flex-wrap: wrap; }
@@ -32,6 +33,7 @@ details.advanced[open] > summary { margin-bottom: var(--s2); }
 .srow .sctl .switch + select { max-width: calc(100% - 34px - var(--s2)); }
 .srow .sctl .vol { display: inline-flex; align-items: center; gap: var(--s2); }
 .obs-bar { position: sticky; top: 48px; z-index: 4; margin-bottom: var(--s3); }
+.obs-bar:not([hidden]) + .update-ask { position: static; }
 .route-words span { display: block; color: var(--text-2); }
 .update-notes { white-space: pre-wrap; font-size: var(--fs-s); color: var(--text-2); max-height: 320px; overflow: auto; }
 #library-job .notice .bar { flex-basis: 100%; width: 100%; }

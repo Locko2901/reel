@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-update-answer"
+description = "Enables the update_answer command without any pre-configured scope."
+commands.allow = ["update_answer"]
+
+[[permission]]
+identifier = "deny-update-answer"
+description = "Denies the update_answer command without any pre-configured scope."
+commands.deny = ["update_answer"]

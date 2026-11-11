@@ -1,5 +1,6 @@
-//! The `reel-desktop://copy/<clip>` and `open/<clip>` links of a Windows notification's buttons.
-//! A web page can open them too, so anything but exactly those two forms is refused.
+//! The `reel-desktop://copy/<clip>` and `open/<clip>` links of a Windows notification's buttons,
+//! and the update's `install/<value>` and `later/<value>`. A web page can open them too, so
+//! anything but exactly those forms is refused, and the update's carry a value of this run's.
 
 pub const SCHEME: &str = "reel-desktop";
 
@@ -7,6 +8,9 @@ pub const SCHEME: &str = "reel-desktop";
 pub enum Link {
     Copy(String),
     Open(String),
+    /// The update's Install now, with the value the run that asked made.
+    Install(String),
+    Later(String),
 }
 
 impl Link {
@@ -14,12 +18,15 @@ impl Link {
         match self {
             Link::Copy(id) => format!("{SCHEME}://copy/{id}"),
             Link::Open(id) => format!("{SCHEME}://open/{id}"),
+            Link::Install(value) => format!("{SCHEME}://install/{value}"),
+            Link::Later(value) => format!("{SCHEME}://later/{value}"),
         }
     }
 
-    pub fn clip(&self) -> &str {
+    pub fn clip(&self) -> Option<&str> {
         match self {
-            Link::Copy(id) | Link::Open(id) => id,
+            Link::Copy(id) | Link::Open(id) => Some(id),
+            Link::Install(_) | Link::Later(_) => None,
         }
     }
 }
@@ -41,6 +48,11 @@ pub fn is_clip_id(s: &str) -> bool {
         })
 }
 
+/// A run's value in the update's links: 128 bits as 22 characters of base64url.
+pub fn is_run_value(s: &str) -> bool {
+    reel_core::ids::looks_like_token(s)
+}
+
 /// The scheme in any case (as a browser may write it) and one trailing slash (as Windows may
 /// add) are allowed; no query, no other verb, no other id.
 pub fn parse(arg: &str) -> Option<Link> {
@@ -54,12 +66,11 @@ pub fn parse(arg: &str) -> Option<Link> {
     let rest = &arg[head.len()..];
     let rest = rest.strip_suffix('/').unwrap_or(rest);
     let (verb, id) = rest.split_once('/')?;
-    if !is_clip_id(id) {
-        return None;
-    }
     match verb {
-        "copy" => Some(Link::Copy(id.to_string())),
-        "open" => Some(Link::Open(id.to_string())),
+        "copy" if is_clip_id(id) => Some(Link::Copy(id.to_string())),
+        "open" if is_clip_id(id) => Some(Link::Open(id.to_string())),
+        "install" if is_run_value(id) => Some(Link::Install(id.to_string())),
+        "later" if is_run_value(id) => Some(Link::Later(id.to_string())),
         _ => None,
     }
 }
@@ -110,6 +121,24 @@ pub fn toast_xml(title: &str, body: &str, clip: &str, copy: bool) -> String {
     )
 }
 
+/// The update's question: Install now and Later as links with this run's value.
+pub fn ask_toast_xml(title: &str, body: &str, value: &str) -> String {
+    let button = |label: &str, link: Link| {
+        format!(
+            "<action content=\"{label}\" activationType=\"protocol\" arguments=\"{}\"/>",
+            escape(&link.url())
+        )
+    };
+    format!(
+        "<toast><visual><binding template=\"ToastGeneric\"><text>{}</text><text>{}</text></binding></visual>\
+         <actions>{}{}</actions>{SILENT}</toast>",
+        escape(title),
+        escape(body),
+        button("Install now", Link::Install(value.to_string())),
+        button("Later", Link::Later(value.to_string())),
+    )
+}
+
 fn escape(s: &str) -> String {
     let mut out = String::with_capacity(s.len());
     for c in s.chars() {
@@ -145,6 +174,55 @@ mod tests {
             Some(Link::Open(ID.into())),
             "the scheme in capitals and a slash at the end, as a browser or Windows may write it"
         );
+    }
+
+    const RUN: &str = "q0Xw-3_mT9cJb1LkZp4aRg";
+
+    #[test]
+    fn the_updates_two_links_and_back() {
+        let install = format!("reel-desktop://install/{RUN}");
+        let later = format!("reel-desktop://later/{RUN}");
+        assert_eq!(parse(&install), Some(Link::Install(RUN.into())));
+        assert_eq!(parse(&later), Some(Link::Later(RUN.into())));
+        assert_eq!(Link::Install(RUN.into()).url(), install);
+        assert_eq!(Link::Later(RUN.into()).url(), later);
+        assert_eq!(
+            parse(&format!("Reel-Desktop://install/{RUN}/")),
+            Some(Link::Install(RUN.into()))
+        );
+        assert_eq!(Link::Install(RUN.into()).clip(), None);
+        assert_eq!(Link::Open(ID.into()).clip(), Some(ID));
+        for bad in [
+            "reel-desktop://install".to_string(),
+            "reel-desktop://install/".into(),
+            format!("reel-desktop://install/{ID}"),
+            format!("reel-desktop://install/{RUN}x"),
+            format!("reel-desktop://install/{}", &RUN[1..]),
+            format!("reel-desktop://install/{RUN}?now=1"),
+            format!("reel-desktop://install/{RUN}/again"),
+            format!("reel-desktop://INSTALL/{RUN}"),
+            format!("reel-desktop://update/{RUN}"),
+            format!("reel-desktop://install/{}", RUN.replace('-', "+")),
+            format!("reel-desktop://later/{}", RUN.replace('_', "/")),
+            format!("reel-desktop://open/{RUN}"),
+        ] {
+            assert_eq!(parse(&bad), None, "{bad}");
+        }
+    }
+
+    #[test]
+    fn the_updates_toast_asks_with_install_now_and_later() {
+        let xml = ask_toast_xml(
+            "reel 1.14.1 is ready",
+            "Install now closes reel & opens it again",
+            RUN,
+        );
+        assert!(xml.contains(&format!(
+            r#"<actions><action content="Install now" activationType="protocol" arguments="reel-desktop://install/{RUN}"/><action content="Later" activationType="protocol" arguments="reel-desktop://later/{RUN}"/></actions>"#
+        )), "{xml}");
+        assert!(xml.contains("<text>reel 1.14.1 is ready</text><text>Install now closes reel &amp; opens it again</text>"));
+        assert!(xml.ends_with(r#"<audio silent="true"/></toast>"#), "{xml}");
+        assert_eq!(xml.matches('<').count(), xml.matches('>').count());
     }
 
     #[test]

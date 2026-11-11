@@ -131,6 +131,21 @@ pub fn before(version: &str, kind: Kind, quit: bool) -> String {
     }
 }
 
+/// The question while an update waits for the click, title and words: the notification's with
+/// Install now and Later, and the window's.
+pub fn ask(version: &str, kind: Kind) -> (String, String) {
+    (
+        format!("reel {version} is ready to install"),
+        format!(
+            "Install now closes reel, and reel {version} opens again by itself in {}. Later asks again in a day.",
+            how_long(kind)
+        ),
+    )
+}
+
+/// The question's words where the desktop's notifications have no buttons.
+pub const ASK_WITHOUT_BUTTONS: &str = "Install it from the tray, or under Settings, Startup.";
+
 /// The notification as the update starts, title and body: one line, the same steps.
 pub fn going(version: &str, kind: Kind, quit: bool) -> (String, String) {
     let long = how_long(kind);
@@ -222,6 +237,22 @@ mod tests {
         );
         assert!(before("1.10.0", Kind::AppImage, false).contains("this AppImage"));
         assert!(before("1.10.0", Kind::AppImage, false).ends_with("in a few seconds."));
+    }
+
+    #[test]
+    fn the_question_says_what_install_now_and_later_do() {
+        assert_eq!(
+            ask("1.14.1", WITH_OBS),
+            (
+                "reel 1.14.1 is ready to install".to_string(),
+                "Install now closes reel, and reel 1.14.1 opens again by itself in about a minute. Later asks again in a day.".to_string()
+            )
+        );
+        assert!(ask("1.14.1", WIN).1.contains("in about half a minute."));
+        assert!(ask("1.14.1", Kind::AppImage)
+            .1
+            .contains("in a few seconds."));
+        assert!(!ask("1.14.1", WIN).1.contains('\n'));
     }
 
     #[test]

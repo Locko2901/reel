@@ -224,8 +224,10 @@ releases, and you see each step:
   **Advanced**, **Check for updates** is on: a minute after the start, then every six hours by the
   clock, once a day with **New versions** off ([What leaves your PC](privacy.md#what-leaves-your-pc)).
   **Check now** under Settings, Startup, **Updates** asks at once. **New versions** there decides
-  what happens with a version found without it: **ask, then install** (the default) tells you in a
-  notification, in the tray menu and on the Updates panel, with the release notes; **install when
+  what happens with a version found without it: **ask, then install** (the default) asks in a
+  notification with **Install now** and **Later**, and at the top of the window's pages while it is
+  open (standalone also on the library), and offers it in the tray menu and on the Updates panel,
+  with the release notes. **Later** asks again a day later, or at the next start; **install when
   the app quits** downloads it and installs it when you quit from the tray; **off** offers it only
   on **Check now**.
 - **Before you press Install**, the panel says what happens next and about how long it takes.

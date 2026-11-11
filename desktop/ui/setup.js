@@ -5,6 +5,7 @@ import { keycaps, recorder, recordersOffOnLeave } from './hotkeys.js';
 import { noiseHelp, noiseOptions, ownMicWords } from './noise.js';
 import { ensureOption, syncCustom, takeInto, takenWords } from './inobs.js';
 import { bindObsBar, renderObsBar } from './obsbar.js';
+import { bindAsk, renderAsk } from './ask.js';
 import { audioPlan, meterIn, renderLevelRows, wordsInto } from './sources.js';
 
 const GUIDED = [['length', 'Clip length'], ['quality', 'Quality'], ['encoder', 'Encoder'], ['capture', 'What to capture'], ['audio', 'Audio'], ['hotkeys', 'Hotkeys'], ['where', 'Where clips go'], ['done', 'Done']];
@@ -464,6 +465,7 @@ function obsWords(what) {
 let unanswered = null;
 function renderObsNotice() {
   renderObsBar(status);
+  renderAsk(status);
   const n = $('#obs-notice');
   const box = status && status.obs_box;
   const connected = !!(status && status.obs && status.obs.connected);
@@ -751,6 +753,7 @@ function bind() {
       go(all[Math.min(i + 1, all.length - 1)][0]);
     } catch (e) { failed(err, String(e.message || e)); }
   };
+  bindAsk();
   bindObsBar(async (r, before) => {
     status = r.status;
     if (before) takeInto(settings, before, r.settings);

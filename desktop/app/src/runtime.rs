@@ -103,6 +103,10 @@ pub struct Inner {
     /// Empty in standalone while the line is what reel on this PC's read of the releases found.
     pub update_line: String,
     pub update_told: Option<String>,
+    /// Later on the update's question: the version and when, by the wall clock.
+    pub update_later: Option<(String, std::time::SystemTime)>,
+    /// This run's value in the links of the update's question, which a web page cannot know.
+    pub update_value: String,
     pub update_checked_at: Option<std::time::SystemTime>,
     /// The version this one replaced, at its first start after an update.
     pub updated_from: Option<String>,
@@ -472,6 +476,8 @@ impl Runtime {
             update_bytes: None,
             update_line: first_line,
             update_told: None,
+            update_later: None,
+            update_value: reel_core::ids::new_token(),
             update_checked_at: None,
             updated_from: None,
             local: None,
@@ -941,6 +947,23 @@ impl Runtime {
                 g.library_job.as_ref(),
             ),
             update_version: g.update.as_ref().map(|u| u.version.clone()),
+            update_ask: crate::updates::asks(
+                g.settings.updates,
+                g.update.as_ref().map(|u| u.version.as_str()),
+                &self.app.package_info().version.to_string(),
+                crate::updates::installing(),
+                g.update_later.as_ref(),
+                std::time::SystemTime::now(),
+            )
+            .map(|v| {
+                let kind = reel_desktop_core::update_steps::Kind::here(g.bundled.is_some());
+                let (title, words) = reel_desktop_core::update_steps::ask(&v, kind);
+                crate::status::UpdateAsk {
+                    version: v,
+                    title,
+                    words,
+                }
+            }),
             update_installing: crate::updates::installing(),
             update_notes: g.update.as_ref().and_then(|u| u.body.clone()),
             update_before: g.update.as_ref().map(|u| {
@@ -1007,6 +1030,8 @@ impl Runtime {
             "version": st.version,
             "versions": st.versions,
             "update_line": st.update_line,
+            // only the library on this PC is granted the answer
+            "update_ask": st.update_ask.as_ref().filter(|_| st.mode == "standalone"),
         })
     }
 
@@ -3634,12 +3659,17 @@ impl Runtime {
         });
     }
 
-    /// One of the app's links from a notification's button, for a clip of this app's own only.
+    /// One of the app's links from a notification's button: for a clip of this app's own only,
+    /// or the update's question's answer.
     pub fn run_link(&self, link: Link) {
+        let Some(clip) = link.clip() else {
+            crate::updates::answer_link(self, link, "a reel-desktop link");
+            return;
+        };
         let found = self
             .lock()
             .ledger
-            .by_either_id(link.clip())
+            .by_either_id(clip)
             .map(|c| (c.clip_id.clone(), c.local_clip_id.clone()));
         let Some((server, local)) = found else {
             tracing::info!(link = %link.url(), "a link to a clip this app does not know: ignored");
@@ -3657,6 +3687,7 @@ impl Runtime {
                     "The clip is in the library on this PC, and the app is connected to a server now.",
                 ),
             },
+            Link::Install(_) | Link::Later(_) => {}
             Link::Open(_) => {
                 let page = if standalone { local } else { server };
                 let opened = match page {

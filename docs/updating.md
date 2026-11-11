@@ -95,9 +95,13 @@ than its own, so no server can pass an older installer off as a newer
 one.
 
 By default the app asks first: a notification says "reel 1.10.1 is
-ready", and **Install reel 1.10.1** appears in the tray menu and under
-Settings, Startup, **Updates**, which says what Install does before you
-press it. On Windows, reel closes, a small window shows the installer's
+ready to install" with **Install now** and **Later**, and while the
+window is open the same question sits at the top of its pages (the app's
+own, and standalone also the library). **Later** asks again a day later,
+or at the next start; **Check now** asks at once. **Install reel
+1.10.1** also appears in the tray menu and under Settings, Startup,
+**Updates**, which says what Install does before you press it. The app
+never opens or raises its window to ask. On Windows, reel closes, a small window shows the installer's
 progress, and reel opens again by itself about a minute later (half a
 minute for reel light), back on the page it showed and with a
 line of what is new. The AppImage takes a few seconds. **New versions**
