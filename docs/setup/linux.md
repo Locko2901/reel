@@ -143,8 +143,8 @@ sandbox.
 ## 5. Hotkeys
 
 Global hotkeys on Linux depend on your desktop: they may not work, or may need to be set up in the
-desktop's own keyboard settings. There you can bind a key to `reel-desktop --save` (Save a clip),
-or with a server `--save-and-share` and `--share-last`. With the AppImage, the command is the
+desktop's own keyboard settings. There you can bind a key to `reel-desktop --save` (Save a clip)
+or `--record-session` (Record a session), or with a server `--save-and-share` and `--share-last`. With the AppImage, the command is the
 AppImage's path, which Settings, **Hotkeys** shows.
 
 ## 6. The first clip

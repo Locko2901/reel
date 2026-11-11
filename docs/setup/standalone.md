@@ -53,7 +53,8 @@ app, with a key that changes at each start ([Privacy](../privacy.md#the-library-
 A clip OBS saves in H.264 with AAC sound, up to 1440p and 50 Mbit/s, goes into the library as it
 is, never encoded again.
 
-In standalone, the tray and the window offer **Save clip**, and the hotkeys **Save a clip**, alone.
+In standalone, the tray and the window offer **Save clip** and **Record a session**, and the
+hotkeys **Save a clip** and **Record a session**, alone.
 Save and share, Share the last clip and Copy link make links, and links need a server.
 
 ### The files are on this PC

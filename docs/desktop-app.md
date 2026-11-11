@@ -75,11 +75,11 @@ how to add a server later.
   for your user; on Linux an entry in your desktop's autostart.
 - **In the tray.** Double-click reel's icon to open the library. Its menu has the app's state,
   **Last clips** (each with **Open** and **Copy link**), **Save clip**, **Save and share**,
-  **Pause recording**, **Share the last clip**, **Pause uploads**, **Open library**, **Open
+  **Record a session**, **Pause recording**, **Share the last clip**, **Pause uploads**, **Open library**, **Open
   settings**, on Windows with the OBS that came with reel **Open OBS** or **Hide OBS**, and
   **Quit**. When an update is ready, **Install reel** with the new version is there too. In
   standalone the menu keeps what makes sense on one PC: the state, **Last clips** (each with
-  **Open**), **Save clip**, **Pause recording**, **Open library**, **Open settings**, OBS's entry
+  **Open**), **Save clip**, **Record a session**, **Pause recording**, **Open library**, **Open settings**, OBS's entry
   and **Quit**, with **Pause uploads** once a server is paired. For a tray whose icons are all one
   colour, Settings, Startup, **Tray icon** shows reel's mark alone in white or in black. On Linux,
   reel's own OBS has a tray icon of its own, which opens its window.
@@ -115,10 +115,13 @@ parts to the header:
   **Save and share** (connected) also copies the clip's link once it is up. Both are off while
   OBS's replay buffer is not running, and say why: in their tooltip, or in a narrow window (600 px
   and less) in the avatar's menu, where they move to. Settings, OBS and the tray have them too.
+- **Record**, next to them, starts a [session recording](#recording-a-whole-session) and stops it;
+  while one runs it shows a red dot, the time and **Stop**. In a narrow window (600 px and less)
+  it moves to the avatar's menu while nothing records.
 - **Share the last clip** (connected), next to them, copies the link of the newest clip, as the
   hotkey does.
 - **The status chip** is a dot and a word for what the app is doing: **idle**, **uploading**,
-  **paused**, **recording paused**, **preparing the link**, **not paired**, **cannot reach the server**, **no replay
+  **paused**, **recording paused**, **recording a session**, **preparing the link**, **not paired**, **cannot reach the server**, **no replay
   saved**, **error**, or the step of the work on a clip. Click it for a line each about the
   **App**, **OBS** and the **Server**, the **Versions**, the **Pause recording** and **Pause
   uploads** switches, **Status page** and **Updates**. In standalone the third line is the **Library**: on this PC, where it
@@ -143,10 +146,52 @@ When the server cannot be reached, the window shows the app's own page instead: 
 in words (for example "No answer from the server" or "The connection is not trusted"), **Retry**,
 and the app's settings. The app tries again by itself and keeps the clips it finds meanwhile.
 
+## Recording a whole session
+
+The replay buffer keeps the last minutes; a session recording keeps all of it, from when you
+start it until you stop it. Start and stop it with **Record** in the window's header, **Record a
+session** in the tray, or its hotkey (Alt+F9 by default). The recording goes into the library like
+a clip, named after its game and when it started, and marked **session recording** on its card
+next to its length. Connected, it goes up to the server once it has stopped, as any clip does,
+and its upload waits while a game has the screen when uploads do.
+
+- **While it runs**, **Record** shows a red dot, the time and **Stop**; the tray's icon has a red
+  dot, and its first line and tooltip say **recording a session** and for how long. **Save clip**
+  still saves replays meanwhile.
+- **Reminders**, so a recording is not forgotten for hours: every 30 minutes a short sound and a
+  notification, "Still recording a session". The sound is what reaches you in a game in full
+  screen, where Windows holds notifications back. Settings, **Session recording** has **Remind
+  every** (in minutes, 0 for none) and the reminder's sound (on or off, its volume, a WAV of your
+  own), which also plays when a recording starts. A PC that slept through several reminders gives
+  one when it wakes.
+- **What it costs**: OBS records with the encoder the replay buffer already runs, so a recording
+  costs room on the disk, not a second encode. At Smooth (25 Mbit/s) an hour is about 11 GB, at
+  Light (12.5 Mbit/s) about 5.6 GB.
+- **It stops by itself** before the disk is full: when the disk OBS records to has less than 5 GB
+  left, or in standalone when the library would have no room left to take the recording in. A
+  notification says so, and the recording so far goes into the library.
+- **If OBS stops** mid recording (a crash, your own OBS closed, or a change under Settings, OBS
+  that starts reel's OBS again), what it wrote is kept and goes into the library, and a
+  notification says so.
+- **Quit** stops the recording first, so its file is whole; it does not ask. A recording you
+  started in your own OBS goes on there. An update waits to install until the recording has
+  stopped.
+- A recording started in OBS itself counts as a session recording too: the window and the tray
+  show it, and its file goes into the library as one.
+- **Keep the last** never cuts a recording, and **Share the last clip** and **Upload the last
+  clip** mean the last replay, not a recording.
+- From a desktop's shortcut or the command line: `--record-session` starts one, or stops the one
+  that runs; `--start-session` and `--stop-session` do one of the two.
+
+With a server, an upload over the server's **Upload size limit** (Settings, Imports; 8 GB unless
+changed) is refused: the app says so and keeps the recording on this PC. Raise the limit for long
+recordings. The server makes no preview video of a session recording by itself; a link to one
+plays the recording.
+
 ## The app's pages
 
 Settings groups its pages by what you do, the app's own beside the server's (in standalone,
-the library's): **Recording** has OBS and the clips, **Library** the library, **Server** the
+the library's): **Recording** has OBS, the clips and session recordings, **Library** the library, **Server** the
 connection to a server and, from the server, Sharing, Devices, Access and Notifications, and
 **System** the rest. Beside a server, a page's line says where it is kept: the app's pages on
 this PC, each PC with its own, the server's on the server, the same for every PC and browser.
@@ -161,8 +206,9 @@ The app's own pages:
 | **OBS** | Recording | with reel's own OBS (the one that came with reel on Windows, the installed one run a second time on Linux): which OBS and how it runs, **Open OBS** on Windows, and **Its setup** (clip length, quality, encoder, capture, audio, format), where a change made in OBS shows once OBS is hidden again. With your own OBS: **What reel needs from OBS**, the obs-websocket connection with **Run the setup**, **What OBS is set to** (its profile among it) and **Change in OBS** |
 | **Clips folder and cache** (in standalone **Clips folder**) | Recording | the folder watched for clips (it follows OBS's recording folder unless you turn **Follow OBS** off) and, connected, how long a clip stays on the PC after the server has it |
 | **Upload** (in standalone **New clips**) | Recording | connected: every clip automatically, the last clip on a hotkey, or by hand; a bandwidth limit; on Windows the pause while a game is fullscreen (never for a Save and share, whose upload goes at once, ahead of the others); **Keep the last**. In standalone: **Keep the last**, on Windows **Wait while a game is fullscreen**, and the loudness of new clips |
-| **Hotkeys** | Recording | the four keys, and a line saying how keys reach the app on this desktop; in standalone **Save a clip** alone |
-| **Sounds** | Recording | the cues, each on or off, with a volume, a WAV file of your own and **Preview**: clip captured, clip uploaded and link copied; in standalone clip captured and clip in the library |
+| **Hotkeys** | Recording | the five keys, and a line saying how keys reach the app on this desktop; in standalone **Save a clip** and **Record a session** |
+| **Session recording** | Recording | the reminders while a [session recording](#recording-a-whole-session) runs: **Remind every** and their sound, on or off, with a volume, a WAV file of your own and **Preview**; the sound also plays when a recording starts |
+| **Sounds** | Recording | the clips' cues, each on or off, with a volume, a WAV file of your own and **Preview**: clip captured, clip uploaded and link copied; in standalone clip captured and clip in the library |
 | **Startup** | System | **Start at logon**, **Tray icon**, the app's **Updates**, and **About** (the version, the folders the app keeps its settings and data in, and on Windows **Uninstall reel...**) |
 | **Log** | System | what the app did, newest at the bottom, the **Log level**, **Open the log folder** |
 
@@ -174,7 +220,7 @@ user can read, in the app's settings folder.
 
 ## Hotkeys
 
-The four hotkeys, under Settings, **Hotkeys**:
+The five hotkeys, under Settings, **Hotkeys**:
 
 | Hotkey | Default | What it does |
 |---|---|---|
@@ -182,10 +228,11 @@ The four hotkeys, under Settings, **Hotkeys**:
 | **Save and share** | Ctrl+Alt+Shift+S | OBS saves the replay, the app uploads it, waits until its link preview is ready and copies the link |
 | **Save a clip** | none (Alt+F10 after the setup) | OBS saves the replay; the clip goes into the library, or up to the server like any clip, without a link |
 | **Upload the last clip** | Ctrl+Alt+U | for the upload mode **the last clip, on the hotkey**; harmless otherwise |
+| **Record a session** | Alt+F9 | starts a [session recording](#recording-a-whole-session), and stops the one that runs |
 
-In standalone only **Save a clip** is taken. The other three make or copy a link, or upload, and
-need a server; from a desktop's own shortcut or the command line they are refused with a
-notification saying so.
+In standalone only **Save a clip** and **Record a session** are taken. The other three make or
+copy a link, or upload, and need a server; from a desktop's own shortcut or the command line they
+are refused with a notification saying so.
 
 The "clip captured" sound plays the moment OBS takes the save, before it has written the replay,
 which for a long replay takes a few seconds. Press Save and share again while one is under way,
@@ -204,7 +251,7 @@ One exception: a game that runs as administrator does not pass its keys to the a
 
 **On Linux** global hotkeys depend on your desktop: they may not work, or may need to be set up in
 the desktop's own keyboard settings. There you can bind a key to `reel-desktop --save-and-share`
-(or `--save`, `--share-last`, `--pause-recording`, `--resume-recording`). With the AppImage the command is the AppImage's path, which the
+(or `--save`, `--share-last`, `--pause-recording`, `--resume-recording`, `--record-session`). With the AppImage the command is the AppImage's path, which the
 Hotkeys page shows.
 
 ## Updates
@@ -245,6 +292,9 @@ releases, and you see each step:
   [move or a copy of the library](setup/standalone.md#the-library-on-another-drive) for as long
   as it goes on: the Updates panel and the tray say "reel 1.12.1 installs once the library has
   moved". **Stop** on the move or the copy lets the update go on at once.
+  While a [session recording](#recording-a-whole-session) runs, the question and the panel say
+  that Install waits for it to stop, and once pressed the panel and the tray say "reel 1.15.1
+  installs once the session recording stops".
 
     ![The small window of an update](setup/img/update-small.png)
 

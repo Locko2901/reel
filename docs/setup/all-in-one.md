@@ -120,6 +120,8 @@ error appears.
 
 6. **Hotkeys**: **Save a clip** is Alt+F10. To change it, click the field and press the keys.
    With a server (the next step), **Save and share** shows here too, Ctrl+Alt+Shift+S by default.
+   **Record a session**, Alt+F9, starts and stops a
+   [session recording](../desktop-app.md#recording-a-whole-session).
 7. **Where clips go**: **This PC only** is chosen already. reel keeps the library in the app, on
    this PC, and nothing goes anywhere ([Standalone](standalone.md)). **Clips folder** is where OBS
    writes the clips; reel takes each one into the library. For a server, see

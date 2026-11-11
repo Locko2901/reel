@@ -430,6 +430,9 @@ under the cap:
   limits and are not counted.
 - The oldest go first, by when they were recorded (as the library's **Oldest** sort orders
   them), but a clip with a live link goes only after every clip without one.
+- A session recording of the desktop app goes before the clips, the older recordings first, so
+  one long recording does not push a hundred clips out. The newest recording goes by its age like
+  a clip.
 - Never moved, whatever its age: a clip someone starred, and a clip in a collection someone made
   (a game's collection does not count).
 - A clip it moves is like a deleted one: its links stop at once, and **Restore** in the trash
