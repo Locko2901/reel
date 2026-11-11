@@ -37,6 +37,16 @@ export function renderVersions(v, line) {
   if (row) row.textContent = `${v.app}, ${v.kind}${v.obs ? ` (OBS ${v.obs})` : ''}; its updater: ${line || 'not asked yet'}`;
 }
 
+// The update's question, which the app sends only to the library on this PC: Install now, Later.
+function renderAsk(a) {
+  const bar = $('#update-ask');
+  if (!bar) return;
+  bar.hidden = !a;
+  if (!a) return;
+  $('#update-ask-title').textContent = `${a.title}.`;
+  $('#update-ask-words').textContent = a.words;
+}
+
 export const APP_DOT = { error: 'err', unpaired: 'err', paused: 'warn', uploading: 'active', working: 'active', preparing: 'active', idle: 'ok' };
 
 export function appShell() {
@@ -60,6 +70,7 @@ export function appShell() {
       if (chipWord) { chipWord.textContent = st.state_word || st.state; chipWord.className = `chip-word ${app === 'ok' ? '' : app}`; }
     }
     renderVersions(st.versions, st.update_line);
+    renderAsk(st.update_ask);
     $$('.app-paired').forEach(el => el.hidden = !(st.panel ? st.panel.pause : st.paired));
     if (pause) setOn(pause, !!st.paused);
     if (recording) setOn(recording, !!st.recording_paused);
@@ -91,6 +102,18 @@ export function appShell() {
   // Back brings a page out of the back/forward cache without running its scripts again.
   window.addEventListener('pageshow', (e) => { if (e.persisted) start(); });
   if (share) share.addEventListener('click', () => call('app_share_last').catch(() => {}));
+  for (const [id, install] of [['#update-ask-install', true], ['#update-ask-later', false]]) {
+    const b = $(id);
+    if (!b) continue;
+    b.addEventListener('click', async () => {
+      b.disabled = true;
+      try {
+        await call('app_update_answer', { install });
+        if (!install) $('#update-ask').hidden = true;
+      } catch (e) { /* the app went away; the page stays a page */ }
+      b.disabled = false;
+    });
+  }
   $('#ver-updates')?.addEventListener('click', (e) => {
     e.preventDefault();
     call('app_open_settings', { section: 'startup', shape: shape() }).catch(() => {});

@@ -1,11 +1,13 @@
 // Shown when the server cannot be reached, so it must never need the server.
 import { $, invoke, listen, mount, renderParts, toast } from './shell.js';
+import { bindAsk, renderAsk } from './ask.js';
 
 let status = null;
 
 function render() {
   if (!status) return;
   renderParts(status);
+  renderAsk(status);
   const off = status.offline;
   if (off) {
     $('#offline-title').textContent = off.title || 'Cannot reach the server';
@@ -23,6 +25,7 @@ function render() {
 
 async function main() {
   await mount('library');
+  bindAsk();
   $('#offline-retry').onclick = () => invoke('offline_retry').catch(e => toast(String(e.message || e), 'err'));
   const section = () => status && status.offline && status.offline.page_error ? 'log' : status && status.mode === 'standalone' ? 'status' : 'server';
   $('#offline-settings').onclick = () => invoke('view_show', { view: 'settings', section: section() }).catch(e => toast(String(e.message || e), 'err'));

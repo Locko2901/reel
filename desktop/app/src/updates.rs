@@ -3,6 +3,7 @@
 //! signed with the release key and checked against the key built into the app.
 use crate::notify;
 use crate::runtime::Runtime;
+use reel_desktop_core::links::Link;
 use reel_desktop_core::settings::{Mode, Settings, UpdateMode};
 use reel_desktop_core::update_steps::{self, Kind, Note};
 use reel_pipeline::app_update::{Flavour, NotOffered};
@@ -38,6 +39,7 @@ pub fn spawn_checks(rt: Runtime) {
                 if new_read(&rt).await || read_is_old(&rt).await {
                     break;
                 }
+                ask(&rt);
                 let last = rt.lock().update_checked_at;
                 let since = last.and_then(|t| SystemTime::now().duration_since(t).ok());
                 if since.map(|d| d >= EVERY).unwrap_or(true) {
@@ -369,7 +371,7 @@ pub async fn check(rt: &Runtime, by_hand: bool) -> Result<(), String> {
             .map_err(|e| e.to_string())?,
     )?;
     match updater.check().await {
-        Ok(Some(update)) => ready(rt, &s, update, Source::Server).await,
+        Ok(Some(update)) => ready(rt, &s, update, Source::Server, by_hand).await,
         Ok(None) => {
             tracing::info!("the app is up to date");
             rt.lock().update = None;
@@ -390,7 +392,14 @@ enum Source {
     Release,
 }
 
-async fn ready(rt: &Runtime, s: &Settings, update: tauri_plugin_updater::Update, from: Source) {
+/// `by_hand`: Check now found it, which asks at once, whatever Later said.
+async fn ready(
+    rt: &Runtime,
+    s: &Settings,
+    update: tauri_plugin_updater::Update,
+    from: Source,
+    by_hand: bool,
+) {
     let version = update.version.clone();
     tracing::info!(
         version,
@@ -405,7 +414,16 @@ async fn ready(rt: &Runtime, s: &Settings, update: tauri_plugin_updater::Update,
         let g = rt.lock();
         g.update_bytes.is_some() && g.update.as_ref().is_some_and(|u| u.version == version)
     };
-    rt.lock().update = Some(update.clone());
+    {
+        let mut g = rt.lock();
+        g.update = Some(update.clone());
+        if by_hand && g.update_later.take().is_some() {
+            tracing::info!(
+                version,
+                "Check now found the update: Later holds the question no longer"
+            );
+        }
+    }
     let current = rt.app.package_info().version.to_string();
     match s.updates {
         _ if test_build(&current) => {
@@ -439,7 +457,11 @@ async fn ready(rt: &Runtime, s: &Settings, update: tauri_plugin_updater::Update,
                 }
             }
         }
-        _ => {
+        UpdateMode::Ask => {
+            set_line(rt, format!("reel {version} is ready to install"));
+            ask(rt);
+        }
+        UpdateMode::Off => {
             set_line(rt, format!("reel {version} is ready to install"));
             let told = rt.lock().update_told.replace(version.clone());
             if told.as_deref() != Some(version.as_str()) {
@@ -451,6 +473,156 @@ async fn ready(rt: &Runtime, s: &Settings, update: tauri_plugin_updater::Update,
             }
         }
     }
+}
+
+/// Later holds the update's question this long by the wall clock, within a run.
+const LATER: Duration = Duration::from_secs(24 * 3600);
+
+/// Whether Later still holds the question about `version`: pressed for it less than a day ago
+/// by the wall clock. A press stamped after now (the clock went back) holds it no longer.
+fn later_holds(later: Option<&(String, SystemTime)>, version: &str, now: SystemTime) -> bool {
+    later.is_some_and(|(v, at)| {
+        v == version && now.duration_since(*at).is_ok_and(|since| since < LATER)
+    })
+}
+
+/// The version the app asks about now: an update ready with New versions on ask, and no
+/// install under way, no test build, no Later that still holds it.
+pub fn asks(
+    mode: UpdateMode,
+    ready: Option<&str>,
+    current: &str,
+    installing: bool,
+    later: Option<&(String, SystemTime)>,
+    now: SystemTime,
+) -> Option<String> {
+    let version = ready?;
+    (mode == UpdateMode::Ask
+        && !test_build(current)
+        && !installing
+        && !later_holds(later, version, now))
+    .then(|| version.to_string())
+}
+
+/// Asks in a notification with Install now and Later, once for each version in a run and again
+/// once a Later's day is over; the window's pages ask as long as `asks` says, never raised.
+fn ask(rt: &Runtime) {
+    let current = rt.app.package_info().version.to_string();
+    let asked = {
+        let mut g = rt.lock();
+        let now = SystemTime::now();
+        let Some(version) = asks(
+            g.settings.updates,
+            g.update.as_ref().map(|u| u.version.as_str()),
+            &current,
+            installing(),
+            g.update_later.as_ref(),
+            now,
+        ) else {
+            return;
+        };
+        if g.update_told.as_deref() == Some(version.as_str()) {
+            return;
+        }
+        g.update_told = Some(version.clone());
+        if g.update_later.take().is_some_and(|(v, _)| v == version) {
+            tracing::info!(version, "a day since Later: the question again");
+        }
+        (version, g.update_value.clone())
+    };
+    let (version, value) = asked;
+    let (title, words) = update_steps::ask(&version, kind(rt));
+    let window = rt
+        .app
+        .get_window(crate::shell::MAIN)
+        .and_then(|w| w.is_visible().ok())
+        .unwrap_or(false);
+    tracing::info!(
+        version,
+        window = if window {
+            "open: its page asks"
+        } else {
+            "closed: its pages ask once it opens"
+        },
+        "the app asks to install the update: a notification with Install now and Later"
+    );
+    notify::ask(&rt.app, &title, &words, &value);
+    rt.push_status();
+}
+
+/// Install now or Later on the update's question, from the window or the notification.
+pub async fn answer(rt: &Runtime, install: bool, from: &'static str) -> Result<(), String> {
+    let version = rt.lock().update.as_ref().map(|u| u.version.clone());
+    let Some(version) = version else {
+        tracing::info!(
+            from,
+            install,
+            "the update's question answered with no update ready: nothing to do"
+        );
+        return Err("no update to install".into());
+    };
+    if install {
+        tracing::info!(version, from, "the update's question answered: Install now");
+        return install_now(rt).await;
+    }
+    tracing::info!(
+        version,
+        from,
+        "the update's question answered: Later; asked again in a day, or at the next start"
+    );
+    {
+        let mut g = rt.lock();
+        g.update_later = Some((version, SystemTime::now()));
+        g.update_told = None;
+    }
+    rt.push_status();
+    Ok(())
+}
+
+/// What a link of the update's question asks, Install now (true) or Later: only with this run's
+/// value and an update ready, as any web page can open the scheme.
+fn link_answer(link: &Link, value: &str, ready: bool) -> Option<bool> {
+    let (install, given) = match link {
+        Link::Install(v) => (true, v),
+        Link::Later(v) => (false, v),
+        Link::Copy(_) | Link::Open(_) => return None,
+    };
+    let same = given.len() == value.len()
+        && given
+            .bytes()
+            .zip(value.bytes())
+            .fold(0u8, |acc, (a, b)| acc | (a ^ b))
+            == 0;
+    (same && ready).then_some(install)
+}
+
+/// A link of the update's question, from the notification's buttons; the value itself is never
+/// written to the log.
+pub fn answer_link(rt: &Runtime, link: Link, from: &'static str) {
+    let (value, ready) = {
+        let g = rt.lock();
+        (g.update_value.clone(), g.update.is_some())
+    };
+    let Some(install) = link_answer(&link, &value, ready) else {
+        let what = if matches!(link, Link::Install(_)) {
+            "Install now"
+        } else {
+            "Later"
+        };
+        tracing::info!(
+            from,
+            what,
+            ready,
+            "an update link without this run's value, or with no update ready: ignored"
+        );
+        return;
+    };
+    let rt = rt.clone();
+    tauri::async_runtime::spawn(async move {
+        if let Err(e) = answer(&rt, install, from).await {
+            notify::show(&rt.app, "The update did not install", &e);
+        }
+    });
 }
 
 /// When reel on this PC made the read of the releases the app last looked at.
@@ -611,7 +783,7 @@ async fn check_release(rt: &Runtime, by_hand: bool, s: &Settings) -> Result<(), 
     }
     let updater = updater(rt, local_builder(&rt.app, &local, with_obs)?)?;
     match updater.check().await {
-        Ok(Some(update)) => ready(rt, s, off_the_pc(update), Source::Release).await,
+        Ok(Some(update)) => ready(rt, s, off_the_pc(update), Source::Release, by_hand).await,
         Ok(None) => {
             rt.lock().update = None;
             set_line(rt, "");
@@ -1302,6 +1474,121 @@ mod tests {
         assert!(
             !again(false, Ask, read, "2026-11-20T00:00:00Z"),
             "Check for updates off: nothing asks GitHub by itself"
+        );
+    }
+
+    #[test]
+    fn later_holds_the_question_a_day_by_the_wall_clock_and_a_newer_version_asks_at_once() {
+        use reel_desktop_core::settings::UpdateMode::{Ask, Off, OnQuit};
+        use std::time::{Duration, SystemTime};
+        let pressed = SystemTime::UNIX_EPOCH + Duration::from_secs(1_762_855_200);
+        let later = Some(("1.14.1".to_string(), pressed));
+        let after = |secs| pressed + Duration::from_secs(secs);
+        let asks = |mode, ready, installing, later: Option<&(String, SystemTime)>, now| {
+            super::asks(mode, ready, "1.14.0", installing, later, now)
+        };
+        assert_eq!(
+            asks(Ask, Some("1.14.1"), false, None, after(0)).as_deref(),
+            Some("1.14.1")
+        );
+        assert_eq!(
+            asks(Ask, Some("1.14.1"), false, later.as_ref(), after(60)),
+            None
+        );
+        assert_eq!(
+            asks(
+                Ask,
+                Some("1.14.1"),
+                false,
+                later.as_ref(),
+                after(24 * 3600 - 1)
+            ),
+            None,
+            "a second short of a day: still held"
+        );
+        assert_eq!(
+            asks(Ask, Some("1.14.1"), false, later.as_ref(), after(24 * 3600)).as_deref(),
+            Some("1.14.1"),
+            "a day later, by the wall clock, also over a night asleep"
+        );
+        assert_eq!(
+            asks(Ask, Some("1.14.2"), false, later.as_ref(), after(60)).as_deref(),
+            Some("1.14.2"),
+            "Later held 1.14.1, not a newer version"
+        );
+        assert_eq!(
+            asks(
+                Ask,
+                Some("1.14.1"),
+                false,
+                later.as_ref(),
+                pressed - Duration::from_secs(60)
+            )
+            .as_deref(),
+            Some("1.14.1"),
+            "a Later stamped after now: the clock went back, and the question comes again"
+        );
+        assert_eq!(
+            asks(Ask, None, false, None, after(0)),
+            None,
+            "nothing ready"
+        );
+        assert_eq!(
+            asks(Ask, Some("1.14.1"), true, None, after(0)),
+            None,
+            "an install under way"
+        );
+        assert_eq!(asks(OnQuit, Some("1.14.1"), false, None, after(0)), None);
+        assert_eq!(asks(Off, Some("1.14.1"), false, None, after(0)), None);
+        assert_eq!(
+            super::asks(
+                Ask,
+                Some("1.14.1"),
+                "1.14.0-dev.e58080a",
+                false,
+                None,
+                after(0)
+            ),
+            None,
+            "a test build installs only when asked"
+        );
+    }
+
+    #[test]
+    fn a_link_of_the_question_acts_only_with_this_runs_value_and_an_update_ready() {
+        use reel_desktop_core::links::{parse, Link};
+        let run = "q0Xw-3_mT9cJb1LkZp4aRg";
+        let other = "Q0Xw-3_mT9cJb1LkZp4aRg";
+        let install = Link::Install(run.into());
+        let later = Link::Later(run.into());
+        assert_eq!(super::link_answer(&install, run, true), Some(true));
+        assert_eq!(super::link_answer(&later, run, true), Some(false));
+        assert_eq!(
+            super::link_answer(&install, run, false),
+            None,
+            "no update ready: nothing to install"
+        );
+        assert_eq!(
+            super::link_answer(&Link::Install(other.into()), run, true),
+            None,
+            "another run's value, or a guess"
+        );
+        assert_eq!(
+            super::link_answer(&Link::Later(other.into()), run, true),
+            None
+        );
+        assert_eq!(
+            super::link_answer(&Link::Open("01M6BCN0TDHAX3FE17KH9KW306".into()), run, true),
+            None
+        );
+        assert_eq!(
+            parse("reel-desktop://install/"),
+            None,
+            "a bare address is no link at all"
+        );
+        assert_eq!(
+            parse(&format!("reel-desktop://install/{run}")).as_ref(),
+            Some(&install)
         );
     }
 

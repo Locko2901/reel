@@ -645,6 +645,21 @@ pub async fn update_install(rt: State<'_, Runtime>) -> R<()> {
     crate::updates::install_now(&rt).await
 }
 
+/// The update's question on the app's own pages: Install now or Later.
+#[tauri::command]
+pub async fn update_answer(rt: State<'_, Runtime>, install: bool) -> R<()> {
+    crate::updates::answer(&rt, install, "the window, on the app's page").await
+}
+
+/// The update's question on the library on this PC, the only one of reel's pages granted it.
+#[tauri::command]
+pub async fn app_update_answer(rt: State<'_, Runtime>, install: bool) -> R<()> {
+    if !rt.is_standalone() {
+        return Err("the server's pages do not answer the update's question".into());
+    }
+    crate::updates::answer(&rt, install, "the window, on the library").await
+}
+
 #[tauri::command]
 pub fn open_releases(app: AppHandle) -> R<()> {
     app.opener()

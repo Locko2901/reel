@@ -142,6 +142,8 @@ pub struct Status {
     pub loudness_target: Option<i32>,
     pub update_line: String,
     pub update_version: Option<String>,
+    /// The update's question while the window is open: Install now and Later.
+    pub update_ask: Option<UpdateAsk>,
     /// An Install under way: it waits for what holds it, downloads, and reel closes.
     pub update_installing: bool,
     /// What the update brings: the notes of the versions it spans, from the server.
@@ -162,6 +164,13 @@ pub struct Status {
     pub data_dir: String,
     pub library: crate::library::LibraryLine,
     pub panel: Panel,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq)]
+pub struct UpdateAsk {
+    pub version: String,
+    pub title: String,
+    pub words: String,
 }
 
 /// The status chip's popover by mode: its third row (Server or Library) and which buttons

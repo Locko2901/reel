@@ -5,6 +5,7 @@ import { keycaps, recorder, recordersOffOnLeave } from './hotkeys.js';
 import { noiseHelp, noiseOptions, ownMicWords } from './noise.js';
 import { ensureOption, syncCustom, takenWords } from './inobs.js';
 import { bindObsBar, renderObsBar } from './obsbar.js';
+import { bindAsk, renderAsk } from './ask.js';
 import { audioPlan, meterIn, renderLevelRows, wordsInto } from './sources.js';
 import { bindLibrary, refreshLibrary, renderLibrary } from './library.js';
 
@@ -563,6 +564,7 @@ function takeSettings(next) {
 function renderStatus() {
   if (!status) return;
   renderParts(status);
+  renderAsk(status);
   renderMode();
   const here = status.mode === 'standalone';
   renderObs();
@@ -778,6 +780,7 @@ function bindButtons() {
     catch (e) { toast(String(e.message || e), 'err'); }
   };
   bindObsBar((r) => doneInObs(r, false));
+  bindAsk();
   $('#copy-app-put').onclick = async () => {
     const b = $('#copy-app-put'), err = $('#copy-app-err');
     b.disabled = true;
