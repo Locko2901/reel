@@ -56,8 +56,8 @@ The first page offers three ways:
 - **Set it up for me** (recommended): press **Set it up**. Eight short steps follow (seven with a
   server), each with a sensible default, so pressing **Next** through them gives a working setup. Everything stays
   changeable later under Settings, **OBS**.
-- **Use my own OBS**: for an OBS you have set up already. The app connects to it as in
-  [Your own OBS](own-obs.md).
+- **Use my own OBS**: for an OBS you have set up already. The setup goes on with the five steps
+  for your own OBS instead, the ones of [Your own OBS](own-obs.md#2-the-setup).
 - **Later**: press **Skip for now**, and the app opens on its own pages. Settings, **OBS** has the
   setup whenever you want it.
 

@@ -158,7 +158,7 @@ The app's own pages:
 | **Server** | Server | **Mode** (connected or standalone), the **Server URL**, the **Device name** and the pairing; in standalone under **A server, later** |
 | **Library folder** (standalone) | Library | where the library is on this PC, with **Move** and **Make a copy**, the **Library cap** and **The cap spares unsent clips** |
 | **Encoder** (standalone) | Library | the **GPU encoder** and the one in use, and **Copies on the GPU** |
-| **OBS** | Recording | with reel's own OBS (the one that came with reel on Windows, the installed one run a second time on Linux): which OBS and how it runs, **Open OBS** on Windows, and **Its setup** (clip length, quality, encoder, capture, audio, format), where a change made in OBS shows once OBS is hidden again. With your own OBS: **What reel needs from OBS**, the obs-websocket connection, **What OBS is set to** and **Change in OBS** |
+| **OBS** | Recording | with reel's own OBS (the one that came with reel on Windows, the installed one run a second time on Linux): which OBS and how it runs, **Open OBS** on Windows, and **Its setup** (clip length, quality, encoder, capture, audio, format), where a change made in OBS shows once OBS is hidden again. With your own OBS: **What reel needs from OBS**, the obs-websocket connection with **Run the setup**, **What OBS is set to** (its profile among it) and **Change in OBS** |
 | **Clips folder and cache** (in standalone **Clips folder**) | Recording | the folder watched for clips (it follows OBS's recording folder unless you turn **Follow OBS** off) and, connected, how long a clip stays on the PC after the server has it |
 | **Upload** (in standalone **New clips**) | Recording | connected: every clip automatically, the last clip on a hotkey, or by hand; a bandwidth limit; on Windows the pause while a game is fullscreen (never for a Save and share, whose upload goes at once, ahead of the others); **Keep the last**. In standalone: **Keep the last**, on Windows **Wait while a game is fullscreen**, and the loudness of new clips |
 | **Hotkeys** | Recording | the four keys, and a line saying how keys reach the app on this desktop; in standalone **Save a clip** alone |
@@ -180,7 +180,7 @@ The four hotkeys, under Settings, **Hotkeys**:
 |---|---|---|
 | **Share the last clip** | Ctrl+Alt+S | asks the server for the newest clip's link, waits until its link preview is ready, copies it and plays the cue |
 | **Save and share** | Ctrl+Alt+Shift+S | OBS saves the replay, the app uploads it, waits until its link preview is ready and copies the link |
-| **Save a clip** | none (Alt+F10 after the OBS setup) | OBS saves the replay; the clip goes into the library, or up to the server like any clip, without a link |
+| **Save a clip** | none (Alt+F10 after the setup) | OBS saves the replay; the clip goes into the library, or up to the server like any clip, without a link |
 | **Upload the last clip** | Ctrl+Alt+U | for the upload mode **the last clip, on the hotkey**; harmless otherwise |
 
 In standalone only **Save a clip** is taken. The other three make or copy a link, or upload, and

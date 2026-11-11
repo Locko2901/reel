@@ -103,6 +103,22 @@ pub struct ObsSettings {
     pub setup: crate::bundled::ObsSetup,
     /// The setup was skipped for now: the app opens on its pages.
     pub setup_later: bool,
+    /// The setup for an OBS of one's own is still to come: only a new install sets it, so an
+    /// app set up before keeps opening on its pages after an update.
+    pub own_setup_due: bool,
+}
+
+impl ObsSettings {
+    /// Whether a start opens the setup: with an OBS that came with the app until that setup
+    /// is done, without one from a new install until its own setup is finished.
+    pub fn setup_opens(&self, with_obs: bool) -> bool {
+        !self.setup_later
+            && if with_obs {
+                !self.setup.done
+            } else {
+                self.own_setup_due
+            }
+    }
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
@@ -316,6 +332,7 @@ impl Default for ObsSettings {
             bundled: false,
             setup: crate::bundled::ObsSetup::default(),
             setup_later: false,
+            own_setup_due: false,
         }
     }
 }
@@ -512,10 +529,15 @@ impl Settings {
         Ok(Settings::load_or_fresh(path)?.0)
     }
 
-    /// A new install starts standalone; a settings file without `mode` loads as connected.
+    /// A new install starts standalone with its setup to come; a settings file without `mode`
+    /// loads as connected.
     pub fn fresh() -> Settings {
         Settings {
             mode: Mode::Standalone,
+            obs: ObsSettings {
+                own_setup_due: true,
+                ..ObsSettings::default()
+            },
             ..Settings::default()
         }
     }
@@ -888,6 +910,48 @@ mod tests {
         ] {
             assert_eq!(kept(json), mode, "{json}");
         }
+    }
+
+    #[test]
+    fn a_new_install_opens_its_setup_and_an_app_set_up_before_an_update_does_not() {
+        let dir = tempfile::tempdir().unwrap();
+        let (new, _) = Settings::load_or_fresh(&dir.path().join("settings.json")).unwrap();
+        assert!(new.obs.setup_opens(false), "reel light, a new install");
+        assert!(new.obs.setup_opens(true), "reel, a new install");
+        let file = dir.path().join("light.json");
+        std::fs::write(
+            &file,
+            r#"{"mode":"standalone","obs":{"enabled":true,"host":"127.0.0.1","port":4455,"password":"x","start_replay":true}}"#,
+        )
+        .unwrap();
+        let before = Settings::load(&file).unwrap();
+        assert!(
+            !before.obs.setup_opens(false),
+            "reel light set up before the setup existed opens on its pages"
+        );
+        assert!(
+            before.obs.setup_opens(true),
+            "the same file under reel, whose setup is not done, still opens it"
+        );
+        let mut s = new.clone();
+        s.save(&file).unwrap();
+        let again = Settings::load(&file).unwrap();
+        assert!(
+            again.obs.setup_opens(false),
+            "a start before the setup was finished opens it again"
+        );
+        s.obs.own_setup_due = false;
+        assert!(!s.obs.setup_opens(false), "finished");
+        assert!(
+            s.obs.setup_opens(true),
+            "finishing reel light's setup leaves reel's own to come, for a switch to reel"
+        );
+        let mut later = new.clone();
+        later.obs.setup_later = true;
+        assert!(!later.obs.setup_opens(false) && !later.obs.setup_opens(true));
+        let mut done = Settings::default();
+        done.obs.setup.done = true;
+        assert!(!done.obs.setup_opens(true) && !done.obs.setup_opens(false));
     }
 
     #[test]

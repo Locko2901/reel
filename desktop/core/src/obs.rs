@@ -125,6 +125,9 @@ pub enum ObsCommand {
 pub struct ObsState {
     pub obs_version: String,
     pub ws_version: String,
+    /// The profile in use, whose settings these are.
+    #[serde(default)]
+    pub profile: String,
     /// Advanced output mode keeps the encoder's settings in a file the WebSocket does not reach.
     pub advanced: bool,
     pub record_dir: String,
@@ -694,6 +697,13 @@ impl Session {
             ws_version: self.version.ws_version.clone(),
             ..ObsState::default()
         };
+        st.profile = self
+            .request("GetProfileList", json!({}))
+            .await?
+            .get("currentProfileName")
+            .and_then(Value::as_str)
+            .unwrap_or_default()
+            .to_string();
         st.advanced =
             self.profile_parameter("Output", "Mode").await?.as_deref() == Some("Advanced");
         let cat = if st.advanced {
@@ -843,10 +853,12 @@ impl Session {
     }
 }
 
-/// The Test button: connect, identify, read the versions, hang up.
-pub async fn test_connection(cfg: &ObsConfig) -> Result<Version, ObsError> {
-    let s = Session::connect(cfg).await?;
-    Ok(s.version)
+/// The Test button: connect, identify, read the versions and what OBS is set to, hang up.
+/// An OBS that answers the versions and refuses the rest is still one that answers.
+pub async fn test_connection(cfg: &ObsConfig) -> Result<(Version, Option<ObsState>), ObsError> {
+    let mut s = Session::connect(cfg).await?;
+    let st = s.state().await.ok();
+    Ok((s.version.clone(), st))
 }
 
 /// OBS writes the window as "Title:Class:exe.exe", with `#3A` for a colon and `#22` for a hash.
@@ -1228,6 +1240,9 @@ mod tests {
                     "GetVersion" => {
                         json!({ "obsVersion": "31.0.2", "obsWebSocketVersion": "5.5.2" })
                     }
+                    "GetProfileList" => {
+                        json!({ "currentProfileName": "Gaming", "profiles": ["Untitled", "Gaming"] })
+                    }
                     "GetProfileParameter" => {
                         let key = format!(
                             "{}/{}",
@@ -1300,6 +1315,7 @@ mod tests {
         let mut s = Session::connect(&cfg).await.unwrap();
         let st = s.state().await.unwrap();
         assert!(!st.advanced);
+        assert_eq!(st.profile, "Gaming");
         assert_eq!(st.record_dir, "C:/Clips");
         assert_eq!(
             (st.format.as_str(), st.encoder.as_str()),
@@ -1363,6 +1379,28 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn the_test_reads_what_obs_is_set_to() {
+        let (port, _server) = fake_obs_profile(false).await;
+        let cfg = ObsConfig {
+            host: "127.0.0.1".into(),
+            port,
+            password: String::new(),
+        };
+        let (v, st) = test_connection(&cfg).await.unwrap();
+        let st = st.unwrap();
+        assert_eq!(v.obs_version, "31.0.2");
+        assert_eq!(
+            (
+                st.profile.as_str(),
+                st.record_dir.as_str(),
+                st.replay_seconds
+            ),
+            ("Gaming", "C:/Clips", 60)
+        );
+        assert!(st.replay_enabled && st.replay_active);
+    }
+
+    #[tokio::test]
     async fn advanced_output_mode_keeps_the_bitrate_in_obs() {
         let (port, _server) = fake_obs_profile(true).await;
         let cfg = ObsConfig {
@@ -1418,7 +1456,12 @@ mod tests {
             port,
             password: "right".into(),
         };
-        assert_eq!(test_connection(&ok).await.unwrap().obs_version, "31.0.0");
+        let (v, st) = test_connection(&ok).await.unwrap();
+        assert_eq!(v.obs_version, "31.0.0");
+        assert!(
+            st.is_none(),
+            "this stand-in hangs up after three requests: the versions still stand"
+        );
         let dead = ObsConfig {
             host: "127.0.0.1".into(),
             port: 1,

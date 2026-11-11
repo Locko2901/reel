@@ -383,6 +383,68 @@ pub struct CheckLine {
     pub line: String,
 }
 
+/// One thing a test of OBS read; `ok` only on what reel needs, whether it is right.
+#[derive(Debug, Clone, Serialize, PartialEq)]
+pub struct Found {
+    pub name: &'static str,
+    pub line: String,
+    pub ok: Option<bool>,
+}
+
+/// What a test of an OBS found, for the setup to show: its versions, its profile, the replay
+/// buffer and what a replay is written as.
+pub fn found(st: &reel_desktop_core::obs::ObsState) -> Vec<Found> {
+    let line = |name, line: String| Found {
+        name,
+        line,
+        ok: None,
+    };
+    let keeps = format!("keeps the last {} s", st.replay_seconds);
+    let replay = match (st.replay_enabled, st.replay_active) {
+        (_, true) => format!("on and running, it {keeps}"),
+        (true, false) => format!("on in this profile, not running; it {keeps}"),
+        (false, false) => "off in this profile".to_string(),
+    };
+    vec![
+        line(
+            "OBS",
+            format!("{} with obs-websocket {}", st.obs_version, st.ws_version),
+        ),
+        line(
+            "Profile",
+            if st.profile.is_empty() {
+                "not named".into()
+            } else {
+                st.profile.clone()
+            },
+        ),
+        Found {
+            name: "The replay buffer",
+            line: replay,
+            ok: Some(st.replay_active),
+        },
+        line(
+            "Recording folder",
+            if st.record_dir.is_empty() {
+                "not set".into()
+            } else {
+                st.record_dir.clone()
+            },
+        ),
+        line(
+            "Recorded as",
+            format!(
+                "{}, {}, {}x{} at {} fps",
+                st.format_name,
+                st.encoder_name,
+                st.output.0,
+                st.output.1,
+                (st.fps * 100.0).round() / 100.0
+            ),
+        ),
+    ]
+}
+
 /// What an OBS of the user's own needs for reel: its WebSocket server and its replay buffer.
 pub fn obs_checks(
     obs: &ObsLine,
@@ -490,6 +552,57 @@ mod tests {
         st.replay_seconds = 60;
         let c = obs_checks(&on, Some(&st), &s);
         assert!(c[1].ok && c[1].line == "running, it keeps the last 60 s");
+    }
+
+    #[test]
+    fn a_test_says_what_it_found_in_the_users_obs() {
+        let mut st = ObsState {
+            obs_version: "32.0.1".into(),
+            ws_version: "5.6.2".into(),
+            profile: "Gaming".into(),
+            record_dir: "C:\\Users\\sam\\Videos".into(),
+            format_name: "hybrid MP4".into(),
+            encoder_name: "NVIDIA NVENC H.264".into(),
+            replay_enabled: true,
+            replay_seconds: 120,
+            replay_active: true,
+            output: (1920, 1080),
+            fps: 60.0,
+            ..ObsState::default()
+        };
+        let lines = |st: &ObsState| {
+            found(st)
+                .into_iter()
+                .map(|f| format!("{}: {}", f.name, f.line))
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(
+            lines(&st),
+            [
+                "OBS: 32.0.1 with obs-websocket 5.6.2",
+                "Profile: Gaming",
+                "The replay buffer: on and running, it keeps the last 120 s",
+                "Recording folder: C:\\Users\\sam\\Videos",
+                "Recorded as: hybrid MP4, NVIDIA NVENC H.264, 1920x1080 at 60 fps",
+            ]
+        );
+        assert_eq!(found(&st)[2].ok, Some(true));
+        assert!(found(&st).iter().filter(|f| f.ok.is_some()).count() == 1);
+        st.replay_active = false;
+        assert_eq!(
+            lines(&st)[2],
+            "The replay buffer: on in this profile, not running; it keeps the last 120 s"
+        );
+        assert_eq!(found(&st)[2].ok, Some(false));
+        st.replay_enabled = false;
+        st.profile.clear();
+        st.record_dir.clear();
+        st.fps = 29.97;
+        let l = lines(&st);
+        assert_eq!(l[1], "Profile: not named");
+        assert_eq!(l[2], "The replay buffer: off in this profile");
+        assert_eq!(l[3], "Recording folder: not set");
+        assert!(l[4].ends_with("at 29.97 fps"), "{}", l[4]);
     }
 
     #[test]

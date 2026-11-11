@@ -295,7 +295,7 @@ pub fn run() {
             let first_run = fresh || (!standalone && server_url.is_empty());
             let wizard = {
                 let g = rt.lock();
-                g.bundled.is_some() && !g.settings.obs.setup.done && !g.settings.obs.setup_later
+                g.settings.obs.setup_opens(g.bundled.is_some())
             };
             #[cfg(target_os = "linux")]
             linux::watch_tray(rt.clone());

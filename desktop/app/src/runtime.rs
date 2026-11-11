@@ -2606,21 +2606,22 @@ impl Runtime {
         });
     }
 
-    /// The Test button's answer: the versions, or plain words with the OS line under them.
+    /// The Test button's answer: the versions and what OBS is set to, or plain words with the
+    /// OS line under them.
     pub async fn obs_test(
         host: &str,
         port: u16,
         password: &str,
-    ) -> Result<String, (String, Option<String>)> {
+    ) -> Result<(String, Vec<crate::status::Found>), (String, Option<String>)> {
         let cfg = ObsConfig {
             host: host.to_string(),
             port,
             password: password.to_string(),
         };
         match reel_desktop_core::obs::test_connection(&cfg).await {
-            Ok(v) => Ok(format!(
-                "OBS {} with obs-websocket {}",
-                v.obs_version, v.ws_version
+            Ok((v, st)) => Ok((
+                format!("OBS {} with obs-websocket {}", v.obs_version, v.ws_version),
+                st.as_ref().map(crate::status::found).unwrap_or_default(),
             )),
             Err(e) => Err(e.explain(host, port)),
         }

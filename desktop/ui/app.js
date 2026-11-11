@@ -254,6 +254,7 @@ function renderObs() {
   if (!st) { dl.innerHTML = ''; return; }
   const kbit = st.video_kbit != null ? `${st.video_kbit} kbit/s` : st.quality ? `quality ${st.quality}` : 'in the encoder settings (advanced output mode)';
   kv(dl, [
+    ['Profile', st.profile || 'not named'],
     ['Output mode', st.advanced ? 'advanced' : 'simple'],
     ['Recording folder', st.record_dir],
     ['Format', st.format_name || st.format],
@@ -748,6 +749,7 @@ function bindButtons() {
   };
   $('#setup-again').onclick = () => invoke('view_show', { view: 'setup', section: null }).catch((e) => toast(String(e.message || e), 'err'));
   $('#bundled-setup').onclick = $('#setup-again').onclick;
+  $('#own-setup').onclick = $('#setup-again').onclick;
   $('#mic-app-on').addEventListener('change', () => {
     const on = isOn($('#mic-app-on'));
     saveSetup((s) => { s.mic = on ? ($('#mic-app').value || 'default') : null; }, $('#mic-app-err'));

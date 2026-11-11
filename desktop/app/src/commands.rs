@@ -117,7 +117,7 @@ pub fn unpair(rt: State<'_, Runtime>) -> Status {
 #[tauri::command]
 pub async fn obs_test(host: String, port: u16, password: String) -> R<Value> {
     match Runtime::obs_test(&host, port, &password).await {
-        Ok(line) => Ok(json!({ "ok": true, "line": line })),
+        Ok((line, found)) => Ok(json!({ "ok": true, "line": line, "found": found })),
         Err((line, detail)) => Ok(json!({ "ok": false, "line": line, "detail": detail })),
     }
 }

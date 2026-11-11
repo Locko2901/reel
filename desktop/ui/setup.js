@@ -1,4 +1,6 @@
 // The bundled OBS's setup, saved at Finish; OBS runs on the defaults meanwhile so the audio step has levels.
+// Without one (reel light), or with Use my own OBS, the steps for an OBS of one's own: the
+// connection is saved as it is left, so the replay buffer's step shows what reel finds there.
 import { $, $$, invoke, listen, toast } from './shell.js';
 import { isOn, setOn } from './assets/js/switch.js';
 import { keycaps, recorder, recordersOffOnLeave } from './hotkeys.js';
@@ -9,10 +11,15 @@ import { bindAsk, renderAsk } from './ask.js';
 import { audioPlan, meterIn, renderLevelRows, wordsInto } from './sources.js';
 
 const GUIDED = [['length', 'Clip length'], ['quality', 'Quality'], ['encoder', 'Encoder'], ['capture', 'What to capture'], ['audio', 'Audio'], ['hotkeys', 'Hotkeys'], ['where', 'Where clips go'], ['look', 'New versions'], ['done', 'Done']];
+const OWN = [['obs', 'Your OBS'], ['needs', 'The replay buffer'], ['hotkeys', 'Hotkeys'], ['where', 'Where clips go'], ['look', 'New versions'], ['done', 'Done']];
+let chose = null;
+const own = () => chose === 'own' || !!(status && !status.bundled);
 // New versions is standalone's: a paired app takes its updates from its server.
-const steps = () => (settings && settings.mode !== 'standalone' ? GUIDED.filter(([k]) => k !== 'look') : GUIDED);
-const COUNT = { 7: 'seven', 8: 'eight' };
-const stepsCount = () => COUNT[steps().length - 1] || String(steps().length - 1);
+const pathSteps = (all) => (settings && settings.mode !== 'standalone' ? all.filter(([k]) => k !== 'look') : all);
+const steps = () => pathSteps(own() ? OWN : GUIDED);
+const COUNT = { 4: 'four', 5: 'five', 6: 'six', 7: 'seven', 8: 'eight' };
+const counted = (all) => COUNT[pathSteps(all).length - 1] || String(pathSteps(all).length - 1);
+const stepsCount = () => counted(own() ? OWN : GUIDED);
 const QUALITY = { light: 'Light: 1080p30', smooth: 'Smooth: 1080p60', sharp: 'Sharp: 1440p60', native: 'Native: your screen', custom: 'As set in OBS' };
 const FORMAT = { hybrid_mp4: 'hybrid MP4', mkv: 'MKV' };
 let settings = null;
@@ -24,7 +31,9 @@ let step = 'choose';
 // Look for new versions on GitHub: on in a first setup; a setup run again shows the library's
 // own Check for updates and writes it only when it is changed here.
 let look = null;
-const lookOn = () => look ?? (setup().done ? !!(status && status.update_check) : true);
+// Finished before: reel light's own setup, else the setup of the package with OBS.
+const again = () => (status && !status.bundled ? !settings.obs.own_setup_due : setup().done);
+const lookOn = () => look ?? (again() ? !!(status && status.update_check) : true);
 const lookWords = () => (lookOn() ? 'looked for on GitHub a minute after reel on this PC starts, then every six hours' : 'only when you press Check now, under Settings, Startup');
 let seen = new Set();
 const setup = () => settings.obs.setup;
@@ -106,6 +115,113 @@ async function showWarnings(el, v) {
   const w = await warnings(v);
   el.textContent = w.join(' ');
   el.hidden = !w.length;
+}
+
+const obsUp = () => !!(status && status.obs && status.obs.connected);
+
+function kvInto(dl, rows) {
+  dl.replaceChildren();
+  for (const [k, val, cls] of rows) {
+    const dt = document.createElement('dt'); dt.textContent = k;
+    const dd = document.createElement('dd'); dd.textContent = val;
+    if (cls) dd.className = cls;
+    dl.append(dt, dd);
+  }
+}
+
+function renderObs() {
+  const o = settings.obs;
+  $('#obs-host').value = o.host;
+  $('#obs-port').value = o.port;
+  $('#obs-password').value = o.password;
+  testObs();
+}
+
+// The Test button's answer for the values on the step; an answer to values changed since is dropped.
+let tests = 0;
+async function testObs() {
+  const run = ++tests;
+  const o = settings.obs, line = $('#obs-test-line');
+  line.className = 'st-active';
+  line.textContent = `connecting to ${o.host}:${o.port}`;
+  $('#obs-test').disabled = true;
+  let r;
+  try { r = await invoke('obs_test', { host: o.host, port: o.port, password: o.password }); }
+  catch (e) { r = { ok: false, line: String(e.message || e), detail: '' }; }
+  if (run !== tests) return;
+  $('#obs-test').disabled = false;
+  line.className = r.ok ? 'st-ok' : 'st-err';
+  line.textContent = r.ok ? 'connected' : 'not connected';
+  const found = r.ok ? (r.found && r.found.length ? r.found : [{ name: 'OBS', line: r.line }]) : [];
+  kvInto($('#obs-found'), found.map((f) => [f.name, f.line, f.ok == null ? '' : (f.ok ? 'st-ok' : 'st-warn')]));
+  $('#obs-found').hidden = !found.length;
+  const words = $('#obs-test-words'), detail = $('#obs-test-detail');
+  words.className = 'st-err';
+  words.textContent = r.ok ? '' : r.line;
+  words.hidden = r.ok;
+  detail.textContent = (!r.ok && r.detail) || '';
+  detail.hidden = r.ok || !r.detail;
+}
+
+// Changes one part of what is saved now, and the same in the page's copy, which Finish saves.
+async function saveNow(change) {
+  change(settings);
+  try {
+    const now = await invoke('settings_get');
+    change(now);
+    await invoke('settings_save', { settings: now, force: false });
+    status = await invoke('status_get');
+  } catch (e) { toast(String(e.message || e), 'err'); }
+}
+
+let savedTo = null;
+function saveConnection() {
+  const o = settings.obs, to = JSON.stringify([o.host, o.port, o.password]);
+  if (o.enabled && to === savedTo) return;
+  savedTo = to;
+  saveNow((s) => Object.assign(s.obs, { enabled: true, host: o.host, port: o.port, password: o.password }));
+}
+
+function renderNeeds() {
+  const checks = (status && status.obs_checks) || [];
+  kvInto($('#needs'), checks.length ? checks.map((c) => [c.name, c.line, c.ok ? 'st-ok' : 'st-warn']) : [['OBS', 'known once reel connects to it', 'st-neutral']]);
+  setOn($('#start-replay'), settings.obs.start_replay);
+  const st = obsUp() ? status.obs_state : null;
+  const n = st ? st.replay_seconds : null;
+  pressed($('#replay-seg'), 'seconds', n);
+  for (const b of $$('#replay-ctl button, #replay-ctl input')) b.disabled = !st;
+  if (document.activeElement !== $('#replay-n')) $('#replay-n').value = n ?? '';
+  $('#replay-help').textContent = st
+    ? `OBS's replay buffer keeps the last ${seconds(n)}; a change here is written into OBS's profile over the WebSocket, and a running buffer starts again with it`
+    : 'known once OBS answers';
+}
+
+async function setReplay(n) {
+  const err = $('#replay-err');
+  err.hidden = true;
+  try {
+    const r = await invoke('obs_apply', { change: { replay_seconds: n } });
+    toast(r.lines.join('; ') || 'nothing to change', 'ok');
+  } catch (e) { err.textContent = String(e.message || e); err.hidden = false; }
+  try { status = await invoke('status_get'); } catch { /* the next status event brings it */ }
+  renderNeeds();
+}
+
+// OBS's recording folder while the clips folder follows it and OBS answers; null otherwise.
+function obsFolder() {
+  const st = own() && settings.clips_follow_obs && obsUp() && status.obs_state;
+  return st && st.record_dir ? st.record_dir : null;
+}
+
+async function setFolder(dir) {
+  if (!dir) return;
+  if (!obsFolder()) { settings.clips_dir = dir; renderWhere(); return; }
+  try {
+    const r = await invoke('obs_apply', { change: { record_dir: dir } });
+    toast(r.lines.join('; ') || 'nothing to change', 'ok');
+    status = await invoke('status_get');
+  } catch (e) { toast(String(e.message || e), 'err'); }
+  renderWhere();
 }
 
 async function renderLength() {
@@ -521,6 +637,7 @@ async function later() {
 function renderHotkeys() {
   $('#hotkey-save-share').hidden = settings.mode === 'standalone';
   $('#hotkey-save-help').textContent = settings.mode === 'standalone' ? 'OBS saves the replay, and it goes into the library on this PC' : 'OBS saves the replay, and it goes up as any clip does';
+  $('#hotkeys-own').hidden = !own();
   for (const row of $$('section[data-step="hotkeys"] .srow[data-kind="hotkey"]')) fillHotkey(row);
 }
 function fillHotkey(row) {
@@ -540,10 +657,13 @@ function renderWhere() {
   $('#pair-row').hidden = local || !!(status && status.paired);
   $('#where-help').textContent = local ? 'reel keeps the library in the app, on this PC; a server can be added later'
     : status && status.paired ? `paired with ${status.server_name || status.server_url} as ${status.user}` : 'pair with the server: one code from its Settings, Devices';
-  $('#clips-dir-help').textContent = local ? 'where OBS writes the clips; reel takes each one into the library on this PC'
-    : 'where OBS writes the clips; with a server, reel removes its copy once the server has it';
+  const folder = obsFolder();
+  const after = local ? 'reel takes each one into the library on this PC' : 'with a server, reel removes its copy once the server has it';
+  $('#clips-dir-help').textContent = folder ? `OBS's recording folder, read from OBS; ${after}. A folder picked here is set in OBS, over the WebSocket`
+    : own() && settings.clips_follow_obs ? `watched until OBS answers, then its recording folder; ${after}`
+      : `where OBS writes the clips; ${after}`;
   $('#server-url').value = settings.server_url || '';
-  $('#clips-dir').value = settings.clips_dir || '';
+  $('#clips-dir').value = folder || settings.clips_dir || '';
 }
 
 function audioSummary(s, p) {
@@ -553,7 +673,21 @@ function audioSummary(s, p) {
   return words.join('; ');
 }
 
+function ownSummary() {
+  const o = settings.obs, st = obsUp() ? status.obs_state : null;
+  const replay = ((status && status.obs_checks) || []).find((c) => c.name === 'The replay buffer');
+  return [
+    ['OBS', st ? `OBS ${st.obs_version} at ${o.host}:${o.port}${st.profile ? `, its profile ${st.profile}` : ''}` : `not connected yet: reel connects once OBS answers at ${o.host}:${o.port}`],
+    ['Replay buffer', replay ? replay.line : 'known once OBS answers'],
+    ['Start the replay buffer', o.start_replay ? 'on: reel turns it on and starts it whenever OBS has it off' : 'off: you start it in OBS'],
+  ];
+}
+
 async function renderDone() {
+  $('#done-intro').textContent = own()
+    ? 'That is the setup. Finish saves it: reel stays connected to your OBS, and the hotkeys work from then on.'
+    : 'That is the setup. Finish starts OBS with it, hidden; the hotkeys work from then on.';
+  if (own()) { summaryInto([...ownSummary(), ...commonSummary()]); return; }
   const s = setup(), v = await video();
   const enc = (encoders || []).find((e) => e.id === s.encoder);
   const sc = screens.find((x) => x.id === s.screen.id);
@@ -563,13 +697,24 @@ async function renderDone() {
     ['Encoder', enc ? enc.word : s.encoder],
     ['Capture', `${s.game ? 'the game in front, the screen behind it' : 'the screen'}; ${screenWords(sc)}`],
     ['Audio', audioSummary(s, await audioPlan(s))],
+    ...commonSummary(),
+  ];
+  if (s.elevated) rows.push(['Games run as administrator', 'OBS from a copy in Program Files that only an administrator can change, started with the highest rights by a task at sign-in; Windows asks once, at Finish']);
+  summaryInto(rows);
+}
+
+function commonSummary() {
+  const folder = obsFolder();
+  const rows = [
     ['Hotkeys', settings.mode === 'standalone' ? `Save a clip ${settings.hotkeys.save || 'none'}` : `Save and share ${settings.hotkeys.save_share || 'none'}, Save ${settings.hotkeys.save || 'none'}`],
     ['Clips go to', settings.mode === 'standalone' ? 'this PC only: the library in the app, on this PC' : (status && status.paired ? (status.server_name || status.server_url) : `${settings.server_url || 'no server yet'}, not paired yet`)],
-    ['Clips folder', settings.clips_dir],
+    ['Clips folder', folder ? `${folder}, OBS's recording folder` : settings.clips_dir],
   ];
-  const here = settings.mode === 'standalone';
-  if (here) rows.push(['New versions', lookWords()]);
-  if (s.elevated) rows.push(['Games run as administrator', 'OBS from a copy in Program Files that only an administrator can change, started with the highest rights by a task at sign-in; Windows asks once, at Finish']);
+  if (settings.mode === 'standalone') rows.push(['New versions', lookWords()]);
+  return rows;
+}
+
+function summaryInto(rows) {
   const kv = $('#summary');
   kv.replaceChildren();
   for (const [k, val] of rows) {
@@ -580,10 +725,11 @@ async function renderDone() {
   }
 }
 
-const RENDER = { length: renderLength, quality: renderQuality, encoder: renderEncoders, capture: renderCapture, audio: renderAudio, hotkeys: renderHotkeys, where: renderWhere, look: renderLook, done: renderDone };
+const RENDER = { obs: renderObs, needs: renderNeeds, length: renderLength, quality: renderQuality, encoder: renderEncoders, capture: renderCapture, audio: renderAudio, hotkeys: renderHotkeys, where: renderWhere, look: renderLook, done: renderDone };
 
 function go(id) {
   if (step === 'audio' && id !== 'audio') invoke('obs_meters', { on: false }).catch(() => {});
+  if (step === 'obs' && id !== 'obs') saveConnection();
   if (step !== 'choose') seen.add(step);
   step = id;
   $('#wizard').dataset.step = id;
@@ -626,19 +772,26 @@ async function finish() {
 
 async function saveAndLeave() {
   const err = $('#finish-err');
-  const wantElevated = !!setup().elevated;
-  const lookWrite = settings.mode === 'standalone' && (!setup().done || look !== null);
+  const mine = own();
+  const wantElevated = !mine && !!setup().elevated;
+  const lookWrite = settings.mode === 'standalone' && (!again() || look !== null);
   const lookWanted = lookOn();
-  settings.obs.bundled = true;
+  const was = { bundled: settings.obs.bundled, done: setup().done, due: settings.obs.own_setup_due };
+  // reel light's own setup leaves reel's to come, for a switch to reel, the package with OBS.
+  if (!mine || status.bundled) {
+    settings.obs.bundled = !mine;
+    setup().done = true;
+  }
+  settings.obs.own_setup_due = false;
   settings.obs.setup_later = false;
-  setup().done = true;
+  const undo = () => { settings.obs.bundled = was.bundled; setup().done = was.done; settings.obs.own_setup_due = was.due; };
   try {
     await save(false);
   } catch (e) {
     const why = String(e.message || e);
     if (/Save anyway\?$/.test(why)) {
-      try { await save(true); } catch (e2) { failed(err, String(e2.message || e2)); setup().done = false; return; }
-    } else { failed(err, why); setup().done = false; return; }
+      try { await save(true); } catch (e2) { failed(err, String(e2.message || e2)); undo(); return; }
+    } else { failed(err, why); undo(); return; }
   }
   invoke('obs_meters', { on: false }).catch(() => {});
   if (lookWrite) await invoke('update_check_set', { on: lookWanted }).catch((e) => toast(String(e.message || e), 'err'));
@@ -655,7 +808,7 @@ async function saveAndLeave() {
     finishedTo = to;
     return;
   }
-  toast('Set up: OBS starts with it, hidden.', 'ok');
+  toast(mine ? 'Set up: reel connects to your OBS whenever it runs.' : 'Set up: OBS starts with it, hidden.', 'ok');
   invoke('view_show', to).catch(() => {});
 }
 
@@ -670,10 +823,36 @@ function bind() {
   };
   $('#choose-own').onclick = async () => {
     settings.obs.bundled = false;
-    setup().done = true;
     try { await save(); } catch (e) { toast(String(e.message || e), 'err'); return; }
-    invoke('view_show', { view: 'settings', section: 'obs' }).catch(() => {});
+    chose = 'own';
+    $('#setup-of').textContent = 'setup for your own OBS';
+    go('obs');
   };
+  for (const [id, key] of [['#obs-host', 'host'], ['#obs-port', 'port'], ['#obs-password', 'password']]) {
+    $(id).addEventListener('change', () => {
+      const v = key === 'port' ? Math.round(+$(id).value) : $(id).value.trim();
+      if (key === 'port' && !(v >= 1 && v <= 65535)) { $(id).value = settings.obs.port; return; }
+      settings.obs[key] = key === 'password' ? $(id).value : v;
+      testObs();
+    });
+  }
+  $('#obs-test').onclick = testObs;
+  $('#start-replay').addEventListener('change', async () => {
+    const on = isOn($('#start-replay'));
+    await saveNow((s) => { s.obs.start_replay = on; });
+    if (step === 'needs') renderNeeds();
+  });
+  const seg = $('#length-seg').cloneNode(true);
+  seg.id = 'replay-seg';
+  $('#replay-ctl').prepend(seg);
+  seg.addEventListener('click', (e) => {
+    const b = e.target.closest('button[data-seconds]');
+    if (b) setReplay(+b.dataset.seconds);
+  });
+  $('#replay-n').addEventListener('change', () => {
+    const n = Math.round(+$('#replay-n').value);
+    if (n >= 1 && n <= 3600) setReplay(n); else renderNeeds();
+  });
   $('#steps').addEventListener('click', (e) => {
     const a = e.target.closest('a[data-step]');
     if (!a) return;
@@ -760,11 +939,11 @@ function bind() {
     if (b) { settings.mode = b.dataset.where === 'local' ? 'standalone' : 'connected'; renderWhere(); renderSteps(); stepLine(); }
   });
   $('#server-url').onchange = () => { settings.server_url = $('#server-url').value.trim(); };
-  $('#clips-dir').onchange = () => { settings.clips_dir = $('#clips-dir').value.trim(); };
+  $('#clips-dir').onchange = () => setFolder($('#clips-dir').value.trim());
   $('#clips-browse').onclick = async () => {
     try {
-      const picked = await invoke('pick_folder', { current: settings.clips_dir });
-      if (picked) { settings.clips_dir = picked; renderWhere(); }
+      const picked = await invoke('pick_folder', { current: obsFolder() || settings.clips_dir });
+      if (picked) setFolder(picked);
     } catch (e) { toast(String(e.message || e), 'err'); }
   };
   $('#pair-btn').onclick = async () => {
@@ -811,8 +990,9 @@ async function main() {
   const s = setup();
   if (!s.screen || !s.screen.id) s.screen = screens.find((x) => x.main) || screens[0] || s.screen;
   if (!settings.hotkeys.save) settings.hotkeys.save = 'Alt+F10';
+  savedTo = JSON.stringify([settings.obs.host, settings.obs.port, settings.obs.password]);
   await listen('encoder-test', (ev) => encoderEvent(ev.payload));
-  testEncoders();
+  if (status.bundled) testEncoders();
   await listen('obs-meters', (ev) => {
     for (const [name, db] of ev.payload || []) meterIn($('#levels'), name, db);
   });
@@ -824,6 +1004,7 @@ async function main() {
     renderObsNotice();
     renderStepping();
     if (step === 'where') renderWhere();
+    if (step === 'needs') renderNeeds();
     if (step === 'audio' && connected !== wasConnected) renderAudio();
     wasConnected = connected;
     const plugins = `${status.obs_app_audio}/${status.obs_game_capture}`;
@@ -835,14 +1016,20 @@ async function main() {
   });
   setInterval(renderObsNotice, 1000);
   $$('.steps-count').forEach((n) => { n.textContent = stepsCount(); });
+  $$('.own-count').forEach((n) => { n.textContent = counted(OWN); });
   if (linux()) {
     $('#choose-intro').textContent = `reel found ${status.obs_which} and can run it a second time with settings of its own (its own profile, scenes, WebSocket and replay buffer), set up in ${stepsCount()} short steps, each with a default. Your own OBS and its settings stay as they are, and both can run at once.`;
     $('#setup-of').textContent = 'setup of reel\'s own OBS';
-    $('#choose-own-help').textContent = 'for an OBS set up already: reel connects to it over its WebSocket and uses its replay buffer. Discord turns on its Streamer Mode while it sees your OBS running; its Streamer Mode settings, Automatically Enable/Disable, turn that off';
+    $('#choose-own-help').textContent = `for an OBS set up already: reel connects to it over its WebSocket and uses its replay buffer, set up in ${counted(OWN)} short steps. Discord turns on its Streamer Mode while it sees your OBS running; its Streamer Mode settings, Automatically Enable/Disable, turn that off`;
     if (status.discord_note) $('#choose-intro').textContent += ` ${status.discord_note}`;
     $('#choose-bundled-help').textContent = 'recommended: reel starts this second OBS with the app, in its own tray icon, and writes its settings from these steps; anything can be changed in OBS itself later';
   }
   const want = location.hash.replace('#', '');
+  if (!status.bundled) {
+    $('#setup-of').textContent = 'setup for your own OBS';
+    go(steps().some(([k]) => k === want) ? want : steps()[0][0]);
+    return;
+  }
   go(settings.obs.bundled && steps().some(([k]) => k === want) ? want : (settings.obs.bundled ? steps()[0][0] : 'choose'));
 }
 

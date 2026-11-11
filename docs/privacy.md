@@ -170,13 +170,14 @@ the app:
 A new install of the desktop app is standalone: the library lives on your
 PC, and the app talks only to OBS on the same PC, over OBS's WebSocket on
 `127.0.0.1`. The one thing that leaves the PC by itself is the check for
-new versions, and only while it is on. The setup of the OBS that came
-with reel asks on a step of its own before Done, **New versions**: **Look
-for new versions on GitHub**, on unless you switch it off there. It is the same switch as
+new versions, and only while it is on. The setup asks on a step of its
+own before Done, **New versions**: **Look for new versions on GitHub**, on
+unless you switch it off there; reel light's setup, for your own OBS,
+asks the same. It is the same switch as
 Settings, **Advanced**, **Check for updates**, so the check happens only
 when it was left on in the setup or turned on under Advanced; a skipped
-setup, a setup that goes to your own OBS, and reel light, which has no
-setup, leave it off. The check is one request for the newest release of
+setup, and an app set up before the setup asked, leave it off. The check
+is one request for the newest release of
 reel's repository on GitHub, with reel's version and nothing else: a
 minute after reel on this PC starts, then every six hours by the clock
 (once a day with **New versions** off), so a new version reaches the app
