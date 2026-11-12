@@ -1,5 +1,5 @@
-// The header's Record button and the menu's item: whether a session recording runs, for how
-// long on a clock of its own between the status reads, and a press that starts or stops it.
+// The bar's Record, and a menu's item where there is one: whether a session recording runs, for
+// how long on a clock of its own between the status reads, and a press that starts or stops it.
 
 export function clock(ms) {
   const s = Math.max(0, Math.floor(ms / 1000));
@@ -19,6 +19,7 @@ export function recordControl(button, item, set, fail) {
     const busy = asking || (!!s && (s.starting || s.stopping));
     const can = st && st.record;
     button.classList.toggle('on', on);
+    button.classList.toggle('busy', busy);
     button.querySelector('.rec-time').textContent = on ? clock(Date.now() - s.since_ms) : '';
     button.querySelector('.rec-word').textContent = !s ? 'Record' : s.starting ? 'Starting' : s.stopping ? 'Stopping' : 'Stop';
     button.disabled = !st || busy || (!s && !(can && can.ok));

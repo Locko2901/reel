@@ -19,18 +19,9 @@ fn act(id: &str, label: impl Into<String>, on: bool) -> Item {
     Item::Act(id.into(), label.into(), on)
 }
 
-/// The menu's first line: the app's state and what it is doing.
-fn state_line(st: &Status) -> String {
-    if st.state_line.is_empty() {
-        st.state_word.clone()
-    } else {
-        format!("{}: {}", st.state_word, st.state_line)
-    }
-}
-
 pub fn items(st: &Status) -> Vec<Item> {
     let standalone = st.mode == "standalone";
-    let mut out = vec![Item::Line("state".into(), state_line(st))];
+    let mut out = vec![Item::Line("state".into(), st.state_short())];
     if st.obs_box.as_ref().is_some_and(|b| b.state == "gave_up") {
         out.push(act("obs-again", "Start OBS again", true));
     }
@@ -312,7 +303,7 @@ fn over(p: &mut [u8], rgb: [u8; 3], a: f32) {
 
 pub fn refresh(app: &AppHandle, st: &Status) {
     static SHOWN: std::sync::Mutex<String> = std::sync::Mutex::new(String::new());
-    let line = state_line(st);
+    let line = st.state_short();
     let mut shown = SHOWN.lock().unwrap_or_else(|e| e.into_inner());
     if *shown != line {
         tracing::debug!(line = %line, "the tray's state line");
@@ -418,6 +409,27 @@ mod tests {
         }
     }
 
+    /// The state as the app's chain says it for these facts.
+    fn say(st: &mut Status, f: crate::status::Facts) {
+        let s = crate::status::said(&f);
+        st.state = s.state.into();
+        st.state_word = s.word;
+        st.state_detail = s.detail;
+        st.state_line = s.line;
+    }
+
+    fn running(standalone: bool, paired: bool) -> crate::status::Facts<'static> {
+        crate::status::Facts {
+            standalone,
+            paired,
+            obs_set_up: true,
+            obs_connected: true,
+            replay: Some((true, 60)),
+            save_key: "Alt+F10",
+            ..Default::default()
+        }
+    }
+
     fn status(mode: &str, paired: bool, url: &str) -> Status {
         let ok = Action {
             ok: true,
@@ -427,7 +439,8 @@ mod tests {
             mode: mode.into(),
             paired,
             server_url: url.into(),
-            state_word: "idle".into(),
+            state_word: "ready".into(),
+            state_detail: "last 60 s".into(),
             save: ok.clone(),
             save_share: ok,
             update_version: Some("9.9.9".into()),
@@ -472,6 +485,33 @@ mod tests {
     }
 
     #[test]
+    fn the_first_line_and_the_tooltip_say_the_bars_words_without_its_fix() {
+        let mut st = status("standalone", false, "");
+        say(&mut st, running(true, false));
+        assert_eq!(entries(&st)[0].1, "ready, last 60 s");
+        assert_eq!(st.tooltip(), "reel: ready, last 60 s");
+        say(
+            &mut st,
+            crate::status::Facts {
+                obs_connected: false,
+                obs_refused: true,
+                replay: None,
+                ..running(true, false)
+            },
+        );
+        assert_eq!(entries(&st)[0].1, "OBS not connected");
+        assert_eq!(st.tooltip(), "reel: OBS not connected");
+        say(
+            &mut st,
+            crate::status::Facts {
+                uploading: Some(("a.mp4", 64, 100)),
+                ..running(false, true)
+            },
+        );
+        assert_eq!(st.tooltip(), "reel: uploading, 64%");
+    }
+
+    #[test]
     fn pause_clips_sits_with_the_saves_and_paused_greys_them_with_its_reason() {
         for mode in ["connected", "standalone"] {
             let mut st = status(mode, true, "https://clips.example.org");
@@ -485,8 +525,13 @@ mod tests {
             assert!(on(&st, "save"));
 
             st.recording_paused = true;
-            st.state_word = "clips paused".into();
-            st.state_line = "the replay buffer is stopped".into();
+            say(
+                &mut st,
+                crate::status::Facts {
+                    recording_paused: true,
+                    ..running(mode == "standalone", true)
+                },
+            );
             let (save, share) =
                 crate::status::save_actions(true, true, true, None, true, mode == "standalone");
             st.save = save;
@@ -499,11 +544,8 @@ mod tests {
                 assert!(!on(&st, "save-share"), "and Save and share");
             }
             assert_eq!(got[at(&got, "save-why")].1, "Clips are paused");
-            assert_eq!(got[0].1, "clips paused: the replay buffer is stopped");
-            assert_eq!(
-                st.tooltip(),
-                "reel: clips paused, the replay buffer is stopped"
-            );
+            assert_eq!(got[0].1, "clips paused");
+            assert_eq!(st.tooltip(), "reel: clips paused");
         }
     }
 
@@ -538,22 +580,22 @@ mod tests {
                 length: "1 h 12 min".into(),
                 ..Default::default()
             });
-            st.state_word = "recording a session".into();
-            st.state_line = "1 h 12 min, started by the hotkey".into();
+            let session = st.session.clone();
+            say(
+                &mut st,
+                crate::status::Facts {
+                    session: session.as_ref(),
+                    ..running(mode == "standalone", true)
+                },
+            );
             let got = entries(&st);
             let stop = &got[at(&got, "session")];
             assert_eq!(
                 (stop.1.as_str(), stop.2),
                 ("Stop the session recording (1 h 12 min)", true)
             );
-            assert_eq!(
-                got[0].1,
-                "recording a session: 1 h 12 min, started by the hotkey"
-            );
-            assert_eq!(
-                st.tooltip(),
-                "reel: recording a session, 1 h 12 min, started by the hotkey"
-            );
+            assert_eq!(got[0].1, "recording, 1 h 12 min");
+            assert_eq!(st.tooltip(), "reel: recording, 1 h 12 min");
             assert!(on(&st, "save"), "a replay still saves while it records");
 
             st.session.as_mut().unwrap().stopping = true;

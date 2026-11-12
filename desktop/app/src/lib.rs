@@ -166,6 +166,7 @@ pub fn run() {
             commands::app_pause_set,
             commands::app_recording_pause_set,
             commands::app_session_set,
+            commands::app_obs_again,
             commands::app_open_settings,
             commands::app_download_open,
             files::app_library_open,

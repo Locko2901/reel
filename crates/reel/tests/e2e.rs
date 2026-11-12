@@ -3298,8 +3298,9 @@ async fn the_standalone_library_offers_nothing_of_a_servers() {
     }
     let (_, front) = ask(&env, "GET", "/", None).await;
     assert!(
-        front.contains(r#"id="app-save" type="button" aria-label="Save clip" hidden"#),
-        "the header has a slot for the app's Save clip"
+        front.contains(r#"<footer class="appbar" id="appbar" aria-label="This PC" hidden>"#)
+            && front.contains(r#"<button class="item" id="app-save" type="button" disabled><span>Save clip</span>"#),
+        "the page has the app's bar, its Save clip in its menu, hidden until the app shows it"
     );
     let (_, page) = ask(&env, "GET", &format!("/clips/{id}"), None).await;
     let master = clip.master_id.clone().expect("a master");
@@ -11156,11 +11157,32 @@ async fn the_apps_parts_in_the_header_stay_hidden_in_a_browser() {
             .await
             .unwrap();
         assert!(
-            html.contains(r#"id="app-share" type="button" aria-label="Share the last clip" hidden"#)
-                && html.contains(r#"id="part-app" hidden"#)
-                && html.contains(r#"<label class="toggle app-part" hidden>Pause uploads <button type="button" class="switch" role="switch" aria-checked="false" id="app-pause">"#),
-            "{path}: the app's parts are in the header and the status chip, hidden until the app unhides them"
+            html.contains(r#"<footer class="appbar" id="appbar" aria-label="This PC" hidden>"#)
+                && html.contains(r#"<button class="item" id="app-share" type="button" disabled><span>Share the last clip</span>"#)
+                && html.contains(r#"<label class="toggle">Pause uploads <button type="button" class="switch" role="switch" aria-checked="false" id="app-pause">"#),
+            "{path}: the app's parts are in its bar at the page's foot, hidden until the app shows it"
         );
+        let header =
+            &html[html.find("<header class=\"top\">").unwrap()..html.find("</header>").unwrap()];
+        for gone in ["id=\"app-", "id=\"upload-link\"", "Save clip", "Record"] {
+            assert!(!header.contains(gone), "{path}: the header has no {gone}");
+        }
+        assert!(
+            header.contains(r#"<a href="/upload" role="menuitem">Upload a file <kbd>u</kbd></a>"#),
+            "{path}: Upload a file is in the avatar's menu"
+        );
+        let upload =
+            html.find(r#"<a class="btn primary lib-upload" href="/upload" id="upload-link""#);
+        assert_eq!(
+            upload.is_some(),
+            path == "/",
+            "{path}: Upload on the library's own row alone"
+        );
+        if let Some(at) = upload {
+            let row = html.find(r#"<div class="page-head lib-head">"#).unwrap();
+            let after = html.find(r#"id="disk-detail""#).unwrap();
+            assert!(row < at && at < after, "Upload is in the library's row");
+        }
         assert_eq!(
             html.matches("class=\"wordmark\"").count(),
             1,

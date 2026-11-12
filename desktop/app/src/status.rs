@@ -77,8 +77,18 @@ pub struct Status {
     pub user: String,
     pub device_name: String,
     pub state: String,
+    /// The state's dot: ok, warn, err, active, rec or neutral.
+    pub state_tone: String,
+    /// The state in a word or two, as the window's bar shows it.
     pub state_word: String,
+    /// A number where one helps: "last 60 s", "64%", "3 waiting".
+    pub state_detail: String,
+    /// The state in a sentence, as the bar's menu opens with it.
     pub state_line: String,
+    pub state_fix: Option<Fix>,
+    /// The bar's menu's OBS row.
+    pub obs_row: Row,
+    pub keys: Keys,
     pub paused_by_user: bool,
     pub paused_fullscreen: bool,
     /// Pause clips: the replay buffer is stopped on purpose until Resume clips.
@@ -264,13 +274,18 @@ pub fn release_line(
 }
 
 impl Status {
-    /// The one line the tray tooltip and the top strip show.
-    pub fn tooltip(&self) -> String {
-        if self.state_line.is_empty() {
-            format!("reel: {}", self.state_word)
+    /// The state as the window's bar says it, without its fix and hint: the tray's first line.
+    pub fn state_short(&self) -> String {
+        if self.state_detail.is_empty() {
+            self.state_word.clone()
         } else {
-            format!("reel: {}, {}", self.state_word, self.state_line)
+            format!("{}, {}", self.state_word, self.state_detail)
         }
+    }
+
+    /// The tray's tooltip.
+    pub fn tooltip(&self) -> String {
+        format!("reel: {}", self.state_short())
     }
 }
 
@@ -331,11 +346,515 @@ pub fn obs_trouble(box_state: &str) -> Option<(&'static str, &'static str)> {
     Some(match box_state {
         "gave_up" => ("error", "OBS stopped"),
         "restarting" => ("error", "OBS restarting"),
-        "silent" => ("error", "OBS does not answer"),
+        "silent" => ("error", "OBS not answering"),
         "failed" => ("error", "OBS did not start"),
-        "waiting" => ("waiting", "OBS waits"),
+        "waiting" => ("waiting", "OBS waiting"),
         _ => return None,
     })
+}
+
+/// A button after the state's words that ends the state or shows why; `act` names what the
+/// page does with it, `settings:<section>` opening that section of the app's settings.
+#[derive(Debug, Clone, Copy, Serialize, PartialEq, Eq)]
+pub struct Fix {
+    pub word: &'static str,
+    pub act: &'static str,
+}
+
+pub const RESUME_CLIPS: Fix = Fix {
+    word: "Resume",
+    act: "resume_clips",
+};
+pub const RESUME_UPLOADS: Fix = Fix {
+    word: "Resume",
+    act: "resume_uploads",
+};
+pub const START_OBS: Fix = Fix {
+    word: "Start OBS",
+    act: "obs_again",
+};
+pub const SETTINGS_OBS: Fix = Fix {
+    word: "Settings",
+    act: "settings:obs",
+};
+pub const SETTINGS_ENCODER: Fix = Fix {
+    word: "Settings",
+    act: "settings:encoder",
+};
+pub const SETTINGS_LIBRARY: Fix = Fix {
+    word: "Settings",
+    act: "settings:library",
+};
+pub const PAIR: Fix = Fix {
+    word: "Pair",
+    act: "settings:server",
+};
+pub const LOG: Fix = Fix {
+    word: "Log",
+    act: "settings:log",
+};
+pub const RETRY: Fix = Fix {
+    word: "Retry",
+    act: "retry",
+};
+
+/// What the app does, as the window's bar, the tray and its tooltip say it: the kind of state,
+/// its dot, a short word, a number where one helps, the sentence its menu opens with, and the
+/// fix it offers.
+#[derive(Debug, Clone, Serialize, Default, PartialEq)]
+pub struct Said {
+    pub state: &'static str,
+    /// The dot's colour: ok, warn, err, active, rec or neutral.
+    pub tone: &'static str,
+    pub word: String,
+    pub detail: String,
+    pub line: String,
+    pub fix: Option<Fix>,
+}
+
+/// What the state chain reads, apart from the app, so each state can be tried on its own.
+#[derive(Debug, Default)]
+pub struct Facts<'a> {
+    pub standalone: bool,
+    pub paired: bool,
+    /// reel's own OBS while the app runs one: its state and line.
+    pub obs_box: Option<(&'a str, &'a str)>,
+    /// reel's own OBS, or one of the user's, is set up for reel.
+    pub obs_set_up: bool,
+    /// The OBS set up is reel's own.
+    pub bundled: bool,
+    pub obs_connected: bool,
+    /// What the connection to OBS says: its versions, or why it is not there.
+    pub obs_line: &'a str,
+    /// The OBS was asked since the last start and did not answer.
+    pub obs_refused: bool,
+    /// Once OBS said: whether its replay buffer runs, and the seconds it keeps.
+    pub replay: Option<(bool, u32)>,
+    pub session: Option<&'a crate::session::Line>,
+    pub recording_paused: bool,
+    pub offline: Option<&'a OfflineLine>,
+    pub encoder_back: Option<&'a str>,
+    pub pair_line: Option<&'a str>,
+    /// A copy or a move of the library: its kind, its phase and how far, in percent.
+    pub library_job: Option<(&'a str, &'a str, u64)>,
+    pub library_away: Option<&'a str>,
+    /// The clip that goes up, its bytes sent and its size.
+    pub uploading: Option<(&'a str, u64, u64)>,
+    /// A clip the server works on: its phase, how far where it says, and its title.
+    pub processing: Option<(&'a str, Option<u64>, &'a str)>,
+    pub preparing: Option<&'a str>,
+    pub save_problem: Option<&'a str>,
+    pub paused_by_user: bool,
+    pub paused_fullscreen: bool,
+    pub last_error: Option<&'a str>,
+    /// Clips that wait to go up.
+    pub waiting: usize,
+    /// Save a clip's hotkey; empty when it has none.
+    pub save_key: &'a str,
+}
+
+/// A row of the bar's menu: its dot, word and line.
+#[derive(Debug, Clone, Serialize, Default, PartialEq)]
+pub struct Row {
+    pub tone: String,
+    pub word: String,
+    pub line: String,
+}
+
+/// The hotkeys the bar names beside what they do; empty where none is set or where the mode
+/// has none.
+#[derive(Debug, Clone, Serialize, Default, PartialEq)]
+pub struct Keys {
+    pub save: String,
+    pub save_share: String,
+    pub share_last: String,
+    pub record: String,
+}
+
+/// The OBS row of the bar's menu.
+pub fn obs_row(f: &Facts) -> Row {
+    let row = |tone: &str, word: &str, line: String| Row {
+        tone: tone.into(),
+        word: word.into(),
+        line,
+    };
+    if let Some((box_state, box_line)) = f.obs_box {
+        if let Some((state, word)) = obs_trouble(box_state) {
+            return row(
+                if state == "waiting" { "warn" } else { "err" },
+                word.trim_start_matches("OBS "),
+                box_line.to_string(),
+            );
+        }
+    }
+    if !f.obs_set_up {
+        return row("neutral", "off", "no OBS is set up for reel".into());
+    }
+    if !f.obs_connected {
+        return if f.obs_refused && !f.bundled {
+            row("warn", "not connected", f.obs_line.to_string())
+        } else {
+            row("neutral", "connecting", f.obs_line.to_string())
+        };
+    }
+    let whose = if f.bundled {
+        "the OBS that came with reel".to_string()
+    } else {
+        f.obs_line.to_string()
+    };
+    match f.replay {
+        Some((true, secs)) => row(
+            "ok",
+            "connected",
+            format!("{whose}, the replay buffer keeps {}", replay_words(secs)),
+        ),
+        Some((false, _)) => row(
+            "warn",
+            "connected",
+            format!("{whose}, its replay buffer is not running"),
+        ),
+        None => row("ok", "connected", whose),
+    }
+}
+
+/// "60 s", "90 s", "3 min": the length OBS's replay buffer keeps.
+pub fn replay_words(secs: u32) -> String {
+    if secs >= 120 && secs.is_multiple_of(60) {
+        format!("{} min", secs / 60)
+    } else {
+        format!("{secs} s")
+    }
+}
+
+/// A line of the app's own words as the start of a sentence, with its full stop.
+fn sentence(s: &str) -> String {
+    let s = s.trim().trim_end_matches('.');
+    if s.is_empty() {
+        return String::new();
+    }
+    format!("{}.", crate::tray::capital(s))
+}
+
+/// The first state that holds is the one said: what wants a hand first, then what runs, then
+/// ready.
+pub fn said(f: &Facts) -> Said {
+    let say = |state, tone, word: &str, detail: String, line: String, fix| Said {
+        state,
+        tone,
+        word: word.to_string(),
+        detail,
+        line,
+        fix,
+    };
+    let none = String::new;
+    if let Some((box_state, box_line)) = f.obs_box {
+        if let Some((state, word)) = obs_trouble(box_state) {
+            let tone = if state == "waiting" { "warn" } else { "err" };
+            return match box_state {
+                "gave_up" => say(
+                    state,
+                    tone,
+                    word,
+                    none(),
+                    format!(
+                        "{} Start OBS tries again; Settings, OBS says why.",
+                        sentence(box_line)
+                    ),
+                    Some(START_OBS),
+                ),
+                "failed" => say(
+                    state,
+                    tone,
+                    word,
+                    none(),
+                    sentence(box_line),
+                    Some(SETTINGS_OBS),
+                ),
+                _ => say(state, tone, word, none(), sentence(box_line), None),
+            };
+        }
+    }
+    if let Some(s) = f.session {
+        return if s.starting {
+            say(
+                "recording",
+                "active",
+                "starting recording",
+                none(),
+                format!("Starting a session recording, {}.", s.line),
+                None,
+            )
+        } else {
+            say(
+                "recording",
+                "rec",
+                if s.stopping {
+                    "stopping recording"
+                } else {
+                    "recording"
+                },
+                s.length.clone(),
+                format!(
+                    "Recording a session: {}. Stop ends it, and the recording goes into the library.",
+                    s.line
+                ),
+                None,
+            )
+        };
+    }
+    if f.recording_paused {
+        return say(
+            "paused",
+            "warn",
+            "clips paused",
+            none(),
+            "Clips paused: OBS keeps no replay until you resume. A session recording still works."
+                .into(),
+            Some(RESUME_CLIPS),
+        );
+    }
+    if f.obs_set_up && !f.obs_connected {
+        return if f.obs_refused && !f.bundled {
+            say(
+                "obs_off",
+                "warn",
+                "OBS not connected",
+                none(),
+                "Your OBS is not running, or its WebSocket is off. reel connects once it answers."
+                    .into(),
+                Some(SETTINGS_OBS),
+            )
+        } else {
+            say(
+                "connecting",
+                "neutral",
+                "connecting to OBS",
+                none(),
+                "OBS has not answered yet.".into(),
+                None,
+            )
+        };
+    }
+    if f.obs_set_up {
+        match f.replay {
+            None => {
+                return say(
+                    "connecting",
+                    "neutral",
+                    "connecting to OBS",
+                    none(),
+                    "OBS is connected and has not said yet whether its replay buffer runs.".into(),
+                    None,
+                )
+            }
+            Some((false, _)) => {
+                return say(
+                    "buffer_off",
+                    "neutral",
+                    "replay buffer off",
+                    none(),
+                    "OBS is connected, its replay buffer is not running: no clip can be saved."
+                        .into(),
+                    Some(SETTINGS_OBS),
+                )
+            }
+            Some((true, _)) => {}
+        }
+    }
+    if let Some(o) = f.offline {
+        if o.page_error {
+            return say(
+                "error",
+                "err",
+                "page error",
+                none(),
+                if o.code.is_empty() {
+                    sentence(&o.title)
+                } else {
+                    format!("{} {}", sentence(&o.title), sentence(&o.code))
+                },
+                Some(RETRY),
+            );
+        }
+        return say(
+            "error",
+            "err",
+            if f.standalone {
+                "library not answering"
+            } else {
+                "server unreachable"
+            },
+            none(),
+            format!("{} {}", sentence(&o.title), sentence(&o.retry_line)),
+            Some(RETRY),
+        );
+    }
+    if let Some(words) = f.encoder_back {
+        return say(
+            "error",
+            "err",
+            "encoder changed back",
+            none(),
+            sentence(words),
+            Some(SETTINGS_ENCODER),
+        );
+    }
+    if !f.paired && !f.standalone {
+        return say(
+            "unpaired",
+            "err",
+            "not paired",
+            none(),
+            sentence(
+                f.pair_line
+                    .unwrap_or("enter the server and a pairing code under Settings, Server"),
+            ),
+            Some(PAIR),
+        );
+    }
+    if let Some((kind, phase, pct)) = f.library_job {
+        let (word, what) = if kind == "copy" {
+            ("copying library", "Copying the library")
+        } else {
+            ("moving library", "Moving the library")
+        };
+        return say(
+            "working",
+            "active",
+            word,
+            format!("{pct}%"),
+            format!("{what}: {phase}, {pct}%."),
+            None,
+        );
+    }
+    if let Some(why) = f.library_away.filter(|_| f.standalone) {
+        return say(
+            "error",
+            "err",
+            "library away",
+            none(),
+            sentence(why),
+            Some(SETTINGS_LIBRARY),
+        );
+    }
+    if let Some((name, sent, total)) = f.uploading {
+        let pct = (sent * 100).checked_div(total).unwrap_or(0);
+        return say(
+            "uploading",
+            "active",
+            "uploading",
+            format!("{pct}%"),
+            format!(
+                "Uploading {name}, {pct}% of {}.",
+                reel_desktop_core::session::size_words(total)
+            ),
+            None,
+        );
+    }
+    if let Some((phase, pct, title)) = f.processing {
+        let preview = phase.starts_with("making the preview");
+        return say(
+            "working",
+            "active",
+            if preview { "making preview" } else { phase },
+            pct.map(|p| format!("{p}%")).unwrap_or_default(),
+            format!(
+                "{title}: {}.",
+                if preview {
+                    "the server makes its preview video"
+                } else {
+                    "the server takes it in"
+                }
+            ),
+            None,
+        );
+    }
+    if let Some(p) = f.preparing {
+        return say(
+            "preparing",
+            "active",
+            "preparing link",
+            none(),
+            format!("Preparing the link to {p}."),
+            None,
+        );
+    }
+    if let Some(p) = f.save_problem {
+        return say(
+            "error",
+            "err",
+            "no clip saved",
+            none(),
+            sentence(p),
+            Some(LOG),
+        );
+    }
+    if f.paused_by_user && (!f.standalone || f.paired) {
+        return say(
+            "paused",
+            "warn",
+            "uploads paused",
+            if f.waiting > 0 {
+                format!("{} waiting", f.waiting)
+            } else {
+                none()
+            },
+            match f.waiting {
+                0 => "Uploads paused until you resume.".to_string(),
+                1 => "Uploads paused: 1 clip waits until you resume.".to_string(),
+                n => format!("Uploads paused: {n} clips wait until you resume."),
+            },
+            Some(RESUME_UPLOADS),
+        );
+    }
+    if f.paused_fullscreen {
+        return say(
+            "paused",
+            "warn",
+            "uploads waiting",
+            none(),
+            if f.standalone {
+                "A game has the screen: the library's heavy work waits.".to_string()
+            } else {
+                "A game has the screen: uploads wait until it lets go.".to_string()
+            },
+            None,
+        );
+    }
+    if let Some(e) = f.last_error {
+        return say("error", "err", "error", none(), sentence(e), Some(LOG));
+    }
+    let wait = match f.waiting {
+        0 => String::new(),
+        1 => " 1 clip waits to upload.".into(),
+        n => format!(" {n} clips wait to upload."),
+    };
+    match f.replay.filter(|_| f.obs_set_up) {
+        Some((_, secs)) => {
+            let kept = replay_words(secs);
+            let how = if f.save_key.is_empty() {
+                "Save clip below saves them".to_string()
+            } else {
+                format!("{} or Save clip below saves them", f.save_key)
+            };
+            say(
+                "idle",
+                "ok",
+                "ready",
+                format!("last {kept}"),
+                format!("OBS keeps the last {kept}; {how}.{wait}"),
+                None,
+            )
+        }
+        None => say(
+            "idle",
+            "ok",
+            "ready",
+            none(),
+            format!("No OBS is set up for reel: it takes in what lands in the clips folder.{wait}"),
+            None,
+        ),
+    }
 }
 
 /// What the app does with OBS's replay buffer, once it knows its state.
@@ -661,9 +1180,375 @@ mod tests {
     fn an_obs_in_trouble_comes_first_in_the_state_line() {
         assert_eq!(obs_trouble("gave_up"), Some(("error", "OBS stopped")));
         assert_eq!(obs_trouble("restarting"), Some(("error", "OBS restarting")));
-        assert_eq!(obs_trouble("waiting"), Some(("waiting", "OBS waits")));
+        assert_eq!(obs_trouble("waiting"), Some(("waiting", "OBS waiting")));
         assert_eq!(obs_trouble("running"), None);
         assert_eq!(obs_trouble("starting"), None);
+    }
+
+    /// A connected app on an OBS whose replay buffer keeps a minute, Save a clip on Alt+F10.
+    fn ready(standalone: bool) -> Facts<'static> {
+        Facts {
+            standalone,
+            paired: !standalone,
+            obs_set_up: true,
+            obs_connected: true,
+            obs_line: "OBS 31.0.0, websocket 5.5.2",
+            replay: Some((true, 60)),
+            save_key: "Alt+F10",
+            ..Facts::default()
+        }
+    }
+
+    fn short(f: &Facts) -> (String, String, Option<&'static str>) {
+        let s = said(f);
+        (s.word, s.detail, s.fix.map(|f| f.act))
+    }
+
+    #[test]
+    fn ready_says_what_obs_keeps_and_how_it_is_saved() {
+        let s = said(&ready(false));
+        assert_eq!((s.state, s.tone), ("idle", "ok"));
+        assert_eq!((s.word.as_str(), s.detail.as_str()), ("ready", "last 60 s"));
+        assert_eq!(
+            s.line,
+            "OBS keeps the last 60 s; Alt+F10 or Save clip below saves them."
+        );
+        assert_eq!(s.fix, None);
+        let s = said(&Facts {
+            replay: Some((true, 180)),
+            save_key: "",
+            waiting: 3,
+            ..ready(true)
+        });
+        assert_eq!(s.detail, "last 3 min");
+        assert_eq!(
+            s.line,
+            "OBS keeps the last 3 min; Save clip below saves them. 3 clips wait to upload."
+        );
+        assert_eq!(
+            said(&Facts {
+                replay: Some((true, 90)),
+                ..ready(false)
+            })
+            .detail,
+            "last 90 s"
+        );
+        let s = said(&Facts {
+            obs_set_up: false,
+            obs_connected: false,
+            replay: None,
+            ..ready(false)
+        });
+        assert_eq!(
+            (s.word.as_str(), s.detail.as_str()),
+            ("ready", ""),
+            "no OBS, nothing kept"
+        );
+    }
+
+    #[test]
+    fn an_obs_of_ones_own_that_does_not_answer_is_not_connected_in_amber_with_settings() {
+        let closed = Facts {
+            obs_connected: false,
+            obs_refused: true,
+            obs_line: "nothing answers at 127.0.0.1:4455; is OBS running?",
+            replay: None,
+            ..ready(true)
+        };
+        let s = said(&closed);
+        assert_eq!(
+            (s.state, s.tone, s.word.as_str()),
+            ("obs_off", "warn", "OBS not connected")
+        );
+        assert_eq!(s.fix, Some(SETTINGS_OBS));
+        assert_eq!(
+            s.line,
+            "Your OBS is not running, or its WebSocket is off. reel connects once it answers."
+        );
+        assert_eq!(
+            short(&Facts {
+                obs_refused: false,
+                ..closed
+            })
+            .0,
+            "connecting to OBS",
+            "before its first answer"
+        );
+        assert_eq!(
+            short(&Facts {
+                bundled: true,
+                ..closed
+            })
+            .0,
+            "connecting to OBS",
+            "reel's own OBS has its own words when it is in trouble"
+        );
+        assert_eq!(
+            short(&Facts {
+                replay: Some((false, 60)),
+                ..ready(false)
+            }),
+            (
+                "replay buffer off".into(),
+                String::new(),
+                Some("settings:obs")
+            )
+        );
+        assert_eq!(
+            short(&Facts {
+                replay: None,
+                ..ready(false)
+            })
+            .0,
+            "connecting to OBS"
+        );
+        let row = obs_row(&closed);
+        assert_eq!(
+            (row.tone.as_str(), row.word.as_str()),
+            ("warn", "not connected")
+        );
+        assert_eq!(
+            row.line,
+            "nothing answers at 127.0.0.1:4455; is OBS running?"
+        );
+        let row = obs_row(&ready(false));
+        assert_eq!(
+            (row.tone.as_str(), row.line.as_str()),
+            (
+                "ok",
+                "OBS 31.0.0, websocket 5.5.2, the replay buffer keeps 60 s"
+            )
+        );
+        let row = obs_row(&Facts {
+            bundled: true,
+            ..ready(false)
+        });
+        assert_eq!(
+            row.line,
+            "the OBS that came with reel, the replay buffer keeps 60 s"
+        );
+    }
+
+    #[test]
+    fn the_first_state_that_holds_is_said_with_its_fix() {
+        let gave_up = Facts {
+            bundled: true,
+            obs_box: Some(("gave_up", "OBS stopped 3 times in a minute")),
+            obs_connected: false,
+            ..ready(false)
+        };
+        let s = said(&gave_up);
+        assert_eq!((s.word.as_str(), s.tone), ("OBS stopped", "err"));
+        assert_eq!(s.fix, Some(START_OBS));
+        assert_eq!(
+            s.line,
+            "OBS stopped 3 times in a minute. Start OBS tries again; Settings, OBS says why."
+        );
+        let rec = crate::session::Line {
+            since_ms: 1,
+            line: "12 min, started from the window".into(),
+            length: "12 min".into(),
+            ..Default::default()
+        };
+        assert_eq!(
+            said(&Facts {
+                session: Some(&rec),
+                ..gave_up
+            })
+            .word,
+            "OBS stopped",
+            "OBS in trouble before the recording"
+        );
+        let s = said(&Facts {
+            session: Some(&rec),
+            recording_paused: true,
+            ..ready(false)
+        });
+        assert_eq!(
+            (s.word.as_str(), s.detail.as_str(), s.tone),
+            ("recording", "12 min", "rec")
+        );
+        assert_eq!(
+            s.line,
+            "Recording a session: 12 min, started from the window. Stop ends it, and the recording goes into the library."
+        );
+        let starting = crate::session::Line {
+            starting: true,
+            line: "asked from the window".into(),
+            ..Default::default()
+        };
+        assert_eq!(
+            short(&Facts {
+                session: Some(&starting),
+                ..ready(false)
+            })
+            .0,
+            "starting recording"
+        );
+        let stopping = crate::session::Line {
+            stopping: true,
+            ..rec.clone()
+        };
+        assert_eq!(
+            short(&Facts {
+                session: Some(&stopping),
+                ..ready(false)
+            })
+            .0,
+            "stopping recording"
+        );
+        assert_eq!(
+            short(&Facts {
+                recording_paused: true,
+                obs_connected: false,
+                obs_refused: true,
+                ..ready(true)
+            }),
+            ("clips paused".into(), String::new(), Some("resume_clips")),
+            "clips paused before OBS not connected"
+        );
+        let away = OfflineLine {
+            title: "No answer from the server".into(),
+            retry_line: "trying again in about 20 s (try 2)".into(),
+            ..Default::default()
+        };
+        let s = said(&Facts {
+            offline: Some(&away),
+            ..ready(false)
+        });
+        assert_eq!(
+            (s.word.as_str(), s.fix),
+            ("server unreachable", Some(RETRY))
+        );
+        assert_eq!(
+            s.line,
+            "No answer from the server. Trying again in about 20 s (try 2)."
+        );
+        assert_eq!(
+            short(&Facts {
+                offline: Some(&away),
+                ..ready(true)
+            })
+            .0,
+            "library not answering"
+        );
+        let broken = OfflineLine {
+            page_error: true,
+            title: "The server answers, but its page did not load here".into(),
+            code: "TypeError: x is undefined".into(),
+            ..Default::default()
+        };
+        assert_eq!(
+            short(&Facts {
+                offline: Some(&broken),
+                ..ready(false)
+            })
+            .0,
+            "page error"
+        );
+        assert_eq!(
+            short(&Facts {
+                paired: false,
+                ..ready(false)
+            }),
+            ("not paired".into(), String::new(), Some("settings:server"))
+        );
+        assert_eq!(
+            short(&Facts {
+                library_job: Some(("copy", "copying", 40)),
+                ..ready(true)
+            }),
+            ("copying library".into(), "40%".into(), None)
+        );
+        assert_eq!(
+            short(&Facts {
+                library_away: Some("the drive E: is not there"),
+                ..ready(true)
+            }),
+            (
+                "library away".into(),
+                String::new(),
+                Some("settings:library")
+            )
+        );
+        let s = said(&Facts {
+            uploading: Some((
+                "Ridgeback Rally 2026.11.12 - 21.02.44.mp4",
+                136_000_000,
+                212_000_000,
+            )),
+            ..ready(false)
+        });
+        assert_eq!((s.word.as_str(), s.detail.as_str()), ("uploading", "64%"));
+        assert_eq!(
+            s.line,
+            "Uploading Ridgeback Rally 2026.11.12 - 21.02.44.mp4, 64% of 212 MB."
+        );
+        assert_eq!(
+            short(&Facts {
+                processing: Some(("making the preview video, 40%", Some(40), "the bridge hold")),
+                ..ready(false)
+            }),
+            ("making preview".into(), "40%".into(), None)
+        );
+        assert_eq!(
+            short(&Facts {
+                processing: Some(("on the server", None, "the bridge hold")),
+                ..ready(false)
+            })
+            .0,
+            "on the server"
+        );
+        assert_eq!(
+            short(&Facts {
+                preparing: Some("the bridge hold"),
+                ..ready(false)
+            })
+            .0,
+            "preparing link"
+        );
+        assert_eq!(
+            short(&Facts {
+                save_problem: Some("OBS did not save the replay"),
+                ..ready(false)
+            }),
+            ("no clip saved".into(), String::new(), Some("settings:log"))
+        );
+        let s = said(&Facts {
+            paused_by_user: true,
+            waiting: 3,
+            ..ready(false)
+        });
+        assert_eq!(
+            (s.word.as_str(), s.detail.as_str()),
+            ("uploads paused", "3 waiting")
+        );
+        assert_eq!(s.fix, Some(RESUME_UPLOADS));
+        assert_eq!(s.line, "Uploads paused: 3 clips wait until you resume.");
+        assert_eq!(
+            short(&Facts {
+                paused_by_user: true,
+                ..ready(true)
+            })
+            .0,
+            "ready",
+            "standalone without a server has no uploads to pause"
+        );
+        assert_eq!(
+            short(&Facts {
+                paused_fullscreen: true,
+                ..ready(false)
+            })
+            .0,
+            "uploads waiting"
+        );
+        assert_eq!(
+            short(&Facts {
+                last_error: Some("server: 502 Bad Gateway"),
+                ..ready(false)
+            }),
+            ("error".into(), String::new(), Some("settings:log"))
+        );
     }
 
     #[test]

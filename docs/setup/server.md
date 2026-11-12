@@ -386,7 +386,7 @@ each with its `.sig` file.
 ## 5. Your first share link
 
 1. Drop a video into the incoming folder (`./incoming`), or press
-   **Upload** at the top right and pick one.
+   **Upload** on the library's row and pick one.
 2. It shows up in the library within seconds, with a poster. The Jobs
    page shows the work on it.
 

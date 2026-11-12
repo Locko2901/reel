@@ -73,21 +73,23 @@ how to add a server later.
 - **At sign-in.** The app starts with your Windows or desktop session, hidden in the tray, without
   a window (Settings, Startup, **Start at logon**, on by default). On Windows that is a Run entry
   for your user; on Linux an entry in your desktop's autostart.
-- **In the tray.** Double-click reel's icon to open the library. Its menu has the app's state,
+- **In the tray.** Double-click reel's icon to open the library. Its menu's first line says what
+  the app does in the words of the window's bar (**ready, last 60 s**, **recording, 12 min**,
+  **clips paused**, **OBS not connected**, **uploading, 64%**), as does the icon's tooltip. Then
   **Last clips** (each with **Open** and **Copy link**), **Save clip**, **Save and share**,
   **Record a session**, **Pause clips**, **Share the last clip**, **Pause uploads**, **Open library**, **Open
   settings**, on Windows with the OBS that came with reel **Open OBS** or **Hide OBS**, and
   **Quit**. When an update is ready, **Install reel** with the new version is there too. In
-  standalone the menu keeps what makes sense on one PC: the state, **Last clips** (each with
+  standalone the menu keeps what makes sense on one PC: that line, **Last clips** (each with
   **Open**), **Save clip**, **Record a session**, **Pause clips**, **Open library**, **Open settings**, OBS's entry
   and **Quit**, with **Pause uploads** once a server is paired. For a tray whose icons are all one
   colour, Settings, Startup, **Tray icon** shows reel's mark alone in white or in black. On Linux,
   reel's own OBS has a tray icon of its own, which opens its window.
-- **Pause clips**, in the tray and in the status chip of the window, stops OBS's replay
+- **Pause clips**, in the tray and in the menu of the window's bar, stops OBS's replay
   buffer: OBS no longer encodes, and the buffer gives back its memory. OBS stays open, so **Resume
-  clips** starts the buffer again at once. While paused, the tray, its icon's tooltip and the
-  chip say **clips paused**, **Save clip** and **Save and share** are off and say why, and the
-  Save hotkey saves nothing but says so. The pause lasts until you resume, or until the app starts
+  clips** starts the buffer again at once. While paused, the bar, the tray and its icon's tooltip
+  say **clips paused**, the bar with **Resume** beside it, **Save clip** and **Save and share** are
+  off and say why, and the Save hotkey saves nothing but says so. The pause lasts until you resume, or until the app starts
   again: a new start always records.
 - **The window.** Closing it (the X) ends the window and the WebView that draws it; the app goes
   on in the tray, and opening the window again builds a new one in about a second. Started at
@@ -107,26 +109,36 @@ how to add a server later.
 ## The window
 
 The window shows reel's pages (Library, Collections, Shares, Jobs, Settings): your server's,
-signed in as you, or in standalone the library on this PC, without Shares. The app adds its own
-parts to the header:
+signed in as you, or in standalone the library on this PC, without Shares. Its header is the one
+a browser shows: the pages, the search, and the menu under your initial, which has **Upload a
+file** (**u** on any page; the library has **Upload** at the end of its own row). What this PC
+does is in a bar along the window's foot:
 
-- **Save clip** and **Save and share**, next to **Upload**, do what the two hotkeys do. **Save
-  clip** has OBS save the replay, which goes into the library, or up to the server like any clip.
-  **Save and share** (connected) also copies the clip's link once it is up. Both are off while
-  OBS's replay buffer is not running, and say why: in their tooltip, or in a narrow window (600 px
-  and less) in the avatar's menu, where they move to. Settings, OBS and the tray have them too.
-- **Record**, next to them, starts a [session recording](#recording-a-whole-session) and stops it;
-  while one runs it shows a red dot, the time and **Stop**. In a narrow window (600 px and less)
-  it moves to the avatar's menu while nothing records.
-- **Share the last clip** (connected), next to them, copies the link of the newest clip, as the
-  hotkey does.
-- **The status chip** is a dot and a word for what the app is doing: **idle**, **uploading**,
-  **paused**, **clips paused**, **recording a session**, **preparing the link**, **not paired**, **cannot reach the server**, **no replay
-  saved**, **error**, or the step of the work on a clip. Click it for a line each about the
-  **App**, **OBS** and the **Server**, the **Versions**, the **Pause clips** and **Pause
-  uploads** switches, **Status page** and **Updates**. In standalone the third line is the **Library**: on this PC, where it
-  lives, and whether reel on this PC runs. Its dot turns red only for a check of the PC's own (its
-  room, ffmpeg, the database), and **Pause uploads** shows once a server is paired.
+- **On the left, the state in a word or two**: **ready** with how much OBS keeps (**last 60 s**)
+  and the save hotkey beside it, **recording**, **clips paused**, **OBS not connected**,
+  **connecting to OBS**, **replay buffer off**, **uploading** and how far, **uploads paused**,
+  **not paired**, **server unreachable**, **OBS stopped**, **no clip saved**, **error**, or the step
+  of the work on a clip. Its dot, and a line along the bar's top, are red while a session records
+  and amber while clips are paused or OBS is not there. When nothing on this PC wants a word
+  first and the server has something to look at (its disk, ffmpeg, the database), the bar says
+  **server warning** or **server error**; in standalone, **library warning** or **library error**.
+- **A button after the words** ends the state or shows why, where one can: **Resume** (clips, or
+  uploads), **Start OBS** (reel's own OBS, after reel stopped starting it), **Settings** (the page
+  with the answer), **Status**, **Retry**, **Pair** and **Log**.
+- **On the right, Record** starts a [session recording](#recording-a-whole-session) and stops it,
+  with its hotkey beside it in a window 1280 px wide or more; while one runs it shows a red square,
+  the time and **Stop**.
+- **The bar's menu** opens from its words or from **...** at its right, above the one you
+  pressed. Its first line says the state in a sentence. Then **Save clip**, **Save and share** and
+  **Share the last clip** (connected), each with its hotkey: they do what the hotkeys do, and
+  while one cannot run it is off and the menu says why. **Save clip** has OBS save the replay,
+  which goes into the library, or up to the server like any clip; **Save and share** also copies
+  the clip's link once it is up. Then the **Pause clips** and **Pause uploads** switches, a line
+  each about **OBS**, the **Server** and the **Versions**, **Status page** and **Updates**. In
+  standalone the server's line is the **Library**: on this PC, where it lives, and whether reel
+  on this PC runs; its dot turns red only for a check of the PC's own (its room, ffmpeg, the
+  database), and **Pause uploads** shows once a server is paired. Esc closes the menu, and the
+  keyboard reaches all of it.
 - **Settings** holds the app's own pages and the server's in one nav, grouped by what you do:
   **Recording**, **Library**, **Server** and **System**. Ctrl+, opens Settings from anywhere in the
   window.
@@ -137,7 +149,7 @@ the app's own included.
 
 A download in the window (a clip's or a version's **Download**, a copy under a size, an animated
 picture, **Download** on a link's page, the zip of picked clips) goes to your Downloads folder. A
-note at the bottom of the page shows its name, size and progress, then where it was saved, with
+note above the bar shows its name, size and progress, then where it was saved, with
 **Show in folder** and **Open**, or why it failed. In standalone, a file already in the library is
 not downloaded: **Open** and **Show in folder** take it where it is
 ([The files are on this PC](setup/standalone.md#the-files-are-on-this-pc)).
@@ -149,15 +161,16 @@ and the app's settings. The app tries again by itself and keeps the clips it fin
 ## Recording a whole session
 
 The replay buffer keeps the last minutes; a session recording keeps all of it, from when you
-start it until you stop it. Start and stop it with **Record** in the window's header, **Record a
+start it until you stop it. Start and stop it with **Record** in the window's bar, **Record a
 session** in the tray, or its hotkey (Alt+F9 by default). The recording goes into the library like
 a clip, named after its game and when it started, and marked **session recording** on its card
 next to its length. Connected, it goes up to the server once it has stopped, as any clip does,
 and its upload waits while a game has the screen when uploads do.
 
-- **While it runs**, **Record** shows a red dot, the time and **Stop**; the tray's icon has a red
-  dot, and its first line and tooltip say **recording a session** and for how long. **Save clip**
-  still saves replays meanwhile.
+- **While it runs**, **Record** shows a red square, the time and **Stop**, and the bar says
+  **recording** with a red line along its top; the tray's icon has a red dot, and its first line
+  and tooltip say **recording** and for how long (**recording, 12 min**). **Save clip** still saves
+  replays meanwhile.
 - **Reminders**, so a recording is not forgotten for hours: every 30 minutes a short sound and a
   notification, "Still recording a session". The sound is what reaches you in a game in full
   screen, where Windows holds notifications back. Settings, **Session recording** has **Remind
@@ -317,7 +330,7 @@ releases, and you see each step:
   installers. Install that one by hand, once; from then on the app installs its updates itself.
 
 The **Versions** panel on Settings, Status names this app's version and kind, the server's, and
-the newest release. The status chip's **Versions** row shows the version, or both while the app
+the newest release. The **Versions** line of the bar's menu shows the version, or both while the app
 and its server differ ("app 1.4.1, server 1.4.0"). On the server, Settings, Devices,
 **App updates** has [Offer app updates](configuration.md#offer-app-updates), on by default, and a
 [Release token](configuration.md#release-token) for a private fork.

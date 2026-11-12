@@ -34,6 +34,16 @@ wait_said() { # wait_said <words> <seconds> <what> <count before>
 start() { "$APP" "$@" > "$W/app$(date +%s%N).out" 2>&1 & PIDS="$PIDS $!"; APP_PID=$!; }
 stop() { kill "$APP_PID" 2>/dev/null || true; for _ in $(seq 1 40); do kill -0 "$APP_PID" 2>/dev/null || break; sleep 0.25; done; }
 window() { xdotool search --onlyvisible --name '^reel$' 2>/dev/null | head -1; }
+# The bar at the window's foot, from the window's size as reel.css lays it out: 30 px high, its
+# words from 12 px, "..." 26 px wide 20 px from the right edge, Record right before it.
+bar() { # bar <words|record|more>: where to click, x and y on the screen
+  eval "$(xdotool getwindowgeometry --shell "$(window)")"
+  case $1 in
+    words) echo "$((X + 40)) $((Y + HEIGHT - 15))" ;;
+    record) echo "$((X + WIDTH - 62)) $((Y + HEIGHT - 15))" ;;
+    more) echo "$((X + WIDTH - 33)) $((Y + HEIGHT - 15))" ;;
+  esac
+}
 shot() { # shot <name>: the window, or the screen
   [ -n "$SHOTS" ] || return 0
   win=$(window)
@@ -89,7 +99,11 @@ L="$D/data/logs"
 export REEL_DESKTOP_DIR="$D"
 mkdir -p "$W/rec-light"
 /target/debug/examples/fake_obs --port 4496 --dir "$W/rec-light" --clip "$W/clip.mp4" --password standin-pass --profile Gaming > "$W/fake-obs-light.out" 2>&1 &
-PIDS="$PIDS $!"
+LIGHT_OBS=$!
+PIDS="$PIDS $LIGHT_OBS"
+python3 /work/desktop/ci/fake-sni.py > "$W/sni-light.txt" 2>&1 &
+SNI_LIGHT=$!
+PIDS="$PIDS $SNI_LIGHT"
 start
 waitlog "no OBS installed here" 30 "the app found an OBS to run: no reel light path"
 waitlog 'window shows view="setup"' 30 "reel light's setup did not open on a new install"
@@ -125,7 +139,19 @@ grep -q '"record": "Alt+F9"' "$D/config/settings.json" || fail "Finish did not k
 grep -q '"done": false' "$D/config/settings.json" || fail "reel light's setup marked the setup of the package with OBS done"
 sleep 3
 shot "light-7-library"
+for _ in $(seq 1 20); do python3 /work/desktop/ci/fake-sni.py menu > "$W/menu-light.txt" 2>/dev/null; grep -qx -- "- ready, last 3 min" "$W/menu-light.txt" && break; sleep 0.5; done
+grep -qx -- "- ready, last 3 min" "$W/menu-light.txt" || fail "reel light's tray with its OBS: $(tr '\n' '|' < "$W/menu-light.txt")"
+b=$(logged "OBS disconnected")
+kill "$LIGHT_OBS"
+waitmore "OBS disconnected" 20 "the app did not see the stand-in OBS close" "$b"
+for _ in $(seq 1 20); do python3 /work/desktop/ci/fake-sni.py menu > "$W/menu-light.txt" 2>/dev/null; grep -qx -- "- OBS not connected" "$W/menu-light.txt" && break; sleep 0.5; done
+grep -qx -- "- OBS not connected" "$W/menu-light.txt" || fail "reel light's tray with its OBS closed: $(tr '\n' '|' < "$W/menu-light.txt")"
+sleep 3
+shot "light-8-obs-not-connected"
+ok "reel light with its OBS closed: the tray says OBS not connected, as the bar does, where it said ready, last 3 min (shot)"
 stop
+kill "$SNI_LIGHT" 2>/dev/null || true
+wait "$SNI_LIGHT" 2>/dev/null || true
 # as a settings file of a version before the setup for an OBS of one's own reads
 python3 -c 'import json,sys; f=sys.argv[1]; s=json.load(open(f)); del s["obs"]["own_setup_due"]; json.dump(s, open(f, "w"), indent=2)' "$D/config/settings.json"
 b=$(logged 'window shows view="library"')
@@ -214,51 +240,59 @@ case "$(tail -n 1 "$W/opened.txt" 2>/dev/null)" in
 esac
 ok "a card's menu in the library: Open the file opens the current version where it is (shot)"
 # shellcheck disable=SC2086
-xdotool mousemove ${REEL_CHIP:-1190 24} click 1
+xdotool mousemove ${REEL_BAR_MORE:-$(bar more)} click 1
 sleep 1
-shot "5-chip"
+shot "5-bar-menu"
 xdotool key Escape
 python3 /work/desktop/ci/fake-sni.py click "Pause clips" > /dev/null || fail "the tray has no Pause clips"
 waitlog "clips paused by the user paused=true" 10 "Pause clips did not pause"
 sleep 3
+shot "5-bar-clips-paused"
+python3 /work/desktop/ci/fake-sni.py menu > "$W/menu-paused.txt"
+grep -qx -- "- clips paused" "$W/menu-paused.txt" || fail "the tray's first line while clips are paused: $(tr '\n' '|' < "$W/menu-paused.txt")"
+# the words open the same menu; Esc closes it and leaves the focus on the words, and the next
+# button is the state's fix, Resume
 # shellcheck disable=SC2086
-xdotool mousemove ${REEL_CHIP:-1190 24} click 1
+xdotool mousemove ${REEL_BAR_WORDS:-$(bar words)} click 1
 sleep 1
-shot "5-chip-clips-paused"
+shot "5-bar-clips-paused-menu"
 xdotool key Escape
-python3 /work/desktop/ci/fake-sni.py click "Resume clips" > /dev/null || fail "the tray has no Resume clips"
-waitlog "clips paused by the user paused=false" 10 "Resume clips did not resume"
+sleep 0.3
+xdotool key Tab Return
+waitlog "clips paused by the user paused=false" 10 "the bar's Resume did not resume clips"
+ok "the bar: its \"...\" and its words open its menu, Esc closes it, and Resume after the words resumes clips (shots)"
 # A session recording from the window's Record: the tray and the chip say so, Stop in the window
 # ends it, and the recording is in the library as one.
-for _ in $(seq 1 20); do python3 /work/desktop/ci/fake-sni.py menu > "$W/menu-rec.txt"; grep -qx -- "- idle" "$W/menu-rec.txt" && break; sleep 0.5; done
+for _ in $(seq 1 20); do python3 /work/desktop/ci/fake-sni.py menu > "$W/menu-rec.txt"; grep -qx -- "- ready, last 3 min" "$W/menu-rec.txt" && break; sleep 0.5; done
+grep -qx -- "- ready, last 3 min" "$W/menu-rec.txt" || fail "the tray's first line is not ready with the stand-in's 180 s: $(tr '\n' '|' < "$W/menu-rec.txt")"
 grep -qx "Record a session" "$W/menu-rec.txt" || fail "the tray has no Record a session: $(tr '\n' '|' < "$W/menu-rec.txt")"
-# the page reads the state every 2 s: the header as it is once idle again
+# the page reads the state every 2 s: the bar as it is once ready again
 sleep 3
 "$FFMPEG" -v error -f lavfi -i "testsrc2=duration=6:size=1280x720:rate=30" -f lavfi -i "sine=frequency=550:sample_rate=48000:duration=6" \
   -c:v libx264 -pix_fmt yuv420p -c:a aac -shortest "$W/session.mp4"
 echo "$W/session.mp4" > "$W/rec/record-clip"
 b=$(logged "standalone: the clip is published")
 # shellcheck disable=SC2086
-xdotool mousemove ${REEL_RECORD:-1098 24} click 1
+xdotool mousemove ${REEL_RECORD:-$(bar record)} click 1
 waitlog "session recording started from the window" 20 "the window's Record did not start a session recording"
 sleep 4
 shot "16-recording"
 python3 /work/desktop/ci/fake-sni.py menu > "$W/menu-rec.txt"
-grep -qx -- "- recording a session: under a minute, started from the window" "$W/menu-rec.txt" && grep -qx "Stop the session recording (under a minute)" "$W/menu-rec.txt" || fail "the tray while recording: $(tr '\n' '|' < "$W/menu-rec.txt")"
+grep -qx -- "- recording, under a minute" "$W/menu-rec.txt" && grep -qx "Stop the session recording (under a minute)" "$W/menu-rec.txt" || fail "the tray while recording: $(tr '\n' '|' < "$W/menu-rec.txt")"
 grep -qx "Save clip" "$W/menu-rec.txt" || fail "Save clip is greyed while recording"
 # shellcheck disable=SC2086
-xdotool mousemove ${REEL_CHIP_RECORDING:-1140 24} click 1
+xdotool mousemove ${REEL_BAR_WORDS:-$(bar words)} click 1
 sleep 1
-shot "16-recording-chip"
+shot "16-recording-menu"
 xdotool key Escape
 xdotool windowsize "$WIN" 720 820 2>/dev/null || true
 sleep 2
 shot "16-recording-720"
 xdotool windowsize "$WIN" 1280 820 2>/dev/null || true
 sleep 2
-ok "Record in the window: OBS records; the button shows the clock and Stop, the tray says \"recording a session\" and offers Stop (shots)"
+ok "Record in the window: OBS records; the button shows the clock and Stop, the tray says \"recording\" and offers Stop (shots)"
 # shellcheck disable=SC2086
-xdotool mousemove ${REEL_RECORD_STOP:-1000 24} click 1
+xdotool mousemove ${REEL_RECORD_STOP:-$(bar record)} click 1
 waitlog "session recording stopped from the window after" 20 "Stop in the window did not stop the session recording"
 for _ in $(seq 1 180); do [ "$(logged 'standalone: the clip is published')" -gt "$b" ] && break; sleep 0.5; done
 [ "$(logged 'standalone: the clip is published')" -gt "$b" ] || fail "the session recording did not go into the library"
@@ -279,7 +313,7 @@ sleep 2
 touch "$W/rec/fail-record"
 b=$(logged "session recording did not start")
 # shellcheck disable=SC2086
-xdotool mousemove ${REEL_RECORD:-1098 24} click 1
+xdotool mousemove ${REEL_RECORD:-$(bar record)} click 1
 waitmore "session recording did not start" 20 "a start OBS refused said nothing" "$b"
 cat "$L"/reel-desktop.log* | grep "session recording did not start" | tail -1 | grep -q "(asked from the window): OBS did not start recording: OBS answered but refused the request." || fail "the refusal's words: $(cat "$L"/reel-desktop.log* | grep 'session recording did not start' | tail -1)"
 sleep 1
@@ -336,7 +370,7 @@ ok "a file moved away outside reel: refused with words, in the page's toast (sho
 "$APP" --section=status > /dev/null 2>&1 || true
 sleep 2
 shot "7-this-app-status"
-ok "the window: the library on this PC, the chip, a clip's page, Settings, Status (shots)"
+ok "the window: the library on this PC, the bar, a clip's page, Settings, Status (shots)"
 "$APP" --section=hotkeys > /dev/null 2>&1 || true
 waitlog "app page section=hotkeys" 20 "the Hotkeys page did not open"
 sleep 2
@@ -514,12 +548,12 @@ ok "a page with a part that throws: it reaches the app, the part's error is in t
 waitlog "page error path=/broken error=a script did not load: /assets/missing.js" 20 "the script that did not load is not in the Log"
 waitlog "cannot reach the server title=The page stopped at an error code=a script did not load: /assets/missing.js" 30 \
   "the offline page does not say the page had an error: $(cat "$L"/reel-desktop.log* | grep "WARN cannot reach the server" | tail -1)"
-waitlog "the tray's state line line=the page had an error: a script did not load: /assets/missing.js" 10 \
-  "the tray does not say the page had an error: $(cat "$L"/reel-desktop.log* | grep "the tray's state line" | tail -1)"
+waitlog "the tray's state line line=page error" 10 \
+  "the tray does not say page error: $(cat "$L"/reel-desktop.log* | grep "the tray's state line" | tail -1)"
 sleep 2
 shot "11-page-error"
 stop
-ok "a page whose script did not load: the Log has it; the offline page and the tray say the page had an error, with its line"
+ok "a page whose script did not load: the Log has it; the offline page says the page had an error, with its line, and the tray says page error"
 
 D="$W/old"
 L="$D/data/logs"
