@@ -404,6 +404,8 @@ ok "Save a clip's hotkey changed on the Hotkeys page, from the setup's Alt+F10 t
   -c:v libx264 -pix_fmt yuv420p -c:a aac -b:a 160k -ac 2 -shortest "$W/quiet.mp4"
 echo "$W/quiet.mp4" > "$W/rec/next-clip"
 b=$(logged "standalone: the clip is published")
+# a press within a second of the last save is a double tap, and saves nothing
+sleep 1.2
 xdotool key --clearmodifiers alt+F8
 for _ in $(seq 1 180); do [ "$(logged 'standalone: the clip is published')" -gt "$b" ] && break; sleep 0.5; done
 [ "$(logged 'standalone: the clip is published')" -gt "$b" ] || fail "the quiet clip was not saved"
