@@ -867,6 +867,7 @@ async function main() {
   }
   sectionsNav(await shaped, current, status?.mode === 'standalone');
   if (status) renderParts(status);
+  delete document.documentElement.dataset.wait;
   await listen('status', (ev) => { status = ev.payload; renderStatus(); reshape(); if (Date.now() - capAt > 5000) capAsk(); });
   await listen('open-section', (ev) => { if (window.openSection) window.openSection(ev.payload); });
   await listen('settings', (ev) => takeSettings(ev.payload));

@@ -21,6 +21,10 @@ pub const SETTINGS_PAGE: &str = "index.html";
 pub const OFFLINE_PAGE: &str = "offline.html";
 pub const SETUP_PAGE: &str = "setup.html";
 
+/// reel's page background under every page, shown before a page has drawn; WebView2 would show
+/// white there, between two pages too.
+const BACKGROUND: tauri::window::Color = tauri::window::Color(0x0d, 0x0b, 0x10, 0xff);
+
 /// The only commands a reel page inside the app may call.
 const REMOTE_PERMISSIONS: [&str; 10] = [
     "allow-app-status",
@@ -237,6 +241,7 @@ pub fn build(app: &AppHandle, server_url: &str) -> tauri::Result<Window> {
     app.manage(crate::downloads::Downloads::default());
     let window = tauri::window::WindowBuilder::new(app, MAIN)
         .title("reel")
+        .background_color(BACKGROUND)
         .inner_size(1280.0, 820.0)
         .min_inner_size(720.0, 480.0)
         .visible(false)
@@ -284,6 +289,7 @@ fn library(app: &AppHandle, first: Url) -> WebviewBuilder<tauri::Wry> {
     let opening = std::sync::atomic::AtomicBool::new(true);
     let first_page = first.to_string();
     WebviewBuilder::new(LIBRARY, WebviewUrl::External(first))
+        .background_color(BACKGROUND)
         .initialization_script(format!(
             "window.__REEL_DESKTOP__ = {{ version: \"{}\" }};\n{PAGE_ERRORS}",
             reel_desktop_core::version_line()

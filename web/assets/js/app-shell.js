@@ -100,7 +100,7 @@ export function appShell() {
     try { render(await call('app_status')); } catch (e) { /* the app went away; the page stays a page */ }
   };
   let timer = 0;
-  const start = () => { poll(); clearInterval(timer); timer = setInterval(poll, 2000); };
+  const start = () => { poll().then(() => { delete document.documentElement.dataset.wait; }); clearInterval(timer); timer = setInterval(poll, 2000); };
   start();
   document.addEventListener('visibilitychange', () => { if (!document.hidden) poll(); });
   window.addEventListener('pagehide', () => clearInterval(timer));

@@ -115,6 +115,11 @@ hr { border: 0; border-top: 1px solid var(--line); margin: var(--s3) 0; }
 .mt { margin-top: var(--s5); }
 .browser-only { display: initial; }
 html[data-app="desktop"] .browser-only { display: none !important; }
+/* A page in the app's window shows once its script has drawn it as the app's, or after a second regardless. Until
+   then it paints nothing, not even the dark scheme's canvas: Chromium keeps the page before it on screen. */
+html[data-wait] { color-scheme: normal; visibility: hidden; animation: shown 0s 1s forwards; }
+html[data-wait] body { background: none; animation: shown 0s 1s forwards; }
+@keyframes shown { to { visibility: visible; color-scheme: dark; background-color: var(--bg); } }
 
 .st-ok { color: var(--ok); }
 .st-active { color: var(--accent); }
