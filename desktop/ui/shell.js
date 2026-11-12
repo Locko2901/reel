@@ -1,7 +1,7 @@
-// reel's header and nav for the app's own pages; links open in this webview, so Back comes back here.
-import { isOn, setOn, switches } from './assets/js/switch.js';
+// reel's header, nav and the app's bar for the app's own pages; links open in this webview, so Back comes back here.
+import { setOn, switches } from './assets/js/switch.js';
 import { mouseWalk } from './assets/js/walk.js';
-import { recordControl } from './assets/js/record.js';
+import { appBar } from './assets/js/appbar.js';
 
 switches();
 export const tauri = window.__TAURI__ || null;
@@ -42,16 +42,13 @@ const NAV = [
   ['System', ['r general', 'r appearance', 'a startup', 'a status', 'a log', 'r advanced']],
 ];
 
-const WORST = ['err', 'warn', 'active', 'ok', 'neutral'];
-const worst = (states) => WORST.find(s => states.includes(s)) || 'ok';
-const APP_DOT = { error: 'err', unpaired: 'err', paused: 'warn', waiting: 'warn', changed: 'warn', uploading: 'active', working: 'active', preparing: 'active', recording: 'active', idle: 'ok' };
-const HEALTH_WORD = { ok: 'ok', warn: 'warning', err: 'error' };
 let serverState = 'ok';
 let serverLine = '';
 // Standalone: the library on this PC, no server.
 let here = false;
-// The header's Record, once the header is mounted.
-let record = () => {};
+// The bar, once it is mounted, and the status it last drew.
+let bar = () => {};
+let last = null;
 const STANDALONE_LABELS = { clips: 'Clips folder', upload: 'New clips' };
 
 function setPart(id, state, word, line) {
@@ -79,11 +76,8 @@ export function applyShape(shape, baseUrl) {
   b.textContent = who.name || '';
   head.append(b, ` ${who.line || ''}`);
   serverState = (shape.health && shape.health.state) || 'ok';
-  const line = (shape.health && shape.health.line) || '';
-  serverLine = line;
-  $('#chip-dot').className = `dot ${serverState}`;
-  $('#chip').setAttribute('aria-label', `Status: ${HEALTH_WORD[serverState] || serverState}`);
-  setPart('part-server', serverState, HEALTH_WORD[serverState] || serverState, line);
+  serverLine = (shape.health && shape.health.line) || '';
+  if (last) bar(last, { state: serverState, line: serverLine });
   const jobs = shape.jobs || {};
   const el = $('#jobs-count');
   const live = (jobs.running || 0) + (jobs.queued || 0);
@@ -173,6 +167,9 @@ export function markSection(current) {
   });
 }
 
+const showSettings = (section) => invoke('view_show', { view: 'settings', section }).catch(err => toast(String(err.message || err), 'err'));
+const drawn = (p) => p.then((st) => { if (st && typeof st === 'object' && st.state) renderParts(st); }).catch(e => toast(String(e.message || e), 'err'));
+
 export function bindHeader() {
   mouseWalk();
   document.addEventListener('click', (e) => {
@@ -187,28 +184,29 @@ export function bindHeader() {
     const q = $('#search').value.trim();
     goServer(q ? `/?q=${encodeURIComponent(q)}` : '/');
   });
-  $('#app-save')?.addEventListener('click', () => runSave('save_clip'));
-  if ($('#app-record')) {
-    record = recordControl($('#app-record'), $('#menu-record'),
-      (on) => invoke('session_set', { on }), (why) => toast(why, 'err'));
-  }
-  $('#app-save-share')?.addEventListener('click', () => runSave('save_and_share'));
-  $('#menu-save')?.addEventListener('click', () => runSave('save_clip'));
-  $('#menu-save-share')?.addEventListener('click', () => runSave('save_and_share'));
-  $('#app-share')?.addEventListener('click', async () => {
-    try { const r = await invoke('share_last'); toast(r.line, 'ok'); } catch (e) { toast(String(e.message || e), 'err'); }
-  });
-  $('#app-pause')?.addEventListener('change', async () => {
-    try { await invoke('pause_set', { paused: isOn($('#app-pause')) }); } catch (e) { toast(String(e.message || e), 'err'); }
-  });
-  $('#app-recording')?.addEventListener('change', async () => {
-    try { await invoke('recording_pause_set', { paused: isOn($('#app-recording')) }); } catch (e) { toast(String(e.message || e), 'err'); }
+  bar = appBar({
+    fix: (act) => {
+      if (act === 'status') goServer('/status');
+      else if (act === 'retry') invoke('offline_retry').catch(e => toast(String(e.message || e), 'err'));
+      else if (act === 'obs_again') drawn(invoke('obs_again'));
+      else if (act === 'resume_clips') drawn(invoke('recording_pause_set', { paused: false }));
+      else if (act === 'resume_uploads') drawn(invoke('pause_set', { paused: false }));
+      else if (act.startsWith('settings:')) showSettings(act.slice(9));
+    },
+    save: (which) => runSave(which === 'save' ? 'save_clip' : 'save_and_share'),
+    share: async () => {
+      try { const r = await invoke('share_last'); toast(r.line, 'ok'); } catch (e) { toast(String(e.message || e), 'err'); }
+    },
+    pauseClips: (on) => drawn(invoke('recording_pause_set', { paused: on })),
+    pauseUploads: (on) => drawn(invoke('pause_set', { paused: on })),
+    record: (on) => invoke('session_set', { on }),
+    fail: (why) => toast(why, 'err'),
   });
   $('#ver-updates')?.addEventListener('click', (e) => {
     e.preventDefault();
-    invoke('view_show', { view: 'settings', section: 'startup' }).catch(err => toast(String(err.message || err), 'err'));
+    showSettings('startup');
   });
-  const pops = [[$('#chip'), $('#chip-pop')], [$('#user-btn'), $('#user-menu')]];
+  const pops = [[$('#user-btn'), $('#user-menu')]];
   const close = () => pops.forEach(([b, p]) => { p.hidden = true; b.setAttribute('aria-expanded', 'false'); });
   for (const [btn, pop] of pops) {
     btn.addEventListener('click', (e) => {
@@ -248,26 +246,9 @@ export function bindHeader() {
 }
 
 export function renderParts(status) {
+  last = status;
   modeParts(status);
-  const app = APP_DOT[status.state] || 'ok';
-  setPart('part-app', app, status.state_word || status.state, status.state_line || '');
-  setPart('part-obs', status.obs.connected ? 'ok' : 'neutral', status.obs.connected ? 'connected' : 'off', status.obs.line || '');
-  $('#chip-dot').className = `dot ${worst([serverState, app])}`;
-  const word = $('#chip-word');
-  word.textContent = status.state_word || status.state;
-  word.className = `chip-word ${app === 'ok' ? '' : app}`;
-  setOn($('#app-pause'), !!status.paused_by_user);
-  setOn($('#app-recording'), !!status.recording_paused);
-  record(status);
-  $('#app-share').disabled = !status.paired;
-  saveButtons(status, $('#app-save'), $('#app-save-share'));
-  saveButtons(status, $('#menu-save'), $('#menu-save-share'));
-  const note = $('#menu-save-why');
-  if (note) {
-    const why = !status.save?.ok ? status.save?.why : (!status.save_share?.ok && !here ? `Save and share: ${status.save_share?.why}` : '');
-    note.textContent = why ? `Not now: ${why}` : '';
-    note.hidden = !why;
-  }
+  bar(status, { state: serverState, line: serverLine });
   renderVersions(status.versions, status.update_line);
   const hasPages = !!status.server_url || status.mode === 'standalone';
   $$('header.top [data-page], nav.sections [data-page]').forEach(a => a.classList.toggle('disabled', !hasPages));
@@ -282,11 +263,8 @@ function modeParts(status) {
   const p = status.panel || {};
   here = status.mode === 'standalone';
   $$('[data-panel]').forEach(el => { el.hidden = p[el.dataset.panel] === false; });
-  const dt = $('#part-server')?.previousElementSibling;
+  const dt = $('#bar-place')?.previousElementSibling;
   if (dt) dt.textContent = p.place || 'Server';
-  if (!here) return;
-  if (p.place_state) setPart('part-server', ...p.place_state);
-  else setPart('part-server', serverState, 'on this PC', serverLine);
 }
 
 const SAVE_WHAT = ['OBS saves the replay and it goes up as any clip does', 'OBS saves the replay, the app uploads it and copies the link'];
@@ -303,7 +281,7 @@ export async function runSave(which) {
   try { const r = await invoke(which); toast(r.line, 'ok'); } catch (e) { toast(String(e.message || e), 'err'); }
 }
 
-// The header as web/templates/base.html writes it.
+// The header as web/templates/base.html writes it, without the browser's status chip.
 export function header(page) {
   const cur = (p) => (p === page ? ' aria-current="page"' : '');
   return `<header class="top">
@@ -320,40 +298,56 @@ export function header(page) {
     <kbd>/</kbd>
   </form>
   <button class="quiet search-toggle" id="search-toggle" type="button" aria-label="Search" aria-expanded="false"><svg class="icon" viewBox="0 0 16 16"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5 14 14"/></svg></button>
-  <a class="btn primary" href="#" data-page="/upload" id="upload-link" aria-label="Upload"><svg class="icon" viewBox="0 0 16 16"><path d="M8 11V3M4.5 6.5 8 3l3.5 3.5M3 13h10"/></svg><span>Upload</span></a>
-  <button class="btn app-save" id="app-save" type="button" aria-label="Save clip" disabled><svg class="icon" viewBox="0 0 16 16"><circle cx="8" cy="8" r="5.5"/><circle cx="8" cy="8" r="1.8"/></svg><span>Save clip</span></button>
-  <button class="btn app-record" id="app-record" type="button" aria-label="Record a session" disabled><svg class="icon" viewBox="0 0 16 16"><circle cx="8" cy="8" r="4.5"/></svg><span class="rec-time"></span><span class="rec-word">Record</span></button>
-  <button class="btn app-save" id="app-save-share" data-panel="save_share" type="button" aria-label="Save and share" disabled><svg class="icon" viewBox="0 0 16 16"><circle cx="5.5" cy="8" r="4"/><circle cx="5.5" cy="8" r="1.2"/><path d="M11 8h4M13 6l2 2-2 2"/></svg><span>Save and share</span></button>
-  <button class="btn app-share" id="app-share" data-panel="share_last" type="button" aria-label="Share the last clip"><svg class="icon" viewBox="0 0 16 16"><path d="M12 5a2 2 0 1 0 0-4 2 2 0 0 0 0 4ZM4 10a2 2 0 1 0 0-4 2 2 0 0 0 0 4Zm8 5a2 2 0 1 0 0-4 2 2 0 0 0 0 4ZM5.7 7.1l4.6-2.3M5.7 8.9l4.6 2.3"/></svg><span>Share the last clip</span></button>
-  <button class="chip" id="chip" type="button" aria-haspopup="dialog" aria-expanded="false" aria-label="Status"><i class="dot ok" id="chip-dot"></i><span class="chip-word" id="chip-word"></span></button>
-  <div class="popover" id="chip-pop" role="dialog" aria-label="Status" hidden>
-    <dl class="parts">
-      <dt>App</dt><dd id="part-app"><i class="dot"></i><span><b></b> <span class="muted"></span></span></dd>
-      <dt>OBS</dt><dd id="part-obs"><i class="dot"></i><span><b></b> <span class="muted"></span></span></dd>
-      <dt>Server</dt><dd id="part-server"><i class="dot ok"></i><span><b></b> <span class="muted"></span></span></dd>
-      <dt>Versions</dt><dd id="part-versions"><i class="dot"></i><span><b></b> <span class="muted"></span></span></dd>
-    </dl>
-    <div class="pop-actions"><label class="toggle">Pause clips <button type="button" class="switch" role="switch" aria-checked="false" id="app-recording"><i></i></button></label><label class="toggle" data-panel="pause">Pause uploads <button type="button" class="switch" role="switch" aria-checked="false" id="app-pause"><i></i></button></label><a class="btn small quiet" href="#" data-page="/status">Status page</a><a class="btn small quiet" href="#" id="ver-updates">Updates</a></div>
-  </div>
   <button class="avatar" id="user-btn" type="button" title="" aria-label="Menu" aria-haspopup="menu" aria-expanded="false"></button>
   <div class="menu" id="user-menu" role="menu" hidden>
     <div class="menu-head"><b></b> </div>
-    <div class="menu-save"><button class="item" id="menu-save" type="button" role="menuitem" disabled>Save clip</button><button class="item" id="menu-record" type="button" role="menuitem" disabled>Record a session</button><button class="item" id="menu-save-share" data-panel="save_share" type="button" role="menuitem" disabled>Save and share</button><p class="menu-note" id="menu-save-why" hidden></p></div>
     <div class="menu-nav">
       <a href="#" data-page="/" role="menuitem">Library</a>
       <a href="#" data-page="/collections" role="menuitem">Collections</a>
       <a href="#" data-page="/shares" data-panel="shares" role="menuitem">Shares</a>
       <a href="#" data-page="/jobs" role="menuitem">Jobs</a>
     </div>
+    <a href="#" data-page="/upload" role="menuitem">Upload a file <kbd>u</kbd></a>
     <a href="#" data-page="/settings" role="menuitem">Settings <kbd>,</kbd></a>
     <a href="#" data-page="/status" role="menuitem">Status <kbd>g t</kbd></a>
   </div>
 </header>`;
 }
 
+// The bar as web/templates/base.html writes it; the mode's parts hide by data-panel.
+export function footer() {
+  return `<footer class="appbar" id="appbar" aria-label="This PC" hidden>
+  <div class="appbar-left">
+    <button class="appbar-words" id="appbar-words" type="button" aria-haspopup="dialog" aria-expanded="false" aria-controls="appbar-pop"><i class="dot" id="appbar-dot"></i><b id="appbar-word"></b><span class="appbar-detail" id="appbar-detail"></span><kbd class="hint" id="appbar-hint"></kbd><svg class="icon chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 9.8 8 5.8l4 4"/></svg></button>
+    <button class="btn small appbar-fix" id="appbar-fix" type="button" hidden></button>
+  </div>
+  <div class="appbar-right">
+    <button class="btn small app-record" id="app-record" type="button" aria-label="Record a session" disabled><svg class="icon rec-ic" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="4.5"/></svg><svg class="icon stop-ic" viewBox="0 0 16 16" aria-hidden="true"><rect x="4.5" y="4.5" width="7" height="7" rx="1"/></svg><span class="rec-time"></span><span class="rec-word">Record</span><kbd class="hint" data-key="record"></kbd></button>
+    <button class="btn small quiet appbar-more" id="appbar-more" type="button" aria-label="More for this PC" aria-haspopup="dialog" aria-expanded="false" aria-controls="appbar-pop"><svg class="icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="3.5" cy="8" r="1.2"/><circle cx="8" cy="8" r="1.2"/><circle cx="12.5" cy="8" r="1.2"/></svg></button>
+  </div>
+  <div class="popover appbar-pop" id="appbar-pop" role="dialog" aria-label="This PC" hidden>
+    <p class="appbar-say" id="appbar-say"></p>
+    <div class="appbar-acts">
+      <button class="item" id="app-save" type="button" disabled><span>Save clip</span><kbd data-key="save"></kbd></button>
+      <button class="item" id="app-save-share" data-panel="save_share" type="button" disabled><span>Save and share</span><kbd data-key="save_share"></kbd></button>
+      <button class="item" id="app-share" data-panel="share_last" type="button" disabled><span>Share the last clip</span><kbd data-key="share_last"></kbd></button>
+      <p class="menu-note" id="app-save-why" hidden></p>
+    </div>
+    <div class="appbar-switches"><label class="toggle">Pause clips <button type="button" class="switch" role="switch" aria-checked="false" id="app-recording"><i></i></button></label><label class="toggle" data-panel="pause">Pause uploads <button type="button" class="switch" role="switch" aria-checked="false" id="app-pause"><i></i></button></label></div>
+    <dl class="parts">
+      <dt>OBS</dt><dd id="part-obs"><i class="dot"></i><span><b></b> <span class="muted"></span></span></dd>
+      <dt>Server</dt><dd id="bar-place"><i class="dot ok"></i><span><b></b> <span class="muted"></span></span></dd>
+      <dt>Versions</dt><dd id="part-versions"><i class="dot"></i><span><b></b> <span class="muted"></span></span></dd>
+    </dl>
+    <div class="pop-actions"><a class="btn small quiet" href="#" data-page="/status">Status page</a><a class="btn small quiet" href="#" id="ver-updates">Updates</a></div>
+  </div>
+</footer>`;
+}
+
 export async function mount(page) {
   document.documentElement.dataset.app = 'desktop';
   document.body.insertAdjacentHTML('afterbegin', header(page));
+  ($('#toasts') || document.body.lastElementChild).insertAdjacentHTML('beforebegin', footer());
   bindHeader();
   let shape = { sections: [], who: {}, health: {}, jobs: {} }, base = '';
   try {

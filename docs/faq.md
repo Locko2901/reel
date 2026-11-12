@@ -267,7 +267,7 @@ On the server, `docker compose down`. See [Uninstalling](uninstalling.md).
 
 ### Something does not work. Where do I look?
 
-The app's status chip and its Status page say what the app, OBS and the
-server are doing; the server's Status page and `reel doctor` say the
+The bar at the foot of the app's window and its Status page say what the
+app, OBS and the server are doing; the server's Status page and `reel doctor` say the
 same for the server. [Troubleshooting](troubleshooting.md) goes through
 the logs and the common errors.

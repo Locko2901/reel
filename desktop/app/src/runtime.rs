@@ -47,6 +47,8 @@ pub struct Processing {
     pub clip_id: String,
     pub title: String,
     pub phase: String,
+    /// How far the phase is, in percent, where the server says.
+    pub pct: Option<u64>,
 }
 
 pub struct Inner {
@@ -64,6 +66,8 @@ pub struct Inner {
     pub player: Player,
     pub log: Option<reel_desktop_core::log::LogHandle>,
     pub obs: ObsLine,
+    /// The OBS was asked since its last start and did not answer.
+    pub obs_refused: bool,
     pub watcher: WatcherLine,
     pub hotkey_ok: bool,
     pub hotkey_line: String,
@@ -455,6 +459,7 @@ impl Runtime {
                 connected: false,
                 line: "off".into(),
             },
+            obs_refused: false,
             watcher: WatcherLine::default(),
             hotkey_ok: false,
             hotkey_line: String::new(),
@@ -650,115 +655,76 @@ impl Runtime {
                 }
             },
         });
-        let obs_trouble = g
-            .obs_box
-            .as_ref()
-            .map(|b| b.line())
-            .and_then(|l| crate::status::obs_trouble(&l.state).map(|w| (w, l.line)));
         let session = crate::session::line(
             g.session.as_ref(),
             g.session_asked.as_ref(),
             g.session_lost.is_some(),
         );
-        let (state, word, line) = if let Some(((state, word), line)) = obs_trouble {
-            (state, word.to_string(), line)
-        } else if let Some(s) = &session {
-            (
-                "recording",
-                if s.starting {
-                    "starting a session recording"
-                } else {
-                    "recording a session"
-                }
-                .to_string(),
-                s.line.clone(),
-            )
-        } else if g.recording_paused {
-            (
-                "paused",
-                "clips paused".to_string(),
-                "the replay buffer is stopped".to_string(),
-            )
-        } else if let Some(o) = g.offline.as_ref().filter(|o| o.page_error) {
-            ("error", "the page had an error".to_string(), o.code.clone())
-        } else if let Some(o) = &g.offline {
-            (
-                "error",
-                if standalone {
-                    "reel on this PC does not answer"
-                } else {
-                    "cannot reach the server"
-                }
-                .to_string(),
-                o.title.clone(),
-            )
-        } else if let Some((_, words)) = &g.encoder_back {
-            ("error", "encoder changed back".to_string(), words.clone())
-        } else if !paired && !standalone {
-            (
-                "unpaired",
-                "not paired".to_string(),
-                g.pair_line.clone().unwrap_or_else(|| {
-                    "enter the server and a pairing code under Settings, Server".into()
-                }),
-            )
-        } else if let Some(j) = g.library_job.as_ref().filter(|j| j.running) {
-            let pct = (j.done * 100).checked_div(j.total).unwrap_or(0);
-            (
-                "working",
-                if j.kind == "copy" {
-                    "copying the library"
-                } else {
-                    "moving the library"
-                }
-                .to_string(),
-                format!("{}, {pct}%", j.phase),
-            )
-        } else if let Some(why) = g.library_away.as_ref().filter(|_| standalone) {
-            ("error", "library away".to_string(), why.clone())
-        } else if let Some((_, name, sent, total)) = &g.uploading {
-            let pct = if *total > 0 { sent * 100 / total } else { 0 };
-            (
-                "uploading",
-                "uploading".to_string(),
-                format!("{name}, {pct}%"),
-            )
-        } else if let Some(p) = g.processing.last() {
-            ("working", p.phase.clone(), p.title.clone())
-        } else if let Some(p) = &g.preparing {
-            ("preparing", "preparing the link".to_string(), p.clone())
-        } else if let Some(p) = &g.save_problem {
-            ("error", "no replay saved".to_string(), p.clone())
-        } else if g.paused_by_user && (!standalone || paired) {
-            (
-                "paused",
-                "paused".to_string(),
-                "uploads wait until you resume".into(),
-            )
-        } else if g.paused_fullscreen {
-            (
-                "paused",
-                "paused".to_string(),
-                if standalone {
-                    "a game has the screen: the library's heavy work waits"
-                } else {
-                    "a game has the screen"
-                }
-                .into(),
-            )
-        } else if let Some(e) = &g.last_error {
-            ("error", "error".to_string(), e.clone())
-        } else {
-            let n = g.ledger.pending().len();
-            (
-                "idle",
-                "idle".to_string(),
-                if n > 0 {
-                    format!("{n} waiting")
-                } else {
+        let bundled = g.bundled.is_some() && g.settings.obs.bundled;
+        let obs_set_up = g.settings.obs.enabled || bundled;
+        let box_line = g.obs_box.as_ref().map(|b| b.line());
+        let facts = crate::status::Facts {
+            standalone,
+            paired,
+            obs_box: box_line
+                .as_ref()
+                .map(|l| (l.state.as_str(), l.line.as_str())),
+            obs_set_up,
+            bundled,
+            obs_connected: g.obs.connected,
+            obs_line: &g.obs.line,
+            obs_refused: g.obs_refused,
+            replay: g
+                .obs_state
+                .as_ref()
+                .map(|s| (s.replay_active, s.replay_seconds)),
+            session: session.as_ref(),
+            recording_paused: g.recording_paused,
+            offline: offline.as_ref(),
+            encoder_back: g.encoder_back.as_ref().map(|(_, w)| w.as_str()),
+            pair_line: g.pair_line.as_deref(),
+            library_job: g.library_job.as_ref().filter(|j| j.running).map(|j| {
+                (
+                    j.kind.as_str(),
+                    j.phase.as_str(),
+                    (j.done * 100).checked_div(j.total).unwrap_or(0),
+                )
+            }),
+            library_away: g.library_away.as_deref(),
+            uploading: g
+                .uploading
+                .as_ref()
+                .map(|(_, name, sent, total)| (name.as_str(), *sent, *total)),
+            processing: g
+                .processing
+                .last()
+                .map(|p| (p.phase.as_str(), p.pct, p.title.as_str())),
+            preparing: g.preparing.as_deref(),
+            save_problem: g.save_problem.as_deref(),
+            paused_by_user: g.paused_by_user,
+            paused_fullscreen: g.paused_fullscreen,
+            last_error: g.last_error.as_deref(),
+            waiting: g.ledger.pending().len(),
+            save_key: &g.settings.hotkeys.save,
+        };
+        let said = crate::status::said(&facts);
+        let obs_row = crate::status::obs_row(&facts);
+        let keys = {
+            let k = &g.settings.hotkeys;
+            crate::status::Keys {
+                save: k.save.clone(),
+                save_share: if standalone {
                     String::new()
+                } else {
+                    k.save_share.clone()
                 },
-            )
+                share_last: if standalone {
+                    String::new()
+                } else {
+                    k.share_last.clone()
+                },
+                record: k.record.clone(),
+            }
         };
         let mut queue: Vec<QueueItem> = g
             .ledger
@@ -873,9 +839,14 @@ impl Runtime {
                 .as_ref()
                 .map(|w| w.name.clone())
                 .unwrap_or_else(|| g.settings.device_name.clone()),
-            state: state.into(),
-            state_word: word,
-            state_line: line,
+            state: said.state.into(),
+            state_tone: said.tone.into(),
+            state_word: said.word,
+            state_detail: said.detail,
+            state_line: said.line,
+            state_fix: said.fix,
+            obs_row,
+            keys,
             paused_by_user: g.paused_by_user,
             paused_fullscreen: g.paused_fullscreen,
             recording_paused: g.recording_paused,
@@ -1050,8 +1021,9 @@ impl Runtime {
         tray::refresh(&self.app, &st);
     }
 
-    /// What a reel page inside the app may know: no URL, no path, no setting value. `own`: the
-    /// library's own page, which alone may answer the update's question.
+    /// What a reel page inside the app may know: no URL, no path, no setting value but the
+    /// hotkeys its bar names. `own`: the library's own page, which alone may answer the update's
+    /// question.
     pub fn app_status(&self, own: bool) -> serde_json::Value {
         static FIRST: std::sync::Once = std::sync::Once::new();
         FIRST.call_once(|| tracing::info!("the server's page reached the app"));
@@ -1061,8 +1033,13 @@ impl Runtime {
             st.mode != "standalone" && st.paired && self.lock().ledger.last_confirmed().is_some();
         serde_json::json!({
             "state": st.state,
+            "state_tone": st.state_tone,
             "state_word": st.state_word,
+            "state_detail": st.state_detail,
             "state_line": st.state_line,
+            "state_fix": st.state_fix,
+            "obs_row": st.obs_row,
+            "keys": st.keys,
             "paused": st.paused_by_user,
             "recording_paused": st.recording_paused,
             "session": st.session,
@@ -2515,6 +2492,7 @@ impl Runtime {
             old.cancel();
         }
         g.obs_commands = None;
+        g.obs_refused = false;
         if !s.obs.enabled && !bundled {
             g.obs = ObsLine {
                 connected: false,
@@ -2556,10 +2534,14 @@ impl Runtime {
                         obs_version,
                         ws_version,
                     } => {
-                        rt.lock().obs = ObsLine {
-                            connected: true,
-                            line: format!("OBS {obs_version}, websocket {ws_version}"),
-                        };
+                        {
+                            let mut g = rt.lock();
+                            g.obs = ObsLine {
+                                connected: true,
+                                line: format!("OBS {obs_version}, websocket {ws_version}"),
+                            };
+                            g.obs_refused = false;
+                        }
                         tracing::info!(obs_version, ws_version, "obs connected");
                         let gen = {
                             let mut g = rt.lock();
@@ -2596,6 +2578,7 @@ impl Runtime {
                                     words
                                 },
                             };
+                            g.obs_refused = true;
                             g.obs_state = None;
                             g.obs_game = None;
                             g.obs_seen.send_modify(|s| {
@@ -3254,6 +3237,7 @@ impl Runtime {
                 clip_id: clip_id.clone(),
                 title: title.clone(),
                 phase: "on the server".into(),
+                pct: None,
             });
         }
         self.push_status();
@@ -3263,14 +3247,14 @@ impl Runtime {
             let rt2 = rt.clone();
             let id = clip_id.clone();
             let r = uploader::watch_clip(&api, &clip_id, &ctl, move |phase| {
-                let line = match phase {
-                    uploader::ServerPhase::Publishing { .. } => "on the server".to_string(),
-                    uploader::ServerPhase::Preview { progress: Some(p) } => format!(
-                        "making the preview video, {}%",
-                        (p.clamp(0.0, 1.0) * 100.0).round() as i64
-                    ),
+                let (line, pct) = match phase {
+                    uploader::ServerPhase::Publishing { .. } => ("on the server".to_string(), None),
+                    uploader::ServerPhase::Preview { progress: Some(p) } => {
+                        let pct = (p.clamp(0.0, 1.0) * 100.0).round() as u64;
+                        (format!("making the preview video, {pct}%"), Some(pct))
+                    }
                     uploader::ServerPhase::Preview { progress: None } => {
-                        "making the preview video".to_string()
+                        ("making the preview video".to_string(), None)
                     }
                 };
                 let changed = {
@@ -3278,6 +3262,7 @@ impl Runtime {
                     match g.processing.iter_mut().find(|p| p.clip_id == id) {
                         Some(p) if p.phase != line => {
                             p.phase = line;
+                            p.pct = pct;
                             true
                         }
                         _ => false,

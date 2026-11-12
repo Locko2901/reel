@@ -316,6 +316,14 @@ pub async fn app_session_set(
     Ok(rt.app_status(library_page(&webview, &rt)))
 }
 
+/// Start OBS in the bar of a reel page: the OBS that came with the app, after the app stopped
+/// starting it.
+#[tauri::command]
+pub fn app_obs_again(webview: tauri::Webview, rt: State<'_, Runtime>) -> R<Value> {
+    rt.start_obs_again();
+    Ok(rt.app_status(library_page(&webview, &rt)))
+}
+
 /// Show in folder and Open on a download's toast: only a file this run downloaded, and Open
 /// only for a video or a picture, so no page can start a program it downloaded.
 #[tauri::command]

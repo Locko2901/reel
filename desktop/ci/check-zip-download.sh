@@ -5,8 +5,8 @@ SERVER="${REEL_E2E_SERVER:-http://127.0.0.1:8746}"
 USER_NAME="${REEL_E2E_USER:-sam}"
 PASSWORD="${REEL_E2E_PASSWORD:?the password of the demo admin}"
 SHOTS="${REEL_SHOTS_OUT:-}"
-# Where Chromium draws the buttons at 1280 by 820.
-BAR_DOWNLOAD="${REEL_ZIP_BAR:-637 779}"
+# Where Chromium draws the buttons at 1280 by 820; the Select bar sits above the app's bar.
+BAR_DOWNLOAD="${REEL_ZIP_BAR:-637 753}"
 DIALOG_DOWNLOAD="${REEL_ZIP_GO:-874 523}"
 W=$(mktemp -d)
 LOG="$W/d/data/logs"

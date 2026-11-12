@@ -6,10 +6,11 @@ says what the message means and what to do.
 
 ## Where to look first
 
-- **The status chip** at the top of the app's window: a dot and a word
-  for the app (**idle**, **uploading**, **paused**, **not paired**,
-  **cannot reach the server**, **error**). Click it for a line each about
-  the app, OBS and the server.
+- **The bar** at the foot of the app's window: a dot and a word or two
+  for what the app does (**ready**, **uploading**, **clips paused**,
+  **OBS not connected**, **not paired**, **server unreachable**,
+  **error**), with a button that fixes it where one can. Click the words
+  for a sentence about it and a line each about OBS and the server.
 - **The app's Status** (Settings, **Status**): the connections,
   one row each for the server, OBS, the clips folder and the hotkeys,
   with a line saying what is wrong; and the queue, with **Retry** on a
@@ -147,8 +148,8 @@ code and pair again under Settings, **Server**.
 
 ## The app cannot reach the server
 
-The window shows the app's own page with the reason, and the chip says
-**cannot reach the server**. The app keeps trying by itself.
+The window shows the app's own page with the reason, and the bar says
+**server unreachable**, with **Retry**. The app keeps trying by itself.
 
 | The page says | What it means |
 |---|---|

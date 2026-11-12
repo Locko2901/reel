@@ -31,7 +31,7 @@
     {% endif %}
     <form method="get" action="/" class="row small muted">
       <input type="hidden" name="q" value="{{ q }}" id="sort-q">
-      <label class="row">Sort
+      <label class="row"><span class="sort-word">Sort</span>
         <select name="sort" aria-label="Sort">
           <option value="newest" {% if sort == "newest" %}selected{% endif %}>Newest</option>
           <option value="oldest" {% if sort == "oldest" %}selected{% endif %}>Oldest</option>
@@ -41,6 +41,7 @@
         </select>
       </label>
     </form>
+    <a class="btn primary lib-upload" href="/upload" id="upload-link" title="Upload a file (u)"><svg class="icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 11V3M4.5 6.5 8 3l3.5 3.5M3 13h10"/></svg><span>Upload</span></a>
   </div>
 </div>
 <p class="faint small disk-detail" id="disk-detail" hidden>{{ disk_detail }}</p>

@@ -66,7 +66,8 @@ file of a re-encoded clip under **Keep originals**.
 
 ## 2. Upload in the browser
 
-1. Sign in to your server and press **Upload** at the top right.
+1. Sign in to your server and press **Upload** at the end of the library's row (or **u** on any
+   page).
 2. Drop videos on the page, or press **pick files**.
 3. Each file shows its progress. When it worked, its row says "uploaded,
    now encoding:" with a link to the clip, then "ready".

@@ -32,8 +32,8 @@ When it worked, **Mode** says "reel runs on this PC", and the window shows the l
 ![The library in standalone mode](img/app-standalone-library.png)
 
 The library lives in `%LOCALAPPDATA%\reel\library` on Windows and `~/.local/share/reel/library` on
-Linux, until you [move it to another drive](#the-library-on-another-drive). The status chip at the
-top of the window has a **Library** row: on this PC, where it lives, and whether reel on this PC
+Linux, until you [move it to another drive](#the-library-on-another-drive). The menu of the bar at the
+foot of the window has a **Library** line: on this PC, where it lives, and whether reel on this PC
 runs.
 
 The library opens in the app's window alone, not in a browser: reel on this PC lets in only the

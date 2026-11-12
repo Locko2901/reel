@@ -60,9 +60,20 @@ ok "Save and share sounded $FIRST ms after the key, as OBS took the save (the re
 apart() { sleep 1.2; } # a press within a second of the last save is a double tap
 apart
 n=$(saves)
-xdotool mousemove 762 23 click 1
-saved "$n" "the header's Save clip"
-ok "the header of the app's own pages: Save clip reached OBS"
+# The bar's "..." from the window's size, as reel.css places it: 26 px wide, 20 px from the right
+# edge, in the 30 px at the foot. Esc closes its menu and gives "..." the focus; Enter opens it
+# from the keyboard, on its first item, Save clip.
+eval "$(xdotool getwindowgeometry --shell "$(xdotool search --onlyvisible --name '^reel$' | head -1)")"
+# shellcheck disable=SC2086
+xdotool mousemove ${REEL_BAR_MORE:-$((X + WIDTH - 33)) $((Y + HEIGHT - 15))} click 1
+sleep 1
+xdotool key Escape
+sleep 0.3
+xdotool key Return
+sleep 0.5
+xdotool key Return
+saved "$n" "the bar's Save clip"
+ok "the bar of the app's own pages: its menu opens from the keyboard on Save clip, which reached OBS"
 
 apart
 n=$(saves)

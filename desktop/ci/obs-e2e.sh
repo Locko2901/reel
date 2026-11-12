@@ -230,7 +230,7 @@ buffer_is true || fail "the replay buffer stopped with the recording's start"
 SESSION=$(session_file "from the command line")
 [ -n "$SESSION" ] && [ "$(dirname "$SESSION")" = "$ROOT/clips" ] || fail "the session recording's file: '$SESSION'"
 wait_for 10 "the start's sound" sh -c "[ \$(cat $LOG/reel-desktop.log* | grep -c 'cue session played') -gt $cues ]"
-wait_for 10 "the tray's line" log_has "line=recording a session: under a minute, started from the command line"
+wait_for 10 "the tray's line" log_has "line=recording, under a minute"
 ok "started from the command line: OBS records into $(basename "$SESSION") beside the running replay buffer, on the buffer's encoder (its own log starts no second x264), the start's sound played, the tray's line says it"
 sleep 8
 own_frames
@@ -312,8 +312,8 @@ python3 -c 'import json,sys; k=json.load(open(sys.argv[1])); sys.exit(not any(v[
 WORDS="OBS stopped right after it started with SVT-AV1 (CPU), so reel records with x264 (CPU) again"
 wait_for 20 "the notification" notified "Encoder changed back"
 notified "$WORDS" || fail "the notification's words: $(grep -A1 'Encoder changed back' "$ROOT/notifications.txt" | tail -1)"
-wait_for 20 "the tray's state line" log_has "line=encoder changed back: $WORDS"
-ok "SVT-AV1, tested but no replay saved with it, stopped OBS $(wc -l <"$ROOT/killed.txt") time(s) right after its start; reel went back to x264, the encoder of the last replay, in its settings and OBS's, refused SVT-AV1 until the setup tests it, started OBS (the buffer runs) and said so in a notification and the tray's first line: \"encoder changed back: $WORDS\""
+wait_for 20 "the tray's state line" log_has "line=encoder changed back"
+ok "SVT-AV1, tested but no replay saved with it, stopped OBS $(wc -l <"$ROOT/killed.txt") time(s) right after its start; reel went back to x264, the encoder of the last replay, in its settings and OBS's, refused SVT-AV1 until the setup tests it, started OBS (the buffer runs) and said so in a notification (\"$WORDS\") and the tray's first line (\"encoder changed back\")"
 
 say "the app quits while a session recording runs: it is stopped first and its file kept whole, then OBS stops"
 # the encoder step leaves OBS starting again: a start is refused until the app is connected

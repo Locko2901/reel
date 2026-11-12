@@ -26,7 +26,7 @@ pub const SETUP_PAGE: &str = "setup.html";
 const BACKGROUND: tauri::window::Color = tauri::window::Color(0x0d, 0x0b, 0x10, 0xff);
 
 /// The only commands a reel page inside the app may call.
-const REMOTE_PERMISSIONS: [&str; 10] = [
+const REMOTE_PERMISSIONS: [&str; 11] = [
     "allow-app-status",
     "allow-app-page-error",
     "allow-app-share-last",
@@ -35,6 +35,7 @@ const REMOTE_PERMISSIONS: [&str; 10] = [
     "allow-app-pause-set",
     "allow-app-recording-pause-set",
     "allow-app-session-set",
+    "allow-app-obs-again",
     "allow-app-open-settings",
     "allow-app-download-open",
 ];

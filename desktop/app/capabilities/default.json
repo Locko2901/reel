@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "What the app's own pages may ask of the shell, on the app's own origin only; the server's pages in the same webview get a capability of their own at run time, nine commands",
+  "description": "What the app's own pages may ask of the shell, on the app's own origin only; the server's pages in the same webview get a capability of their own at run time, eleven commands",
   "windows": [
     "main"
   ],

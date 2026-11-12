@@ -31,12 +31,6 @@ export function header() {
   }
 }
 
-export const WORST = ['err', 'warn', 'active', 'ok', 'neutral'];
-export function worst(states) {
-  for (const s of WORST) if (states.includes(s)) return s;
-  return 'ok';
-}
-
 export function setPart(id, state, word, line) {
   const dd = $(`#${id}`), dt = dd?.previousElementSibling;
   if (!dd) return;

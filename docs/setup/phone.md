@@ -53,7 +53,8 @@ before anything is sent, with the reason.
 Safari does not let a web app appear in the share sheet, so on an iPhone
 you upload from reel itself:
 
-1. Open reel and tap the upload button at the top (the arrow).
+1. Open reel and tap the upload button on the library's row (the arrow), or **Upload a file**
+   in the menu under your initial.
 2. Tap **pick files**, then choose **Photo Library** or Files, and pick
    your videos.
 

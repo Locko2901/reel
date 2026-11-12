@@ -155,8 +155,8 @@ everything else and says which part failed and why. You can try that part again 
 4. To send it, open **Send** on the clip's page, download the original or a copy under your chat's
    upload limit, and drag the file into the chat ([Standalone](standalone.md) has the details).
 
-When something does not happen, click the status chip at the top of the window: it says what the
-app and OBS are doing. Settings, **Status** has more.
+When something does not happen, look at the bar at the foot of the window: it says what the app
+and OBS are doing, and its words open a menu that says more. Settings, **Status** has the rest.
 
 ## Add a server for links
 
