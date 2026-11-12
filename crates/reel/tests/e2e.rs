@@ -4147,7 +4147,12 @@ async fn every_module_a_page_loads_carries_the_pages_build() {
         page.contains(&format!(r#"href="/assets/{mark}/reel.css""#)),
         "the stylesheet too"
     );
-    let mut queue = vec![src.to_string(), format!("/assets/{mark}/share.js")];
+    let wait = format!("/assets/{mark}/js/app-wait.js");
+    assert!(
+        page.contains(&format!(r#"<script src="{wait}"></script>"#)),
+        "the head's classic script, of the page's build"
+    );
+    let mut queue = vec![src.to_string(), format!("/assets/{mark}/share.js"), wait];
     let mut seen = std::collections::HashSet::new();
     while let Some(url) = queue.pop() {
         if !seen.insert(url.clone()) {
@@ -11160,6 +11165,11 @@ async fn the_apps_parts_in_the_header_stay_hidden_in_a_browser() {
             html.matches("class=\"wordmark\"").count(),
             1,
             "{path}: one header, one wordmark"
+        );
+        let head = &html[..html.find("<body").expect("a body")];
+        assert!(
+            head.contains("/js/app-wait.js\"></script>"),
+            "{path}: the script that keeps the page hidden in the app's window until the app's parts are drawn runs before the first paint"
         );
     }
     let html = env
