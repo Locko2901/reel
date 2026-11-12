@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.16.0](https://github.com/Locko2901/reel/compare/v1.15.0...v1.16.0) (2026-11-12)
+
+
+### Features
+
+* record a whole session from the window, the tray or Alt+F9, with a reminder every 30 minutes ([dd697c8](https://github.com/Locko2901/reel/commit/dd697c80161804be0dc8d9fbad30ca157b76ea10))
+* reel light has a setup for your own OBS, opened on a new install and from Settings, OBS ([93e708c](https://github.com/Locko2901/reel/commit/93e708c664db14f1a3f0ee24fe050c8fe1bf7425))
+* the replay buffer's pause is called Pause clips, so it is not taken for a session recording ([fe215ba](https://github.com/Locko2901/reel/commit/fe215ba4b379c427a8edc16ac3a5364c39f97ed1))
+
+
+### Bug Fixes
+
+* a video of hours is no longer cut off by the job timeout, and its upload's last step survives a proxy's timeout ([ef08b47](https://github.com/Locko2901/reel/commit/ef08b47f135ef24499555ff20f449578d5fac88f))
+* moving between the app's settings and the server's no longer flashes a half drawn or white page ([fe8517c](https://github.com/Locko2901/reel/commit/fe8517caa27b2cc10c26f565aa1cc6ff0610e887))
+
 ## [1.15.0](https://github.com/Locko2901/reel/compare/v1.14.0...v1.15.0) (2026-11-11)
 
 
