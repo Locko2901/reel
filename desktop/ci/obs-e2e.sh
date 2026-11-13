@@ -34,7 +34,8 @@ obs_pid() { local p; for p in $(pgrep -x reel-capture; pgrep -x obs); do tr '\0'
 no_reel_obs() { [ -z "$(obs_pid)" ]; }
 reel_obs_not() { local p; p=$(obs_pid); [ -n "$p" ] && [ "$p" != "$1" ]; }
 MAIN_CONF="$HOME/.config/obs-studio"
-main_sum() { (cd "$MAIN_CONF" && find . -type f ! -path './logs/*' ! -path './profiler_data/*' ! -path './crashes/*' ! -path './.sentinel/*' -print0 | sort -z | xargs -0 sha256sum); }
+# updates/ holds the news OBS downloads for itself at any time, --disable-updater or not.
+main_sum() { (cd "$MAIN_CONF" && find . -type f ! -path './logs/*' ! -path './profiler_data/*' ! -path './crashes/*' ! -path './.sentinel/*' ! -path './updates/*' -print0 | sort -z | xargs -0 sha256sum); }
 main_alive() { kill -0 "$MAIN_PID" 2>/dev/null; }
 ROOT_WINDOW=$(xwininfo -root -int | sed -n 's/.*Window id: \([0-9]*\).*/\1/p')
 # OBS's windows on the screen but its tray icon, a window of a few pixels.
