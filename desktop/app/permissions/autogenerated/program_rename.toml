@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-program-rename"
+description = "Enables the program_rename command without any pre-configured scope."
+commands.allow = ["program_rename"]
+
+[[permission]]
+identifier = "deny-program-rename"
+description = "Denies the program_rename command without any pre-configured scope."
+commands.deny = ["program_rename"]

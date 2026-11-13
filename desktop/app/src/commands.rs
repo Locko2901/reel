@@ -729,3 +729,81 @@ pub fn open_releases(app: AppHandle) -> R<()> {
         .open_url(crate::updates::releases_url(), None::<&str>)
         .map_err(|e| e.to_string())
 }
+
+/// Settings, Games and apps: the list, Steam, and what the page's words depend on.
+#[tauri::command]
+pub fn programs_get(rt: State<'_, Runtime>) -> Value {
+    rt.programs_page()
+}
+
+/// Steam's games as last read, for the setup's step Games; waits for the first read.
+#[tauri::command]
+pub async fn steam_get(rt: State<'_, Runtime>) -> R<Value> {
+    Ok(rt.steam_page().await)
+}
+
+#[tauri::command]
+pub fn program_set(rt: State<'_, Runtime>, id: String, change: crate::games::Change) -> R<Value> {
+    rt.program_set(&id, change)
+}
+
+#[tauri::command]
+pub fn program_add(
+    rt: State<'_, Runtime>,
+    path: String,
+    name: String,
+    class: reel_desktop_core::programs::Class,
+) -> R<Value> {
+    rt.program_add(&path, &name, class)
+}
+
+#[tauri::command]
+pub fn program_remove(rt: State<'_, Runtime>, id: String) -> R<()> {
+    rt.program_remove(&id)
+}
+
+#[tauri::command]
+pub fn program_add_back(rt: State<'_, Runtime>, app: u32) -> R<()> {
+    rt.program_add_back(app)
+}
+
+#[tauri::command]
+pub async fn programs_running(rt: State<'_, Runtime>) -> R<Vec<Value>> {
+    let rt = rt.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || rt.programs_running())
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// Add a program's A file: a program, or on Windows a shortcut to one.
+#[tauri::command]
+pub async fn program_pick(app: AppHandle, rt: State<'_, Runtime>) -> R<Option<Value>> {
+    let mut d = app.dialog().file();
+    if cfg!(windows) {
+        d = d.add_filter("A program or a shortcut to one", &["exe", "lnk"]);
+    }
+    let picked = tauri::async_runtime::spawn_blocking(move || d.blocking_pick_file())
+        .await
+        .map_err(|e| e.to_string())?;
+    match picked {
+        Some(p) => rt
+            .program_picked(std::path::Path::new(&p.to_string()))
+            .map(Some),
+        None => Ok(None),
+    }
+}
+
+#[tauri::command]
+pub fn program_rename_plan(rt: State<'_, Runtime>, id: String, name: String) -> R<Value> {
+    rt.rename_plan(&id, &name)
+}
+
+#[tauri::command]
+pub async fn program_rename(
+    rt: State<'_, Runtime>,
+    id: String,
+    name: String,
+    older: bool,
+) -> R<Value> {
+    rt.rename(&id, &name, older).await
+}

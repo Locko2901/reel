@@ -10,14 +10,14 @@ import { bindObsBar, renderObsBar } from './obsbar.js';
 import { bindAsk, renderAsk } from './ask.js';
 import { audioPlan, meterIn, renderLevelRows, wordsInto } from './sources.js';
 
-const GUIDED = [['length', 'Clip length'], ['quality', 'Quality'], ['encoder', 'Encoder'], ['capture', 'What to capture'], ['audio', 'Audio'], ['hotkeys', 'Hotkeys'], ['where', 'Where clips go'], ['look', 'New versions'], ['done', 'Done']];
-const OWN = [['obs', 'Your OBS'], ['needs', 'The replay buffer'], ['hotkeys', 'Hotkeys'], ['where', 'Where clips go'], ['look', 'New versions'], ['done', 'Done']];
+const GUIDED = [['length', 'Clip length'], ['quality', 'Quality'], ['encoder', 'Encoder'], ['capture', 'What to capture'], ['audio', 'Audio'], ['hotkeys', 'Hotkeys'], ['games', 'Games'], ['where', 'Where clips go'], ['look', 'New versions'], ['done', 'Done']];
+const OWN = [['obs', 'Your OBS'], ['needs', 'The replay buffer'], ['hotkeys', 'Hotkeys'], ['games', 'Games'], ['where', 'Where clips go'], ['look', 'New versions'], ['done', 'Done']];
 let chose = null;
 const own = () => chose === 'own' || !!(status && !status.bundled);
 // New versions is standalone's: a paired app takes its updates from its server.
 const pathSteps = (all) => (settings && settings.mode !== 'standalone' ? all.filter(([k]) => k !== 'look') : all);
 const steps = () => pathSteps(own() ? OWN : GUIDED);
-const COUNT = { 4: 'four', 5: 'five', 6: 'six', 7: 'seven', 8: 'eight' };
+const COUNT = { 4: 'four', 5: 'five', 6: 'six', 7: 'seven', 8: 'eight', 9: 'nine' };
 const counted = (all) => COUNT[pathSteps(all).length - 1] || String(pathSteps(all).length - 1);
 const stepsCount = () => counted(own() ? OWN : GUIDED);
 const QUALITY = { light: 'Light: 1080p30', smooth: 'Smooth: 1080p60', sharp: 'Sharp: 1440p60', native: 'Native: your screen', custom: 'As set in OBS' };
@@ -646,6 +646,47 @@ function fillHotkey(row) {
   keycaps($('button.hotkey', row), v);
 }
 
+// Steam's games as the app last read them, asked once.
+let steam = null;
+const NUM = ['no', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine'];
+const plural = (n, one, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
+const front = () => !(status && status.linux);
+
+async function renderGames() {
+  setOn($('#steam-on'), !!settings.games.steam);
+  $('#games-after').textContent = front()
+    ? 'The rest of the list fills as you play. Settings, Games and apps sorts it: which programs are games, and the name each gives its clips.'
+    : 'On Linux reel cannot tell which program is in front, so the rest of the list fills by hand, under Settings, Games and apps.';
+  if (!steam) {
+    try { steam = await invoke('steam_get'); } catch { steam = { found: false, read: true, games: [], applications: [], shortcuts: [], libraries: 0 }; }
+  }
+  const s = steam, found = s.found;
+  const libs = s.libraries === 1 ? 'one Steam library' : `${NUM[s.libraries] || s.libraries} Steam libraries`;
+  $('#steam-step-desc').textContent = found ? `${libs} on this PC, read here: nothing leaves the PC` : 'Steam is not installed on this PC, or reel did not find it';
+  $('#steam-step-found').hidden = !found;
+  if (found) {
+    const shown = s.games.slice(0, 6);
+    $('#steam-step-names').textContent = s.games.length
+      ? `${plural(s.games.length, 'game')}: ${shown.join(', ')}${s.games.length > shown.length ? `, and ${s.games.length - shown.length} more` : ''}`
+      : 'No game installed in Steam yet.';
+    const more = [];
+    if (s.applications.length) more.push(`${plural(s.applications.length, 'application')}, ${s.applications.slice(0, 3).join(', ')}${s.applications.length > 3 ? ' and more' : ''}`);
+    if (s.shortcuts.length) more.push(`${plural(s.shortcuts.length, 'program')} added to Steam by hand`);
+    $('#steam-step-more').textContent = `${more.length ? `And ${more.join(', and ')}, which ${s.applications.length + s.shortcuts.length === 1 ? 'comes' : 'come'} in as Not sorted yet. ` : ''}Steam's own tools and soundtracks stay out.`;
+  }
+  $('#steam-step-help').textContent = found
+    ? `${s.games.length ? 'these' : 'its games'}, and each new one as it is installed, as Games with their names in Steam${front() ? ', so clips are named after them from the first one' : ''}; off, Steam adds nothing. Settings, Games and apps changes it later`
+    : 'nothing to add now; once Steam is installed, its games come in by themselves, each as it is installed, as Games with their names in Steam';
+}
+
+function gamesSummary() {
+  const s = steam || { found: false, games: [] }, on = !!settings.games.steam;
+  const rest = front() ? 'the rest fills as you play' : 'the rest fills by hand';
+  if (!on) return `Steam adds nothing; ${front() ? 'the list fills as you play' : 'the list fills by hand'}`;
+  if (!s.found) return `Steam not found: its games come in once it is installed; ${rest}`;
+  return `${plural(s.games.length, 'Steam game')} ${s.games.length === 1 ? 'goes' : 'go'} into the list as Games, and each new one as it is installed; ${rest}`;
+}
+
 function renderLook() {
   setOn($('#look'), lookOn());
 }
@@ -707,6 +748,7 @@ function commonSummary() {
   const folder = obsFolder();
   const rows = [
     ['Hotkeys', `${settings.mode === 'standalone' ? `Save a clip ${settings.hotkeys.save || 'none'}` : `Save and share ${settings.hotkeys.save_share || 'none'}, Save ${settings.hotkeys.save || 'none'}`}, Record a session ${settings.hotkeys.record || 'none'}`],
+    ['Games', gamesSummary()],
     ['Clips go to', settings.mode === 'standalone' ? 'this PC only: the library in the app, on this PC' : (status && status.paired ? (status.server_name || status.server_url) : `${settings.server_url || 'no server yet'}, not paired yet`)],
     ['Clips folder', folder ? `${folder}, OBS's recording folder` : settings.clips_dir],
   ];
@@ -725,7 +767,7 @@ function summaryInto(rows) {
   }
 }
 
-const RENDER = { obs: renderObs, needs: renderNeeds, length: renderLength, quality: renderQuality, encoder: renderEncoders, capture: renderCapture, audio: renderAudio, hotkeys: renderHotkeys, where: renderWhere, look: renderLook, done: renderDone };
+const RENDER = { obs: renderObs, needs: renderNeeds, length: renderLength, quality: renderQuality, encoder: renderEncoders, capture: renderCapture, audio: renderAudio, hotkeys: renderHotkeys, games: renderGames, where: renderWhere, look: renderLook, done: renderDone };
 
 function go(id) {
   if (step === 'audio' && id !== 'audio') invoke('obs_meters', { on: false }).catch(() => {});
@@ -884,6 +926,7 @@ function bind() {
     if (line) line.textContent = lookWords();
   });
   $('#elevated').addEventListener('change', () => { setup().elevated = isOn($('#elevated')); });
+  $('#steam-on').addEventListener('change', () => { settings.games.steam = isOn($('#steam-on')); });
   $('#screen').onchange = () => { const sc = screens.find((x) => x.id === $('#screen').value); if (sc) setup().screen = sc; };
   $('#desktop-audio').onchange = () => {
     setup().desktop_audio = $('#desktop-audio').value;
@@ -979,6 +1022,7 @@ async function main() {
   bind();
   try {
     settings = await invoke('settings_get');
+    settings.games ||= { steam: true };
     status = await invoke('status_get');
     screens = await invoke('screens_get');
     suggested = await invoke('obs_suggested_quality').catch(() => null);

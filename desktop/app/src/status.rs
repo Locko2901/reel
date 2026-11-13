@@ -91,6 +91,8 @@ pub struct Status {
     pub keys: Keys,
     pub paused_by_user: bool,
     pub paused_fullscreen: bool,
+    /// Programs in Settings, Games and apps not sorted yet, for the nav's count.
+    pub unsorted: usize,
     /// Pause clips: the replay buffer is stopped on purpose until Resume clips.
     pub recording_paused: bool,
     /// A session recording that runs or starts.

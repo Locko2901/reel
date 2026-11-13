@@ -107,6 +107,16 @@ const COMMANDS: &[&str] = &[
     "offline_retry",
     "page_shape_get",
     "page_section",
+    "programs_get",
+    "steam_get",
+    "program_set",
+    "program_add",
+    "program_remove",
+    "program_add_back",
+    "programs_running",
+    "program_pick",
+    "program_rename_plan",
+    "program_rename",
 ];
 
 fn main() {

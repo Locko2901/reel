@@ -3,6 +3,7 @@ mod commands;
 mod downloads;
 mod encoders;
 mod files;
+mod games;
 mod hotkey;
 mod library;
 #[cfg(target_os = "linux")]
@@ -212,6 +213,16 @@ pub fn run() {
             commands::update_check_set,
             commands::app_update_answer,
             commands::open_releases,
+            commands::programs_get,
+            commands::steam_get,
+            commands::program_set,
+            commands::program_add,
+            commands::program_remove,
+            commands::program_add_back,
+            commands::programs_running,
+            commands::program_pick,
+            commands::program_rename_plan,
+            commands::program_rename,
         ])
         .setup(move |app| {
             let kind = reel_desktop_core::settings::Settings::load(

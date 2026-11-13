@@ -60,10 +60,21 @@ printf '#!/bin/sh\nprintf "%%s\\n" "$*" >> "%s/opened.txt"\n' "$W" > "$W/bin/xdg
 chmod +x "$W/bin/xdg-open"
 export PATH="$W/bin:$PATH"
 opened() { grep -c . "$W/opened.txt" 2>/dev/null || true; }
+# A made up Steam with two libraries: 7 games, an application and a program added by hand, a
+# runtime, a soundtrack and a Proton build that stay out, and one still installing.
+python3 /work/desktop/ci/made-up-steam.py "$W/steam" "$W/lib2"
+STEAM_READ="Steam read in $W/steam: 2 libraries, the types from appinfo.vdf version 41; 7 as Game, 2 as Not sorted yet (1 of them added to Steam by hand), 3 stayed out, 1 still installing"
+programs() { # programs <python condition on p, the list's file>: whether it holds
+  python3 -c 'import json,sys; p=json.load(open(sys.argv[1])); e={x["id"]: x for x in p["entries"]}; sys.exit(0 if eval(sys.argv[2]) else 1)' "$D/config/programs.json" "$1" 2>/dev/null
+}
+wait_programs() { # wait_programs <condition> <seconds> <what>
+  for _ in $(seq 1 $(($2 * 2))); do programs "$1" && return 0; sleep 0.5; done
+  fail "$3: $(cat "$D/config/programs.json" 2>/dev/null | tr -d '\n ' | cut -c1-400)"
+}
 
 D="$W/new"
 L="$D/data/logs"
-export REEL_DESKTOP_DIR="$D" RUST_BACKTRACE=1
+export REEL_DESKTOP_DIR="$D" RUST_BACKTRACE=1 REEL_STEAM_DIR="$W/steam"
 export REEL_OBS_EXE=/work/desktop/ci/standin-obs-slow.sh STANDIN_DIR="$W/rec-new" STANDIN_CLIP="$W/clip.mp4" STANDIN_CLOSE_S=0
 mkdir -p "$W/rec-new"
 start
@@ -80,12 +91,20 @@ xdotool mousemove ${REEL_SETUP_GO:-967 305} click 1
 sleep 2
 shot "2-new-install-setup"
 grep -q '"bundled": true' "$D/config/settings.json" && grep -q '"mode": "standalone"' "$D/config/settings.json" || fail "Set it up did not keep standalone"
+waitlog "$STEAM_READ" 30 "the made up Steam was not read as it is: $(cat "$L"/reel-desktop.log* | grep -m1 'Steam read in')"
+waitlog "Steam read: nothing added until the setup is finished" 10 "Steam's games went into the list before the setup was finished"
 # shellcheck disable=SC2086
-xdotool mousemove ${REEL_SETUP_WHERE:-233 273} click 1
+xdotool mousemove ${REEL_SETUP_GAMES:-233 273} click 1
+sleep 2
+shot "3-new-install-games"
+! programs 'len(p["entries"]) > 0' || fail "the list has programs before the setup was finished"
+ok "the setup's step Games, Steam found: Steam's files read as they are (the types from appinfo.vdf), nothing in the list before Finish (shot)"
+# shellcheck disable=SC2086
+xdotool mousemove ${REEL_SETUP_WHERE:-233 305} click 1
 sleep 2
 shot "3-new-install-where"
 # shellcheck disable=SC2086
-xdotool mousemove ${REEL_SETUP_NEW_VERSIONS:-233 305} click 1
+xdotool mousemove ${REEL_SETUP_NEW_VERSIONS:-233 337} click 1
 sleep 2
 shot "4-new-install-new-versions"
 stop
@@ -96,7 +115,7 @@ ok "Set it up keeps standalone, the default of Where clips go (shots: the choice
 # the stand-in OBS with a password on a port of its own; a start after Finish opens no setup.
 D="$W/light"
 L="$D/data/logs"
-export REEL_DESKTOP_DIR="$D"
+export REEL_DESKTOP_DIR="$D" REEL_STEAM_DIR="$W/no-steam"
 mkdir -p "$W/rec-light"
 /target/debug/examples/fake_obs --port 4496 --dir "$W/rec-light" --clip "$W/clip.mp4" --password standin-pass --profile Gaming > "$W/fake-obs-light.out" 2>&1 &
 LIGHT_OBS=$!
@@ -122,23 +141,25 @@ sleep 1
 shot "light-1-obs"
 [ "$(logged 'obs connected')" -eq 0 ] || fail "the app connected before the step was left"
 ok "reel light, a new install: its setup opens on Your OBS; the test reads the stand-in OBS with its password and profile (shots)"
-for at in "113:light-2-needs" "145:light-3-hotkeys" "177:light-4-where" "209:light-5-new-versions" "241:light-6-done"; do
+for at in "113:light-2-needs" "145:light-3-hotkeys" "177:light-4-games" "209:light-5-where" "241:light-6-new-versions" "273:light-7-done"; do
   xdotool mousemove 233 "${at%%:*}" click 1
   [ "${at#*:}" != light-2-needs ] || waitlog "obs connected" 30 "leaving Your OBS did not connect the app to the stand-in OBS"
   sleep 2
   shot "${at#*:}"
 done
 grep -q '"port": 4496' "$D/config/settings.json" && grep -q '"password": "standin-pass"' "$D/config/settings.json" || fail "the connection was not saved as the step was left"
-ok "the connection is saved as Your OBS is left, and the app connects; The replay buffer, Hotkeys, Where clips go, New versions and Done (shots)"
+waitlog "Steam read: Steam is not installed on this PC, or reel did not find it" 10 "a PC without Steam was not said to have none"
+ok "the connection is saved as Your OBS is left, and the app connects; The replay buffer, Hotkeys, Games without Steam, Where clips go, New versions and Done (shots)"
 # shellcheck disable=SC2086
-xdotool mousemove ${REEL_LIGHT_FINISH:-495 439} click 1
+xdotool mousemove ${REEL_LIGHT_FINISH:-495 463} click 1
 waitlog 'window shows view="library"' 30 "Finish did not open the library"
 grep -q '"own_setup_due": false' "$D/config/settings.json" || fail "Finish did not mark reel light's setup finished"
 grep -q '"save": "Alt+F10"' "$D/config/settings.json" || fail "Finish did not save Save a clip on Alt+F10"
 grep -q '"record": "Alt+F9"' "$D/config/settings.json" || fail "Finish did not keep Record a session on Alt+F9"
 grep -q '"done": false' "$D/config/settings.json" || fail "reel light's setup marked the setup of the package with OBS done"
+python3 -c 'import json,sys; sys.exit(0 if json.load(open(sys.argv[1]))["games"]["steam"] else 1)' "$D/config/settings.json" || fail "Finish did not keep Add my Steam games to the list on"
 sleep 3
-shot "light-7-library"
+shot "light-8-library"
 for _ in $(seq 1 20); do python3 /work/desktop/ci/fake-sni.py menu > "$W/menu-light.txt" 2>/dev/null; grep -qx -- "- ready, last 3 min" "$W/menu-light.txt" && break; sleep 0.5; done
 grep -qx -- "- ready, last 3 min" "$W/menu-light.txt" || fail "reel light's tray with its OBS: $(tr '\n' '|' < "$W/menu-light.txt")"
 b=$(logged "OBS disconnected")
@@ -147,7 +168,7 @@ waitmore "OBS disconnected" 20 "the app did not see the stand-in OBS close" "$b"
 for _ in $(seq 1 20); do python3 /work/desktop/ci/fake-sni.py menu > "$W/menu-light.txt" 2>/dev/null; grep -qx -- "- OBS not connected" "$W/menu-light.txt" && break; sleep 0.5; done
 grep -qx -- "- OBS not connected" "$W/menu-light.txt" || fail "reel light's tray with its OBS closed: $(tr '\n' '|' < "$W/menu-light.txt")"
 sleep 3
-shot "light-8-obs-not-connected"
+shot "light-9-obs-not-connected"
 ok "reel light with its OBS closed: the tray says OBS not connected, as the bar does, where it said ready, last 3 min (shot)"
 stop
 kill "$SNI_LIGHT" 2>/dev/null || true
@@ -184,7 +205,7 @@ PIDS="$PIDS $!"
 python3 /work/desktop/ci/fake-sni.py > "$W/sni.txt" 2>&1 &
 SNI=$!
 PIDS="$PIDS $SNI"
-export REEL_DESKTOP_DIR="$D"
+export REEL_DESKTOP_DIR="$D" REEL_STEAM_DIR="$W/steam"
 start --hidden
 waitlog "standalone: reel serves on the loopback" 60 "reel on this PC did not start"
 waitlog "obs connected" 30 "the app did not connect to the stand-in OBS"
@@ -371,6 +392,54 @@ ok "a file moved away outside reel: refused with words, in the page's toast (sho
 sleep 2
 shot "7-this-app-status"
 ok "the window: the library on this PC, the bar, a clip's page, Settings, Status (shots)"
+# Settings, Games and apps: Steam's games came in at the start; one sorted, taken out, added
+# back by Steam, and renamed
+waitlog "$STEAM_READ" 30 "the made up Steam was not read as it is"
+waitlog "Steam read: 9 new in the list" 10 "Steam's games did not come into the list: $(cat "$L"/reel-desktop.log* | grep 'Steam read:' | tail -1)"
+programs 'len(p["entries"]) == 9 and e["steam-1957780"]["class"] == "game" and e["steam-2391820"]["class"] == "not_sorted" and e["steam-1957780"]["folder"] and not e["steam-2610450"]["fresh"]' \
+  || fail "the list after Steam's first read: $(tr -d '\n ' < "$D/config/programs.json" | cut -c1-400)"
+"$APP" --section=games > /dev/null 2>&1 || true
+waitlog "app page section=games" 20 "Games and apps did not open"
+sleep 2
+shot "8-games-and-apps"
+ok "Steam's 7 games came in as Games, the application and the program added to Steam by hand as Not sorted yet; Games and apps lists them (shot)"
+"$APP" --section=games/steam-1957780 > /dev/null 2>&1 || true
+sleep 2
+shot "8-games-cinder-road"
+# shellcheck disable=SC2086
+xdotool mousemove ${REEL_GAMES_NOT_A_GAME:-620 549} click 1
+wait_programs 'e["steam-1957780"]["class"] == "not_a_game"' 10 "a click on Not a game did not sort Cinder Road"
+sleep 1
+shot "8-games-not-a-game"
+# shellcheck disable=SC2086
+xdotool mousemove ${REEL_GAMES_REMOVE:-299 629} click 1
+wait_programs '"steam-1957780" not in e and [n["app"] for n in p["not_again"]] == [1957780]' 10 "Remove did not take Cinder Road out and keep it from Steam"
+waitlog "games and apps: removed from the list" 10 "the Log does not say Cinder Road was removed"
+sleep 2
+shot "8-games-not-added-again"
+ok "a Steam game sorted as Not a game in one click, then taken out: Steam does not add it again (shots)"
+b=$(logged "Steam read in")
+# shellcheck disable=SC2086
+xdotool mousemove ${REEL_GAMES_ADD_BACK:-1211 400} click 1
+waitlog "games and apps: Steam may add it again" 10 "Add back did nothing"
+waitmore "Steam read in" 20 "Add back did not read Steam again" "$b"
+wait_programs '"steam-1957780" in e and not p["not_again"] and e["steam-1957780"]["class"] == "game"' 10 "Cinder Road did not come back from Steam as a Game"
+ok "Add back: Steam's next read adds it again, as a Game"
+"$APP" --section=games/steam-1957780 > /dev/null 2>&1 || true
+sleep 2
+# shellcheck disable=SC2086
+xdotool mousemove ${REEL_GAMES_NAME:-1117 266} click 1 key ctrl+a type "Cinder Road Deluxe"
+xdotool key Return
+wait_programs 'e["steam-1957780"]["name"] == "Cinder Road Deluxe" and e["steam-1957780"]["name_from"] == "hand"' 10 "the rename was not kept"
+waitlog "games and apps: renamed" 10 "the Log does not say the rename"
+sleep 1
+shot "8-games-renamed"
+b=$(logged "Steam read in")
+"$APP" --section=games > /dev/null 2>&1 || true
+touch "$W/lib2/steamapps/appmanifest_2610450.acf"
+waitmore "Steam read in" 20 "a change in a Steam library was not read" "$b"
+programs 'e["steam-1957780"]["name"] == "Cinder Road Deluxe"' || fail "Steam's read took back the name given by hand"
+ok "a rename without older clips is kept, and Steam's read after a change in its library keeps it (shot)"
 "$APP" --section=hotkeys > /dev/null 2>&1 || true
 waitlog "app page section=hotkeys" 20 "the Hotkeys page did not open"
 sleep 2

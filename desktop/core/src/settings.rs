@@ -24,6 +24,7 @@ pub struct Settings {
     pub hotkeys: HotkeySettings,
     pub sounds: SoundSettings,
     pub session: SessionSettings,
+    pub games: GamesSettings,
     pub startup: StartupSettings,
     /// In colour, or the mark alone in one colour for a tray whose icons are all one colour.
     pub tray_icon: TrayIcon,
@@ -186,7 +187,9 @@ pub struct UploadSettings {
     pub mode: UploadMode,
     /// 0 is unlimited.
     pub bandwidth_kbit: u64,
-    pub pause_in_fullscreen: bool,
+    /// Uploads, and standalone the library's heavy work, wait while a game has the screen. Off
+    /// by default; an older file's `pause_in_fullscreen` is not read, so it starts off as well.
+    pub wait_for_games: bool,
     /// Off by default: an upload on the LAN still costs the game disk and CPU time.
     pub pause_only_on_wan: bool,
     /// 0 takes the server's chunk size.
@@ -308,6 +311,20 @@ impl Default for SessionSettings {
     }
 }
 
+/// Settings, Games and apps.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(default)]
+pub struct GamesSettings {
+    /// Steam's installed games come into the list, and each new one as it is installed.
+    pub steam: bool,
+}
+
+impl Default for GamesSettings {
+    fn default() -> Self {
+        Self { steam: true }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(default)]
 pub struct StartupSettings {
@@ -337,6 +354,7 @@ impl Default for Settings {
             hotkeys: HotkeySettings::default(),
             sounds: SoundSettings::default(),
             session: SessionSettings::default(),
+            games: GamesSettings::default(),
             startup: StartupSettings::default(),
             tray_icon: TrayIcon::Colour,
             updates: UpdateMode::Ask,
@@ -369,7 +387,7 @@ impl Default for UploadSettings {
         Self {
             mode: UploadMode::Auto,
             bandwidth_kbit: 0,
-            pause_in_fullscreen: true,
+            wait_for_games: false,
             pause_only_on_wan: false,
             chunk_mb: 0,
             keep_last: 0,
@@ -465,6 +483,10 @@ impl Paths {
     }
     pub fn ledger_file(&self) -> PathBuf {
         self.data_dir.join("ledger.json")
+    }
+    /// Settings, Games and apps' list.
+    pub fn programs_file(&self) -> PathBuf {
+        self.config_dir.join("programs.json")
     }
     /// What the app knows of this PC's encoders for OBS.
     pub fn encoders_file(&self) -> PathBuf {
@@ -804,6 +826,51 @@ mod tests {
         }
         assert!(s.accepts(Path::new("a.MKV")));
         assert!(!s.accepts(Path::new("a.txt")));
+    }
+
+    #[test]
+    fn the_waits_are_off_for_every_install_once_and_steam_is_on() {
+        let s = Settings::default();
+        assert!(!s.upload.wait_for_games, "off by default");
+        assert!(s.games.steam, "Steam's games come in by default");
+        assert!(!Settings::fresh().upload.wait_for_games);
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("settings.json");
+        for older in [
+            r#"{"upload":{"pause_in_fullscreen":true,"pause_only_on_wan":true}}"#,
+            r#"{"upload":{"pause_in_fullscreen":false}}"#,
+            r#"{"upload":{"mode":"auto","bandwidth_kbit":0,"pause_in_fullscreen":true,"pause_only_on_wan":false,"chunk_mb":0,"keep_last":0}}"#,
+        ] {
+            std::fs::write(&file, older).unwrap();
+            let read = Settings::load(&file).unwrap();
+            assert!(
+                !read.upload.wait_for_games,
+                "{older}: the waits are off after the update"
+            );
+            assert!(read.games.steam, "{older}");
+            read.save(&file).unwrap();
+            let text = std::fs::read_to_string(&file).unwrap();
+            assert!(
+                !text.contains("pause_in_fullscreen"),
+                "the next save drops the old key"
+            );
+            assert!(text.contains(r#""wait_for_games": false"#));
+            assert_eq!(
+                Settings::load(&file).unwrap().upload.pause_only_on_wan,
+                older.contains(r#""pause_only_on_wan":true"#),
+                "Only on the internet keeps its value"
+            );
+        }
+        std::fs::write(
+            &file,
+            r#"{"upload":{"wait_for_games":true},"games":{"steam":false}}"#,
+        )
+        .unwrap();
+        let on = Settings::load(&file).unwrap();
+        assert!(
+            on.upload.wait_for_games && !on.games.steam,
+            "a choice made after the update is kept"
+        );
     }
 
     #[test]

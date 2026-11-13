@@ -33,6 +33,7 @@ futures-util.workspace = true
 url.workspace = true
 gethostname.workspace = true
 flate2.workspace = true
+steamlocate.workspace = true
 
 [target.'cfg(windows)'.dependencies]
 keyring.workspace = true

@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-programs-get"
+description = "Enables the programs_get command without any pre-configured scope."
+commands.allow = ["programs_get"]
+
+[[permission]]
+identifier = "deny-programs-get"
+description = "Denies the programs_get command without any pre-configured scope."
+commands.deny = ["programs_get"]

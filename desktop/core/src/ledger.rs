@@ -324,6 +324,31 @@ impl Ledger {
             .collect()
     }
 
+    /// The clips named after `old` take `new`, and the titles reel made them with it; a title
+    /// changed by hand stays. Each one's id in the library on this PC and its moment, for the
+    /// library's titles. Not saved: the caller saves.
+    pub fn rename_game(
+        &mut self,
+        old: &str,
+        new: &str,
+    ) -> Vec<(Option<String>, Option<Timestamp>)> {
+        let mut out = Vec::new();
+        for c in self
+            .clips
+            .iter_mut()
+            .filter(|c| c.game.as_deref() == Some(old))
+        {
+            c.game = Some(new.to_string());
+            if let (Some(t), Some(at)) = (&c.title, c.recorded_at) {
+                if let Some(again) = crate::programs::retitle(t, old, new, at) {
+                    c.title = Some(again);
+                }
+            }
+            out.push((c.local_clip_id.clone(), c.recorded_at));
+        }
+        out
+    }
+
     /// Forgets records whose files are gone, but keeps the ones the clip list shows.
     pub fn forget_missing(&mut self) -> anyhow::Result<usize> {
         let before = self.clips.len();
@@ -472,5 +497,73 @@ mod tests {
             l.cache_entries().is_empty(),
             "a kept file is never a cache candidate"
         );
+    }
+
+    #[test]
+    fn a_rename_takes_the_clips_of_the_old_name_and_leaves_a_title_changed_by_hand() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut l = Ledger::load(&dir.path().join("ledger.json")).unwrap();
+        let at: Timestamp = "2026-11-09T21:14:00Z".parse().unwrap();
+        let old = "De Libvm C Str Onkl Sto";
+        for (i, (game, title, local)) in [
+            (
+                Some(old),
+                Some(crate::gaming::clip_title(Some(old), at)),
+                Some("lib1"),
+            ),
+            (Some(old), Some("My best round".to_string()), None),
+            (
+                Some("Ember Pass"),
+                Some(crate::gaming::clip_title(Some("Ember Pass"), at)),
+                None,
+            ),
+            (Some(old), None, None),
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            let p = dir.path().join(format!("{i}.mkv"));
+            l.found(&p, 1).unwrap();
+            let c = l.get_mut(&p).unwrap();
+            c.game = game.map(str::to_string);
+            c.title = title;
+            c.recorded_at = Some(at);
+            c.local_clip_id = local.map(str::to_string);
+        }
+        let moved = l.rename_game(old, "libvmcst");
+        assert_eq!(moved.len(), 3, "the three named after it");
+        assert_eq!(moved[0], (Some("lib1".to_string()), Some(at)));
+        let title = |i: usize| {
+            l.get(&dir.path().join(format!("{i}.mkv")))
+                .unwrap()
+                .title
+                .clone()
+        };
+        let game = |i: usize| {
+            l.get(&dir.path().join(format!("{i}.mkv")))
+                .unwrap()
+                .game
+                .clone()
+        };
+        assert_eq!(
+            title(0),
+            Some(crate::gaming::clip_title(Some("libvmcst"), at))
+        );
+        assert_eq!(
+            title(1).as_deref(),
+            Some("My best round"),
+            "changed by hand: it stays"
+        );
+        assert_eq!(
+            game(1).as_deref(),
+            Some("libvmcst"),
+            "its game changes either way"
+        );
+        assert_eq!(
+            game(2).as_deref(),
+            Some("Ember Pass"),
+            "another game's clip"
+        );
+        assert_eq!((game(3).as_deref(), title(3)), (Some("libvmcst"), None));
     }
 }

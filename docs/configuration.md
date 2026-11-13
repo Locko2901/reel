@@ -939,5 +939,6 @@ The GitHub repository whose releases are checked, as owner/name.
 | `REEL_OIDC_CLIENT_SECRET_FILE` | The server | A file holding that secret instead, such as a Docker secret under `/run/secrets/`. |
 | `REEL_PASSWORD` | The server | Read by `reel passwd <name>` only: the new password of that user, twelve characters at least. `docker exec -e REEL_PASSWORD='...' reel reel passwd --make-admin admin` is the way back in when the admin is locked out. |
 | `REEL_DESKTOP_DIR` | The desktop app | Puts the app's settings (under `config`) and its data, the logs and a standalone library included (under `data`), in this one folder instead of the user's own folders. |
+| `REEL_STEAM_DIR` | The desktop app | Steam's own folder, the one that holds `steamapps`, for Settings, Games and apps when Steam is not where it installs itself; a folder without Steam in it counts as no Steam. |
 
 `RUST_LOG`, when set, wins over [Log level](#log-level). `TZ` sets the container's clock; [Time zone](#time-zone) is what the pages follow.

@@ -168,12 +168,19 @@ fn page_of(url: &Url) -> Option<View> {
     })
 }
 
-/// Whether a section id is safe to put into a URL.
+/// Whether a section id is safe to put into a URL: a section, or a section and one page in
+/// it (`games/steam-570`).
 pub fn section_ok(s: &str) -> bool {
-    !s.is_empty()
-        && s.len() <= 32
-        && s.bytes()
-            .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'_' || b == b'-')
+    let word = |w: &str| {
+        !w.is_empty()
+            && w.bytes()
+                .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'_' || b == b'-')
+    };
+    s.len() <= 40
+        && match s.split_once('/') {
+            Some((a, b)) => word(a) && word(b),
+            None => word(s),
+        }
 }
 
 /// The server's front page, or a blank page while no server is set.
@@ -671,6 +678,32 @@ pub mod audio {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_section_or_a_page_in_it_and_nothing_else() {
+        for ok in [
+            "games",
+            "obs",
+            "games/steam-570",
+            "games/p-0123456789ab",
+            "a_b",
+        ] {
+            assert!(section_ok(ok), "{ok}");
+        }
+        for bad in [
+            "",
+            "games/",
+            "/games",
+            "games/a/b",
+            "Games",
+            "games/../x",
+            "x#y",
+            "a b",
+            &"x".repeat(41),
+        ] {
+            assert!(!section_ok(bad), "{bad}");
+        }
+    }
 
     fn url(s: &str) -> Url {
         s.parse().expect("a url")

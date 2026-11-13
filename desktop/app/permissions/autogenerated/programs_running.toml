@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-programs-running"
+description = "Enables the programs_running command without any pre-configured scope."
+commands.allow = ["programs_running"]
+
+[[permission]]
+identifier = "deny-programs-running"
+description = "Denies the programs_running command without any pre-configured scope."
+commands.deny = ["programs_running"]
