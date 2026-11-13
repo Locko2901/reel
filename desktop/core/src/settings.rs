@@ -100,6 +100,8 @@ pub struct ObsSettings {
     pub password: String,
     /// When OBS is open and its replay buffer is off, the app enables it and starts it.
     pub start_replay: bool,
+    /// Always, or only while a game runs (Settings, Games and apps says which are games).
+    pub replay_buffer: ReplayBuffer,
     /// The app runs the OBS that came with it instead of connecting to the one above.
     pub bundled: bool,
     pub setup: crate::bundled::ObsSetup,
@@ -121,6 +123,17 @@ impl ObsSettings {
                 self.own_setup_due
             }
     }
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum ReplayBuffer {
+    /// Only while a game runs, and a minute after the last one closes.
+    Games,
+    /// A mode of a later version reads as this one: the buffer runs as it always did.
+    #[default]
+    #[serde(other)]
+    Always,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
@@ -295,19 +308,32 @@ pub struct SoundSettings {
     pub link_copied: CueSettings,
     /// A session recording starts, and each reminder while it runs.
     pub session: CueSettings,
+    /// The Save hotkey finds no replay buffer, as a game's own setting or the mode keeps it off.
+    pub no_clip: CueSettings,
 }
 
-/// A recording of a whole session, started and stopped by hand.
+/// A recording of a whole session, started and stopped by hand or by a game.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(default)]
 pub struct SessionSettings {
     /// A sound and a notification every this many minutes while it records; 0 is none.
     pub remind_minutes: u32,
+    /// Every game records by itself, but one set off under Games and apps.
+    pub record_by_itself: bool,
+    /// A recording stops once the games that ran during it have closed.
+    pub stop_with_game: bool,
+    /// A game that closes and starts again within this counts as still running.
+    pub grace_seconds: u32,
 }
 
 impl Default for SessionSettings {
     fn default() -> Self {
-        Self { remind_minutes: 30 }
+        Self {
+            remind_minutes: 30,
+            record_by_itself: false,
+            stop_with_game: true,
+            grace_seconds: 60,
+        }
     }
 }
 
@@ -374,6 +400,7 @@ impl Default for ObsSettings {
             port: 4455,
             password: String::new(),
             start_replay: true,
+            replay_buffer: ReplayBuffer::Always,
             bundled: false,
             setup: crate::bundled::ObsSetup::default(),
             setup_later: false,
@@ -434,6 +461,7 @@ impl Default for SoundSettings {
                 file: None,
             },
             session: CueSettings::default(),
+            no_clip: CueSettings::default(),
         }
     }
 }
@@ -826,6 +854,38 @@ mod tests {
         }
         assert!(s.accepts(Path::new("a.MKV")));
         assert!(!s.accepts(Path::new("a.txt")));
+    }
+
+    #[test]
+    fn the_games_settings_default_and_an_older_file() {
+        let s = Settings::default();
+        assert_eq!(
+            s.obs.replay_buffer,
+            ReplayBuffer::Always,
+            "as it always ran"
+        );
+        assert!(!s.session.record_by_itself, "only the games chosen");
+        assert!(s.session.stop_with_game);
+        assert_eq!(s.session.grace_seconds, 60);
+        assert!(s.sounds.no_clip.enabled);
+        let older: Settings = serde_json::from_str(
+            r#"{"session":{"remind_minutes":15},"obs":{"start_replay":false}}"#,
+        )
+        .unwrap();
+        assert_eq!(older.session.remind_minutes, 15);
+        assert_eq!(
+            (older.session.grace_seconds, older.obs.replay_buffer),
+            (60, ReplayBuffer::Always)
+        );
+        let later: Settings =
+            serde_json::from_str(r#"{"obs":{"replay_buffer":"on_tuesdays"}}"#).unwrap();
+        assert_eq!(
+            later.obs.replay_buffer,
+            ReplayBuffer::Always,
+            "a later mode runs it always"
+        );
+        let games: Settings = serde_json::from_str(r#"{"obs":{"replay_buffer":"games"}}"#).unwrap();
+        assert_eq!(games.obs.replay_buffer, ReplayBuffer::Games);
     }
 
     #[test]

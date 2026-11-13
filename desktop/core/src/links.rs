@@ -11,6 +11,8 @@ pub enum Link {
     /// The update's Install now, with the value the run that asked made.
     Install(String),
     Later(String),
+    /// Settings, Games and apps: it only opens a page, so it needs no value.
+    Games,
 }
 
 impl Link {
@@ -20,13 +22,14 @@ impl Link {
             Link::Open(id) => format!("{SCHEME}://open/{id}"),
             Link::Install(value) => format!("{SCHEME}://install/{value}"),
             Link::Later(value) => format!("{SCHEME}://later/{value}"),
+            Link::Games => format!("{SCHEME}://settings/games"),
         }
     }
 
     pub fn clip(&self) -> Option<&str> {
         match self {
             Link::Copy(id) | Link::Open(id) => Some(id),
-            Link::Install(_) | Link::Later(_) => None,
+            Link::Install(_) | Link::Later(_) | Link::Games => None,
         }
     }
 }
@@ -71,6 +74,7 @@ pub fn parse(arg: &str) -> Option<Link> {
         "open" if is_clip_id(id) => Some(Link::Open(id.to_string())),
         "install" if is_run_value(id) => Some(Link::Install(id.to_string())),
         "later" if is_run_value(id) => Some(Link::Later(id.to_string())),
+        "settings" if id == "games" => Some(Link::Games),
         _ => None,
     }
 }
@@ -121,6 +125,17 @@ pub fn toast_xml(title: &str, body: &str, clip: &str, copy: bool) -> String {
     )
 }
 
+/// A notification with Open Games and apps.
+pub fn games_toast_xml(title: &str, body: &str) -> String {
+    format!(
+        "<toast><visual><binding template=\"ToastGeneric\"><text>{}</text><text>{}</text></binding></visual>\
+         <actions><action content=\"Open Games and apps\" activationType=\"protocol\" arguments=\"{}\"/></actions>{SILENT}</toast>",
+        escape(title),
+        escape(body),
+        escape(&Link::Games.url())
+    )
+}
+
 /// The update's question: Install now and Later as links with this run's value.
 pub fn ask_toast_xml(title: &str, body: &str, value: &str) -> String {
     let button = |label: &str, link: Link| {
@@ -160,6 +175,17 @@ mod tests {
     use super::*;
 
     const ID: &str = "01M6BCN0TDHAX3FE17KH9KW306";
+
+    #[test]
+    fn games_opens_its_page_and_nothing_else() {
+        assert_eq!(parse("reel-desktop://settings/games"), Some(Link::Games));
+        assert_eq!(parse("REEL-DESKTOP://settings/games/"), Some(Link::Games));
+        assert_eq!(parse(&Link::Games.url()), Some(Link::Games));
+        assert_eq!(parse("reel-desktop://settings/obs"), None);
+        assert_eq!(Link::Games.clip(), None);
+        assert!(games_toast_xml("No clip saved", "a <b>").contains("reel-desktop://settings/games"));
+        assert!(games_toast_xml("No clip saved", "a <b>").contains("a &lt;b&gt;"));
+    }
 
     #[test]
     fn the_two_links_and_back() {

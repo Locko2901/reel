@@ -101,7 +101,11 @@ export function appBar(acts) {
     w.className = tone === 'ok' || tone === 'neutral' || tone === 'rec' ? '' : tone;
     $('#appbar-detail').textContent = detail;
     $('#appbar-hint').textContent = hint || '';
-    words.setAttribute('aria-label', `${word}${detail ? `, ${detail}` : ''}: this PC's menu`);
+    // The game that runs, quiet after the words; it is the first to give way to Record and the fix.
+    const game = st.playing ? st.playing.short : '';
+    const playing = $('#appbar-game');
+    if (playing) { playing.textContent = game; playing.title = st.playing ? st.playing.name : ''; }
+    words.setAttribute('aria-label', `${word}${detail ? `, ${detail}` : ''}${game ? `, ${game} runs` : ''}: this PC's menu`);
     $('#appbar-say').textContent = line;
     shownFix = fixNow;
     fix.hidden = !fixNow;

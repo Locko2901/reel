@@ -93,7 +93,9 @@ async function save(row, force = false) {
   ok.textContent = 'saved';
   setTimeout(() => ok.remove(), 1800);
   depends();
-  if (key === 'games.steam' || key === 'upload.wait_for_games') gamesRefresh(true);
+  if (key === 'games.steam' || key === 'upload.wait_for_games' || key.startsWith('session.') || key === 'obs.replay_buffer') gamesRefresh(true);
+  if (key === 'obs.replay_buffer') await bufferForGames();
+  if (key.startsWith('session.')) renderRecordNow();
   if (key.startsWith('obs.setup.') && status) renderBundled();
 }
 
@@ -173,6 +175,8 @@ function sections() {
     if (push) history.pushState(null, '', `#${sub ? `${id}/${sub}` : id}`);
     window.scrollTo(0, 0);
     gamesOpened(id === 'games', sub);
+    if (id === 'session') renderRecordNow();
+    if (id === 'obs') renderBufferNote();
     if (id === 'log') loadLog();
     invoke('obs_meters', { on: id === 'obs' }).catch(() => {});
     if (id === 'obs' && settings && settings.obs.bundled) invoke('obs_read').then((r) => doneInObs(r, false, true)).catch(() => {});
@@ -214,6 +218,40 @@ function depends() {
     const on = !!(settings && get(settings, r.dataset.depends));
     r.toggleAttribute('data-dep-off', !on);
   }
+}
+
+// Only while a game runs needs reel to start OBS's replay buffer: with an OBS of one's own that
+// is Start the replay buffer, turned on with it and said.
+async function bufferForGames() {
+  renderBufferNote();
+  if (!settings || settings.obs.replay_buffer !== 'games' || (status && status.obs_box) || settings.obs.start_replay) return;
+  const row = $('.srow[data-key="obs.start_replay"]');
+  setOn($(CTL, row), true);
+  await save(row);
+  if (settings.obs.start_replay) toast('Start the replay buffer is on now: reel starts OBS\'s replay buffer with a game and stops it after.', 'ok');
+  renderBufferNote();
+}
+
+function renderBufferNote() {
+  const note = $('#buffer-note');
+  if (!note || !settings) return;
+  const own = !(status && status.obs_box);
+  const show = settings.obs.replay_buffer === 'games' && own && !settings.obs.start_replay;
+  note.textContent = show ? 'Start the replay buffer, under obs-websocket below, is off: reel cannot start OBS\'s replay buffer with a game until it is on.' : '';
+  note.classList.toggle('st-warn', show);
+  note.hidden = !show;
+}
+
+// The games that record by themselves now, from the list and Session recording's switch.
+async function renderRecordNow() {
+  const box = $('#record-now');
+  if (!box) return;
+  let page;
+  try { page = await invoke('programs_get'); } catch { return; }
+  const every = page.every || {};
+  const names = (page.entries || []).filter((e) => e.class !== 'ignored' && (e.own.record === 'on'
+    || (e.own.record === 'as_class' && e.class === 'game' && every.record))).map((e) => e.name);
+  box.textContent = names.length ? names.join(', ') : every.record ? 'every game; none in the list yet' : 'none: set Record by itself on a game\'s page under Games and apps';
 }
 
 // The waits' words follow the mode: the library's heavy work standalone, uploads connected.
@@ -598,6 +636,7 @@ function renderStatus() {
   renderAsk(status);
   renderMode();
   renderWaits();
+  renderBufferNote();
   const here = status.mode === 'standalone';
   renderObs();
   renderLocal();
@@ -749,6 +788,7 @@ async function loadLog() {
 }
 
 function bindButtons() {
+  for (const b of $$('button[data-go-section]')) b.addEventListener('click', () => window.openSection?.(b.dataset.goSection));
   $('#obs-save').onclick = () => runSave('save_clip');
   $('#obs-save-share').onclick = () => runSave('save_and_share');
   $('#pair-btn').onclick = async () => {

@@ -130,6 +130,12 @@ impl Inner {
         if by_window.is_some() {
             return by_window;
         }
+        // with no program in front to read (Linux), the one Game that runs comes before OBS's window
+        if front.is_none() {
+            if let Some(game) = self.game_running_alone() {
+                return Some(game);
+            }
+        }
         let guess = front
             .as_ref()
             .filter(|p| self.programs.find(&p.path).is_none())
@@ -137,17 +143,18 @@ impl Inner {
                 self.take_in(p, came);
                 gaming::game_name(&p.exe_name, &p.title)
             });
-        self.obs_game.clone().or(guess)
+        self.obs_game
+            .clone()
+            .or(guess)
+            .or_else(|| self.game_running_alone())
     }
 
     /// Whether uploads and the library's heavy work wait now; the program in front is seen,
     /// and one not in the list that takes the whole screen comes in as Not sorted yet.
     pub(crate) fn front_waits(&mut self, front: Option<&ProcessInfo>, fullscreen: bool) -> bool {
-        let every = Every {
-            wait: self.settings.upload.wait_for_games,
-            ..Every::default()
-        };
+        let every = Every::of(&self.settings);
         let Some(p) = front else {
+            self.front_entry = None;
             let f = if fullscreen {
                 Front::Unknown
             } else {
@@ -157,12 +164,17 @@ impl Inner {
         };
         if self.programs.find(&p.path).is_none() {
             if no_game(p) {
+                self.front_entry = None;
                 return false;
             }
             if fullscreen {
                 self.take_in(p, Came::Fullscreen);
             }
         }
+        self.front_entry = self
+            .programs
+            .find(&p.path)
+            .map(|e| (e.id.clone(), fullscreen));
         match self.programs.find(&p.path).map(|e| e.id.clone()) {
             Some(id) => {
                 if self.programs.seen(&id, Timestamp::now()) {
@@ -262,6 +274,9 @@ impl Inner {
 pub struct Change {
     pub class: Option<Class>,
     pub naming: Option<Naming>,
+    pub buffer: Option<Own>,
+    pub record: Option<Own>,
+    pub stop: Option<Own>,
     pub wait: Option<Own>,
 }
 
@@ -394,6 +409,14 @@ impl Runtime {
             "paired": g.api.is_some(),
             "linux": cfg!(not(windows)),
             "waits_on": g.settings.upload.wait_for_games,
+            "every": {
+                "buffer_always": g.settings.obs.replay_buffer != reel_desktop_core::settings::ReplayBuffer::Games,
+                "record": g.settings.session.record_by_itself,
+                "stop": g.settings.session.stop_with_game,
+                "wait": g.settings.upload.wait_for_games,
+            },
+            "grace": g.settings.session.grace_seconds,
+            "running": g.runs.ids().filter(|id| g.runs.get(id).is_some_and(|r| r.gone_at.is_none())).collect::<Vec<_>>(),
         })
     }
 
@@ -429,10 +452,19 @@ impl Runtime {
             if let Some(n) = c.naming {
                 e.naming = n;
             }
+            if let Some(w) = c.buffer {
+                e.own.buffer = w;
+            }
+            if let Some(w) = c.record {
+                e.own.record = w;
+            }
+            if let Some(w) = c.stop {
+                e.own.stop = w;
+            }
             if let Some(w) = c.wait {
                 e.own.wait = w;
             }
-            tracing::info!(name = %e.name, class = ?e.class, naming = ?e.naming, wait = ?e.own.wait, "games and apps: a program changed");
+            tracing::info!(name = %e.name, class = ?e.class, naming = ?e.naming, own = ?e.own, "games and apps: a program changed");
             g.programs.save().map_err(|e| e.to_string())?;
         }
         self.push_status();
@@ -564,6 +596,7 @@ impl Runtime {
                 break;
             }
         }
+        let made = |c: &&&reel_desktop_core::ledger::ClipRecord| matches!((&c.title, c.recorded_at), (Some(t), Some(at)) if programs::retitle(t, &old, &name, at).is_some());
         Ok(json!({
             "old": old,
             "name": name,
@@ -571,6 +604,8 @@ impl Runtime {
             "recordings": older.iter().filter(|c| c.recording).count(),
             "examples": examples,
             "on_server": older.iter().filter(|c| c.clip_id.is_some()).count(),
+            "server_titles": older.iter().filter(|c| c.clip_id.is_some()).filter(made).count(),
+            "server_can": g.api.is_some() && g.who.as_ref().is_some_and(|w| w.clip_titles),
             "standalone": g.settings.mode == reel_desktop_core::settings::Mode::Standalone,
         }))
     }
@@ -578,7 +613,7 @@ impl Runtime {
     /// The program's new name; with `older`, the clips and recordings of this PC named after
     /// the old one take the new one, and the titles reel made them change with it, here and in
     /// the library on this PC.
-    pub async fn rename(&self, id: &str, name: &str, older: bool) -> R<Value> {
+    pub async fn rename(&self, id: &str, name: &str, older: bool, server: bool) -> R<Value> {
         let name = clean_name(name)?;
         let (old, moved) = {
             let mut g = self.lock();
@@ -601,11 +636,28 @@ impl Runtime {
             (old, moved)
         };
         let mut library = 0;
+        let (mut changed, mut kept, mut failed) = (0, 0, 0);
+        let api = self.lock().api.clone();
+        if let Some(api) = api.filter(|_| server) {
+            for r in &moved {
+                let (Some(clip), Some((was, now))) = (&r.server, &r.titles) else {
+                    continue;
+                };
+                match api.set_title(clip, now, was).await {
+                    Ok(true) => changed += 1,
+                    Ok(false) => kept += 1,
+                    Err(e) => {
+                        failed += 1;
+                        tracing::warn!(clip = %clip, error = %e, "games and apps: a title on the server did not change");
+                    }
+                }
+            }
+        }
         if let Some(local) = self.local() {
             let store = &local.ctx.store;
             for (clip, recorded) in moved
                 .iter()
-                .filter_map(|(c, at)| c.clone().map(|c| (c, *at)))
+                .filter_map(|r| r.local.clone().map(|c| (c, r.recorded)))
             {
                 let Ok(Some(c)) = store.clip(&clip).await else {
                     continue;
@@ -630,10 +682,15 @@ impl Runtime {
             to = %name,
             older = moved.len(),
             library,
+            server_changed = changed,
+            server_kept = kept,
+            server_failed = failed,
             "games and apps: renamed"
         );
         self.push_status();
-        self.entry_view(id)
+        let mut v = self.entry_view(id)?;
+        v["server"] = json!({ "changed": changed, "kept": kept, "failed": failed });
+        Ok(v)
     }
 }
 

@@ -19,6 +19,10 @@ pub enum By {
     Quit,
     /// OBS ended or stopped answering mid recording.
     ObsEnded,
+    /// A game set to record by itself started; the recording says which in `with`.
+    Game,
+    /// The games it stops with closed, and the grace period passed.
+    GameClosed,
 }
 
 impl By {
@@ -33,6 +37,8 @@ impl By {
             By::Disk => "by reel, the disk being almost full",
             By::Quit => "by reel's Quit",
             By::ObsEnded => "by OBS ending",
+            By::Game => "by a game",
+            By::GameClosed => "as its game closed",
         }
     }
 }
@@ -52,6 +58,8 @@ pub struct Recording {
     pub game: Option<String>,
     /// A stop was asked, and by what; OBS has not said that it stopped yet.
     pub stopping: Option<By>,
+    /// The game that started it by itself.
+    pub with: Option<String>,
 }
 
 impl Recording {
@@ -64,6 +72,7 @@ impl Recording {
             reminded_at: Duration::ZERO,
             game: None,
             stopping: None,
+            with: None,
         }
     }
 
@@ -76,6 +85,9 @@ impl Recording {
     pub fn line(&self, now: SystemTime) -> String {
         if let Some(by) = self.stopping {
             return format!("stopping, asked {}", by.words());
+        }
+        if let (By::Game, Some(game)) = (self.by, &self.with) {
+            return format!("{}, started with {game}", minutes_words(self.length(now)));
         }
         format!(
             "{}, started {}",
