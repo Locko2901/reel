@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.17.0](https://github.com/Locko2901/reel/compare/v1.16.0...v1.17.0) (2026-11-13)
+
+
+### Features
+
+* a bar at the foot of the app's window says what it does, holds Record and one menu, and the header is the same everywhere ([1a7ca7f](https://github.com/Locko2901/reel/commit/1a7ca7f3027dcde3646322109f97bab733ef2b1f))
+
 ## [1.16.0](https://github.com/Locko2901/reel/compare/v1.15.0...v1.16.0) (2026-11-12)
 
 
