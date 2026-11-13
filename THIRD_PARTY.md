@@ -109,7 +109,7 @@ titles, collections and links around them are a made up player's.
 
 ## The sound cues
 
-The app's two cues are reel's own, made with ffmpeg
+The app's cues are reel's own, made with ffmpeg
 ([`desktop/assets/sounds/SOUNDS.md`](desktop/assets/sounds/SOUNDS.md)).
 
 ## Rust crates

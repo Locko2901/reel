@@ -654,9 +654,11 @@ const front = () => !(status && status.linux);
 
 async function renderGames() {
   setOn($('#steam-on'), !!settings.games.steam);
+  pressed($('#buffer-seg'), 'buffer', settings.obs.replay_buffer === 'games' ? 'games' : 'always');
+  if (!front()) $('#buffer-step-help').textContent = 'always: as before, a clip can be saved at any time. Only while a game runs: it starts with a game and stops a minute after the last one closes';
   $('#games-after').textContent = front()
-    ? 'The rest of the list fills as you play. Settings, Games and apps sorts it: which programs are games, and the name each gives its clips.'
-    : 'On Linux reel cannot tell which program is in front, so the rest of the list fills by hand, under Settings, Games and apps.';
+    ? 'The rest of the list fills as you play. Settings, Games and apps sorts it: which programs are games, the name each gives its clips, and the games that record by themselves.'
+    : 'On Linux reel cannot tell which program is in front, so the rest of the list fills by hand, under Settings, Games and apps, where you also choose the games that record by themselves.';
   if (!steam) {
     try { steam = await invoke('steam_get'); } catch { steam = { found: false, read: true, games: [], applications: [], shortcuts: [], libraries: 0 }; }
   }
@@ -681,10 +683,11 @@ async function renderGames() {
 
 function gamesSummary() {
   const s = steam || { found: false, games: [] }, on = !!settings.games.steam;
+  const buffer = settings.obs.replay_buffer === 'games' ? 'the replay buffer only while a game runs' : 'the replay buffer always';
   const rest = front() ? 'the rest fills as you play' : 'the rest fills by hand';
-  if (!on) return `Steam adds nothing; ${front() ? 'the list fills as you play' : 'the list fills by hand'}`;
-  if (!s.found) return `Steam not found: its games come in once it is installed; ${rest}`;
-  return `${plural(s.games.length, 'Steam game')} ${s.games.length === 1 ? 'goes' : 'go'} into the list as Games, and each new one as it is installed; ${rest}`;
+  if (!on) return `${buffer}; Steam adds nothing; ${front() ? 'the list fills as you play' : 'the list fills by hand'}`;
+  if (!s.found) return `${buffer}; Steam not found: its games come in once it is installed; ${rest}`;
+  return `${buffer}; ${plural(s.games.length, 'Steam game')} ${s.games.length === 1 ? 'goes' : 'go'} into the list as Games, and each new one as it is installed; ${rest}`;
 }
 
 function renderLook() {
@@ -927,6 +930,18 @@ function bind() {
   });
   $('#elevated').addEventListener('change', () => { setup().elevated = isOn($('#elevated')); });
   $('#steam-on').addEventListener('change', () => { settings.games.steam = isOn($('#steam-on')); });
+  $('#buffer-seg').addEventListener('click', (e) => {
+    const b = e.target.closest('button[data-buffer]');
+    if (!b) return;
+    settings.obs.replay_buffer = b.dataset.buffer;
+    // an OBS of one's own: reel starts its replay buffer with a game only with Start the replay buffer on
+    if (b.dataset.buffer === 'games' && own() && !settings.obs.start_replay) {
+      settings.obs.start_replay = true;
+      setOn($('#start-replay'), true);
+      toast('Start the replay buffer is on now: reel starts OBS\'s replay buffer with a game and stops it after.', 'ok');
+    }
+    pressed($('#buffer-seg'), 'buffer', b.dataset.buffer);
+  });
   $('#screen').onchange = () => { const sc = screens.find((x) => x.id === $('#screen').value); if (sc) setup().screen = sc; };
   $('#desktop-audio').onchange = () => {
     setup().desktop_audio = $('#desktop-audio').value;

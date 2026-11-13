@@ -104,6 +104,16 @@ impl ClipRecord {
     }
 }
 
+/// A clip a rename gave the new name: its ids, its moment, and its title before and after when
+/// reel made it.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Renamed {
+    pub local: Option<String>,
+    pub server: Option<String>,
+    pub recorded: Option<Timestamp>,
+    pub titles: Option<(String, String)>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
 #[serde(default)]
 pub struct Ledger {
@@ -325,13 +335,9 @@ impl Ledger {
     }
 
     /// The clips named after `old` take `new`, and the titles reel made them with it; a title
-    /// changed by hand stays. Each one's id in the library on this PC and its moment, for the
-    /// library's titles. Not saved: the caller saves.
-    pub fn rename_game(
-        &mut self,
-        old: &str,
-        new: &str,
-    ) -> Vec<(Option<String>, Option<Timestamp>)> {
+    /// changed by hand stays. Each one as the library on this PC and a server need it. Not
+    /// saved: the caller saves.
+    pub fn rename_game(&mut self, old: &str, new: &str) -> Vec<Renamed> {
         let mut out = Vec::new();
         for c in self
             .clips
@@ -339,12 +345,19 @@ impl Ledger {
             .filter(|c| c.game.as_deref() == Some(old))
         {
             c.game = Some(new.to_string());
+            let mut titles = None;
             if let (Some(t), Some(at)) = (&c.title, c.recorded_at) {
                 if let Some(again) = crate::programs::retitle(t, old, new, at) {
+                    titles = Some((t.clone(), again.clone()));
                     c.title = Some(again);
                 }
             }
-            out.push((c.local_clip_id.clone(), c.recorded_at));
+            out.push(Renamed {
+                local: c.local_clip_id.clone(),
+                server: c.clip_id.clone(),
+                recorded: c.recorded_at,
+                titles,
+            });
         }
         out
     }
@@ -530,9 +543,26 @@ mod tests {
             c.recorded_at = Some(at);
             c.local_clip_id = local.map(str::to_string);
         }
+        l.get_mut(&dir.path().join("0.mkv")).unwrap().clip_id = Some("srv1".into());
         let moved = l.rename_game(old, "libvmcst");
         assert_eq!(moved.len(), 3, "the three named after it");
-        assert_eq!(moved[0], (Some("lib1".to_string()), Some(at)));
+        assert_eq!(
+            (
+                moved[0].local.as_deref(),
+                moved[0].server.as_deref(),
+                moved[0].recorded
+            ),
+            (Some("lib1"), Some("srv1"), Some(at))
+        );
+        assert_eq!(
+            moved[0].titles,
+            Some((
+                crate::gaming::clip_title(Some(old), at),
+                crate::gaming::clip_title(Some("libvmcst"), at)
+            )),
+            "the title before, which the server is asked to match, and after"
+        );
+        assert_eq!(moved[1].titles, None, "a title changed by hand is not sent");
         let title = |i: usize| {
             l.get(&dir.path().join(format!("{i}.mkv")))
                 .unwrap()

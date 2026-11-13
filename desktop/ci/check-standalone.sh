@@ -146,22 +146,38 @@ for at in "113:light-2-needs" "145:light-3-hotkeys" "177:light-4-games" "209:lig
   [ "${at#*:}" != light-2-needs ] || waitlog "obs connected" 30 "leaving Your OBS did not connect the app to the stand-in OBS"
   sleep 2
   shot "${at#*:}"
+  if [ "${at#*:}" = light-4-games ]; then
+    # shellcheck disable=SC2086
+    xdotool mousemove ${REEL_LIGHT_ONLY_GAMES:-563 286} click 1
+    sleep 1
+    shot "light-4-games-only-while-a-game-runs"
+  fi
 done
 grep -q '"port": 4496' "$D/config/settings.json" && grep -q '"password": "standin-pass"' "$D/config/settings.json" || fail "the connection was not saved as the step was left"
 waitlog "Steam read: Steam is not installed on this PC, or reel did not find it" 10 "a PC without Steam was not said to have none"
 ok "the connection is saved as Your OBS is left, and the app connects; The replay buffer, Hotkeys, Games without Steam, Where clips go, New versions and Done (shots)"
 # shellcheck disable=SC2086
-xdotool mousemove ${REEL_LIGHT_FINISH:-495 463} click 1
+xdotool mousemove ${REEL_LIGHT_FINISH:-495 483} click 1
 waitlog 'window shows view="library"' 30 "Finish did not open the library"
 grep -q '"own_setup_due": false' "$D/config/settings.json" || fail "Finish did not mark reel light's setup finished"
 grep -q '"save": "Alt+F10"' "$D/config/settings.json" || fail "Finish did not save Save a clip on Alt+F10"
 grep -q '"record": "Alt+F9"' "$D/config/settings.json" || fail "Finish did not keep Record a session on Alt+F9"
 grep -q '"done": false' "$D/config/settings.json" || fail "reel light's setup marked the setup of the package with OBS done"
 python3 -c 'import json,sys; sys.exit(0 if json.load(open(sys.argv[1]))["games"]["steam"] else 1)' "$D/config/settings.json" || fail "Finish did not keep Add my Steam games to the list on"
+python3 -c 'import json,sys; o=json.load(open(sys.argv[1]))["obs"]; sys.exit(0 if o["replay_buffer"] == "games" and o["start_replay"] else 1)' "$D/config/settings.json" \
+  || fail "Finish did not save the replay buffer only while a game runs, with Start the replay buffer on: $(python3 -c 'import json,sys; o=json.load(open(sys.argv[1]))["obs"]; print(o.get("replay_buffer"), o.get("start_replay"))' "$D/config/settings.json")"
+waitlog "replay buffer stopped: it runs only while a game runs, and none runs" 15 "no game runs and the rule did not hold the replay buffer"
+n=$(said "No clip saved")
+xdotool key --clearmodifiers alt+F10
+waitlog "save refused: the replay buffer runs only while a game runs" 15 "the Save hotkey was not refused while no game runs"
+wait_said "No clip saved" 15 "no No clip saved notification" "$n"
+grep "No clip saved" "$W/notifications.txt" | tail -1 | grep -q "Alt+F9 records a session instead" || fail "No clip saved's words: $(grep 'No clip saved' "$W/notifications.txt" | tail -1)"
+grep "No clip saved" "$W/notifications.txt" | tail -1 | grep -q "Open Games and apps" || fail "No clip saved has no Open Games and apps: $(grep 'No clip saved' "$W/notifications.txt" | tail -1)"
+ok "the setup's Replay buffer, only while a game runs: saved at Finish with Start the replay buffer on; no game runs, so the Save hotkey is refused with No clip saved and Open Games and apps"
 sleep 3
 shot "light-8-library"
-for _ in $(seq 1 20); do python3 /work/desktop/ci/fake-sni.py menu > "$W/menu-light.txt" 2>/dev/null; grep -qx -- "- ready, last 3 min" "$W/menu-light.txt" && break; sleep 0.5; done
-grep -qx -- "- ready, last 3 min" "$W/menu-light.txt" || fail "reel light's tray with its OBS: $(tr '\n' '|' < "$W/menu-light.txt")"
+for _ in $(seq 1 20); do python3 /work/desktop/ci/fake-sni.py menu > "$W/menu-light.txt" 2>/dev/null; grep -qx -- "- waiting for a game" "$W/menu-light.txt" && break; sleep 0.5; done
+grep -qx -- "- waiting for a game" "$W/menu-light.txt" || fail "reel light's tray with its OBS and no game: $(tr '\n' '|' < "$W/menu-light.txt")"
 b=$(logged "OBS disconnected")
 kill "$LIGHT_OBS"
 waitmore "OBS disconnected" 20 "the app did not see the stand-in OBS close" "$b"
@@ -169,7 +185,7 @@ for _ in $(seq 1 20); do python3 /work/desktop/ci/fake-sni.py menu > "$W/menu-li
 grep -qx -- "- OBS not connected" "$W/menu-light.txt" || fail "reel light's tray with its OBS closed: $(tr '\n' '|' < "$W/menu-light.txt")"
 sleep 3
 shot "light-9-obs-not-connected"
-ok "reel light with its OBS closed: the tray says OBS not connected, as the bar does, where it said ready, last 3 min (shot)"
+ok "reel light with its OBS closed: the tray says OBS not connected, as the bar does, where it said waiting for a game (shot)"
 stop
 kill "$SNI_LIGHT" 2>/dev/null || true
 wait "$SNI_LIGHT" 2>/dev/null || true
@@ -411,8 +427,12 @@ xdotool mousemove ${REEL_GAMES_NOT_A_GAME:-620 549} click 1
 wait_programs 'e["steam-1957780"]["class"] == "not_a_game"' 10 "a click on Not a game did not sort Cinder Road"
 sleep 1
 shot "8-games-not-a-game"
+# Remove is at the page's foot, under This program's rows: the wheel takes the page to its end
+xdotool mousemove 740 400 click --repeat 30 --delay 30 5
+sleep 1
+shot "8-games-remove"
 # shellcheck disable=SC2086
-xdotool mousemove ${REEL_GAMES_REMOVE:-299 629} click 1
+xdotool mousemove ${REEL_GAMES_REMOVE:-299 730} click 1
 wait_programs '"steam-1957780" not in e and [n["app"] for n in p["not_again"]] == [1957780]' 10 "Remove did not take Cinder Road out and keep it from Steam"
 waitlog "games and apps: removed from the list" 10 "the Log does not say Cinder Road was removed"
 sleep 2
@@ -420,7 +440,7 @@ shot "8-games-not-added-again"
 ok "a Steam game sorted as Not a game in one click, then taken out: Steam does not add it again (shots)"
 b=$(logged "Steam read in")
 # shellcheck disable=SC2086
-xdotool mousemove ${REEL_GAMES_ADD_BACK:-1211 400} click 1
+xdotool mousemove ${REEL_GAMES_ADD_BACK:-1211 452} click 1
 waitlog "games and apps: Steam may add it again" 10 "Add back did nothing"
 waitmore "Steam read in" 20 "Add back did not read Steam again" "$b"
 wait_programs '"steam-1957780" in e and not p["not_again"] and e["steam-1957780"]["class"] == "game"' 10 "Cinder Road did not come back from Steam as a Game"

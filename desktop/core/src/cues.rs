@@ -8,6 +8,7 @@ use std::sync::{Arc, Mutex};
 pub const SAVE_WAV: &[u8] = include_bytes!("../../assets/sounds/save.wav");
 pub const UPLOADED_WAV: &[u8] = include_bytes!("../../assets/sounds/uploaded.wav");
 pub const SESSION_WAV: &[u8] = include_bytes!("../../assets/sounds/session.wav");
+pub const NO_CLIP_WAV: &[u8] = include_bytes!("../../assets/sounds/no_clip.wav");
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Cue {
@@ -16,10 +17,18 @@ pub enum Cue {
     LinkCopied,
     /// A session recording starts, or still runs.
     Session,
+    /// The Save hotkey found no replay buffer running.
+    NoClip,
 }
 
 impl Cue {
-    pub const ALL: [Cue; 4] = [Cue::Captured, Cue::Uploaded, Cue::LinkCopied, Cue::Session];
+    pub const ALL: [Cue; 5] = [
+        Cue::Captured,
+        Cue::Uploaded,
+        Cue::LinkCopied,
+        Cue::Session,
+        Cue::NoClip,
+    ];
 
     pub fn name(&self) -> &'static str {
         match self {
@@ -27,6 +36,7 @@ impl Cue {
             Cue::Uploaded => "uploaded",
             Cue::LinkCopied => "link_copied",
             Cue::Session => "session",
+            Cue::NoClip => "no_clip",
         }
     }
 
@@ -39,6 +49,7 @@ impl Cue {
             Cue::Captured => SAVE_WAV,
             Cue::Uploaded | Cue::LinkCopied => UPLOADED_WAV,
             Cue::Session => SESSION_WAV,
+            Cue::NoClip => NO_CLIP_WAV,
         }
     }
 }
@@ -50,6 +61,7 @@ impl crate::settings::SoundSettings {
             Cue::Uploaded => &self.uploaded,
             Cue::LinkCopied => &self.link_copied,
             Cue::Session => &self.session,
+            Cue::NoClip => &self.no_clip,
         }
     }
 }

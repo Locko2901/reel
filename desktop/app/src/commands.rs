@@ -188,6 +188,9 @@ pub fn share_last(rt: State<'_, Runtime>) -> R<Value> {
 
 #[tauri::command]
 pub fn save_clip(rt: State<'_, Runtime>) -> R<Value> {
+    if let Some(words) = rt.held_words() {
+        return Err(words);
+    }
     rt.save_clip();
     Ok(json!({ "line": if rt.is_standalone() {
         "OBS saves the replay; it goes into the library on this PC"
@@ -279,6 +282,9 @@ pub fn app_share_last(rt: State<'_, Runtime>) -> R<()> {
 
 #[tauri::command]
 pub fn app_save_clip(rt: State<'_, Runtime>) -> R<()> {
+    if let Some(words) = rt.held_words() {
+        return Err(words);
+    }
     rt.save_clip();
     Ok(())
 }
@@ -804,6 +810,7 @@ pub async fn program_rename(
     id: String,
     name: String,
     older: bool,
+    server: Option<bool>,
 ) -> R<Value> {
-    rt.rename(&id, &name, older).await
+    rt.rename(&id, &name, older, server.unwrap_or(false)).await
 }

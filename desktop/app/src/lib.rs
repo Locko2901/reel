@@ -1,5 +1,6 @@
 //! The Tauri shell: tray, window, plugins and hotkeys; the logic lives in reel-desktop-core.
 mod commands;
+mod detect;
 mod downloads;
 mod encoders;
 mod files;
@@ -275,6 +276,21 @@ pub fn run() {
                             } else if let Some(id) = other.strip_prefix("open:") {
                                 if let Err(e) = rt.open_library(&format!("/clips/{id}")) {
                                     notify::show(app, "The clip did not open", &e);
+                                }
+                            } else if let Some((how, id)) = other
+                                .strip_prefix("sort-")
+                                .and_then(|r| r.split_once(':'))
+                            {
+                                use reel_desktop_core::programs::Class;
+                                match how {
+                                    "game" => rt.sort_from_tray(id, Class::Game),
+                                    "not" => rt.sort_from_tray(id, Class::NotAGame),
+                                    "ignore" => rt.sort_from_tray(id, Class::Ignored),
+                                    _ => shell::show(
+                                        app,
+                                        shell::View::Settings,
+                                        Some(&format!("games/{id}")),
+                                    ),
                                 }
                             }
                         }

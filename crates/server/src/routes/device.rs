@@ -125,6 +125,7 @@ pub async fn whoami(
         "admin": me.user.role == "admin",
         "normalize_new": cfg.media.normalize_new,
         "loudness_target": cfg.media.loudness_target,
+        "clip_titles": true,
     })))
 }
 
@@ -575,6 +576,46 @@ pub async fn clip(
 ) -> AppResult<Json<Value>> {
     let c = own_clip(&st, &me, &id).await?;
     Ok(Json(clip_json(&st, &c).await?))
+}
+
+#[derive(Deserialize)]
+pub struct TitleBody {
+    pub title: String,
+    /// The title the device knew: a title changed since, on the server by hand, is kept.
+    #[serde(default)]
+    pub was: Option<String>,
+}
+
+/// A clip's title from the device that sent it, when its game is renamed in the app.
+pub async fn set_title(
+    State(st): State<AppState>,
+    Extension(me): Extension<DeviceAuth>,
+    Path(id): Path<String>,
+    Json(body): Json<TitleBody>,
+) -> AppResult<Json<Value>> {
+    let clip = own_clip(&st, &me, &id).await?;
+    let title = body.title.trim();
+    if title.is_empty() || title.chars().count() > 300 {
+        return Err(AppError::BadRequest(
+            "a title has 1 to 300 characters".into(),
+        ));
+    }
+    if body.was.as_deref().is_some_and(|was| was != clip.title) {
+        return Ok(Json(
+            json!({ "ok": true, "changed": false, "title": clip.title }),
+        ));
+    }
+    st.ctx
+        .store
+        .update_clip_text(&id, Some(title), None)
+        .await?;
+    st.ctx.emit(reel_core::events::Event::Clip {
+        id: clip.id.clone(),
+        state: "updated".into(),
+        title: title.to_string(),
+    });
+    tracing::info!(device = %me.device.id, clip = %clip.id, "a clip's title changed by the app that sent it");
+    Ok(Json(json!({ "ok": true, "changed": true, "title": title })))
 }
 
 #[derive(Deserialize, Default)]
