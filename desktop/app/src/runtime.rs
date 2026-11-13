@@ -11,6 +11,7 @@ use reel_desktop_core::gaming::{self, Foreground};
 use reel_desktop_core::ledger::{ClipState, Ledger};
 use reel_desktop_core::links::Link;
 use reel_desktop_core::obs::{ObsChange, ObsCommand, ObsConfig, ObsError, ObsEvent, ObsState};
+use reel_desktop_core::programs::Came;
 use reel_desktop_core::secrets::TokenStore;
 use reel_desktop_core::settings::{
     self, Mode, Paths, Settings, UpdateMode, UploadMode, WebviewAudio,
@@ -105,8 +106,14 @@ pub struct Inner {
     pub obs_commands: Option<mpsc::Sender<ObsCommand>>,
     pub obs_state: Option<ObsState>,
     /// The game OBS's game capture source targets by window, which names the clips before the
-    /// foreground does.
+    /// foreground does, and that window's program file.
     pub obs_game: Option<String>,
+    pub obs_game_exe: Option<String>,
+    /// Settings, Games and apps' list.
+    pub programs: reel_desktop_core::programs::Programs,
+    pub steam: crate::games::SteamSeen,
+    /// Wakes the reader of Steam's files.
+    pub steam_wake: Option<mpsc::UnboundedSender<()>>,
     /// OBS's recording folder, kept from the last connection; the clips folder follows it.
     pub obs_dir: Option<PathBuf>,
     pub foreground: Arc<dyn Foreground>,
@@ -422,6 +429,7 @@ impl Runtime {
             }
         }
         let ledger = Ledger::load(&paths.ledger_file())?;
+        let programs = crate::games::load(&paths.programs_file());
         let tokens = TokenStore::new(&paths.config_dir);
         let token = tokens.get().unwrap_or_else(|e| {
             tracing::warn!(error = %e, "the token store did not answer");
@@ -490,6 +498,10 @@ impl Runtime {
             obs_commands: None,
             obs_state: None,
             obs_game: None,
+            obs_game_exe: None,
+            programs,
+            steam: crate::games::SteamSeen::default(),
+            steam_wake: None,
             obs_dir: None,
             foreground: Arc::new(gaming::System),
             share_running: false,
@@ -556,7 +568,8 @@ impl Runtime {
         };
         rt.lane.start(Steps(rt.clone()));
         rt.spawn_upload_worker(queue_rx);
-        rt.spawn_fullscreen_poll();
+        rt.spawn_front_poll();
+        rt.spawn_steam();
         rt.restart_watcher();
         rt.register_hotkeys();
         rt.startup_at_start();
@@ -810,6 +823,7 @@ impl Runtime {
             standalone,
         );
         let mut st = Status {
+            unsorted: g.programs.unsorted(),
             paired,
             offline,
             mode: if standalone {
@@ -1341,11 +1355,18 @@ impl Runtime {
             self.stop_local();
             self.start_local();
         }
-        if new.upload.pause_in_fullscreen != old.upload.pause_in_fullscreen
-            && !new.upload.pause_in_fullscreen
-        {
-            self.lock().paused_fullscreen = false;
+        if new.upload.wait_for_games != old.upload.wait_for_games && !new.upload.wait_for_games {
+            let held = std::mem::take(&mut self.lock().paused_fullscreen);
             self.update_paused();
+            if held {
+                if let Some(l) = self.local() {
+                    l.hold(false);
+                }
+            }
+        }
+        let due = |s: &Settings| s.obs.setup_opens(self.lock().bundled.is_some());
+        if new.games.steam && (!old.games.steam || due(&old) != due(&new)) {
+            self.steam_now();
         }
         if new.cache != old.cache {
             self.sweep_cache();
@@ -2581,6 +2602,7 @@ impl Runtime {
                             g.obs_refused = true;
                             g.obs_state = None;
                             g.obs_game = None;
+                            g.obs_game_exe = None;
                             g.obs_seen.send_modify(|s| {
                                 s.connected = false;
                                 s.active = false;
@@ -2598,9 +2620,11 @@ impl Runtime {
                         use tauri::Emitter;
                         let _ = rt.app.emit("obs-meters", levels);
                     }
-                    ObsEvent::Game { game } => {
+                    ObsEvent::Game { game, exe } => {
                         tracing::info!(game = ?game, "obs game capture");
-                        rt.lock().obs_game = game;
+                        let mut g = rt.lock();
+                        g.obs_game = game;
+                        g.obs_game_exe = exe;
                     }
                     ObsEvent::SceneChanged => {}
                     ObsEvent::ReplayBufferState { active } => {
@@ -2901,10 +2925,10 @@ impl Runtime {
                 let given = recording.as_ref().and_then(|r| r.as_ref());
                 let game = match given {
                     Some(f) => f.game.clone(),
-                    None => g.obs_game.clone().or_else(|| {
-                        g.foreground
-                            .foreground_process()
-                            .and_then(|p| gaming::game_name(&p.exe_name, &p.title))
+                    None => g.name_in_front(if recording.is_some() {
+                        Came::Recording
+                    } else {
+                        Came::Clip
                     }),
                 };
                 let now = given
@@ -3298,7 +3322,7 @@ impl Runtime {
         self.lock().settings.mode == Mode::Standalone
     }
 
-    fn local(&self) -> Option<Arc<Local>> {
+    pub(crate) fn local(&self) -> Option<Arc<Local>> {
         self.lock().local.clone()
     }
 
@@ -3998,23 +4022,31 @@ impl Runtime {
         }
     }
 
-    fn spawn_fullscreen_poll(&self) {
+    /// Every 2 s, the program in front: the waits follow it, and one not in Games and apps
+    /// that takes the whole screen comes in as Not sorted yet.
+    fn spawn_front_poll(&self) {
         let rt = self.clone();
         tauri::async_runtime::spawn(async move {
             let mut lan: Option<(std::time::Instant, bool)> = None;
             loop {
                 tokio::time::sleep(Duration::from_secs(2)).await;
-                let (want, only_wan, server, fg) = {
+                let (only_wan, server, fg) = {
                     let g = rt.lock();
                     (
-                        g.settings.upload.pause_in_fullscreen,
                         g.settings.upload.pause_only_on_wan,
                         g.settings.server_url.clone(),
                         g.foreground.clone(),
                     )
                 };
-                let mut fullscreen = want && fg.fullscreen_app();
-                if fullscreen && only_wan {
+                let full = fg.fullscreen_app();
+                let front = fg.foreground_process();
+                let (mut waits, grew) = {
+                    let mut g = rt.lock();
+                    let n = g.programs.entries.len();
+                    let w = g.front_waits(front.as_ref(), full);
+                    (w, g.programs.entries.len() != n)
+                };
+                if waits && only_wan {
                     let fresh = match lan {
                         Some((at, v)) if at.elapsed() < Duration::from_secs(60) => v,
                         _ => {
@@ -4024,21 +4056,23 @@ impl Runtime {
                         }
                     };
                     if fresh {
-                        fullscreen = false;
+                        waits = false;
                     }
                 }
                 let changed = {
                     let mut g = rt.lock();
-                    let changed = g.paused_fullscreen != fullscreen;
-                    g.paused_fullscreen = fullscreen;
+                    let changed = g.paused_fullscreen != waits;
+                    g.paused_fullscreen = waits;
                     changed
                 };
                 if changed {
-                    tracing::info!(fullscreen, "fullscreen app");
+                    tracing::info!(waits, "a game has the screen");
                     rt.update_paused();
                     if let Some(l) = rt.local() {
-                        l.hold(fullscreen);
+                        l.hold(waits);
                     }
+                }
+                if changed || grew {
                     rt.push_status();
                 }
             }

@@ -71,9 +71,11 @@ pub enum ObsEvent {
     },
     /// The program scene or an input changed; the game the clips are of is read again.
     SceneChanged,
-    /// The game OBS's game capture source targets, when it targets a window by name.
+    /// The game OBS's game capture source targets, when it targets a window by name, and
+    /// that window's program file.
     Game {
         game: Option<String>,
+        exe: Option<String>,
     },
     /// Each input's loudest channel's peak in dB (-60 for silence), while the meters are on.
     Meters {
@@ -574,7 +576,7 @@ impl Session {
 
     /// The game the program scene's first enabled game capture targets by window name; None
     /// when it captures any fullscreen app.
-    pub async fn game_capture_target(&mut self) -> Result<Option<String>, ObsError> {
+    pub async fn game_capture_target(&mut self) -> Result<Option<(String, String)>, ObsError> {
         let scene = self.request("GetCurrentProgramScene", json!({})).await?;
         let Some(name) = scene["sceneName"]
             .as_str()
@@ -601,8 +603,10 @@ impl Session {
             if settings["capture_mode"].as_str() != Some("window") {
                 continue;
             }
-            if let Some(game) = settings["window"].as_str().and_then(game_of_window) {
-                return Ok(Some(game));
+            if let Some(window) = settings["window"].as_str() {
+                if let Some(game) = game_of_window(window) {
+                    return Ok(Some((game, exe_of_window(window))));
+                }
             }
         }
         Ok(None)
@@ -908,6 +912,15 @@ pub async fn test_connection(cfg: &ObsConfig) -> Result<(Version, Option<ObsStat
 }
 
 /// OBS writes the window as "Title:Class:exe.exe", with `#3A` for a colon and `#22` for a hash.
+pub fn exe_of_window(window: &str) -> String {
+    window
+        .rsplit(':')
+        .next()
+        .unwrap_or_default()
+        .replace("#3A", ":")
+        .replace("#22", "#")
+}
+
 pub fn game_of_window(window: &str) -> Option<String> {
     let mut parts = window.split(':');
     let title = parts.next().unwrap_or("");
@@ -962,8 +975,8 @@ pub async fn run(
                         ws_version: session.version.ws_version.clone(),
                     })
                     .await;
-                let game = session.game_capture_target().await.unwrap_or(None);
-                let _ = tx.send(ObsEvent::Game { game }).await;
+                let (game, exe) = session.game_capture_target().await.unwrap_or(None).unzip();
+                let _ = tx.send(ObsEvent::Game { game, exe }).await;
                 let quiet = tokio::time::sleep(QUIET);
                 tokio::pin!(quiet);
                 let reason = loop {
@@ -981,8 +994,8 @@ pub async fn run(
                         }
                         ev = session.next_event() => match ev {
                             Ok(ObsEvent::SceneChanged) => {
-                                let game = session.game_capture_target().await.unwrap_or(None);
-                                if tx.send(ObsEvent::Game { game }).await.is_err() { return; }
+                                let (game, exe) = session.game_capture_target().await.unwrap_or(None).unzip();
+                                if tx.send(ObsEvent::Game { game, exe }).await.is_err() { return; }
                             }
                             Ok(e @ ObsEvent::Meters { .. }) => {
                                 if tx.send(e).await.is_err() { return; }
@@ -1117,6 +1130,10 @@ mod tests {
         );
         assert_eq!(game_of_window("Zen:MozillaWindowClass:zen.exe"), None);
         assert_eq!(game_of_window("no colons here"), None);
+        assert_eq!(
+            exe_of_window("Beat Saber:UnityWndClass:Beat Saber.exe"),
+            "Beat Saber.exe"
+        );
     }
 
     #[test]
@@ -1615,7 +1632,10 @@ mod tests {
         let game = rx.recv().await.unwrap();
         assert_eq!(
             game,
-            ObsEvent::Game { game: None },
+            ObsEvent::Game {
+                game: None,
+                exe: None
+            },
             "no game capture in this OBS"
         );
         let second = rx.recv().await.unwrap();

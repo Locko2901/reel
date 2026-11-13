@@ -8,6 +8,7 @@ import { bindObsBar, renderObsBar } from './obsbar.js';
 import { bindAsk, renderAsk } from './ask.js';
 import { audioPlan, meterIn, renderLevelRows, wordsInto } from './sources.js';
 import { bindLibrary, refreshLibrary, renderLibrary } from './library.js';
+import { bindGames, opened as gamesOpened, refresh as gamesRefresh } from './games.js';
 
 const CTL = 'input, select, button[role="switch"]';
 
@@ -91,6 +92,8 @@ async function save(row, force = false) {
   if (!ok) { ok = document.createElement('span'); ok.className = 'ok'; ctl.append(ok); }
   ok.textContent = 'saved';
   setTimeout(() => ok.remove(), 1800);
+  depends();
+  if (key === 'games.steam' || key === 'upload.wait_for_games') gamesRefresh(true);
   if (key.startsWith('obs.setup.') && status) renderBundled();
 }
 
@@ -156,8 +159,10 @@ function sections() {
   history.scrollRestoration = 'manual';
   const root = $('#settings'), body = $('#sections-body');
   const known = (id) => APP_SECTIONS.some(([k]) => k === id);
-  const open = (id, push, chosen = true) => {
-    if (!known(id)) id = 'status';
+  const open = (want, push, chosen = true) => {
+    // a program's page under Games and apps is games/<its id>
+    let [id, sub] = String(want).split('/');
+    if (!known(id)) { id = 'status'; sub = undefined; }
     current = id;
     if (id === 'library') capAsk();
     root.dataset.section = id;
@@ -165,8 +170,9 @@ function sections() {
     $$('.section-line, .panel, .srow', body).forEach(el => el.hidden = el.hasAttribute('data-off'));
     $('#no-match').hidden = true;
     markSection(id);
-    if (push) history.pushState(null, '', `#${id}`);
+    if (push) history.pushState(null, '', `#${sub ? `${id}/${sub}` : id}`);
     window.scrollTo(0, 0);
+    gamesOpened(id === 'games', sub);
     if (id === 'log') loadLog();
     invoke('obs_meters', { on: id === 'obs' }).catch(() => {});
     if (id === 'obs' && settings && settings.obs.bundled) invoke('obs_read').then((r) => doneInObs(r, false, true)).catch(() => {});
@@ -200,6 +206,29 @@ function sections() {
     });
     $('#no-match').hidden = hits > 0;
   });
+}
+
+// A row whose switch is off hides the rows that depend on it, as reel's own settings pages do.
+function depends() {
+  for (const r of $$('[data-depends]')) {
+    const on = !!(settings && get(settings, r.dataset.depends));
+    r.toggleAttribute('data-dep-off', !on);
+  }
+}
+
+// The waits' words follow the mode: the library's heavy work standalone, uploads connected.
+function renderWaits() {
+  if (!status || !settings) return;
+  const here = status.mode === 'standalone', both = here && status.paired;
+  const tail = 'A game is what Games and apps calls one, and a program not sorted yet while it has the whole screen; a program\'s own setting there turns it on or off for that game alone';
+  const [label, help] = !here
+    ? ['Uploads wait while a game has the screen', `off: each clip goes up as it is found, also while you play. On: uploads wait while a game has the screen and go on after, for a slow connection or a busy PC. ${tail}`]
+    : both
+      ? ['Uploads and encoding wait while a game has the screen', `off: the library's heavy work (a re-encode, the copies, the loop and the strip) and the uploads to the server go on while you play. On: they wait while a game has the screen and go on after, for a PC a game keeps busy or a slow connection. ${tail}`]
+      : ['Encoding waits while a game has the screen', `off: the library's heavy work (a re-encode, the copies, the loop and the strip) goes on while you play. On: it waits while a game has the screen and goes on after, for a PC a game keeps busy. ${tail}`];
+  $('#waits-label').textContent = label;
+  $('#waits-help').textContent = help;
+  $('#waits-row .switch').setAttribute('aria-label', label);
 }
 
 // data-off keeps it hidden when a section opens or the filter runs.
@@ -554,6 +583,7 @@ async function doneInObs(r, always, quiet) {
 
 function takeSettings(next) {
   settings = next;
+  depends();
   const typing = document.activeElement && document.activeElement.matches('input, select, textarea');
   $$('.srow[data-key]')
     .filter((row) => !(typing && row.contains(document.activeElement)))
@@ -567,6 +597,7 @@ function renderStatus() {
   renderParts(status);
   renderAsk(status);
   renderMode();
+  renderWaits();
   const here = status.mode === 'standalone';
   renderObs();
   renderLocal();
@@ -852,10 +883,12 @@ async function main() {
   bindHotkeys();
   bindObs();
   bindLibrary();
+  bindGames();
   try {
     settings = await invoke('settings_get');
     ownMicApp = await invoke('obs_own_mic').catch(() => null);
     $$('.srow[data-key]').forEach(fill);
+    depends();
     capAsk();
     off($('#elevated-start-row'), !settings.startup.elevated);
     status = await invoke('status_get');
@@ -868,7 +901,7 @@ async function main() {
   sectionsNav(await shaped, current, status?.mode === 'standalone');
   if (status) renderParts(status);
   delete document.documentElement.dataset.wait;
-  await listen('status', (ev) => { status = ev.payload; renderStatus(); reshape(); if (Date.now() - capAt > 5000) capAsk(); });
+  await listen('status', (ev) => { status = ev.payload; renderStatus(); reshape(); gamesRefresh(); if (Date.now() - capAt > 5000) capAsk(); });
   await listen('open-section', (ev) => { if (window.openSection) window.openSection(ev.payload); });
   await listen('settings', (ev) => takeSettings(ev.payload));
   await listen('obs-meters', (ev) => {

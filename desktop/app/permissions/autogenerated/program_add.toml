@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-program-add"
+description = "Enables the program_add command without any pre-configured scope."
+commands.allow = ["program_add"]
+
+[[permission]]
+identifier = "deny-program-add"
+description = "Denies the program_add command without any pre-configured scope."
+commands.deny = ["program_add"]
