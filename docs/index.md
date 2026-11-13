@@ -27,7 +27,8 @@ waits in the tray at 13 MB while you play.
   or square for a phone, join clips into a montage, or make a GIF of the best second. See
   [The editor](editor.md).
 - **Light on the gaming PC.** Closed to the tray, the app is one process of 13 MB on Windows,
-  and uploads can wait while a game is fullscreen. See [How light it is](light.md).
+  and uploads can wait while a game has the screen, when you want them to. See
+  [How light it is](light.md) and [Games and apps](games-and-apps.md).
 - **Yours.** The library lives on your PC out of the box; add a server of your own, one
   Docker container, when you want share links, accounts for friends and a library on the
   phone.

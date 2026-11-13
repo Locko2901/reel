@@ -77,9 +77,10 @@ downloading a copy:
 
 - **Low priority.** Every ffmpeg runs at the lowest priority: Windows' idle class, `nice 10` on
   Linux.
-- **Heavy work waits for the game.** On Windows, a re-encode, the hover loop and the filmstrip,
-  and the copies under a size wait while a game is fullscreen, and run when it ends (Settings,
-  New clips, **Wait while a game is fullscreen**).
+- **Heavy work can wait for the game.** On Windows, with Settings, New clips, **Encoding waits
+  while a game has the screen** on, a re-encode, the hover loop and the filmstrip, and the copies
+  under a size wait while a game has the screen, and run when it lets go. It is off unless you
+  turn it on, for every game or for one game alone ([Games and apps](../games-and-apps.md#the-waits)).
 - **The graphics card where it can.** When it starts, reel tests the encoders with a short encode
   and takes the first that works: on Windows NVIDIA NVENC, AMD AMF, then Intel Quick Sync; on
   Linux Intel Quick Sync, then VAAPI; else the CPU. Settings, **Encoder** shows which one, and its
