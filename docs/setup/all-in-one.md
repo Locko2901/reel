@@ -123,17 +123,23 @@ error appears.
    **Record a session**, Alt+F9, starts and stops a
    [session recording](../desktop-app.md#recording-a-whole-session).
 7. **Games**: reel keeps a list of the programs it has seen, which says which ones are games
-   and the name each gives its clips. **Your Steam games** names the games installed in Steam on
-   this PC, read here, and **Add my Steam games to the list** is on: they go into the list as
-   Games with their names in Steam, and each new one as it is installed. Switched off, Steam adds
-   nothing; without Steam, its games come in once it is installed. Settings, **Games and apps**
-   changes it later ([Games and apps](../games-and-apps.md)).
+   and the name each gives its clips. **Replay buffer** is **Always** to begin with: a clip can be
+   saved at any time. **Only while a game runs** starts OBS's replay buffer with a game and stops
+   it a minute after the last one closed, which leaves the PC its memory and its encoder when no
+   game runs. **Your Steam games** names the games installed in Steam on this PC, read here, and
+   **Add my Steam games to the list** is on: they go into the list as Games with their names in
+   Steam, and each new one as it is installed. Switched off, Steam adds nothing; without Steam,
+   its games come in once it is installed. Settings, **Games and apps** changes it later, with
+   the games that record by themselves ([Games and apps](../games-and-apps.md)).
+
+    ![Games](img/app-setup-7-games.png)
+
 8. **Where clips go**: **This PC only** is chosen already. reel keeps the library in the app, on
    this PC, and nothing goes anywhere ([Standalone](standalone.md)). **Clips folder** is where OBS
    writes the clips; reel takes each one into the library. For a server, see
    [Add a server for links](#add-a-server-for-links).
 
-    ![Where clips go](img/app-setup-7-where.png)
+    ![Where clips go](img/app-setup-8-where.png)
 
 9. **New versions**: **Look for new versions on GitHub** is on. The app then asks GitHub for
    reel's newest release, with reel's version and nothing else, a minute after the start and
@@ -141,11 +147,11 @@ error appears.
    asks ([What leaves your PC](../privacy.md#what-leaves-your-pc)). With a server this step is
    not there: the server brings the app's updates.
 
-    ![New versions](img/app-setup-8-new-versions.png)
+    ![New versions](img/app-setup-9-new-versions.png)
 
 10. **Done** shows a summary. Press **Finish**.
 
-    ![Done, the summary](img/app-setup-9-done.png)
+    ![Done, the summary](img/app-setup-10-done.png)
 
 When it worked, OBS starts with your setup, hidden (no window, no second tray icon), and the window
 opens on your library. From now on OBS starts and stops with the app. If one part could not be
