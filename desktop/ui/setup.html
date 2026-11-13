@@ -174,6 +174,19 @@
         <p class="small" id="hotkeys-own" hidden>OBS's own Save Replay key, under its Settings, Hotkeys, saves a clip as well: OBS saves, and reel takes the clip in. Pick a key here that OBS does not use.</p>
       </section>
 
+      <section data-step="games" hidden>
+        <h1>Games</h1>
+        <p class="intro">reel keeps a list of the programs it has seen, which says which ones are games and the name each gives its clips.</p>
+        <div class="panel" id="steam-step">
+          <header><h2>Your Steam games</h2><span class="desc" id="steam-step-desc">looking for Steam on this PC</span></header>
+          <div class="body" id="steam-step-found" hidden><p class="steam-names" id="steam-step-names"></p><p class="muted small" id="steam-step-more"></p></div>
+          <div class="body flush" id="steam-step-switch">
+            <div class="srow"><div class="slabel"><b>Add my Steam games to the list</b><span class="shelp" id="steam-step-help"></span></div><div class="sctl"><button type="button" class="switch" role="switch" aria-checked="true" id="steam-on" aria-label="Add my Steam games to the list"><i></i></button></div></div>
+          </div>
+        </div>
+        <p class="games-after" id="games-after"></p>
+      </section>
+
       <section data-step="where" hidden>
         <h1>Where clips go</h1>
         <p class="intro">On this PC, where reel keeps the library itself and nothing goes anywhere; or to a reel server, which makes the links to share.</p>

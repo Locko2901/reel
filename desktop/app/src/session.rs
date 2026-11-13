@@ -286,7 +286,7 @@ impl Runtime {
             let by = asked.map(|a| a.by).unwrap_or(By::Obs);
             let mut r = Recording::new(SystemTime::now(), by);
             r.file = file.clone();
-            r.game = g.obs_game.clone().or_else(|| foreground_game(&g));
+            r.game = g.name_in_front(reel_desktop_core::programs::Came::Recording);
             let started = r.started;
             g.session = Some(r);
             g.session_lost = None;
@@ -514,7 +514,7 @@ impl Runtime {
     /// The game a recording is named after: the one seen last while it ran.
     fn session_game(&self) {
         let mut g = self.lock();
-        let seen = g.obs_game.clone().or_else(|| foreground_game(&g));
+        let seen = g.name_in_front(reel_desktop_core::programs::Came::Recording);
         if let (Some(game), Some(r)) = (seen, g.session.as_mut()) {
             r.game = Some(game);
         }
@@ -636,12 +636,6 @@ impl Runtime {
 /// A session recording runs or starts: an install waits until it has stopped.
 pub fn holds_install(g: &crate::runtime::Inner) -> bool {
     g.session.is_some() || g.session_asked.is_some()
-}
-
-fn foreground_game(g: &crate::runtime::Inner) -> Option<String> {
-    g.foreground
-        .foreground_process()
-        .and_then(|p| reel_desktop_core::gaming::game_name(&p.exe_name, &p.title))
 }
 
 fn free_bytes(dir: &Path) -> Option<u64> {

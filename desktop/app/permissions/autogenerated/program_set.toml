@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-program-set"
+description = "Enables the program_set command without any pre-configured scope."
+commands.allow = ["program_set"]
+
+[[permission]]
+identifier = "deny-program-set"
+description = "Denies the program_set command without any pre-configured scope."
+commands.deny = ["program_set"]

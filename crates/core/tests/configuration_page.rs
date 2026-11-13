@@ -31,6 +31,11 @@ const OTHER: &[(&str, &str, &str)] = &[
         "The desktop app",
         "Puts the app's settings (under `config`) and its data, the logs and a standalone library included (under `data`), in this one folder instead of the user's own folders.",
     ),
+    (
+        "REEL_STEAM_DIR",
+        "The desktop app",
+        "Steam's own folder, the one that holds `steamapps`, for Settings, Games and apps when Steam is not where it installs itself; a folder without Steam in it counts as no Steam.",
+    ),
 ];
 
 /// A line under a setting that points to the page about changing it.

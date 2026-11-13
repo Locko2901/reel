@@ -90,7 +90,17 @@
     "allow-uninstall",
     "allow-offline-retry",
     "allow-page-shape-get",
-    "allow-page-section"
+    "allow-page-section",
+    "allow-programs-get",
+    "allow-steam-get",
+    "allow-program-set",
+    "allow-program-add",
+    "allow-program-remove",
+    "allow-program-add-back",
+    "allow-programs-running",
+    "allow-program-pick",
+    "allow-program-rename-plan",
+    "allow-program-rename"
   ],
   "webviews": [
     "library"
