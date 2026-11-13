@@ -122,14 +122,20 @@ error appears.
    With a server (the next step), **Save and share** shows here too, Ctrl+Alt+Shift+S by default.
    **Record a session**, Alt+F9, starts and stops a
    [session recording](../desktop-app.md#recording-a-whole-session).
-7. **Where clips go**: **This PC only** is chosen already. reel keeps the library in the app, on
+7. **Games**: reel keeps a list of the programs it has seen, which says which ones are games
+   and the name each gives its clips. **Your Steam games** names the games installed in Steam on
+   this PC, read here, and **Add my Steam games to the list** is on: they go into the list as
+   Games with their names in Steam, and each new one as it is installed. Switched off, Steam adds
+   nothing; without Steam, its games come in once it is installed. Settings, **Games and apps**
+   changes it later ([Games and apps](../games-and-apps.md)).
+8. **Where clips go**: **This PC only** is chosen already. reel keeps the library in the app, on
    this PC, and nothing goes anywhere ([Standalone](standalone.md)). **Clips folder** is where OBS
    writes the clips; reel takes each one into the library. For a server, see
    [Add a server for links](#add-a-server-for-links).
 
     ![Where clips go](img/app-setup-7-where.png)
 
-8. **New versions**: **Look for new versions on GitHub** is on. The app then asks GitHub for
+9. **New versions**: **Look for new versions on GitHub** is on. The app then asks GitHub for
    reel's newest release, with reel's version and nothing else, a minute after the start and
    then every six hours, and asks you before it installs one; switched off, only **Check now**
    asks ([What leaves your PC](../privacy.md#what-leaves-your-pc)). With a server this step is
@@ -137,7 +143,7 @@ error appears.
 
     ![New versions](img/app-setup-8-new-versions.png)
 
-9. **Done** shows a summary. Press **Finish**.
+10. **Done** shows a summary. Press **Finish**.
 
     ![Done, the summary](img/app-setup-9-done.png)
 

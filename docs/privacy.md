@@ -200,6 +200,12 @@ the app checks the signature against the key built into it before it
 installs anything. The signature names the installer's version, so a
 server cannot offer an older installer as a newer one.
 
+Settings, **Games and apps** reads Steam's own files on this PC, to list
+its installed games: where its libraries are, each app's manifest and the
+app types in Steam's cache. Nothing of it, and nothing about the programs
+you run, leaves the PC; the list stays in the app's settings folder
+([Games and apps](games-and-apps.md#what-stays-on-the-pc)).
+
 Nothing else: no telemetry, no analytics, no crash reports, no account
 with anyone.
 

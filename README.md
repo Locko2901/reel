@@ -54,7 +54,7 @@ Read the **[documentation](https://locko2901.github.io/reel/)**, start with
 - **OBS included and set up.** The Windows installer can bring OBS, unmodified, and set it
   up in a few steps: quality, encoder, audio tracks, noise suppression. Or the app connects
   to the OBS you already have.
-- **Gentle on the game.** Uploads can pause while a game is fullscreen and keep under a
+- **Gentle on the game.** Uploads can wait while a game has the screen and keep under a
   bandwidth limit, and a dropped upload goes on where it stopped.
 - **Windows and Linux.** An installer for Windows; an AppImage or a .deb for Linux.
 

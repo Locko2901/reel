@@ -68,13 +68,15 @@ before you begin.
    saves, and the app takes the clip in. Pick a key here that OBS does not use. With a server (the
    next step), **Save and share** shows here too. **Record a session**, Alt+F9, starts and stops
    a [session recording](../desktop-app.md#recording-a-whole-session).
-4. **Where clips go**: **This PC only** is chosen already: the library on this PC
+4. **Games**: the same step as in [All in one](all-in-one.md#3-the-setup): **Add my Steam
+   games to the list** is on, and Settings, **Games and apps** changes it later.
+5. **Where clips go**: **This PC only** is chosen already: the library on this PC
    ([Standalone](standalone.md)). For a server, see [Add a server for links](#add-a-server-for-links).
    **Clips folder** is OBS's recording folder, as OBS says; a folder picked here is set in OBS.
-5. **New versions**: the same step as in [All in one](all-in-one.md#3-the-setup): **Look for new
+6. **New versions**: the same step as in [All in one](all-in-one.md#3-the-setup): **Look for new
    versions on GitHub** is on, and switched off only **Check now** asks. With a server this step
    is not there.
-6. **Done** shows a summary. Press **Finish**, and the window opens on your library.
+7. **Done** shows a summary. Press **Finish**, and the window opens on your library.
 
     ![Done, the summary](img/app-light-6-done.png)
 

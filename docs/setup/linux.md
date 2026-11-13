@@ -9,7 +9,7 @@ none inside, only the OBS you install.
 You pick one of two ways with OBS:
 
 - **Set it up for me**: reel runs the OBS installed on this PC a second time, with settings of its
-  own (its own profile, scenes, WebSocket and replay buffer), and sets it up in eight steps. Your
+  own (its own profile, scenes, WebSocket and replay buffer), and sets it up in nine steps. Your
   own OBS and its settings stay exactly as they are, and both can run at once: stream or record
   with yours while reel's keeps the replay buffer.
 - **Use my own OBS**: reel connects to your OBS over its WebSocket and uses its replay buffer.
@@ -77,7 +77,7 @@ example "the OBS installed on this PC (/usr/bin/obs)" or "OBS from Flathub".
 
 ### Set it up for me
 
-The same eight steps as on Windows, each with a default, so pressing **Next** through them gives a
+The same nine steps as on Windows, each with a default, so pressing **Next** through them gives a
 working setup; [All in one](all-in-one.md) walks through them with pictures. **Where clips go**
 has **This PC only** chosen: the library on this PC ([Standalone](standalone.md)); **New
 versions**, after it, looks for new versions on GitHub unless you switch it off. What differs on
@@ -119,7 +119,7 @@ inside OBS.
 ## 4. Your own OBS
 
 With **Use my own OBS**, or at the first start without OBS installed where reel looks (an OBS
-built or run another way), the setup for your own OBS has five short steps, the same as reel
+built or run another way), the setup for your own OBS has six short steps, the same as reel
 light's on Windows: [Your own OBS](own-obs.md#2-the-setup) walks through them with pictures.
 Start OBS first.
 
@@ -131,7 +131,9 @@ Start OBS first.
    replay buffer on and starts it by itself. When it worked, **What reel needs from OBS** says
    "running, it keeps the last 60 s" (or your length). It goes on checking, at the top of
    Settings, **OBS**, for as long as the app runs.
-3. **Hotkeys**, **Where clips go**, **New versions** and **Done**, as on Windows.
+3. **Hotkeys**, **Games**, **Where clips go**, **New versions** and **Done**, as on Windows. On
+   Linux the list of games fills from Steam and by hand: the app cannot tell which program is in
+   front there.
 
 The recording format and the encoder are OBS's: any H.264 encoder (VAAPI, NVENC or x264) with AAC
 audio keeps clips as they are, never encoded again. [Your own OBS](own-obs.md#3-obss-settings-later)
