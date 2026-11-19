@@ -1193,6 +1193,7 @@ discord_limits_mb = [10, 50]
 
 [auth]
 admins = "sam, robin"
+dev_user = 1979-05-27
 "#,
         )
         .unwrap();
@@ -1205,6 +1206,7 @@ admins = "sam, robin"
             ("share.download_default", "false"),
             ("share.discord_limits_mb", "10, 50"),
             ("auth.admins", "sam, robin"),
+            ("auth.dev_user", "1979-05-27"),
         ] {
             assert_eq!(get(&eff.config, key), value, "{key}");
             assert_eq!(eff.source(key), Source::File, "{key}");

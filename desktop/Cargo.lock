@@ -4468,7 +4468,7 @@ dependencies = [
  "serde_json",
  "thiserror 2.0.21",
  "tokio",
- "toml 0.8.2",
+ "toml 1.1.7+spec-1.1.0",
  "ulid",
 ]
 
@@ -4581,7 +4581,7 @@ dependencies = [
  "thiserror 2.0.21",
  "tokio",
  "tokio-util",
- "toml 0.8.2",
+ "toml 1.1.7+spec-1.1.0",
  "tracing",
  "tracing-subscriber",
  "windows-sys 0.59.0",
@@ -4620,7 +4620,7 @@ dependencies = [
  "tokio",
  "tokio-stream",
  "tokio-util",
- "toml 0.8.2",
+ "toml 1.1.7+spec-1.1.0",
  "tower",
  "tower-http",
  "tower-sessions",
