@@ -9130,6 +9130,28 @@ async fn advanced_has_the_logs_the_history_the_exports_and_a_restart() {
         cfg.contains("[auth]") && cfg.contains("ntfy_token = \"\""),
         "{cfg}"
     );
+    let lines: Vec<&str> = cfg.lines().collect();
+    assert!(
+        lines.contains(&"[ingest]") && lines.contains(&"extensions = ["),
+        "a section to a table and a list item to a line: {cfg}"
+    );
+    let file: toml::Value = toml::from_str(&cfg).expect("the export is a TOML file");
+    let back = reel_core::settings::build(
+        &Config::default(),
+        Some(&file),
+        &[],
+        &reel_core::settings::no_env,
+    )
+    .expect("the export reads as a config file");
+    let running = reel_core::settings::without_secrets(&env.ctx.config());
+    for d in reel_core::settings::DEFS {
+        assert_eq!(
+            reel_core::settings::get(&back.config, d.key),
+            reel_core::settings::get(&running, d.key),
+            "{} reads back from the export as it is in force",
+            d.key
+        );
+    }
 
     let (status, d) = post_json(&env, "/api/restart").await;
     assert_eq!(status, 200, "{d}");

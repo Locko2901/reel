@@ -1174,6 +1174,44 @@ mod tests {
     }
 
     #[test]
+    fn a_config_file_reads_a_value_in_any_of_its_toml_forms() {
+        let file: toml::Value = toml::from_str(
+            r#"
+site_name = "Sam's \"clips\""
+media.ffmpeg = 'C:\ffmpeg\bin\ffmpeg.exe'
+
+[ingest]
+poll_seconds = 1_2
+extensions = [
+    "mkv",
+    "mp4",
+]
+
+[share]
+download_default = false
+discord_limits_mb = [10, 50]
+
+[auth]
+admins = "sam, robin"
+"#,
+        )
+        .unwrap();
+        let eff = build(&Config::default(), Some(&file), &[], &no_env).unwrap();
+        for (key, value) in [
+            ("site_name", r#"Sam's "clips""#),
+            ("media.ffmpeg", r"C:\ffmpeg\bin\ffmpeg.exe"),
+            ("ingest.poll_seconds", "12"),
+            ("ingest.extensions", "mkv, mp4"),
+            ("share.download_default", "false"),
+            ("share.discord_limits_mb", "10, 50"),
+            ("auth.admins", "sam, robin"),
+        ] {
+            assert_eq!(get(&eff.config, key), value, "{key}");
+            assert_eq!(eff.source(key), Source::File, "{key}");
+        }
+    }
+
+    #[test]
     fn a_saved_limit_list_without_the_default_limit_keeps_working() {
         let base = Config::default();
         assert_eq!(base.share.discord_limits_mb, vec![10, 20, 50, 100, 500]);
