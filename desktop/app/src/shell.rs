@@ -68,6 +68,20 @@ pub fn library_page_of(label: &str, url: Option<&str>, base: &str) -> bool {
     label == LIBRARY && here.is_some() && url.and_then(origin_of) == here
 }
 
+/// The app's pages in the nav of the server's Settings pages, whatever the server's version, and
+/// Games and apps' count beside it: desktop/ui/nav.js without its exports, then server_nav.js.
+fn server_nav() -> String {
+    let nav: Vec<&str> = include_str!("../../ui/nav.js")
+        .lines()
+        .map(|l| l.strip_prefix("export ").unwrap_or(l))
+        .collect();
+    format!(
+        "(() => {{\n{}\n{}}})();",
+        nav.join("\n"),
+        include_str!("server_nav.js")
+    )
+}
+
 /// Every page's uncaught errors, unhandled rejections and scripts that did not load go to the
 /// app's Log; installed before the page's own scripts, so a page that never starts tells why.
 /// The app's own pages are not granted the command.
@@ -302,6 +316,7 @@ fn library(app: &AppHandle, first: Url) -> WebviewBuilder<tauri::Wry> {
             "window.__REEL_DESKTOP__ = {{ version: \"{}\" }};\n{PAGE_ERRORS}",
             reel_desktop_core::version_line()
         ))
+        .initialization_script(server_nav())
         .on_navigation(move |url| {
             tracing::info!(to = %where_to(url), "library goes to");
             // WebView2 starts the first page after the library may have been asked for: it
@@ -678,6 +693,29 @@ pub mod audio {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_server_pages_get_the_apps_nav_as_a_plain_script() {
+        let js = server_nav();
+        assert!(
+            js.starts_with("(() => {\n") && js.ends_with("})();"),
+            "{js}"
+        );
+        let code = js.lines().map(str::trim_start);
+        assert!(!code
+            .clone()
+            .any(|l| l.starts_with("export ") || l.starts_with("import ")));
+        for part in [
+            "const APP_SECTIONS = [",
+            "const NAV = [",
+            "'a games'",
+            "function unsortedCount(",
+            "const fill = () => {",
+        ] {
+            assert!(js.contains(part), "{part}");
+        }
+        assert_eq!(code.filter(|l| l.starts_with("const NAV = [")).count(), 1);
+    }
 
     #[test]
     fn a_section_or_a_page_in_it_and_nothing_else() {
