@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.18.0](https://github.com/Locko2901/reel/compare/v1.17.0...v1.18.0) (2026-11-20)
+
+
+### Features
+
+* Settings, Games and apps lists the games and programs reel has seen, with Steam's games, and clips take the names given there ([6c52543](https://github.com/Locko2901/reel/commit/6c52543fee3781478bd38aa0719b38f2ad008602))
+
+
+### Bug Fixes
+
+* Games and apps shows in the Settings nav of the server's pages too, with its count, also when the server is older than the app ([c5cb6b5](https://github.com/Locko2901/reel/commit/c5cb6b59a9752f9c8c4c37471f55ea26ec9265ea))
+
 ## [1.17.0](https://github.com/Locko2901/reel/compare/v1.16.0...v1.17.0) (2026-11-13)
 
 
