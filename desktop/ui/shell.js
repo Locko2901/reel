@@ -2,6 +2,9 @@
 import { setOn, switches } from './assets/js/switch.js';
 import { mouseWalk } from './assets/js/walk.js';
 import { appBar } from './assets/js/appbar.js';
+import { APP_SECTIONS, NAV, STANDALONE_LABELS, unsortedCount } from './nav.js';
+
+export { APP_SECTIONS, STANDALONE_ONLY } from './nav.js';
 
 switches();
 export const tauri = window.__TAURI__ || null;
@@ -26,22 +29,6 @@ export function goServer(path) {
 
 function serverHref(path) { return base ? base + path : path; }
 
-export const APP_SECTIONS = [
-  ['status', 'Status'], ['server', 'Server'], ['obs', 'OBS'], ['clips', 'Clips folder and cache'], ['upload', 'Upload'],
-  ['hotkeys', 'Hotkeys'], ['session', 'Session recording'], ['games', 'Games and apps'], ['sounds', 'Sounds'], ['startup', 'Startup'], ['log', 'Log'],
-  ['library', 'Library folder'], ['encoder', 'Encoder'],
-];
-export const STANDALONE_ONLY = ['library', 'encoder'];
-// The nav by what a person does: reel's sections ('r') and the app's pages ('a'), each always, in
-// standalone alone ('s') or beside a server alone ('p'); crates/server/src/routes/settings.rs
-// groups reel's pages the same way.
-const NAV = [
-  ['Recording', ['a obs', 'a clips', 'a upload', 'a hotkeys', 'a session', 'a games', 'a sounds']],
-  ['Library', ['r storage', 'as library', 'r ingest', 'as encoder', 'rs sharing', 'r imports']],
-  ['Server', ['a server', 'rp sharing', 'r devices', 'r access', 'r notifications']],
-  ['System', ['r general', 'r appearance', 'a startup', 'a status', 'a log', 'r advanced']],
-];
-
 let serverState = 'ok';
 let serverLine = '';
 // Standalone: the library on this PC, no server.
@@ -51,7 +38,6 @@ let bar = () => {};
 let last = null;
 // Programs in Games and apps not sorted yet, beside its name in the nav.
 let unsorted = 0;
-const STANDALONE_LABELS = { clips: 'Clips folder', upload: 'New clips' };
 
 function setPart(id, state, word, line) {
   const dd = $(`#${id}`), dt = dd?.previousElementSibling;
@@ -136,7 +122,7 @@ export function sectionsNav(shape, current, standalone) {
     a.href = `#${id}`;
     a.dataset.appSection = id;
     a.textContent = (standalone && STANDALONE_LABELS[id]) || APP_SECTIONS.find(([k]) => k === id)[1];
-    if (id === 'games') a.append(' ', countSpan());
+    if (id === 'games') a.append(' ', unsortedCount(unsorted));
     if (id === current) a.setAttribute('aria-current', 'page');
     return a;
   };
@@ -162,15 +148,6 @@ export function sectionsNav(shape, current, standalone) {
     if (entries.length) nav.append(head(words), ...entries);
   }
   nav.append(...sections.filter((s) => !placed.includes(s.id)).map(reels));
-}
-
-function countSpan() {
-  const n = document.createElement('span');
-  n.className = 'n';
-  n.id = 'games-n';
-  n.textContent = unsorted || '';
-  n.title = unsorted ? `${unsorted} not sorted yet` : '';
-  return n;
 }
 
 export function markSection(current) {
@@ -261,7 +238,7 @@ export function renderParts(status) {
   last = status;
   if (status.unsorted !== undefined && status.unsorted !== unsorted) {
     unsorted = status.unsorted;
-    $('#games-n')?.replaceWith(countSpan());
+    $('#games-n')?.replaceWith(unsortedCount(unsorted));
   }
   modeParts(status);
   bar(status, { state: serverState, line: serverLine });

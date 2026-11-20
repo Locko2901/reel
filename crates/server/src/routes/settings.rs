@@ -87,8 +87,8 @@ const fn app(id: &'static str) -> NavPage {
     (id, true, Shows::Always)
 }
 
-/// The nav by what a person does, the sections and the desktop app's pages side by side;
-/// desktop/ui/shell.js groups the same way.
+/// The nav by what a person does, the sections and the desktop app's pages side by side; the
+/// app's own pages draw the same nav from desktop/ui/nav.js, which a test holds this to.
 const NAV: [(&str, &[NavPage]); 4] = [
     (
         "Recording",
@@ -98,6 +98,7 @@ const NAV: [(&str, &[NavPage]); 4] = [
             app("upload"),
             app("hotkeys"),
             app("session"),
+            app("games"),
             app("sounds"),
         ],
     ),
@@ -146,6 +147,7 @@ fn app_label(id: &str, standalone: bool) -> &'static str {
         "upload" => "Upload",
         "hotkeys" => "Hotkeys",
         "session" => "Session recording",
+        "games" => "Games and apps",
         "sounds" => "Sounds",
         "startup" => "Startup",
         "log" => "Log",
@@ -1076,4 +1078,93 @@ pub async fn history(State(st): State<AppState>) -> AppResult<Json<Value>> {
         })
         .collect();
     Ok(Json(json!({ "history": out })))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::HashMap;
+
+    /// The app's own pages draw the same nav from desktop/ui/nav.js.
+    #[test]
+    fn the_nav_is_the_apps_own() {
+        let js = include_str!("../../../../desktop/ui/nav.js");
+        let block = |name: &str| {
+            let at = js
+                .find(&format!("export const {name} = "))
+                .unwrap_or_else(|| panic!("nav.js has no {name}"));
+            &js[at..at + js[at..].find(";\n").expect("its end")]
+        };
+        let quoted = |s: &str| {
+            s.split('\'')
+                .skip(1)
+                .step_by(2)
+                .map(str::to_string)
+                .collect::<Vec<_>>()
+        };
+        let apps: Vec<(String, Vec<String>)> = block("NAV")
+            .lines()
+            .filter_map(|line| {
+                let words = quoted(line);
+                let (head, pages) = words.split_first()?;
+                Some((head.clone(), pages.to_vec()))
+            })
+            .collect();
+        let ours: Vec<(String, Vec<String>)> = NAV
+            .iter()
+            .map(|(head, pages)| {
+                let pages = pages
+                    .iter()
+                    .map(|(id, app, shows)| {
+                        let kind = if *app { "a" } else { "r" };
+                        let only = match shows {
+                            Shows::Always => "",
+                            Shows::Standalone => "s",
+                            Shows::WithServer => "p",
+                        };
+                        format!("{kind}{only} {id}")
+                    })
+                    .collect();
+                (head.to_string(), pages)
+            })
+            .collect();
+        assert_eq!(ours, apps, "the groups, their pages and their order");
+
+        let labels = block("STANDALONE_LABELS");
+        let standalone: HashMap<String, String> = labels
+            [labels.find('{').expect("an object") + 1..]
+            .split(',')
+            .filter_map(|pair| {
+                let (id, label) = pair.split_once(':')?;
+                Some((id.trim().to_string(), quoted(label).first()?.clone()))
+            })
+            .collect();
+        let sections = quoted(block("APP_SECTIONS"));
+        assert!(!sections.is_empty() && sections.len().is_multiple_of(2));
+        for pair in sections.chunks(2) {
+            let (id, label) = (&pair[0], &pair[1]);
+            assert!(
+                NAV.iter()
+                    .flat_map(|(_, pages)| pages.iter())
+                    .any(|(p, app, _)| *app && p == id),
+                "{id} has a place in the nav"
+            );
+            assert_eq!(app_label(id, false), label, "{id}");
+            assert_eq!(
+                app_label(id, true),
+                standalone.get(id).unwrap_or(label),
+                "{id} in standalone"
+            );
+        }
+        for (id, _, _) in NAV
+            .iter()
+            .flat_map(|(_, pages)| pages.iter())
+            .filter(|(_, app, _)| *app)
+        {
+            assert!(
+                sections.iter().step_by(2).any(|s| s == id),
+                "{id} is a page of the app's"
+            );
+        }
+    }
 }

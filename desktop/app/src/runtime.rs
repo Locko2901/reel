@@ -1070,6 +1070,7 @@ impl Runtime {
             "versions": st.versions,
             "update_line": st.update_line,
             "update_ask": st.update_ask.as_ref().filter(|_| own),
+            "unsorted": st.unsorted,
         })
     }
 
