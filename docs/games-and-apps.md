@@ -245,6 +245,39 @@ borderless game counts), a program not sorted yet while it has the whole screen.
 The update of the OBS copy for games that run as administrator still waits until no full
 screen program is in front, whatever these say: Windows' question would take the game's screen.
 
+## Discord
+
+**Show on Discord**, in the panel Discord of Games and apps, is off unless you turn it on. On,
+while a Game of the list runs and reel clips it or records it, your friends see it on your
+Discord profile: under reel's mark the game's name and **Clipping**, or **Recording** while a
+session recording runs, the time since the game started (since the recording started, while
+one runs), and a button, **reel on GitHub**. The member list still says **Playing Starfall
+Tactics**, as for a game Discord finds by itself.
+
+- reel tells the Discord app on this PC, over Discord's own connection on the PC, and Discord
+  shows it to your friends. Discord in a browser cannot be told.
+- Only a Game counts: nothing shows for a program Not a game, Not sorted yet or Ignored, nor
+  while no game runs. A game that runs without the replay buffer, and with no session recording,
+  shows nothing either.
+- **Name the game**, on by default: off, Discord says Clipping or Recording without the game's
+  name.
+- **Button to reel**, on by default: your friends see the button; Discord never shows it to you.
+- The line under the switch says what reel sent, `Sent to Discord: Starfall Tactics, Clipping`,
+  or why nothing went: no game runs, Discord is not running on this PC (reel tries again every
+  30 seconds, so it shows once Discord starts), or Discord refused it, in Discord's words.
+- A change goes to Discord at most every 5 seconds, the last state of it. When the game closes,
+  reel takes it back, but while the bar [counts down](#the-grace-period) what the game's close
+  ends, a buffer or a recording that stops: then it stays until the countdown's end, and goes
+  with it. The bar's menu then says `Discord has it until then.` after the countdown's sentence.
+  reel takes it back when it quits, too.
+- Whether Discord shares your activity at all is Discord's own setting: reel cannot see it, so
+  its line says what was sent, not what your friends see.
+- Discord shows your friends one game at a time. A game that puts its own details on your
+  profile can have them replaced by reel's for as long as reel's are the newer.
+
+The Log says each step, for example `discord: sent Starfall Tactics, Clipping`, `discord: not
+running; reel tries again every 30 s` and `discord: cleared`.
+
 ## Every game, its class, its own setting
 
 What a program does while it runs comes in three layers, each changing the one before:
@@ -270,7 +303,8 @@ runs** shows the order.
 
 The list lives in `programs.json` in the app's settings folder (Settings, Startup, **About**
 names it). Steam's files are read on this PC, and nothing about them, or about the programs
-you run, leaves it. See [Privacy and security](privacy.md).
+you run, leaves it, but with **Show on Discord** on: then the name of the Game that runs goes
+to Discord, [as below](#discord). See [Privacy and security](privacy.md).
 
 ## Examples
 
