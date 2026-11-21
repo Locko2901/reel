@@ -109,7 +109,7 @@ well.
 
 !!! note "One game capture at a time"
     obs-vkcapture serves one OBS at a time. If your own OBS is open and captures games through it
-    too, give reel's OBS the screen alone (turn **The game in front** off under Settings, OBS).
+    too, give reel's OBS the screen alone (turn **The game in front** off under Settings, Capture).
 
 ### Use my own OBS
 
@@ -129,8 +129,8 @@ Start OBS first.
    version, its profile, the replay buffer and the recording folder.
 2. **The replay buffer**: with **Start the replay buffer** on (the default), reel turns OBS's
    replay buffer on and starts it by itself. When it worked, **What reel needs from OBS** says
-   "running, it keeps the last 60 s" (or your length). It goes on checking, at the top of
-   Settings, **OBS**, for as long as the app runs.
+   "running, it keeps the last 60 s" (or your length). It goes on checking, under
+   Settings, **Capture**, **The OBS behind it**, for as long as the app runs.
 3. **Hotkeys**, **Games**, **Where clips go**, **New versions** and **Done**, as on Windows. On
    Linux the list of games fills from Steam and by hand: the app cannot tell which program is in
    front there, only which programs of the list run, which is what the replay buffer's choice
@@ -148,12 +148,12 @@ sandbox.
 Global hotkeys on Linux depend on your desktop: they may not work, or may need to be set up in the
 desktop's own keyboard settings. There you can bind a key to `reel-desktop --save` (Save a clip)
 or `--record-session` (Record a session), or with a server `--save-and-share` and `--share-last`. With the AppImage, the command is the
-AppImage's path, which Settings, **Hotkeys** shows.
+AppImage's path, which Settings shows under **Save a clip**.
 
 ## 6. The first clip
 
 1. Play a game and press **Save a clip**: Alt+F10 after **Set it up for me** or **Use my own OBS**;
-   otherwise set a key under Settings, **Hotkeys**. The "clip captured" sound plays.
+   otherwise set a key under Settings, **Save a clip**. The "clip captured" sound plays.
 2. A moment later the notification "Clip in the library" appears. Click **Open** to see the clip.
 3. To send it, open **Send** on the clip's page, download the original or a copy under your chat's
    upload limit, and drag the file into the chat ([Standalone](standalone.md) has the details).
@@ -186,7 +186,7 @@ Then make your first link:
 
 ## Good to know
 
-- **Start at logon**: Settings, **Startup**. For the AppImage the entry points at the AppImage's
+- **Start at logon**: on Settings' first page. For the AppImage the entry points at the AppImage's
   own path, so after moving the file, turn it off and on again.
 - **NVIDIA**: with NVIDIA's driver, WebKitGTK's DMA-BUF renderer leaves windows blank, and on
   Wayland NVIDIA's explicit sync breaks them. reel turns both off for itself unless you set
@@ -196,7 +196,7 @@ Then make your first link:
   your system's. If a plugin a clip needs is missing, or the page stops answering while it plays,
   the app loads the page again without video and sound rather than let the window freeze, and its
   log says why. Links and the pages in a browser play as always.
-- **reel's OBS or yours**: Settings, OBS switches between them at any time (**Run a second OBS of
+- **reel's OBS or yours**: Settings, Capture switches between them at any time (**Run a second OBS of
   reel's**); off, reel connects to your own. Its line there says which OBS reel runs.
 - **Its name**: reel runs its second OBS as `reel-capture`, so Discord does not switch to Streamer
   Mode while it records in the background. It is a copy of the OBS you installed, OBS's own program
@@ -204,7 +204,7 @@ Then make your first link:
   your own OBS, Discord still switches: in Discord, **User Settings**, **Streamer Mode** (in newer
   versions under **Appearance**), turn off **Automatically Enable/Disable**. Discord from Flathub
   never turns it on by itself.
-- **Updates**: the AppImage installs a new version from Settings, Startup, **Install** (from its
+- **Updates**: the AppImage installs a new version from Settings, App, **Install** (from its
   server when paired, from the release in standalone), replaces itself and starts again. The
   `.deb` does not update itself: install the next `.deb` the same way as the first. See
   [Updates](../desktop-app.md#updates).

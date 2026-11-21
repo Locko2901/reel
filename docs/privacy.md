@@ -182,15 +182,15 @@ new versions, and only while it is on. The setup asks on a step of its
 own before Done, **New versions**: **Look for new versions on GitHub**, on
 unless you switch it off there; reel light's setup, for your own OBS,
 asks the same. It is the same switch as
-Settings, **Advanced**, **Check for updates**, so the check happens only
-when it was left on in the setup or turned on under Advanced; a skipped
+Settings, **App**, **Look for new versions on GitHub**, so the check happens only
+when it was left on in the setup or turned on there; a skipped
 setup, and an app set up before the setup asked, leave it off. The check
 is one request for the newest release of
 reel's repository on GitHub, with reel's version and nothing else: a
 minute after reel on this PC starts, then every six hours by the clock
 (once a day with **New versions** off), so a new version reaches the app
 within hours, also on a PC that sleeps at night. **Check now** under
-Settings, Startup asks at once whenever you press it.
+Settings, App asks at once whenever you press it.
 
 When that check finds a newer reel, the app reads the signature of its
 installer from the same release, and downloads the installer itself when

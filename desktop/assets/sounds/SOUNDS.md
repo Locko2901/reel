@@ -27,4 +27,4 @@ ffmpeg -f lavfi -i "aevalsrc=exprs='0.5*($E+$G)|0.5*($E+$G)':s=44100:d=0.6" \
   -af "afade=t=out:st=0.5:d=0.1,volume=-6dB" -map_metadata -1 -fflags +bitexact -flags:a +bitexact -c:a pcm_s16le no_clip.wav
 ```
 
-Settings, Sounds in the app takes a WAV of your own for each cue instead.
+Settings, Clips, Sounds in the app takes a WAV of your own for each cue instead.

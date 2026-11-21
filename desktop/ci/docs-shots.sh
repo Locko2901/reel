@@ -66,6 +66,7 @@ chmod 600 "$D/config/token"
 cat > "$D/config/settings.json" <<JSON
 { "mode": "connected", "server_url": "$SERVER", "device_name": "GAMING-PC",
   "obs": { "enabled": true, "host": "127.0.0.1", "port": 4466, "password": "", "start_replay": false },
+  "hotkeys": { "save": "Alt+F10" },
   "clips_follow_obs": true, "clips_dir": "$REC", "stable_seconds": 2,
   "startup": { "autostart": false, "elevated": false }, "log_level": "info" }
 JSON
@@ -94,9 +95,9 @@ b=$(logged "link copied")
 "$APP" --save-and-share > /dev/null 2>&1 || true
 waitlog "link copied" 120 "Save and share did not copy a link" "$b"
 sleep 2
-page img/app-log.png log
+page img/app-log.png status/log
 page img/app-status.png status
-page setup/img/app-settings-obs.png obs
-page setup/img/app-settings-hotkeys.png hotkeys
-page setup/img/app-settings-server.png server
+page setup/img/app-settings.png first
+page setup/img/app-settings-capture.png capture
+page setup/img/app-settings-connection.png server
 echo done

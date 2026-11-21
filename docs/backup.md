@@ -160,8 +160,7 @@ folder instead: the settings under `config`, the rest under `data`
 ([Configuration](configuration.md)).
 
 The clips folder, where OBS writes its replays, is a folder of yours:
-Settings, **Clips folder and cache** (**Clips folder** in standalone)
-names it.
+Settings, **Clips**, **On this PC** names it.
 
 ### Back up a standalone library
 
@@ -187,4 +186,4 @@ To use a copy the app made, on this PC or a new one: Settings, **Library
 folder**, **Move**, and pick the copy's folder. To
 restore a copy made by hand, quit reel, put the folders back, and start
 it. On a new Windows PC the pairing is not in those folders: pair the
-app again under Settings, **Server**.
+app again under Settings, **Connection**.
