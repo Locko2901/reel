@@ -249,33 +249,56 @@ screen program is in front, whatever these say: Windows' question would take the
 
 **Show on Discord**, in the panel Discord of Games and apps, is off unless you turn it on. On,
 while a Game of the list runs and reel clips it or records it, your friends see it on your
-Discord profile: under reel's mark the game's name and **Clipping**, or **Recording** while a
-session recording runs, the time since the game started (since the recording started, while
-one runs), and a button, **reel on GitHub**. The member list still says **Playing Starfall
-Tactics**, as for a game Discord finds by itself.
+Discord profile: **Clipping with reel**, or **Recording with reel** while a session recording
+runs, then the game's name, the clips you saved, the time since the game started (since the
+recording started, while one runs) and a button, **reel on GitHub**. The member list still says
+**Playing Starfall Tactics**, as for a game Discord finds by itself.
 
 - reel tells the Discord app on this PC, over Discord's own connection on the PC, and Discord
   shows it to your friends. Discord in a browser cannot be told.
 - Only a Game counts: nothing shows for a program Not a game, Not sorted yet or Ignored, nor
   while no game runs. A game that runs without the replay buffer, and with no session recording,
   shows nothing either.
-- **Name the game**, on by default: off, Discord says Clipping or Recording without the game's
-  name.
+- **The picture** is the game's icon from Discord's own list of games, with reel's mark small in
+  its corner. reel finds the game by its Steam app id, and on Windows also by its program's
+  folder and file name; a name that more than one game in the list has finds none, and on Linux
+  only the Steam app id finds it. A game Discord does not know shows reel's mark alone.
+- **The clips** count only this session: `Saved 1 clip`, `Saved 2 clips`, from the first clip
+  you save while the game runs, nothing before it. When the game closes and its [grace
+  period](#the-grace-period) is over, the count goes with it, and the game's next start begins
+  with no line; a game that starts again within the grace period keeps its count. Turning Show on
+  Discord off ends the count too. reel keeps no count anywhere, for a game or in all.
+- **Name the game**, on by default: off, Discord says **A game**, with reel's mark and no
+  picture, and reel does not read Discord's list.
 - **Button to reel**, on by default: your friends see the button; Discord never shows it to you.
-- The line under the switch says what reel sent, `Sent to Discord: Starfall Tactics, Clipping`,
-  or why nothing went: no game runs, Discord is not running on this PC (reel tries again every
-  30 seconds, so it shows once Discord starts), or Discord refused it, in Discord's words.
-- A change goes to Discord at most every 5 seconds, the last state of it. When the game closes,
-  reel takes it back, but while the bar [counts down](#the-grace-period) what the game's close
-  ends, a buffer or a recording that stops: then it stays until the countdown's end, and goes
-  with it. The bar's menu then says `Discord has it until then.` after the countdown's sentence.
-  reel takes it back when it quits, too.
+- The line under the switch says what reel sent, `Sent to Discord: Starfall Tactics, Clipping
+  with reel, 2 clips, with Discord's picture of the game`, or why nothing went: no game runs,
+  Discord is not running on this PC (reel tries again every 30 seconds, so it shows once Discord
+  starts), or Discord refused it, in Discord's words.
+- A change goes to Discord at most every 5 seconds, the last state of it; a clip saved is one
+  change. When the game closes, reel takes it back, but while the bar [counts
+  down](#the-grace-period) what the game's close ends, a buffer or a recording that stops: then
+  it stays until the countdown's end, and goes with it. The bar's menu then says `Discord has it
+  until then.` after the countdown's sentence. reel takes it back when it quits, too.
 - Whether Discord shares your activity at all is Discord's own setting: reel cannot see it, so
   its line says what was sent, not what your friends see.
-- Discord shows your friends one game at a time. A game that puts its own details on your
-  profile can have them replaced by reel's for as long as reel's are the newer.
+- Discord shows one game card at a time: another app that sends its own, such as an editor
+  extension, can take its place. Turn off that app's own Discord option while you play to see
+  reel's.
 
-The Log says each step, for example `discord: sent Starfall Tactics, Clipping`, `discord: not
+### Discord's list of games
+
+With Show on Discord and Name the game both on, reel reads Discord's list of the games it knows
+from `discord.com`, the list Discord's own app reads, without signing in. It asks at most once a
+day, and while its copy is current Discord answers that nothing changed, without sending the list
+again. reel keeps only what it finds a game by, in `discord-games.json` in the app's data folder.
+If the list cannot be read, reel goes on with the copy it has, or with its own mark, and asks
+again a day later.
+
+The picture's address goes to Discord with the rest, and Discord fetches the picture from its own
+servers; your friends' Discord apps load it from Discord too. The Log says each step, for example
+`discord: sent Starfall Tactics, Clipping with reel, 2 clips, with Discord's picture of the game`,
+`discord: read Discord's list of games: 20414 by Steam app id, 9293 by program`, `discord: not
 running; reel tries again every 30 s` and `discord: cleared`.
 
 ## Every game, its class, its own setting
@@ -304,7 +327,7 @@ runs** shows the order.
 The list lives in `programs.json` in the app's settings folder (Settings, Startup, **About**
 names it). Steam's files are read on this PC, and nothing about them, or about the programs
 you run, leaves it, but with **Show on Discord** on: then the name of the Game that runs goes
-to Discord, [as below](#discord). See [Privacy and security](privacy.md).
+to Discord, [as above](#discord). See [Privacy and security](privacy.md).
 
 ## Examples
 
