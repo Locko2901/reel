@@ -27,7 +27,7 @@ async function main() {
   await mount('library');
   bindAsk();
   $('#offline-retry').onclick = () => invoke('offline_retry').catch(e => toast(String(e.message || e), 'err'));
-  const section = () => status && status.offline && status.offline.page_error ? 'log' : status && status.mode === 'standalone' ? 'status' : 'server';
+  const section = () => status && status.offline && status.offline.page_error ? 'status/log' : status && status.mode === 'standalone' ? 'status' : 'server';
   $('#offline-settings').onclick = () => invoke('view_show', { view: 'settings', section: section() }).catch(e => toast(String(e.message || e), 'err'));
   $('#offline-standalone').onclick = async () => {
     try {

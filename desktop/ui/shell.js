@@ -1,8 +1,8 @@
-// reel's header, nav and the app's bar for the app's own pages; links open in this webview, so Back comes back here.
+// reel's header and the app's bar for the app's own pages; links open in this webview, so Back comes back here.
 import { setOn, switches } from './assets/js/switch.js';
 import { mouseWalk } from './assets/js/walk.js';
 import { appBar } from './assets/js/appbar.js';
-import { APP_SECTIONS, NAV, STANDALONE_LABELS, unsortedCount } from './nav.js';
+import { unsortedCount } from './nav.js';
 
 export { APP_SECTIONS, STANDALONE_ONLY } from './nav.js';
 
@@ -27,7 +27,7 @@ export function goServer(path) {
   invoke('open_page', { path }).catch(e => toast(String(e.message || e), 'err'));
 }
 
-function serverHref(path) { return base ? base + path : path; }
+export function serverHref(path) { return base ? base + path : path; }
 
 let serverState = 'ok';
 let serverLine = '';
@@ -36,7 +36,7 @@ let here = false;
 // The bar, once it is mounted, and the status it last drew.
 let bar = () => {};
 let last = null;
-// Programs in Games and apps not sorted yet, beside its name in the nav.
+// Programs in Games and apps not sorted yet, beside its name.
 let unsorted = 0;
 
 function setPart(id, state, word, line) {
@@ -99,64 +99,9 @@ function followServer() {
   own.after(link, fonts);
 }
 
-export function sectionsNav(shape, current, standalone) {
-  const nav = $('nav.sections');
-  if (!nav) return;
-  nav.textContent = '';
-  const reels = (s) => {
-    const a = document.createElement('a');
-    a.href = serverHref(`/settings/${s.id}`);
-    a.dataset.page = `/settings/${s.id}`;
-    a.dataset.section = s.id;
-    a.append(s.label);
-    if (s.changed > 0) {
-      const n = document.createElement('span');
-      n.className = 'n';
-      n.textContent = s.changed;
-      a.append(' ', n);
-    }
-    return a;
-  };
-  const own = (id) => {
-    const a = document.createElement('a');
-    a.href = `#${id}`;
-    a.dataset.appSection = id;
-    a.textContent = (standalone && STANDALONE_LABELS[id]) || APP_SECTIONS.find(([k]) => k === id)[1];
-    if (id === 'games') a.append(' ', unsortedCount(unsorted));
-    if (id === current) a.setAttribute('aria-current', 'page');
-    return a;
-  };
-  const head = (words) => {
-    const h = document.createElement('span');
-    h.className = 'sections-head';
-    h.textContent = words;
-    return h;
-  };
-  const sections = shape.sections || [];
-  const placed = [];
-  for (const [words, pages] of NAV) {
-    const entries = [];
-    for (const page of pages) {
-      const [kind, id] = page.split(' ');
-      if ((kind.includes('s') && !standalone) || (kind.includes('p') && standalone)) continue;
-      if (kind[0] === 'a') entries.push(own(id));
-      else {
-        const s = sections.find((x) => x.id === id);
-        if (s) { entries.push(reels(s)); placed.push(id); }
-      }
-    }
-    if (entries.length) nav.append(head(words), ...entries);
-  }
-  nav.append(...sections.filter((s) => !placed.includes(s.id)).map(reels));
-}
-
-export function markSection(current) {
-  $$('nav.sections a[data-app-section]').forEach(a => {
-    if (a.dataset.appSection === current) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
-  });
-}
-
 const showSettings = (section) => invoke('view_show', { view: 'settings', section }).catch(err => toast(String(err.message || err), 'err'));
+// The app's Settings, which lists this PC's pages and the server's: in place on its own page.
+const toSettings = () => (window.openSection ? window.openSection('first') : showSettings(null));
 const drawn = (p) => p.then((st) => { if (st && typeof st === 'object' && st.state) renderParts(st); }).catch(e => toast(String(e.message || e), 'err'));
 
 export function bindHeader() {
@@ -166,7 +111,8 @@ export function bindHeader() {
     const a = e.target.closest('a[data-page], button[data-page]');
     if (!a || a.classList.contains('disabled')) return;
     e.preventDefault();
-    goServer(a.dataset.page);
+    if (a.dataset.page === '/settings') toSettings();
+    else goServer(a.dataset.page);
   });
   $('#search-form')?.addEventListener('submit', (e) => {
     e.preventDefault();
@@ -228,7 +174,7 @@ export function bindHeader() {
     if (inField || e.ctrlKey || e.metaKey) return;
     if (e.key === '/') { e.preventDefault(); $('#search')?.focus(); $('#search')?.select(); return; }
     if (chord === 'g') { chord = ''; if (e.key === 's' && !here) goServer('/shares'); if (e.key === 'l') goServer('/'); if (e.key === 'j') goServer('/jobs'); if (e.key === 't') goServer('/status'); return; }
-    if (e.key === ',') { goServer('/settings'); return; }
+    if (e.key === ',') { toSettings(); return; }
     if (e.key === 'g') { chord = 'g'; setTimeout(() => chord = '', 900); return; }
     if (e.key === 'u') goServer('/upload');
   });
@@ -244,7 +190,7 @@ export function renderParts(status) {
   bar(status, { state: serverState, line: serverLine });
   renderVersions(status.versions, status.update_line);
   const hasPages = !!status.server_url || status.mode === 'standalone';
-  $$('header.top [data-page], nav.sections [data-page]').forEach(a => a.classList.toggle('disabled', !hasPages));
+  $$('header.top [data-page], #more-reel [data-page]').forEach(a => a.classList.toggle('disabled', !hasPages));
 }
 
 export function renderVersions(v, line) {

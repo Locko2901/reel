@@ -101,7 +101,7 @@ fn entry_text(exec: &str, icon: &str) -> String {
     )
 }
 
-/// The note the Hotkeys page shows on Linux.
+/// The note under Settings' Save a clip on Linux.
 pub fn hotkeys_how() -> String {
     let cmd = command();
     format!(

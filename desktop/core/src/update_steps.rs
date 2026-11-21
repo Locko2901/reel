@@ -121,7 +121,7 @@ fn closes(recording: bool) -> &'static str {
     }
 }
 
-/// What happens when the update is installed, said where it is offered (Settings, Startup).
+/// What happens when the update is installed, said where it is offered (Settings, App).
 pub fn before(version: &str, kind: Kind, quit: bool, recording: bool) -> String {
     let long = how_long(kind);
     let closes = closes(recording);
@@ -155,7 +155,7 @@ pub fn ask(version: &str, kind: Kind, recording: bool) -> (String, String) {
 }
 
 /// The question's words where the desktop's notifications have no buttons.
-pub const ASK_WITHOUT_BUTTONS: &str = "Install it from the tray, or under Settings, Startup.";
+pub const ASK_WITHOUT_BUTTONS: &str = "Install it from the tray, or under Settings, App.";
 
 /// The notification as the update starts, title and body: one line, the same steps.
 pub fn going(version: &str, kind: Kind, quit: bool) -> (String, String) {
@@ -201,7 +201,7 @@ pub fn after(
     );
     Some((
         format!("reel {} did not install", note.to),
-        format!("{why}. reel {now} runs as before; Install under Settings, Startup tries again."),
+        format!("{why}. reel {now} runs as before; Install under Settings, App tries again."),
     ))
 }
 
@@ -350,7 +350,7 @@ mod tests {
             ),
             Some((
                 "reel 1.10.0 did not install".to_string(),
-                "reel could not stop what runs from its folder. reel 1.9.1 runs as before; Install under Settings, Startup tries again.".to_string()
+                "reel could not stop what runs from its folder. reel 1.9.1 runs as before; Install under Settings, App tries again.".to_string()
             ))
         );
         assert!(after(Some(&note), "1.9.1", "1.9.1", None)

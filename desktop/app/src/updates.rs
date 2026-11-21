@@ -468,7 +468,7 @@ async fn ready(
                 notify::show(
                     &rt.app,
                     &format!("reel {version} is ready"),
-                    "Install it from the tray, or under Settings, Startup.",
+                    "Install it from the tray, or under Settings, App.",
                 );
             }
         }
@@ -1144,7 +1144,7 @@ pub enum Then {
     Exit,
     /// The update the setting keeps for the quit; the app quits whether it installs or not.
     InstallOnQuit(Box<tauri_plugin_updater::Update>, Vec<u8>),
-    /// Install reel from the tray or Settings, Startup; the app starts again if it does not install.
+    /// Install reel from the tray or Settings, App; the app starts again if it does not install.
     Install(Box<tauri_plugin_updater::Update>, Vec<u8>),
 }
 

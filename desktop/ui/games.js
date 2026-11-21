@@ -29,11 +29,11 @@ const sep = () => h('span', { class: 'sep' }, '·');
 const fail = (e) => toast(String(e.message || e), 'err');
 const go = (section) => window.openSection?.(section);
 
-// The waits' words follow the mode, as their row under New clips (Upload when connected) does.
+// The waits' words follow the mode, as their row under Encoding (Uploads when connected) does.
 function waits() {
-  if (!page.standalone) return { page: 'Upload', page_id: 'upload', row: 'Uploads wait', on: 'uploads wait', off: 'uploads go on', help: 'while it has the screen', never: 'uploads never wait for it', sub: 'Uploads wait' };
-  if (page.paired) return { page: 'New clips', page_id: 'upload', row: 'Uploads and encoding wait', on: 'uploads and encoding wait', off: 'uploads and encoding go on', help: 'uploads, and the library\'s heavy work, while it has the screen', never: 'uploads and encoding never wait for it', sub: 'Uploads and encoding wait' };
-  return { page: 'New clips', page_id: 'upload', row: 'Encoding waits', on: 'encoding waits', off: 'encoding goes on', help: 'the library\'s heavy work, while it has the screen', never: 'encoding never waits for it', sub: 'Encoding waits' };
+  if (!page.standalone) return { page: 'Uploads', page_id: 'upload', row: 'Uploads wait', on: 'uploads wait', off: 'uploads go on', help: 'while it has the screen', never: 'uploads never wait for it', sub: 'Uploads wait' };
+  if (page.paired) return { page: 'Encoding', page_id: 'encoder', row: 'Uploads and encoding wait', on: 'uploads and encoding wait', off: 'uploads and encoding go on', help: 'uploads, and the library\'s heavy work, while it has the screen', never: 'uploads and encoding never wait for it', sub: 'Uploads and encoding wait' };
+  return { page: 'Encoding', page_id: 'encoder', row: 'Encoding waits', on: 'encoding waits', off: 'encoding goes on', help: 'the library\'s heavy work, while it has the screen', never: 'encoding never waits for it', sub: 'Encoding waits' };
 }
 
 // The four behaviours of a program, the page each one's setting for every game lives on, and
@@ -41,7 +41,7 @@ function waits() {
 function behaviours() {
   const w = waits();
   const out = [
-    { key: 'buffer', row: 'Replay buffer', help: 'runs while it runs, or stops while it runs', page: 'OBS', page_id: 'obs', on: 'replay buffer while it runs', off: 'no replay buffer' },
+    { key: 'buffer', row: 'Replay buffer', help: 'runs while it runs, or stops while it runs', page: 'Settings', page_id: 'first', on: 'replay buffer while it runs', off: 'no replay buffer' },
     { key: 'record', row: 'Record by itself', help: 'a session recording starts when it starts', page: 'Session recording', page_id: 'session', on: 'records by itself', off: 'never records by itself' },
     { key: 'stop', row: 'Stop when it closes', help: 'the session recording stops when it closes', page: 'Session recording', page_id: 'session', on: 'stops the recording when it closes', off: 'recording goes on after it closes' },
   ];
@@ -138,7 +138,7 @@ function renderTop() {
   const w = waits(), line = $('#games-line');
   line.replaceChildren(
     'Which programs are games, the name each gives its clips, and what one program does apart from its class. What every game gets is set where it belongs: the replay buffer under ',
-    link('OBS', 'obs'), ', recording by itself under ', link('Session recording', 'session'),
+    link('Settings', 'first'), ', recording by itself under ', link('Session recording', 'session'),
     ...(page.linux
       ? ['. On Linux reel cannot tell which program is in front: the list fills from Steam and by hand, and a clip takes the name of the game that runs.']
       : [', the waits under ', link(w.page, w.page_id), '.']),

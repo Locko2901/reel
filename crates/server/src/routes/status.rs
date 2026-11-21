@@ -533,6 +533,12 @@ pub async fn page(
                 "",
                 None,
             ),
+            // the app on this PC sets its library's check on its own App page
+            _ if cfg.standalone() => (
+                "checking is off (Settings, App, Look for new versions on GitHub)".into(),
+                "",
+                None,
+            ),
             _ => ("checking is off (Settings, Advanced)".into(), "", None),
         };
     let checked = updates
@@ -590,10 +596,13 @@ pub async fn doctor(State(st): State<AppState>) -> AppResult<Json<Value>> {
 
 /// Check now, for admins while the check is on: switched off, reel asks GitHub nothing.
 pub async fn update_check(State(st): State<AppState>) -> AppResult<Json<Value>> {
-    if !st.ctx.config().advanced.update_check {
-        return Err(AppError::Conflict(
-            "checking for updates is off: Settings, Advanced, Check for updates".into(),
-        ));
+    let cfg = st.ctx.config();
+    if !cfg.advanced.update_check {
+        return Err(AppError::Conflict(if cfg.standalone() {
+            "checking for updates is off: Settings, App, Look for new versions on GitHub".into()
+        } else {
+            "checking for updates is off: Settings, Advanced, Check for updates".into()
+        }));
     }
     let state = reel_pipeline::updates::check_once(&st.ctx).await;
     Ok(Json(json!({

@@ -18,7 +18,7 @@ const NOT_YET: &str = "That file is not made yet.";
 const MISSING: &str =
     "The file is not in the library folder any more: it was moved or deleted outside reel.";
 const OUTSIDE: &str = "That file is outside the library folder, so it does not open from here.";
-const NO_DATABASE: &str = "The library's database did not answer; Settings, Log says why.";
+const NO_DATABASE: &str = "The library's database did not answer; Settings, Status, Log says why.";
 
 /// Which file of a clip a page asks for.
 #[derive(Debug, PartialEq)]

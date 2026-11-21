@@ -34,7 +34,7 @@ impl Held {
     /// The Save hotkey's notification says it in full.
     pub fn refusal(&self) -> String {
         match self {
-            Held::NoGame => "The replay buffer runs only while a game runs, as set under Settings, OBS, and no game runs now.".into(),
+            Held::NoGame => "The replay buffer runs only while a game runs, as set under Settings, and no game runs now.".into(),
             Held::Off(name) => format!(
                 "The replay buffer is off while {} runs, as set for it under Games and apps.",
                 short(name)
