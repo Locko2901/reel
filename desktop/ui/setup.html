@@ -176,7 +176,12 @@
 
       <section data-step="games" hidden>
         <h1>Games</h1>
-        <p class="intro">reel keeps a list of the programs it has seen, which says which ones are games and the name each gives its clips.</p>
+        <p class="intro">reel can tell when a game runs, from a list of the programs it has seen: to keep the replay buffer for games alone, to record the games you choose by themselves, and to name clips after the game.</p>
+        <div class="panel">
+          <div class="body flush">
+            <div class="srow wide"><div class="slabel"><b>Replay buffer</b><span class="shelp" id="buffer-step-help">always: as before, a clip can be saved at any time. Only while a game runs: it starts with a game and stops a minute after the last one closes; a program reel does not know yet counts while it has the whole screen</span></div><div class="sctl"><div class="seg" role="group" aria-label="Replay buffer" id="buffer-seg"><button type="button" data-buffer="always">Always</button><button type="button" data-buffer="games">Only while a game runs</button></div></div></div>
+          </div>
+        </div>
         <div class="panel" id="steam-step">
           <header><h2>Your Steam games</h2><span class="desc" id="steam-step-desc">looking for Steam on this PC</span></header>
           <div class="body" id="steam-step-found" hidden><p class="steam-names" id="steam-step-names"></p><p class="muted small" id="steam-step-more"></p></div>

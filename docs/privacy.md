@@ -144,6 +144,14 @@ pairing tries are limited per address.
   a server on the same PC, so the token never crosses the network
   unencrypted.
 
+The token reaches the clips that device sent, and nothing else of the
+library: the app sends clips, reads how they went, makes a link to one,
+and looks for a new version of itself. For a rename under [Games and
+apps](games-and-apps.md#renaming) it can also change a clip's title,
+with `PATCH /api/device/clips/{id}` and the title before and after: only
+for a clip that device sent and its user may edit, and only while the
+title still reads as before, so a title changed on the server stays.
+
 **Revoke** next to the device under Settings, **Devices** signs that app
 out at once, and it asks to be paired again. The list shows each device's
 name, whose it is, when it was last seen and how many clips it sent.

@@ -2,8 +2,9 @@
 
 `save.wav` (1.07 s, "clip captured": two rising notes, E5 then B5), `uploaded.wav` (0.48 s,
 "clip is safe on the server": one soft A5) and `session.wav` (0.62 s, "a session recording
-starts, or still runs": G5 twice, short) are reel's own, synthesised with ffmpeg and under reel's
-MIT licence. The cue "link copied" plays `uploaded.wav` at a lower volume by default. 44.1 kHz,
+starts, or still runs": G5 twice, short) and `no_clip.wav` (0.6 s, "the Save hotkey found no
+replay buffer": D4 falling to A3, low and short) are reel's own, synthesised with ffmpeg and under
+reel's MIT licence. The cue "link copied" plays `uploaded.wav` at a lower volume by default. 44.1 kHz,
 16 bit stereo PCM, as the app's player expects.
 
 They were made with:
@@ -20,6 +21,10 @@ C="(sin(2*PI*783.99*t)+0.3*sin(2*PI*1567.98*t)+0.08*sin(2*PI*2351.97*t))*exp(-9*
 D="if(gte(t,0.17),(sin(2*PI*783.99*(t-0.17))+0.3*sin(2*PI*1567.98*(t-0.17))+0.08*sin(2*PI*2351.97*(t-0.17)))*exp(-9*(t-0.17))*min(1,(t-0.17)/0.003),0)"
 ffmpeg -f lavfi -i "aevalsrc=exprs='0.5*($C+$D)|0.5*($C+$D)':s=44100:d=0.62" \
   -af "afade=t=out:st=0.52:d=0.1,volume=-9dB" -map_metadata -1 -fflags +bitexact -flags:a +bitexact -c:a pcm_s16le session.wav
+E="(sin(2*PI*293.66*t)+0.25*sin(2*PI*587.33*t)+0.06*sin(2*PI*880.99*t))*exp(-8*t)*min(1,t/0.004)"
+G="if(gte(t,0.15),(sin(2*PI*220*(t-0.15))+0.25*sin(2*PI*440*(t-0.15))+0.06*sin(2*PI*660*(t-0.15)))*exp(-7*(t-0.15))*min(1,(t-0.15)/0.004),0)"
+ffmpeg -f lavfi -i "aevalsrc=exprs='0.5*($E+$G)|0.5*($E+$G)':s=44100:d=0.6" \
+  -af "afade=t=out:st=0.5:d=0.1,volume=-6dB" -map_metadata -1 -fflags +bitexact -flags:a +bitexact -c:a pcm_s16le no_clip.wav
 ```
 
 Settings, Sounds in the app takes a WAV of your own for each cue instead.

@@ -280,14 +280,14 @@ fn current(rt: &Runtime) -> String {
     rt.settings().obs.setup.encoder_id().to_string()
 }
 
-/// The watch over a change of encoder needs reel's own OBS, recording wanted, and no try of
-/// the setup's running.
+/// The watch over a change of encoder needs reel's own OBS, its replay buffer wanted (not held
+/// by Pause clips or the rules for games), and no try of the setup's running.
 fn watched(rt: &Runtime) -> bool {
     let g = rt.lock();
     g.bundled.is_some()
         && g.settings.obs.bundled
         && g.settings.obs.start_replay
-        && !g.recording_paused
+        && !g.buffer_off()
         && g.encoder_trial.is_none()
 }
 

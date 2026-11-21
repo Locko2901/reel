@@ -1,8 +1,10 @@
 # Games and apps
 
 Settings, **Games and apps**, in the app's **Recording** group, is the list of the programs reel
-has seen on this PC: which ones are games, and the name each gives its clips. Steam's installed
-games come into it by themselves. The list is this PC's alone and stays on it.
+has seen on this PC: which ones are games, the name each gives its clips, and what each does
+while it runs: whether the replay buffer runs, whether a session recording starts by itself and
+stops when it closes, and whether uploads and encoding wait. Steam's installed games come into it
+by themselves. The list is this PC's alone and stays on it.
 
 ## How a program gets in
 
@@ -20,8 +22,12 @@ editors, Explorer, OBS and reel itself never come in: reel knows they are no gam
 !!! note "On Linux"
 
     The app cannot tell which program is in front on Linux, so there the list fills from Steam
-    and by hand, and clips are named as before: by the game OBS captures by its window, when it
-    does, and otherwise by their date.
+    and by hand. It can tell which programs of the list run: the replay buffer, a session
+    recording that starts by itself and one that stops with its game work as on Windows, and a
+    clip takes the name of the game that runs, when one Game alone runs. Otherwise clips are
+    named as before: by the game OBS captures by its window, when it does, and otherwise by
+    their date. A program not sorted yet never counts as a game there, as reel cannot tell
+    whether it has the whole screen; the waits are Windows' alone.
 
 ## Steam
 
@@ -74,6 +80,9 @@ A program's page shows its class as four cards; one click sorts it.
 | | Game | Not a game | Not sorted yet | Ignored |
 |---|---|---|---|---|
 | Clips saved in front of it take its name | yes | yes | yes | no |
+| The replay buffer, when it runs only while a game runs | runs while it runs | not started by it | runs while it has the whole screen | as if it were not there |
+| Records by itself, when every game does | yes | no | no | no |
+| Stops the session recording when it closes | yes | no | no | no |
 | The waits, when they are on | while it is in front | never | while it has the whole screen | never |
 | In the list | by name | by name | first, marked | at the end |
 
@@ -95,10 +104,104 @@ A program's page shows its class as four cards; one click sorts it.
 - **Clips are named** (Windows): after its name, or after its window's title, for an emulator
   or a launcher that shows the game it runs.
 - **Class**: the four cards above.
-- **This program** (Windows): the waits for this program alone, **As its class**, **On** or
-  **Off**, with the line of where its value comes from ([The waits](#the-waits)).
+- **This program**: what it does while it runs, each **As its class**, **On** or **Off** for this
+  program alone, with the line of where its value comes from ([Every game, its class, its own
+  setting](#every-game-its-class-its-own-setting)): **Replay buffer**, **Record by itself**,
+  **Stop when it closes**, and on Windows the waits.
 - **Remove from the list**: it comes back as Not sorted yet when it is seen again; a Steam game
   is not added again. The class Ignored keeps a program out for good.
+
+The list says **running now** on the line of a program that runs.
+
+## While a game runs
+
+reel looks at the programs that run every 3 seconds: on Windows each process and the file it
+runs from, on Linux each program's file under `/proc`. A program counts when its file is in the
+list, or lies in the folder of a Steam game of the list. Nothing of it leaves the PC; the Log
+says each start and close of a program of the list, for example `game: Ember Pass started
+(C:\Games\Ember Pass\EmberPass-Win64-Shipping.exe), a Game`.
+
+### The replay buffer
+
+Settings, **OBS**, **The replay buffer**, **Runs**:
+
+- **always**, the default: as before, a clip can be saved at any time.
+- **only while a game runs**: OBS's replay buffer starts with a game and stops once the last
+  one closed and the [grace period](#the-grace-period) passed. It leaves the PC its memory and
+  its encoder while no game runs.
+
+A game can also stop it while it runs, with its own **Replay buffer** set to **Off**: a heavy
+game that needs every bit of the PC. Such an Off wins over every other program that runs: the
+buffer stays stopped until that game closes.
+
+With an OBS of your own, reel starts and stops OBS's replay buffer only with **Start the
+replay buffer** on (OBS, obs-websocket); choosing **only while a game runs** turns it on, and
+says so. The setup's step **Games** asks the same, **Always** pressed.
+
+### Session recordings
+
+Settings, **Session recording**, **With a game**:
+
+- **Every game records by itself**, off by default: on, a session recording starts when a Game
+  starts. Off, only the games you choose do, with **Record by itself** on their page.
+- **Stop the session recording when its game closes**, on by default: a recording stops once its
+  game closed and the grace period passed. That is also one you started by hand while the game
+  ran. With several such games running, it stops once the last of them closed.
+- **Grace period**, 60 s by default (0 to 600).
+- **Record by itself now** names the games that do, as the list sets them.
+
+One recording covers every game: a second game that starts while one runs does not start
+another. A game that runs when reel starts starts none; one that starts after does. The
+recording takes the game's name, as a clip does. Its notification, **Session recording started**,
+says `Ember Pass started. It stops when Ember Pass closes; Alt+F9 stops it sooner.`, and its end
+**Session recording stopped: Ember Pass closed**. **Record** and Alt+F9 stop it sooner, as
+any recording.
+
+### The grace period
+
+A game that closes and starts again within the grace period counts as still running: a
+launcher that restarts the game, a crash and a quick start again, a change of graphics
+settings that restarts it. The recording goes on as one, and a buffer that runs only while a
+game runs stays. The Log says `game: Ember Pass closed; the session recording stops in 60 s
+unless it starts again`.
+
+While it runs, the window's bar counts down to what its end changes, in place of the game's
+name: **ready**, then **buffer stops in 0:45** (a buffer that runs only while a game runs);
+**recording**, then **stops in 0:45** (a recording that stops with its game, and with it the
+buffer when both end together); **no replay buffer**, then **back in 0:45** (a game whose own Off
+kept the buffer off). Its menu's sentence says which game closed: `Ember Pass closed: the
+session recording stops in 0:45; if Ember Pass starts again before then, it goes on.` The tray
+has a line with the time it ends, `Ember Pass closed: the recording stops at 21:14:05`. A game
+that starts again within it takes the countdown away, and at its end the recording or the
+buffer stops right then.
+
+### When a clip cannot be saved
+
+While the replay buffer is stopped by these rules, the Save hotkey saves nothing. reel says so
+at once, as a game in full screen may hold notifications back:
+
+- the sound **No clip** (Settings, **Sounds**), a short falling tone, which can be turned off or
+  changed there;
+- the notification **No clip saved**: `The replay buffer is off while Starfall Tactics runs, as
+  set for it under Games and apps. Alt+F9 records a session instead.`, with **Open Games and
+  apps**;
+- in the window, a toast that says why, and the bar's state;
+- in the tray, **Save clip** greyed, with why on the line under it.
+
+**Record** (Alt+F9) works all along.
+
+### In the bar and the tray
+
+While a Game of the list runs, the window's bar names it after its state's words, quietly; a
+long name is cut short, and gives way first on a narrow window, before Record or the state's
+fix. Its menu's sentence says what the game gets: `Ember Pass runs for 14 min, a Game: the
+replay buffer runs.` The tray names it on a line of its own, `Ember Pass runs: the recording
+stops when it closes`, and its tooltip ends with it.
+
+With the buffer stopped, the bar says **waiting for a game** (only while a game runs, and none
+runs) or **no replay buffer** (a game's own Off), the latter with **Games and apps** to change
+it. A program not sorted yet that takes the whole screen shows in the tray as `Quarry Kings is
+new: sort it`, with **Game**, **Not a game**, **Ignore** and **Open in settings**.
 
 ## Renaming
 
@@ -110,8 +213,14 @@ their game, and changes the titles reel made them (the name followed by the mome
 the library on this PC, and the game's own collection follows.
 
 On a connected PC the titles change in the app (Settings, Status, and a clip not sent yet goes
-up with its new title), but not on the server: the app cannot change a clip's title there. Its
-question says so, with how many the server has; change a title on the clip's page on the
+up with its new title). The question also offers **And the N on the server**, on to begin with:
+the titles of the clips this PC sent, changed on the server too. reel sends each one's title
+before and after; the server changes it only while it still reads as before, so a title someone
+changed on the server since stays, and the toast says how many did. A clip whose title on the
+PC was changed by hand is not sent at all.
+
+A server of a version before this cannot take a title from the app: the question then says the
+server's titles stay, with how many the server has; change a title on the clip's page on the
 server.
 
 ## The waits
@@ -129,21 +238,33 @@ Connected, **Only on the internet, not on the LAN** shows under it while it is o
 upload to a server on the local network goes on during a game. An install updated from a
 version before Games and apps starts with the waits off too.
 
-What waits, while which program is in front, comes in three steps, each changing the one
-before:
-
-1. **Every game**: the switch above.
-2. **Its class**: a Game takes it as it is, while its window is in front (a borderless game
-   counts); Not sorted yet takes it while it has the whole screen; Not a game and Ignored never
-   wait.
-3. **Its own setting**, under This program on its page: **On** or **Off** for this program alone,
-   whatever the switch and its class say; **As its class** leaves them.
-
-A program's page shows the three as a line under the row, the one that counts in white:
-`Every game, set under New clips: off › Starfall Tactics: on`.
+What waits, while which program is in front, comes from the [three
+layers](#every-game-its-class-its-own-setting): a Game waits while its window is in front (a
+borderless game counts), a program not sorted yet while it has the whole screen.
 
 The update of the OBS copy for games that run as administrator still waits until no full
 screen program is in front, whatever these say: Windows' question would take the game's screen.
+
+## Every game, its class, its own setting
+
+What a program does while it runs comes in three layers, each changing the one before:
+
+1. **Every game**: set where its subject is.
+2. **Its class**: what the class makes of it ([The classes](#the-classes)).
+3. **Its own setting**, under This program on its page: **On** or **Off** for this program
+   alone, whatever the other two say; **As its class** leaves them.
+
+| | Every game, set under | Off by its class | Its own On | Its own Off |
+|---|---|---|---|---|
+| **Replay buffer** | OBS, The replay buffer: always, or only while a game runs | Not a game and Ignored never start it; Ignored is as if it were not there | it runs while it runs | stopped while it runs, whatever runs beside it |
+| **Record by itself** | Session recording, Every game records by itself | every class but Game | it records when it starts | never |
+| **Stop when it closes** | Session recording, Stop the session recording when its game closes | every class but Game | the recording stops when it closes | the recording goes on after it |
+| **The waits** (Windows) | New clips (Upload when connected) | Not a game and Ignored | they wait while it is in front | never |
+
+Ignored overrides its own settings: an Ignored program does nothing. A program's page shows the
+layers as a line under each row, the one that counts in white: `Every game, set under New
+clips: off › Starfall Tactics: on`. At the top of the list, **What happens while a program
+runs** shows the order.
 
 ## What stays on the PC
 
@@ -169,3 +290,17 @@ takes the whole screen, comes in as Not sorted yet: sort it as **Not a game**.
 **A heavy game.** One game keeps the PC so busy that a re-encode beside it stutters, while the
 others are fine. Leave the waits off under New clips, and on that game's page set **Encoding
 waits** to **On**: the line reads `Every game, set under New clips: off › Starfall Tactics: on`.
+
+**A heavy game with its replay buffer off.** Starfall Tactics needs all of the PC's memory, and
+clips of it are not wanted. On its page set **Replay buffer** to **Off**. While it runs, OBS's
+replay buffer is stopped, also with another game running beside it; the bar says **no replay
+buffer**, and the Save hotkey plays **No clip** and says why. Alt+F9 still records a session.
+Once it closed and the grace period passed, the buffer runs again.
+
+**Two games that record by themselves.** You want every evening of Ember Pass and of Cinder
+Road on record, and clips of the rest. Leave **Every game records by itself** off, and on both
+games' pages set **Record by itself** to **On**; **Record by itself now** under Session recording
+names them. Ember Pass starts a recording; Cinder Road, started an hour later beside it, starts
+none, and the one recording goes on. Ember Pass closes first: the recording goes on while
+Cinder Road runs, and stops once it closed too and the grace period passed. A crash of Cinder
+Road and a start again within the minute does not cut it.

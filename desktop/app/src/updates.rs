@@ -589,7 +589,7 @@ fn link_answer(link: &Link, value: &str, ready: bool) -> Option<bool> {
     let (install, given) = match link {
         Link::Install(v) => (true, v),
         Link::Later(v) => (false, v),
-        Link::Copy(_) | Link::Open(_) => return None,
+        Link::Copy(_) | Link::Open(_) | Link::Games => return None,
     };
     let same = given.len() == value.len()
         && given

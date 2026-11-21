@@ -70,6 +70,9 @@ pub struct WhoAmI {
     pub normalize_new: Option<bool>,
     #[serde(default)]
     pub loudness_target: Option<i32>,
+    /// The server takes a clip's title from the app that sent it.
+    #[serde(default)]
+    pub clip_titles: bool,
     /// The largest upload the server takes, for the setup to warn about a clip too long.
     #[serde(default)]
     pub upload_max_bytes: Option<u64>,
@@ -406,6 +409,18 @@ impl Api {
     pub async fn clip(&self, clip_id: &str) -> Result<ClipStatus, ApiError> {
         let req = self.auth(self.client.get(self.url(&format!("clips/{clip_id}"))));
         Ok(self.send("clip", req).await?.1)
+    }
+
+    /// A clip's new title; the server keeps one changed since `was`, and says whether it changed.
+    pub async fn set_title(&self, clip_id: &str, title: &str, was: &str) -> Result<bool, ApiError> {
+        let body = serde_json::json!({ "title": title, "was": was });
+        let req = self.auth(
+            self.client
+                .patch(self.url(&format!("clips/{clip_id}")))
+                .json(&body),
+        );
+        let (_, v): (_, serde_json::Value) = self.send("title", req).await?;
+        Ok(v["changed"].as_bool().unwrap_or(false))
     }
 
     pub async fn share(&self, clip_id: Option<&str>) -> Result<ShareAnswer, ApiError> {

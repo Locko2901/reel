@@ -22,6 +22,25 @@ fn act(id: &str, label: impl Into<String>, on: bool) -> Item {
 pub fn items(st: &Status) -> Vec<Item> {
     let standalone = st.mode == "standalone";
     let mut out = vec![Item::Line("state".into(), st.state_short())];
+    if let Some(p) = &st.playing {
+        out.push(Item::Line("game".into(), p.line.clone()));
+    }
+    if let Some(g) = &st.grace {
+        out.push(Item::Line("grace".into(), g.line.clone()));
+    }
+    if let Some(n) = &st.newcomer {
+        let id = &n.id;
+        out.push(Item::Sub(
+            "sort".into(),
+            format!("{} is new: sort it", crate::detect::short(&n.name)),
+            vec![
+                act(&format!("sort-game:{id}"), "Game", true),
+                act(&format!("sort-not:{id}"), "Not a game", true),
+                act(&format!("sort-ignore:{id}"), "Ignore", true),
+                act(&format!("sort-open:{id}"), "Open in settings", true),
+            ],
+        ));
+    }
     if st.obs_box.as_ref().is_some_and(|b| b.state == "gave_up") {
         out.push(act("obs-again", "Start OBS again", true));
     }
@@ -465,6 +484,80 @@ mod tests {
     }
 
     #[test]
+    fn the_game_that_runs_has_a_line_and_a_new_one_in_full_screen_is_offered_to_sort() {
+        let mut st = status("standalone", false, "");
+        st.playing = Some(crate::detect::Playing {
+            name: "Ember Pass".into(),
+            short: "Ember Pass".into(),
+            line: "Ember Pass runs: the recording stops when it closes".into(),
+            ..Default::default()
+        });
+        st.newcomer = Some(crate::detect::Newcomer {
+            id: "p-1".into(),
+            name: "Quarry Kings: Deluxe".into(),
+        });
+        st.save = Action {
+            ok: false,
+            why: "no replay buffer while Starfall Tactics runs".into(),
+        };
+        let all = items(&st);
+        assert!(
+            matches!(&all[1], Item::Line(id, l) if id == "game" && l == "Ember Pass runs: the recording stops when it closes")
+        );
+        match &all[2] {
+            Item::Sub(id, label, acts) => {
+                assert_eq!(
+                    (id.as_str(), label.as_str()),
+                    ("sort", "Quarry Kings is new: sort it")
+                );
+                let ids: Vec<String> = acts
+                    .iter()
+                    .filter_map(|a| match a {
+                        Item::Act(id, _, true) => Some(id.clone()),
+                        _ => None,
+                    })
+                    .collect();
+                assert_eq!(
+                    ids,
+                    [
+                        "sort-game:p-1",
+                        "sort-not:p-1",
+                        "sort-ignore:p-1",
+                        "sort-open:p-1"
+                    ]
+                );
+            }
+            other => panic!("{other:?}"),
+        }
+        let got = entries(&st);
+        assert!(got.contains(&("save".into(), "Save clip".into(), false)));
+        assert!(got.contains(&(
+            "save-why".into(),
+            "No replay buffer while Starfall Tactics runs".into(),
+            false
+        )));
+        assert_eq!(st.tooltip(), "reel: ready, last 60 s; Ember Pass runs");
+    }
+
+    #[test]
+    fn a_grace_period_has_a_line_under_the_state() {
+        let mut st = status("standalone", false, "");
+        st.grace = Some(crate::detect::Grace {
+            line: "Ember Pass closed: the recording stops at 21:14:05".into(),
+            ..Default::default()
+        });
+        let all = items(&st);
+        assert!(matches!(&all[0], Item::Line(id, _) if id == "state"));
+        assert!(
+            matches!(&all[1], Item::Line(id, l) if id == "grace" && l == "Ember Pass closed: the recording stops at 21:14:05"),
+            "greyed, as the state's line: {:?}",
+            all[1]
+        );
+        st.grace = None;
+        assert!(!ids(&st).contains(&"grace".to_string()), "gone with it");
+    }
+
+    #[test]
     fn an_obs_the_app_stopped_starting_is_started_again_from_under_the_state_line() {
         let mut st = status("connected", true, "https://clips.example.org");
         let line = |state: &str| crate::obsbox::BoxLine {
@@ -532,8 +625,15 @@ mod tests {
                     ..running(mode == "standalone", true)
                 },
             );
-            let (save, share) =
-                crate::status::save_actions(true, true, true, None, true, mode == "standalone");
+            let (save, share) = crate::status::save_actions(
+                true,
+                None,
+                true,
+                true,
+                None,
+                true,
+                mode == "standalone",
+            );
             st.save = save;
             st.save_share = share;
             let got = entries(&st);

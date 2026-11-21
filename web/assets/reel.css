@@ -319,6 +319,12 @@ html[data-app="desktop"] .top .chip { display: none; }
 .appbar-words b.active { color: var(--accent); }
 .appbar-detail { min-width: 0; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
 .appbar-detail:empty { display: none; }
+.appbar-game { min-width: 0; max-width: 260px; overflow: hidden; text-overflow: ellipsis; color: var(--text-2); }
+.appbar-game::before { content: "\00b7"; margin-right: 7px; color: var(--text-3); }
+.appbar-game:empty { display: none; }
+.appbar-grace { flex: none; color: var(--text-2); font-variant-numeric: tabular-nums; }
+.appbar-grace::before { content: "\00b7"; margin-right: 7px; color: var(--text-3); }
+.appbar-grace:empty { display: none; }
 .appbar kbd.hint { height: auto; min-width: 0; padding: 0; border: 0; background: none; font-family: var(--mono); font-size: var(--fs-xs); line-height: 1; color: var(--text-3); }
 .appbar kbd.hint:empty { display: none; }
 .appbar-words .chev { width: 13px; height: 13px; color: var(--text-3); flex: none; }

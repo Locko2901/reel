@@ -123,3 +123,4 @@ dialog.games-dialog .add-body { display: flex; flex-direction: column; gap: var(
   .dfield .hint { grid-column: 1; }
   .games-head #games-find { width: 100%; }
 }
+.games-dialog .server-titles { padding: 6px 0 0; border-top: 1px solid var(--line); border-bottom: 0; }
