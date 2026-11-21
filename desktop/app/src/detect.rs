@@ -1,11 +1,12 @@
 //! The running check: every 3 s the programs of Games and apps that run, kept for the grace period
 //! after they close; the replay buffer kept or stopped by the rules for games, a session
-//! recording started and stopped with a game, and the game the bar and the tray name.
+//! recording started and stopped with a game, the game the bar and the tray name, and the
+//! countdown to what a grace period ends.
 use crate::notify;
 use crate::runtime::{Inner, Runtime};
 use crate::session::Ask;
 use reel_desktop_core::cues::Cue;
-use reel_desktop_core::programs::{self, Class, Every, Running};
+use reel_desktop_core::programs::{self, Class, Every, Running, Turn};
 use reel_desktop_core::session::By;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
@@ -67,6 +68,80 @@ pub struct Playing {
     pub sentence: String,
     /// The tray's line under its first: "Ember Pass runs: the recording stops when it closes".
     pub line: String,
+}
+
+/// A countdown to what the end of a grace period changes: the bar counts down each second to
+/// `until_ms` on the page's own clock, the bar's menu says it in a sentence, the tray in a line.
+#[derive(Debug, Clone, serde::Serialize, Default, PartialEq)]
+pub struct Grace {
+    /// The end, in milliseconds since 1970.
+    pub until_ms: u64,
+    /// The bar's words before the clock: "buffer stops in"; "stops in" after "recording".
+    pub bar: String,
+    /// The time left when the status was read: "0:45".
+    pub left: String,
+    /// The menu's sentence, with `{left}` where the clock goes.
+    pub sentence: String,
+    /// That sentence with the time left when the status was read, as the menu's line has it.
+    pub said: String,
+    /// The tray's line, with the time of day it ends.
+    pub line: String,
+}
+
+/// A countdown's time left as the bar shows it, rounded up to the second: "0:45", "10:00".
+pub fn clock(left: Duration) -> String {
+    let s = left.as_millis().div_ceil(1000);
+    format!("{}:{:02}", s / 60, s % 60)
+}
+
+/// What a grace period ends, in words: `name` the program that closed, `left` the time until
+/// its end, `at` that end's time of day. The bar's words wait for the state (`grace_bar`).
+pub fn grace_words(e: &programs::Ending, name: &str, left: Duration, at: &str) -> Grace {
+    let n = short(name);
+    let (sentence, line) = match (e.recording, e.buffer) {
+        (true, Some(Turn::Stops)) => (
+            format!("{n} closed: the session recording and the replay buffer stop in {{left}}; if {n} starts again before then, both go on."),
+            format!("{n} closed: the recording and the buffer stop at {at}"),
+        ),
+        (true, Some(Turn::Starts)) => (
+            format!("{n} closed: the session recording stops and the replay buffer runs again in {{left}}; if {n} starts again before then, both stay as they are."),
+            format!("{n} closed: the recording stops at {at}"),
+        ),
+        (true, None) => (
+            format!("{n} closed: the session recording stops in {{left}}; if {n} starts again before then, it goes on."),
+            format!("{n} closed: the recording stops at {at}"),
+        ),
+        (false, Some(Turn::Starts)) => (
+            format!("{n} closed: the replay buffer runs again in {{left}}; if {n} starts again before then, it stays off."),
+            format!("{n} closed: the replay buffer runs again at {at}"),
+        ),
+        (false, _) => (
+            format!("{n} closed: the replay buffer stops in {{left}}; if a game starts before then, it goes on."),
+            format!("{n} closed: the replay buffer stops at {at}"),
+        ),
+    };
+    let left = clock(left);
+    Grace {
+        until_ms: 0,
+        bar: String::new(),
+        said: sentence.replace("{left}", &left),
+        left,
+        sentence,
+        line,
+    }
+}
+
+/// The bar's words before the clock, after the state's own word: short where that word says
+/// what it is about: "stops in" after "recording".
+pub fn grace_bar(e: &programs::Ending, state: &str) -> String {
+    match (e.recording, e.buffer) {
+        (true, _) if state == "recording" => "stops in",
+        (true, _) => "recording stops in",
+        (false, Some(Turn::Starts)) if state == "buffer_off" => "back in",
+        (false, Some(Turn::Starts)) => "buffer back in",
+        (false, _) => "buffer stops in",
+    }
+    .to_string()
 }
 
 /// A program not sorted yet that has the whole screen now, for the tray's offer to sort it.
@@ -293,7 +368,7 @@ impl Inner {
         if self.buffer_held == Some(Held::Off(e.name.clone())) {
             // the state's line says it already
             line = Some("no replay buffer for it".to_string());
-        } else if !self.recording_paused {
+        } else if !self.recording_paused && self.buffer_held.is_none() {
             gives.push("the replay buffer runs".to_string());
         }
         if self.session.is_some() && self.stop_with.contains(&e.id) {
@@ -329,6 +404,50 @@ impl Inner {
                 None => format!("{s} runs"),
             },
         })
+    }
+
+    /// What the end of a grace period will change, while one runs: the replay buffer, where the
+    /// rules for games decide it and OBS would follow, and a session recording that stops with
+    /// the programs that closed. The bar's words follow once the state is known (`grace_bar`).
+    pub(crate) fn grace(&self) -> Option<(programs::Ending, Grace)> {
+        let grace = Duration::from_secs(u64::from(self.settings.session.grace_seconds));
+        let every = Every::of(&self.settings);
+        let running = self.running();
+        let set_up =
+            self.settings.obs.enabled || (self.bundled.is_some() && self.settings.obs.bundled);
+        let replay = self.obs_state.as_ref().map(|s| s.replay_active);
+        // what OBS will do: a buffer that runs stops, one the app starts runs again
+        let follows = if programs::buffer_runs(&every, &running) {
+            replay == Some(true)
+        } else {
+            replay == Some(false) && self.settings.obs.start_replay
+        };
+        let buffer = set_up && self.obs.connected && !self.recording_paused && follows;
+        let stops_with = self
+            .session
+            .as_ref()
+            .filter(|r| r.stopping.is_none())
+            .map(|_| self.stop_with.as_slice());
+        let e = programs::ending(&every, &self.runs, &running, buffer, stops_with, grace)?;
+        let left = e.at.saturating_duration_since(Instant::now());
+        if left.is_zero() {
+            return None;
+        }
+        let name = self.programs.get(&e.id)?.name.clone();
+        let end = std::time::SystemTime::now() + left;
+        let at = jiff::Timestamp::try_from(end)
+            .map(|t| {
+                t.to_zoned(jiff::tz::TimeZone::system())
+                    .strftime("%H:%M:%S")
+                    .to_string()
+            })
+            .unwrap_or_default();
+        let mut g = grace_words(&e, &name, left, &at);
+        g.until_ms = end
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_millis() as u64)
+            .unwrap_or_default();
+        Some((e, g))
     }
 
     /// The one Game that runs, when one alone does: it names a clip that nothing in front names,
@@ -378,7 +497,17 @@ impl Runtime {
                     .await
                     .unwrap_or_default();
                 rt.look_at_running(&paths, Instant::now());
-                tokio::time::sleep(EVERY).await;
+                // the next look comes at a grace period's end, where the bar's countdown ends
+                let end = {
+                    let g = rt.lock();
+                    let grace = Duration::from_secs(u64::from(g.settings.session.grace_seconds));
+                    g.runs.next_end(grace)
+                };
+                let wait = end.map_or(EVERY, |t| {
+                    t.saturating_duration_since(Instant::now())
+                        .clamp(Duration::from_millis(50), EVERY)
+                });
+                tokio::time::sleep(wait).await;
             }
         });
     }
@@ -548,6 +677,82 @@ mod tests {
             "Half-Life 2",
             "a dash inside a word stays"
         );
+    }
+
+    #[test]
+    fn a_countdown_rounds_up_to_the_second() {
+        assert_eq!(clock(Duration::from_millis(44_200)), "0:45");
+        assert_eq!(clock(Duration::from_secs(60)), "1:00");
+        assert_eq!(clock(Duration::from_millis(1)), "0:01");
+        assert_eq!(clock(Duration::ZERO), "0:00");
+        assert_eq!(clock(Duration::from_secs(600)), "10:00");
+    }
+
+    #[test]
+    fn what_a_grace_period_ends_in_the_bar_the_menu_and_the_tray() {
+        let ending = |recording, buffer| programs::Ending {
+            at: Instant::now(),
+            id: "p-1".into(),
+            recording,
+            buffer,
+        };
+        let left = Duration::from_millis(44_200);
+        let name = "Ember Pass: The Long Road";
+        let buffer = ending(false, Some(Turn::Stops));
+        let g = grace_words(&buffer, name, left, "21:14:05");
+        assert_eq!(
+            g.said,
+            "Ember Pass closed: the replay buffer stops in 0:45; if a game starts before then, it goes on."
+        );
+        assert_eq!(g.said, g.sentence.replace("{left}", &g.left));
+        assert_eq!(
+            g.line,
+            "Ember Pass closed: the replay buffer stops at 21:14:05"
+        );
+        assert_eq!(grace_bar(&buffer, "idle"), "buffer stops in");
+
+        let rec = ending(true, None);
+        let g = grace_words(&rec, name, left, "21:14:05");
+        assert_eq!(
+            g.said,
+            "Ember Pass closed: the session recording stops in 0:45; if Ember Pass starts again before then, it goes on."
+        );
+        assert_eq!(g.line, "Ember Pass closed: the recording stops at 21:14:05");
+        assert_eq!(
+            grace_bar(&rec, "recording"),
+            "stops in",
+            "after the state's word recording"
+        );
+        assert_eq!(
+            grace_bar(&rec, "obs_off"),
+            "recording stops in",
+            "another state's word: the countdown says what stops"
+        );
+
+        let both = ending(true, Some(Turn::Stops));
+        let g = grace_words(&both, name, left, "21:14:05");
+        assert_eq!(
+            g.said,
+            "Ember Pass closed: the session recording and the replay buffer stop in 0:45; if Ember Pass starts again before then, both go on."
+        );
+        assert_eq!(
+            g.line,
+            "Ember Pass closed: the recording and the buffer stop at 21:14:05"
+        );
+        assert_eq!(grace_bar(&both, "recording"), "stops in", "one countdown");
+
+        let back = ending(false, Some(Turn::Starts));
+        let g = grace_words(&back, "Starfall Tactics", left, "21:14:05");
+        assert_eq!(
+            g.said,
+            "Starfall Tactics closed: the replay buffer runs again in 0:45; if Starfall Tactics starts again before then, it stays off."
+        );
+        assert_eq!(
+            g.line,
+            "Starfall Tactics closed: the replay buffer runs again at 21:14:05"
+        );
+        assert_eq!(grace_bar(&back, "buffer_off"), "back in");
+        assert_eq!(grace_bar(&back, "idle"), "buffer back in");
     }
 
     #[test]

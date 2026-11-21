@@ -95,6 +95,8 @@ pub struct Status {
     pub unsorted: usize,
     /// The game that runs, which the bar and the tray name.
     pub playing: Option<crate::detect::Playing>,
+    /// The countdown to what a grace period ends, while one runs.
+    pub grace: Option<crate::detect::Grace>,
     /// A program not sorted yet with the whole screen, which the tray offers to sort.
     pub newcomer: Option<crate::detect::Newcomer>,
     /// Pause clips: the replay buffer is stopped on purpose until Resume clips.
@@ -471,6 +473,8 @@ pub struct Facts<'a> {
     pub held: Option<&'a crate::detect::Held>,
     /// The sentence about the game that runs, which ends the menu's first.
     pub playing: Option<&'a str>,
+    /// The sentence about what a grace period ends, after the game's.
+    pub grace: Option<&'a str>,
 }
 
 /// A row of the bar's menu: its dot, word and line.
@@ -569,14 +573,14 @@ fn sentence(s: &str) -> String {
 }
 
 /// The first state that holds is the one said: what wants a hand first, then what runs, then
-/// ready; the game that runs ends its sentence.
+/// ready; the game that runs ends its sentence, and what a grace period ends after it.
 pub fn said(f: &Facts) -> Said {
     let mut s = said_alone(f);
-    if let Some(game) = f.playing {
+    for more in [f.playing, f.grace].into_iter().flatten() {
         s.line = if s.line.is_empty() {
-            game.to_string()
+            more.to_string()
         } else {
-            format!("{} {game}", s.line)
+            format!("{} {more}", s.line)
         };
     }
     s
@@ -1350,6 +1354,31 @@ mod tests {
         assert!(
             s.line.ends_with(game) && s.line.starts_with("OBS keeps the last 60 s"),
             "{}",
+            s.line
+        );
+        let grace = "Hollow Pines closed: the replay buffer stops in 0:45; if a game starts before then, it goes on.";
+        let s = said(&Facts {
+            grace: Some(grace),
+            ..ready(false)
+        });
+        assert_eq!(
+            (s.state, s.word.as_str(), s.detail.as_str()),
+            ("idle", "ready", "last 60 s"),
+            "a grace period: the state stays, clips can still be saved"
+        );
+        assert!(
+            s.line.starts_with("OBS keeps the last 60 s") && s.line.ends_with(grace),
+            "{}",
+            s.line
+        );
+        let s = said(&Facts {
+            playing: Some(game),
+            grace: Some(grace),
+            ..ready(false)
+        });
+        assert!(
+            s.line.ends_with(&format!("{game} {grace}")),
+            "the game that runs, then what the grace period ends: {}",
             s.line
         );
     }

@@ -25,6 +25,9 @@ pub fn items(st: &Status) -> Vec<Item> {
     if let Some(p) = &st.playing {
         out.push(Item::Line("game".into(), p.line.clone()));
     }
+    if let Some(g) = &st.grace {
+        out.push(Item::Line("grace".into(), g.line.clone()));
+    }
     if let Some(n) = &st.newcomer {
         let id = &n.id;
         out.push(Item::Sub(
@@ -534,6 +537,24 @@ mod tests {
             false
         )));
         assert_eq!(st.tooltip(), "reel: ready, last 60 s; Ember Pass runs");
+    }
+
+    #[test]
+    fn a_grace_period_has_a_line_under_the_state() {
+        let mut st = status("standalone", false, "");
+        st.grace = Some(crate::detect::Grace {
+            line: "Ember Pass closed: the recording stops at 21:14:05".into(),
+            ..Default::default()
+        });
+        let all = items(&st);
+        assert!(matches!(&all[0], Item::Line(id, _) if id == "state"));
+        assert!(
+            matches!(&all[1], Item::Line(id, l) if id == "grace" && l == "Ember Pass closed: the recording stops at 21:14:05"),
+            "greyed, as the state's line: {:?}",
+            all[1]
+        );
+        st.grace = None;
+        assert!(!ids(&st).contains(&"grace".to_string()), "gone with it");
     }
 
     #[test]

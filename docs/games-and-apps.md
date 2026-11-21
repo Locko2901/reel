@@ -165,6 +165,16 @@ settings that restarts it. The recording goes on as one, and a buffer that runs 
 game runs stays. The Log says `game: Ember Pass closed; the session recording stops in 60 s
 unless it starts again`.
 
+While it runs, the window's bar counts down to what its end changes, in place of the game's
+name: **ready**, then **buffer stops in 0:45** (a buffer that runs only while a game runs);
+**recording**, then **stops in 0:45** (a recording that stops with its game, and with it the
+buffer when both end together); **no replay buffer**, then **back in 0:45** (a game whose own Off
+kept the buffer off). Its menu's sentence says which game closed: `Ember Pass closed: the
+session recording stops in 0:45; if Ember Pass starts again before then, it goes on.` The tray
+has a line with the time it ends, `Ember Pass closed: the recording stops at 21:14:05`. A game
+that starts again within it takes the countdown away, and at its end the recording or the
+buffer stops right then.
+
 ### When a clip cannot be saved
 
 While the replay buffer is stopped by these rules, the Save hotkey saves nothing. reel says so

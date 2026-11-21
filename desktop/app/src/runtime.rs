@@ -698,6 +698,8 @@ impl Runtime {
         let obs_set_up = g.settings.obs.enabled || bundled;
         let box_line = g.obs_box.as_ref().map(|b| b.line());
         let playing = g.playing();
+        let grace = g.grace();
+        let grace_said = grace.as_ref().map(|(_, x)| x.said.clone());
         let facts = crate::status::Facts {
             standalone,
             paired,
@@ -743,8 +745,13 @@ impl Runtime {
             save_key: &g.settings.hotkeys.save,
             held: g.buffer_held.as_ref(),
             playing: playing.as_ref().map(|p| p.sentence.as_str()),
+            grace: grace_said.as_deref(),
         };
         let said = crate::status::said(&facts);
+        let grace = grace.map(|(e, mut x)| {
+            x.bar = crate::detect::grace_bar(&e, said.state);
+            x
+        });
         let obs_row = crate::status::obs_row(&facts);
         let keys = {
             let k = &g.settings.hotkeys;
@@ -851,6 +858,7 @@ impl Runtime {
         let mut st = Status {
             unsorted: g.programs.unsorted(),
             playing: playing.clone(),
+            grace,
             newcomer: g.newcomer(),
             paired,
             offline,
@@ -1083,11 +1091,17 @@ impl Runtime {
         let st = self.status();
         let can_share =
             st.mode != "standalone" && st.paired && self.lock().ledger.last_confirmed().is_some();
+        // A server's page from before the countdown draws the bar from the state's words alone:
+        // there the countdown is the state's detail, as of each read (such a page reads every 2 s).
+        let detail = match &st.grace {
+            Some(g) => format!("{} {}", g.bar, g.left),
+            None => st.state_detail.clone(),
+        };
         serde_json::json!({
             "state": st.state,
             "state_tone": st.state_tone,
             "state_word": st.state_word,
-            "state_detail": st.state_detail,
+            "state_detail": detail,
             "state_line": st.state_line,
             "state_fix": st.state_fix,
             "obs_row": st.obs_row,
@@ -1109,6 +1123,8 @@ impl Runtime {
             "update_line": st.update_line,
             "update_ask": st.update_ask.as_ref().filter(|_| own),
             "unsorted": st.unsorted,
+            "playing": st.playing,
+            "grace": st.grace,
         })
     }
 
