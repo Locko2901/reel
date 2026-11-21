@@ -9,6 +9,7 @@ import { bindAsk, renderAsk } from './ask.js';
 import { audioPlan, meterIn, renderLevelRows, wordsInto } from './sources.js';
 import { bindLibrary, refreshLibrary, renderLibrary } from './library.js';
 import { bindGames, opened as gamesOpened, refresh as gamesRefresh } from './games.js';
+import { renderPresence } from './presence.js';
 
 const CTL = 'input, select, button[role="switch"]';
 
@@ -637,6 +638,7 @@ function renderStatus() {
   renderMode();
   renderWaits();
   renderBufferNote();
+  renderPresence(status);
   const here = status.mode === 'standalone';
   renderObs();
   renderLocal();

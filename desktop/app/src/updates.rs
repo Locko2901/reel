@@ -1221,6 +1221,9 @@ pub fn leave(rt: &Runtime, from: &'static str, then: Then) {
         if let Some(what) = rt.session_before_quit() {
             steps.step(&what);
         }
+        if rt.discord_quit() {
+            steps.step("Discord's presence is cleared");
+        }
         if rt.stop_bundled() {
             steps.step("OBS is stopped");
         }

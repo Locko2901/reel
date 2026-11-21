@@ -17,6 +17,7 @@ pub mod log;
 pub mod machine;
 pub mod obs;
 pub mod obsproc;
+pub mod presence;
 pub mod programs;
 pub mod readback;
 pub mod screens;

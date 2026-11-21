@@ -342,21 +342,22 @@ impl Inner {
         acts
     }
 
+    /// The Game the bar names: of the Games that run, the one that started last.
+    pub(crate) fn playing_id(&self) -> Option<&String> {
+        let games = self.runs.ids().filter(|id| {
+            self.runs.get(id).is_some_and(|r| r.gone_at.is_none())
+                && self
+                    .programs
+                    .get(id)
+                    .is_some_and(|e| e.class == Class::Game)
+        });
+        self.runs.newest(games)
+    }
+
     /// The game the bar and the tray name, with what its rules give it.
     pub(crate) fn playing(&self) -> Option<Playing> {
         let every = Every::of(&self.settings);
-        let games: Vec<&String> = self
-            .runs
-            .ids()
-            .filter(|id| {
-                self.runs.get(id).is_some_and(|r| r.gone_at.is_none())
-                    && self
-                        .programs
-                        .get(id)
-                        .is_some_and(|e| e.class == Class::Game)
-            })
-            .collect();
-        let id = self.runs.newest(games.into_iter())?;
+        let id = self.playing_id()?;
         let e = self.programs.get(id)?;
         let run = self.runs.get(id)?;
         let r = e.resolve(&every);

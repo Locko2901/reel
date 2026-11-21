@@ -25,6 +25,7 @@ pub struct Settings {
     pub sounds: SoundSettings,
     pub session: SessionSettings,
     pub games: GamesSettings,
+    pub discord: DiscordSettings,
     pub startup: StartupSettings,
     /// In colour, or the mark alone in one colour for a tray whose icons are all one colour.
     pub tray_icon: TrayIcon,
@@ -351,6 +352,26 @@ impl Default for GamesSettings {
     }
 }
 
+/// What friends see on Discord while a game runs.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(default)]
+pub struct DiscordSettings {
+    /// Off unless turned on: the game's name then goes to Discord.
+    pub show: bool,
+    pub name_game: bool,
+    pub button: bool,
+}
+
+impl Default for DiscordSettings {
+    fn default() -> Self {
+        Self {
+            show: false,
+            name_game: true,
+            button: true,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(default)]
 pub struct StartupSettings {
@@ -381,6 +402,7 @@ impl Default for Settings {
             sounds: SoundSettings::default(),
             session: SessionSettings::default(),
             games: GamesSettings::default(),
+            discord: DiscordSettings::default(),
             startup: StartupSettings::default(),
             tray_icon: TrayIcon::Colour,
             updates: UpdateMode::Ask,
@@ -931,6 +953,25 @@ mod tests {
             on.upload.wait_for_games && !on.games.steam,
             "a choice made after the update is kept"
         );
+    }
+
+    #[test]
+    fn discord_is_off_until_turned_on_with_the_name_and_the_button() {
+        let s = Settings::default();
+        assert!(!s.discord.show);
+        assert!(s.discord.name_game && s.discord.button);
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("settings.json");
+        std::fs::write(&file, r#"{"games":{"steam":true}}"#).unwrap();
+        let older = Settings::load(&file).unwrap();
+        assert_eq!(
+            older.discord,
+            DiscordSettings::default(),
+            "a file from before"
+        );
+        std::fs::write(&file, r#"{"discord":{"show":true,"button":false}}"#).unwrap();
+        let on = Settings::load(&file).unwrap();
+        assert!(on.discord.show && on.discord.name_game && !on.discord.button);
     }
 
     #[test]
