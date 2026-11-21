@@ -1,7 +1,8 @@
 //! Link previews from an S3-compatible bucket; one task keeps it as the links want it.
 
 use crate::enqueue::{
-    ensure_embed, ensure_embed_ext, ext_file, ext_file_made, needs_embed, ExtFile,
+    ensure_embed, ensure_embed_ext, ext_copy_progress, ext_file, ext_file_made, needs_embed,
+    ExtFile,
 };
 use crate::s3::{Bucket, S3};
 use crate::Ctx;
@@ -481,6 +482,39 @@ pub async fn readiness(ctx: &Ctx, version: &Rendition) -> anyhow::Result<Readine
             _ => waiting("upload", ctx.external.going_up(&version.id)),
         }),
     }
+}
+
+/// Whether a live link, of its own or through a collection, serves a version: the only
+/// versions whose preview the pass owes, in the storage or served from here.
+async fn linked(ctx: &Ctx, version_id: &str) -> anyhow::Result<bool> {
+    Ok(ctx
+        .store
+        .live_links()
+        .await?
+        .iter()
+        .any(|l| l.version_id.as_deref() == Some(version_id)))
+}
+
+/// What an app following a clip it sent waits for. With a live link, what the link waits for.
+/// Without one nothing goes up for a link (a preview made ahead goes when it can, and a link
+/// made later waits for its own), so only a copy a job is making at the storage's size is
+/// waited for; nothing is queued for the asking.
+pub async fn app_readiness(ctx: &Ctx, version: &Rendition) -> anyhow::Result<Readiness> {
+    if linked(ctx, &version.id).await? {
+        return readiness(ctx, version).await;
+    }
+    Ok(match ext_copy_progress(ctx, version).await? {
+        Some(p) => Readiness {
+            ready: false,
+            step: "preview",
+            progress: p,
+        },
+        None => Readiness {
+            ready: true,
+            step: "",
+            progress: 1.0,
+        },
+    })
 }
 
 /// Waits at most `limit` until a version's links have their preview, in the storage or served

@@ -364,6 +364,28 @@ pub async fn ext_file_made(
     )
 }
 
+/// How far a job is with a version's copy at the storage's size; None while no job makes one.
+pub async fn ext_copy_progress(ctx: &Ctx, version: &Rendition) -> anyhow::Result<Option<f64>> {
+    let cfg = ctx.config();
+    if !needs_embed_ext(&cfg, version) {
+        return Ok(None);
+    }
+    let recipe = reel_core::recipe::EmbedRecipe::for_size(&cfg, cfg.external.embed_mb).json();
+    let Some(copy) = ctx
+        .store
+        .derived_rendition(&version.id, "embed_ext", Some(&recipe))
+        .await?
+        .filter(|c| !c.is_ready())
+    else {
+        return Ok(None);
+    };
+    Ok(ctx
+        .store
+        .active_job_for_rendition(&copy.id)
+        .await?
+        .map(|j| j.progress))
+}
+
 /// A copy that is missing is queued at `priority`.
 pub async fn ext_file(ctx: &Ctx, version: &Rendition, priority: i64) -> anyhow::Result<ExtFile> {
     let cfg = ctx.config();
