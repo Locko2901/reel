@@ -3339,32 +3339,27 @@ async fn the_standalone_library_offers_nothing_of_a_servers() {
     assert_eq!(
         settings_nav(&sharing),
         [
-            "head Recording",
-            "app obs",
-            "app clips Clips folder",
-            "app upload New clips",
-            "app hotkeys",
+            "head This PC",
+            "app clips",
             "app session Session recording",
+            "app capture",
             "app games Games and apps",
-            "app sounds",
+            "app server Connection",
+            "app startup App",
+            "app status",
             "head Library",
             "section storage",
             "app library Library folder",
             "section ingest",
-            "app encoder",
+            "app encoder Encoding",
             "section sharing",
             "section imports",
-            "head Server",
-            "app server",
             "head System",
             "section general",
             "section appearance",
-            "app startup",
-            "app status",
-            "app log",
             "section advanced",
         ],
-        "the nav by what a person does, the app's pages beside reel's"
+        "the nav by what a person does: this PC's pages, then reel's with the app's that belong among them"
     );
     let (_, storage) = ask(&env, "GET", "/settings/storage", None).await;
     assert!(
@@ -11315,7 +11310,7 @@ async fn the_apps_parts_in_the_header_stay_hidden_in_a_browser() {
         .await
         .unwrap();
     assert!(
-        html.contains(r#"<span class="sections-head app-link" hidden>Recording</span>"#)
+        html.contains(r#"<span class="sections-head app-link" hidden>This PC</span>"#)
             && html.contains(r#"<span class="sections-head">Library</span>"#)
             && html.contains(r##"<a class="app-link" href="#" data-app-section="status" hidden>Status</a>"##),
         "the app's pages and a head over them alone are hidden until the app unhides them; a head over reel's sections shows in a browser"
@@ -11323,20 +11318,20 @@ async fn the_apps_parts_in_the_header_stay_hidden_in_a_browser() {
     assert_eq!(
         settings_nav(&html),
         [
-            "head Recording",
-            "app obs",
-            "app clips Clips folder and cache",
-            "app upload",
-            "app hotkeys",
+            "head This PC",
+            "app clips",
             "app session Session recording",
+            "app capture",
             "app games Games and apps",
-            "app sounds",
+            "app upload Uploads",
+            "app server Connection",
+            "app startup App",
+            "app status",
             "head Library",
             "section storage",
             "section ingest",
             "section imports",
             "head Server",
-            "app server",
             "section sharing",
             "section devices",
             "section access",
@@ -11344,9 +11339,6 @@ async fn the_apps_parts_in_the_header_stay_hidden_in_a_browser() {
             "head System",
             "section general",
             "section appearance",
-            "app startup",
-            "app status",
-            "app log",
             "section advanced",
         ],
         "a server's nav in the same groups, what only a server has under Server"

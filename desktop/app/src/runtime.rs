@@ -1076,7 +1076,9 @@ impl Runtime {
             data_dir: g.paths.data_dir.display().to_string(),
             library: Default::default(),
             panel: Default::default(),
+            pages: Default::default(),
         };
+        st.pages = crate::pages::of(&g.settings, &st, &g.programs);
         drop(g);
         st.library = self.library_line();
         st.panel = crate::status::panel(&st);
@@ -1518,7 +1520,7 @@ impl Runtime {
             problems.join("; ")
         } else if here {
             match s.hotkeys.save.trim() {
-                "" => "no hotkey for Save a clip yet: set one below".to_string(),
+                "" => "no hotkey for Save a clip yet".to_string(),
                 k if obs_saves => format!("{k} saves a clip, through OBS"),
                 k => format!("{k} saves a clip"),
             }
@@ -1609,7 +1611,7 @@ impl Runtime {
                     Err(e) => {
                         tracing::warn!(error = %e, "no hotkeys through a portal");
                         g.hotkey_ok = false;
-                        g.hotkey_line = "the desktop took no hotkeys: bind a key to the command the Hotkeys page shows in its keyboard settings".into();
+                        g.hotkey_line = "the desktop took no hotkeys: bind a key to the command Settings shows under Save a clip in its keyboard settings".into();
                     }
                 }
             }
@@ -1890,7 +1892,7 @@ impl Runtime {
         if line.without_rights {
             self.tell_once(
                 "OBS runs without the highest rights",
-                "Games that run as administrator are not captured until the copy of OBS for them is in Program Files again: Settings, OBS. Your other games are.",
+                "Games that run as administrator are not captured until the copy of OBS for them is in Program Files again: Settings, Capture. Your other games are.",
             );
         }
     }
@@ -2066,7 +2068,7 @@ impl Runtime {
             "the copy of OBS in Program Files read"
         );
         if g.copy_left {
-            tracing::warn!(there, task, "a copy of OBS with the rights is left in Program Files though Capture games that run as administrator is off: Settings, OBS offers to remove it");
+            tracing::warn!(there, task, "a copy of OBS with the rights is left in Program Files though Capture games that run as administrator is off: Settings, Capture offers to remove it");
         } else if on && there && !task {
             tracing::warn!("Capture games that run as administrator is on, the copy is there, its task at sign-in is not: Update the copy puts it back");
         }
@@ -2104,7 +2106,7 @@ impl Runtime {
             tracing::warn!(copy = %was, wanted, "the copy of OBS for games that run as administrator is not the OBS this reel brought: Update the copy");
             self.tell_once(
                 &format!("The OBS for games that run as administrator is {was}"),
-                &format!("This version of reel brought OBS {wanted}. Update the copy under Settings, OBS; Windows asks once."),
+                &format!("This version of reel brought OBS {wanted}. Update the copy under Settings, Capture; Windows asks once."),
             );
         }
     }
@@ -2168,10 +2170,10 @@ impl Runtime {
                 }
                 Err(e) => {
                     tracing::warn!(error = %e, "the copy for games that run as administrator was not updated; reel asks again after its next update");
-                    note(&rt, Some(format!("the copy was not updated ({e}): Settings, OBS, Update the copy, or reel asks again after its next update")));
+                    note(&rt, Some(format!("the copy was not updated ({e}): Settings, Capture, Update the copy, or reel asks again after its next update")));
                     rt.tell_once(
                         &format!("The OBS for games that run as administrator is {was}"),
-                        &format!("This version of reel brought OBS {wanted}. Update the copy under Settings, OBS; Windows asks once."),
+                        &format!("This version of reel brought OBS {wanted}. Update the copy under Settings, Capture; Windows asks once."),
                     );
                 }
             }
@@ -2536,7 +2538,7 @@ impl Runtime {
                 &rt.app,
                 "OBS keeps stopping",
                 &format!(
-                    "{} stopped {} times in a row, so reel stopped starting it. Start OBS again is in the tray; Settings, Log has what OBS said.",
+                    "{} stopped {} times in a row, so reel stopped starting it. Start OBS again is in the tray; Settings, Status, Log has what OBS said.",
                     if cfg!(target_os = "linux") {
                         "reel's own OBS"
                     } else {
@@ -3476,7 +3478,7 @@ impl Runtime {
                     };
                     if let Some(on) = look {
                         if let Err(e) = local.set_update_check(on).await {
-                            tracing::warn!(error = %e, "the setup's Check for updates was not set");
+                            tracing::warn!(error = %e, "Look for new versions on GitHub was not set");
                         }
                     }
                     rt.watch_library(local);
@@ -3540,7 +3542,7 @@ impl Runtime {
         notify::show(
             &self.app,
             &format!("{what} is not part of standalone"),
-            "reel keeps the clips in the library on this PC, and makes no links; Save clip saves one there. A server can be added under Settings, Server.",
+            "reel keeps the clips in the library on this PC, and makes no links; Save clip saves one there. A server can be added under Settings, Connection.",
         );
         true
     }
@@ -3706,7 +3708,7 @@ impl Runtime {
         let rt = self.clone();
         tauri::async_runtime::spawn(async move {
             if !rt.lock().obs.connected {
-                return rt.save_failed("OBS is not connected; Settings, OBS says why.");
+                return rt.save_failed("OBS is not connected; Settings, Capture says why.");
             }
             let (tx, rx) = oneshot::channel();
             rt.lock().save_waits.push_back((tx, None));
@@ -3798,7 +3800,7 @@ impl Runtime {
             if !(s.obs.enabled || rt.bundled_in_use()) || !rt.lock().obs.connected {
                 return stop(
                     &rt,
-                    "OBS is not connected; the app reaches it under Settings, OBS.",
+                    "OBS is not connected; the app reaches it under Settings, Capture.",
                 );
             }
             match rt.obs_command(ObsCommand::ReplayBufferActive).await {
@@ -3818,7 +3820,7 @@ impl Runtime {
                     } else if s.obs.start_replay {
                         "The replay buffer is off and did not start (OBS may be recording); start it in OBS."
                     } else {
-                        "The replay buffer is off; start it in OBS, or turn on Start the replay buffer under Settings, OBS."
+                        "The replay buffer is off; start it in OBS, or turn on Start it in OBS under Settings, Clips."
                     };
                     return stop(&rt, words);
                 }
@@ -4210,7 +4212,7 @@ impl Runtime {
             return Err(if standalone {
                 "reel on this PC is not running yet".into()
             } else {
-                "no server set yet; enter the server URL under Settings, Server".into()
+                "no server set yet; enter the server URL under Settings, Connection".into()
             });
         }
         let _ = url;
@@ -4221,8 +4223,8 @@ impl Runtime {
     }
 
     /// The library webview's base: the local reel in standalone, the server otherwise.
-    /// The setup's Look for new versions on GitHub: Settings, Advanced, Check for updates in the
-    /// library on this PC, now or once reel on this PC is up.
+    /// Look for new versions on GitHub, from the setup or Settings, App: a setting of the library
+    /// on this PC, set now or once reel on this PC is up.
     pub async fn set_update_check(&self, on: bool) -> Result<(), String> {
         let local = {
             let mut g = self.lock();
@@ -4235,7 +4237,7 @@ impl Runtime {
                     g.update_check_pending = Some(on);
                     tracing::info!(
                         on,
-                        "the setup's Check for updates waits for reel on this PC"
+                        "Look for new versions on GitHub waits for reel on this PC"
                     );
                     return Ok(());
                 }
@@ -4244,7 +4246,7 @@ impl Runtime {
         local
             .set_update_check(on)
             .await
-            .map_err(|e| format!("Check for updates was not set: {e}"))?;
+            .map_err(|e| format!("Look for new versions on GitHub was not set: {e}"))?;
         self.push_status();
         Ok(())
     }
@@ -4528,7 +4530,7 @@ impl Runtime {
                 (
                     "The page stopped at an error".to_string(),
                     format!(
-                        "{} answered, but the library's page stopped at an error before it reached the app. The app tries again by itself; the error is in Settings, Log.",
+                        "{} answered, but the library's page stopped at an error before it reached the app. The app tries again by itself; the error is in Settings, Status, Log.",
                         if standalone { "reel on this PC" } else { "The server" }
                     ),
                     line,
@@ -4536,7 +4538,7 @@ impl Runtime {
             } else if standalone {
                 (
                     "reel on this PC does not answer".to_string(),
-                    "The library's pages did not open in the window. The app tries again by itself; Settings, Log says why.".to_string(),
+                    "The library's pages did not open in the window. The app tries again by itself; Settings, Status, Log says why.".to_string(),
                     why.code.clone(),
                 )
             } else {

@@ -116,11 +116,12 @@ click ${REEL_ENCODER_DETAILS:-760 430}
 sleep 1
 shot "4-done-details"
 ok "VAAPI refused with OBS's own line behind details, NVENC works; kept for Settings (shot 4)"
+# the id Settings, Capture had before, which still opens it
 "$W/app/reel-desktop" --section=obs > /dev/null 2>&1 || true
 waitlog 'window shows view="settings"' 1 20 "Settings did not open"
 sleep 2
-for _ in $(seq 1 ${REEL_SETTINGS_SCROLL:-5}); do xdotool click 5; done
+for _ in $(seq 1 ${REEL_SETTINGS_SCROLL:-0}); do xdotool click 5; done
 sleep 1
 shot "6-settings-refused"
-ok "Settings, OBS: the encoders not offered and why (shot 6)"
+ok "Settings, Capture: the encoders not offered and why (shot 6)"
 grep "setup: " "$L"/reel-desktop.log* | sed 's/^[^ ]* *//' | cut -c1-220

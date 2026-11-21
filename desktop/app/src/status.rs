@@ -172,9 +172,9 @@ pub struct Status {
     pub update_installing: bool,
     /// What the update brings: the notes of the versions it spans, from the server.
     pub update_notes: Option<String>,
-    /// What installing the update does, said before it does (Settings, Startup).
+    /// What installing the update does, said before it does (Settings, App).
     pub update_before: Option<String>,
-    /// Standalone: Settings, Advanced, Check for updates of the library on this PC, once it is up.
+    /// Standalone: Look for new versions on GitHub (the library's own setting), once it is up.
     pub update_check: Option<bool>,
     /// When the server was last asked, in milliseconds since 1970, for the page's clock.
     pub update_checked_at: Option<u64>,
@@ -190,6 +190,8 @@ pub struct Status {
     pub data_dir: String,
     pub library: crate::library::LibraryLine,
     pub panel: Panel,
+    /// Settings in words: the first page's sentence and each page's line.
+    pub pages: crate::pages::Pages,
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq)]
@@ -389,9 +391,13 @@ pub const START_OBS: Fix = Fix {
     word: "Start OBS",
     act: "obs_again",
 };
-pub const SETTINGS_OBS: Fix = Fix {
+pub const SETTINGS_CAPTURE: Fix = Fix {
     word: "Settings",
-    act: "settings:obs",
+    act: "settings:capture",
+};
+pub const SETTINGS_CLIPS: Fix = Fix {
+    word: "Settings",
+    act: "settings:clips",
 };
 pub const SETTINGS_ENCODER: Fix = Fix {
     word: "Settings",
@@ -411,7 +417,7 @@ pub const GAMES: Fix = Fix {
 };
 pub const LOG: Fix = Fix {
     word: "Log",
-    act: "settings:log",
+    act: "settings:status/log",
 };
 pub const RETRY: Fix = Fix {
     word: "Retry",
@@ -608,7 +614,7 @@ fn said_alone(f: &Facts) -> Said {
                     word,
                     none(),
                     format!(
-                        "{} Start OBS tries again; Settings, OBS says why.",
+                        "{} Start OBS tries again; Settings, Capture says why.",
                         sentence(box_line)
                     ),
                     Some(START_OBS),
@@ -619,7 +625,7 @@ fn said_alone(f: &Facts) -> Said {
                     word,
                     none(),
                     sentence(box_line),
-                    Some(SETTINGS_OBS),
+                    Some(SETTINGS_CAPTURE),
                 ),
                 _ => say(state, tone, word, none(), sentence(box_line), None),
             };
@@ -673,7 +679,7 @@ fn said_alone(f: &Facts) -> Said {
                 none(),
                 "Your OBS is not running, or its WebSocket is off. reel connects once it answers."
                     .into(),
-                Some(SETTINGS_OBS),
+                Some(SETTINGS_CAPTURE),
             )
         } else {
             say(
@@ -730,7 +736,7 @@ fn said_alone(f: &Facts) -> Said {
                     none(),
                     "OBS is connected, its replay buffer is not running: no clip can be saved."
                         .into(),
-                    Some(SETTINGS_OBS),
+                    Some(SETTINGS_CLIPS),
                 )
             }
             Some((true, _)) => {}
@@ -782,7 +788,7 @@ fn said_alone(f: &Facts) -> Said {
             none(),
             sentence(
                 f.pair_line
-                    .unwrap_or("enter the server and a pairing code under Settings, Server"),
+                    .unwrap_or("enter the server and a pairing code under Settings, Connection"),
             ),
             Some(PAIR),
         );
@@ -1441,7 +1447,7 @@ mod tests {
             (s.state, s.tone, s.word.as_str()),
             ("obs_off", "warn", "OBS not connected")
         );
-        assert_eq!(s.fix, Some(SETTINGS_OBS));
+        assert_eq!(s.fix, Some(SETTINGS_CAPTURE));
         assert_eq!(
             s.line,
             "Your OBS is not running, or its WebSocket is off. reel connects once it answers."
@@ -1472,7 +1478,7 @@ mod tests {
             (
                 "replay buffer off".into(),
                 String::new(),
-                Some("settings:obs")
+                Some("settings:clips")
             )
         );
         assert_eq!(
@@ -1523,7 +1529,7 @@ mod tests {
         assert_eq!(s.fix, Some(START_OBS));
         assert_eq!(
             s.line,
-            "OBS stopped 3 times in a minute. Start OBS tries again; Settings, OBS says why."
+            "OBS stopped 3 times in a minute. Start OBS tries again; Settings, Capture says why."
         );
         let rec = crate::session::Line {
             since_ms: 1,
@@ -1693,7 +1699,11 @@ mod tests {
                 save_problem: Some("OBS did not save the replay"),
                 ..ready(false)
             }),
-            ("no clip saved".into(), String::new(), Some("settings:log"))
+            (
+                "no clip saved".into(),
+                String::new(),
+                Some("settings:status/log")
+            )
         );
         let s = said(&Facts {
             paused_by_user: true,
@@ -1728,7 +1738,7 @@ mod tests {
                 last_error: Some("server: 502 Bad Gateway"),
                 ..ready(false)
             }),
-            ("error".into(), String::new(), Some("settings:log"))
+            ("error".into(), String::new(), Some("settings:status/log"))
         );
     }
 

@@ -34,7 +34,7 @@ let look = null;
 // Finished before: reel light's own setup, else the setup of the package with OBS.
 const again = () => (status && !status.bundled ? !settings.obs.own_setup_due : setup().done);
 const lookOn = () => look ?? (again() ? !!(status && status.update_check) : true);
-const lookWords = () => (lookOn() ? 'looked for on GitHub a minute after reel on this PC starts, then every six hours' : 'only when you press Check now, under Settings, Startup');
+const lookWords = () => (lookOn() ? 'looked for on GitHub a minute after reel on this PC starts, then every six hours' : 'only when you press Check now, under Settings, App');
 let seen = new Set();
 const setup = () => settings.obs.setup;
 
@@ -630,7 +630,7 @@ async function later() {
     settings = await invoke('settings_save', { settings: now, force: false });
   } catch (e) { toast(String(e.message || e), 'err'); return; }
   invoke('obs_meters', { on: false }).catch(() => {});
-  invoke('view_show', { view: 'settings', section: 'obs' }).catch(() => {});
+  invoke('view_show', { view: 'settings', section: 'first' }).catch(() => {});
 }
 
 // Save and share makes a server's link, so not while This PC only is chosen.
@@ -844,7 +844,7 @@ async function saveAndLeave() {
   const to = { view: ready ? 'library' : 'settings', section: ready ? null : 'server' };
   if (wantElevated && !settings.obs.setup.elevated) {
     try { status = await invoke('status_get'); } catch (e) { /* the words below stand without it */ }
-    $('#finish-note-line').textContent = `Saved, and OBS starts with it. ${(status && status.obs_task_problem) || 'Capture games that run as administrator stayed off'}; it can be tried again under Settings, OBS.`;
+    $('#finish-note-line').textContent = `Saved, and OBS starts with it. ${(status && status.obs_task_problem) || 'Capture games that run as administrator stayed off'}; it can be tried again under Settings, Capture.`;
     $('#finish-note').hidden = false;
     $('#log-link').hidden = false;
     $('#next').textContent = ready ? 'Open the library' : 'Pair with a server';

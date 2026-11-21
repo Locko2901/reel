@@ -11,7 +11,7 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 use tokio::sync::mpsc;
 
-/// What the bundled OBS is doing, for Settings, OBS and the chip.
+/// What the bundled OBS is doing, for Settings, Capture and the bar.
 #[derive(Debug, Clone, Serialize, PartialEq)]
 pub struct BoxLine {
     /// starting, running, silent, waiting, restarting, stopped, failed, gave_up
@@ -140,7 +140,7 @@ fn backoff(crashes: u32) -> Duration {
 /// The words once OBS stopped TRIES times in a row, `last` the last time's.
 fn gave_up_words(last: &str) -> String {
     format!(
-        "{last}; it stopped {TRIES} times in a row, each within minutes of its start, so reel stopped starting it. Start OBS again, in the tray or in Settings, OBS, tries once more; the log has what OBS said"
+        "{last}; it stopped {TRIES} times in a row, each within minutes of its start, so reel stopped starting it. Start OBS again, in the tray or in Settings, Capture, tries once more; the log has what OBS said"
     )
 }
 
@@ -1009,7 +1009,7 @@ fn running_words(
     match missing {
         Some(why) => format!("{words}, without the highest rights, so games that run as administrator are not captured: {why}"),
         None if from_copy && version != wanted => format!(
-            "{words}; the copy is OBS {version}, and this version of reel brought OBS {wanted}: Settings, OBS, Update the copy"
+            "{words}; the copy is OBS {version}, and this version of reel brought OBS {wanted}: Settings, Capture, Update the copy"
         ),
         None => words.to_string(),
     }
@@ -1023,10 +1023,10 @@ async fn rights_missing(copy_there: bool) -> Option<String> {
     match (task, copy_there) {
         (true, _) => None,
         (false, true) => Some(
-            "the task that starts its copy in Program Files is missing; Settings, OBS, Update the copy puts it back".into(),
+            "the task that starts its copy in Program Files is missing; Settings, Capture, Update the copy puts it back".into(),
         ),
         (false, false) => Some(
-            "the copy of OBS in Program Files is not there; Settings, OBS, Put it in place".into(),
+            "the copy of OBS in Program Files is not there; Settings, Capture, Put it in place".into(),
         ),
     }
 }
@@ -1544,7 +1544,8 @@ mod tests {
             running_words(&b, Reach::Own, false, None, &wanted),
             "running, hidden"
         );
-        let why = "the copy of OBS in Program Files is not there; Settings, OBS, Put it in place";
+        let why =
+            "the copy of OBS in Program Files is not there; Settings, Capture, Put it in place";
         assert_eq!(
             running_words(&b, Reach::Own, false, Some(why), &wanted),
             format!("running, hidden, without the highest rights, so games that run as administrator are not captured: {why}")
@@ -1555,7 +1556,7 @@ mod tests {
         );
         assert_eq!(
             running_words(&b, Reach::Task, true, None, "32.2.2"),
-            format!("running with the highest rights from its copy in Program Files, hidden; the copy is OBS 32.2.2, and this version of reel brought OBS {wanted}: Settings, OBS, Update the copy")
+            format!("running with the highest rights from its copy in Program Files, hidden; the copy is OBS 32.2.2, and this version of reel brought OBS {wanted}: Settings, Capture, Update the copy")
         );
     }
 
