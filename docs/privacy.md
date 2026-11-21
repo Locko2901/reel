@@ -214,6 +214,12 @@ app types in Steam's cache. Nothing of it, and nothing about the programs
 you run, leaves the PC; the list stays in the app's settings folder
 ([Games and apps](games-and-apps.md#what-stays-on-the-pc)).
 
+With **Show on Discord** on (Settings, Games and apps; off unless you turn it on), the app
+tells the Discord app on this PC the name of the Game that runs and whether reel clips it or
+records it, and Discord shows that to your friends
+([Discord](games-and-apps.md#discord)). It goes to Discord through Discord's own app, over a
+connection on this PC; the app itself sends nothing over the network for it.
+
 Nothing else: no telemetry, no analytics, no crash reports, no account
 with anyone.
 
