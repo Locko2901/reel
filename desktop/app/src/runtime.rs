@@ -215,6 +215,8 @@ pub struct Inner {
     pub obs_seen: watch::Sender<crate::encoders::Seen>,
     /// When the app last connected to OBS: the log of that OBS's run is written after it.
     pub obs_since: Option<std::time::SystemTime>,
+    /// What Discord shows friends, and the task that tells it.
+    pub discord: crate::presence::Discord,
 }
 
 /// What went wrong with the server, in words and in code, and when the next try is.
@@ -566,6 +568,7 @@ impl Runtime {
             encoder_back: None,
             obs_seen: watch::Sender::new(Default::default()),
             obs_since: None,
+            discord: Default::default(),
         };
         let mut inner = inner;
         // what the rules for games say before the first look, so reel's OBS starts as they want
@@ -590,6 +593,7 @@ impl Runtime {
         rt.spawn_upload_worker(queue_rx);
         rt.spawn_front_poll();
         rt.spawn_running_check();
+        rt.spawn_discord();
         rt.spawn_steam();
         rt.restart_watcher();
         rt.register_hotkeys();
@@ -699,7 +703,13 @@ impl Runtime {
         let box_line = g.obs_box.as_ref().map(|b| b.line());
         let playing = g.playing();
         let grace = g.grace();
-        let grace_said = grace.as_ref().map(|(_, x)| x.said.clone());
+        let told = g.discord_told();
+        let sentence = playing
+            .as_ref()
+            .map(|p| crate::presence::sentence(&p.sentence, told == Some(false)));
+        let grace_said = grace
+            .as_ref()
+            .map(|(_, x)| crate::presence::after_grace(&x.said, told == Some(true)));
         let facts = crate::status::Facts {
             standalone,
             paired,
@@ -744,7 +754,7 @@ impl Runtime {
             waiting: g.ledger.pending().len(),
             save_key: &g.settings.hotkeys.save,
             held: g.buffer_held.as_ref(),
-            playing: playing.as_ref().map(|p| p.sentence.as_str()),
+            playing: sentence.as_deref(),
             grace: grace_said.as_deref(),
         };
         let said = crate::status::said(&facts);
@@ -856,6 +866,7 @@ impl Runtime {
             standalone,
         );
         let mut st = Status {
+            presence: g.discord.line.clone(),
             unsorted: g.programs.unsorted(),
             playing: playing.clone(),
             grace,
@@ -1076,6 +1087,7 @@ impl Runtime {
     /// Sends the snapshot to the tray and to the app's own page; a server page asks with
     /// `app_status` instead.
     pub fn push_status(&self) {
+        self.discord_poke();
         let st = self.status();
         shell::emit_local(&self.app, "status", &st);
         tray::refresh(&self.app, &st);

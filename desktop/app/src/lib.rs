@@ -16,6 +16,7 @@ mod obsbox;
 mod page_errors;
 #[cfg(target_os = "linux")]
 mod portal;
+mod presence;
 mod runtime;
 mod session;
 mod setup;
