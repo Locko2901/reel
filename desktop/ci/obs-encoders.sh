@@ -90,14 +90,14 @@ took=$(grep -h "setup: the encoders tried in OBS" "$LOG"/reel-desktop.log* | sed
 sleep 1
 shot "obs-encoders-setup"
 ok "both refused from OBS's own list of encoders, in ${took:-?} ms, OBS never started with one: no Missing Encoders dialog"
-"$E/app/reel-desktop" --section=obs >>"$E/app.out" 2>&1 || true
+"$E/app/reel-desktop" --section=capture >>"$E/app.out" 2>&1 || true
 wait_for 20 "Settings to open" log_has 'window shows view="settings"'
 sleep 2
-for _ in $(seq 1 "${REEL_SETTINGS_SCROLL:-5}"); do xdotool click 5; done
+for _ in $(seq 1 "${REEL_SETTINGS_SCROLL:-0}"); do xdotool click 5; done
 sleep 1
 shot "obs-encoders-settings"
 quit
-ok "Settings, OBS shows the two not offered and why"
+ok "Settings, Capture shows the two not offered and why"
 
 say "a setup with an encoder OBS's last start did not list: taken back to x264 before OBS starts"
 setting '{"done": true, "encoder": "ffmpeg_vaapi_tex"}'

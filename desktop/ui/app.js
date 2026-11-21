@@ -1,9 +1,10 @@
 // The app's own Settings section: every row saves as it changes.
-import { $, $$, APP_SECTIONS, STANDALONE_ONLY, applyShape, invoke, listen, markSection, mount, renderParts, runSave, saveButtons, sectionsNav, toast } from './shell.js';
+import { $, $$, APP_SECTIONS, STANDALONE_ONLY, applyShape, invoke, listen, mount, renderParts, runSave, saveButtons, serverHref, toast } from './shell.js';
+import { NAV } from './nav.js';
 import { isOn, setOn } from './assets/js/switch.js';
 import { keycaps, recorder, recordersOffOnLeave } from './hotkeys.js';
 import { noiseHelp, noiseOptions, ownMicWords } from './noise.js';
-import { ensureOption, syncCustom, takenWords } from './inobs.js';
+import { ensureOption, takenWords } from './inobs.js';
 import { bindObsBar, renderObsBar } from './obsbar.js';
 import { bindAsk, renderAsk } from './ask.js';
 import { audioPlan, meterIn, renderLevelRows, wordsInto } from './sources.js';
@@ -17,6 +18,10 @@ let settings = null;
 const HW_WORD = { none: 'x264 on the CPU', nvenc: 'NVIDIA NVENC', amf: 'AMD AMF', qsv: 'Intel Quick Sync', vaapi: 'VAAPI' };
 let status = null;
 let shapeKey = '';
+let shape = null;
+// The clip length's stops; the box beside them takes any length.
+const STOPS = [15, 30, 60, 120, 300, 600];
+const QUALITY_WORD = { light: 'Light', smooth: 'Smooth', sharp: 'Sharp', native: 'Native', custom: 'as set in OBS' };
 
 function get(obj, path) { return path.split('.').reduce((o, k) => (o == null ? undefined : o[k]), obj); }
 function set(obj, path, value) {
@@ -30,6 +35,8 @@ function fill(row) {
   const key = row.dataset.key, kind = row.dataset.kind;
   const v = get(settings, key);
   if (kind === 'hotkey') { row.dataset.value = v || ''; keycaps($('button.hotkey', row), v || ''); return; }
+  if (kind === 'cards') { pick(row, v); return; }
+  if (kind === 'length') { if (!row.dataset.own) showLength(v); return; }
   const ctl = $(CTL, row);
   if (!ctl) return;
   if (kind === 'bool') setOn(ctl, !!v);
@@ -42,6 +49,8 @@ function fill(row) {
 function read(row) {
   const key = row.dataset.key, kind = row.dataset.kind;
   if (kind === 'hotkey') return row.dataset.value || '';
+  if (kind === 'cards') return $('[role="radio"].on', row)?.dataset.value ?? get(settings, key);
+  if (kind === 'length') return Math.round(+$('#length-n').value);
   const ctl = $(CTL, row);
   if (kind === 'bool') return isOn(ctl);
   if (kind === 'volume') return Math.max(0, Math.min(100, +ctl.value)) / 100;
@@ -49,6 +58,24 @@ function read(row) {
   if (kind === 'list') return ctl.value.split(',').map(s => s.trim().toLowerCase().replace(/^\./, '')).filter(Boolean);
   if (kind === 'file') return ctl.value.trim() === '' ? null : ctl.value.trim();
   return ctl.value;
+}
+
+function pick(row, value) {
+  for (const b of $$('[role="radio"]', row)) {
+    const on = b.dataset.value === String(value);
+    b.classList.toggle('on', on);
+    b.setAttribute('aria-checked', String(on));
+    b.tabIndex = on || (!$('[role="radio"][data-value="' + value + '"]', row) && b === $('[role="radio"]', row)) ? 0 : -1;
+  }
+}
+
+const stopAt = (secs) => Math.max(0, STOPS.reduce((at, x, i) => (secs >= x ? i : at), 0));
+// Not while it is being changed: the next save says the length.
+function showLength(secs) {
+  const n = $('#length-n'), range = $('#length-stops');
+  if (document.activeElement === n || document.activeElement === range) return;
+  n.value = secs ?? '';
+  range.value = stopAt(+secs || 0);
 }
 
 // The elevated switch shows its click until every answer is in, whatever order answers and events come in.
@@ -88,7 +115,7 @@ async function save(row, force = false) {
     if (!answer || get(answer, key) !== get(next, key)) { if (status) renderBundled(); return; }
   }
   if (!answer) return;
-  const ctl = $('.sctl', row);
+  const ctl = $('.sctl', row) || row;
   let ok = $('.ok', ctl);
   if (!ok) { ok = document.createElement('span'); ok.className = 'ok'; ctl.append(ok); }
   ok.textContent = 'saved';
@@ -98,6 +125,7 @@ async function save(row, force = false) {
   if (key === 'obs.replay_buffer') await bufferForGames();
   if (key.startsWith('session.')) renderRecordNow();
   if (key.startsWith('obs.setup.') && status) renderBundled();
+  if (key.startsWith('session.') || key.startsWith('hotkeys.') || key.startsWith('obs.')) renderModes();
 }
 
 let capAsk = () => {}, capAt = 0;
@@ -120,7 +148,30 @@ function capLine() {
 
 function bindRows() {
   capLine();
+  for (const row of $$('.srow[data-kind="cards"]')) {
+    for (const b of $$('[role="radio"]', row)) {
+      b.addEventListener('click', () => {
+        if (b.classList.contains('on')) return;
+        pick(row, b.dataset.value);
+        save(row);
+      });
+      b.addEventListener('keydown', (e) => {
+        const all = $$('[role="radio"]', row).filter((x) => !x.hidden);
+        const step = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[e.key];
+        if (!step) return;
+        e.preventDefault();
+        const next = all[(all.indexOf(b) + step + all.length) % all.length];
+        next.focus();
+        next.click();
+      });
+    }
+  }
+  const range = $('#length-stops'), n = $('#length-n');
+  range.addEventListener('input', () => { n.value = STOPS[+range.value]; renderCosts(); });
+  range.addEventListener('change', saveLength);
+  n.addEventListener('change', () => { range.value = stopAt(+n.value); saveLength(); });
   for (const row of $$('.srow[data-key]')) {
+    if (row.dataset.kind === 'cards' || row.dataset.kind === 'length') continue;
     const ctl = $(CTL, row);
     if (!ctl) continue;
     ctl.addEventListener('change', () => save(row));
@@ -152,45 +203,76 @@ function bindRows() {
   });
 }
 
+// Reel's own OBS keeps the setup's length; an OBS of one's own is told its replay length.
+async function saveLength() {
+  const row = $('#length-row');
+  const secs = Math.round(+$('#length-n').value);
+  if (!secs) return;
+  if (row.dataset.own) { await applyObs(row, { replay_seconds: secs }); return; }
+  await save(row);
+  renderCosts();
+}
+
 function bindHotkeys() {
   for (const row of $$('.srow[data-kind="hotkey"]')) recorder(row, { save, fill });
   recordersOffOnLeave();
 }
 
-let current = 'status';
+let current = 'first';
+const PAGE = Object.fromEntries(APP_SECTIONS);
+// A page of the nav table: its kind (reel's or the app's) and when it shows.
+const pageOf = (page) => {
+  const [kind, id] = page.split(' ');
+  return { kind, id, app: kind[0] === 'a', standalone: kind.includes('s'), paired: kind.includes('p') };
+};
+const shows = (p, here) => !(p.standalone && !here) && !(p.paired && here);
+
 function sections() {
   history.scrollRestoration = 'manual';
   const root = $('#settings'), body = $('#sections-body');
-  const known = (id) => APP_SECTIONS.some(([k]) => k === id);
+  for (const g of $$('.group', body)) {
+    const h = document.createElement('h2');
+    h.className = 'hit-page';
+    h.hidden = true;
+    h.textContent = g.dataset.appSection === 'first' ? 'Settings' : PAGE[g.dataset.appSection];
+    g.prepend(h);
+  }
+  const known = (id) => id === 'first' || id in PAGE;
   const open = (want, push, chosen = true) => {
-    // a program's page under Games and apps is games/<its id>
-    let [id, sub] = String(want).split('/');
-    if (!known(id)) { id = 'status'; sub = undefined; }
+    // a program's page under Games and apps is games/<its id>; Status at its log is status/log
+    let [id, sub] = String(want || 'first').split('/');
+    if (!known(id)) { id = 'first'; sub = undefined; }
+    const here = status && status.mode === 'standalone';
+    if (status && !here && STANDALONE_ONLY.includes(id)) { id = 'first'; sub = undefined; }
+    if (here && id === 'upload') id = 'clips';
     current = id;
     if (id === 'library') capAsk();
     root.dataset.section = id;
     $$('.group', body).forEach(g => g.hidden = g.dataset.appSection !== id);
-    $$('.section-line, .panel, .srow', body).forEach(el => el.hidden = el.hasAttribute('data-off'));
+    $$('.section-line, .panel, .srow, .q-h, .row-link, #summary, #more-reel', body).forEach(el => el.hidden = el.hasAttribute('data-off'));
+    $$('.hit-page', body).forEach(h => h.hidden = true);
     $('#no-match').hidden = true;
-    markSection(id);
+    heading(id);
     if (push) history.pushState(null, '', `#${sub ? `${id}/${sub}` : id}`);
     window.scrollTo(0, 0);
-    gamesOpened(id === 'games', sub);
+    gamesOpened(id === 'games', id === 'games' ? sub : undefined);
     if (id === 'session') renderRecordNow();
-    if (id === 'obs') renderBufferNote();
-    if (id === 'log') loadLog();
-    invoke('obs_meters', { on: id === 'obs' }).catch(() => {});
-    if (id === 'obs' && settings && settings.obs.bundled) invoke('obs_read').then((r) => doneInObs(r, false, true)).catch(() => {});
+    if (id === 'first') { renderBufferNote(); renderCosts(); }
+    // Status at its log: once the lines are in, so the page is long enough to get there
+    if (id === 'status') loadLog().then(() => { if (sub === 'log' && current === 'status') $('#log-panel')?.scrollIntoView(); });
+    invoke('obs_meters', { on: id === 'capture' }).catch(() => {});
+    if (id === 'capture' && settings && settings.obs.bundled) invoke('obs_read').then((r) => doneInObs(r, false, true)).catch(() => {});
     invoke('page_section', { section: id, chosen }).catch(() => {});
   };
   document.addEventListener('click', (e) => {
-    const a = e.target.closest('nav.sections a[data-app-section]');
+    const a = e.target.closest('a[data-app-section]');
     if (!a) return;
     e.preventDefault();
     open(a.dataset.appSection, true);
   });
-  window.addEventListener('popstate', () => open(location.hash.replace('#', '') || 'status', false));
-  open(location.hash.replace('#', '') || 'status', false, false);
+  $('#crumb').addEventListener('click', (e) => { e.preventDefault(); open('first', true); });
+  window.addEventListener('popstate', () => open(location.hash.replace('#', '') || 'first', false));
+  open(location.hash.replace('#', '') || 'first', false, false);
   window.openSection = (id) => open(id, true);
   const filter = $('#settings-filter');
   let searched = false;
@@ -199,18 +281,163 @@ function sections() {
     if (q && !searched) { searched = true; invoke('page_section', { section: current, chosen: true }).catch(() => {}); }
     if (!q) { open(current, false); return; }
     let hits = 0;
+    heading(null);
     $$('.group', body).forEach(g => g.hidden = false);
-    $$('.section-line', body).forEach(l => l.hidden = true);
+    $$('.section-line, .q-h, #summary', body).forEach(l => l.hidden = true);
     $$('.panel', body).forEach(p => {
       let any = false;
       $$('.srow', p).forEach(r => {
         const hit = `${$('.shelp', r)?.textContent || ''} ${$('b', r)?.textContent || ''} ${r.dataset.key || ''}`.toLowerCase().includes(q);
         r.hidden = !hit || r.hasAttribute('data-off'); any = any || !r.hidden;
       });
+      $$('.row-link', p).forEach(r => {
+        r.hidden = !r.textContent.toLowerCase().includes(q) || r.hasAttribute('data-off'); any = any || !r.hidden;
+      });
       p.hidden = !any || p.hasAttribute('data-off'); hits += p.hidden ? 0 : 1;
+    });
+    $$('.group', body).forEach(g => {
+      const any = $$('.panel', g).some(p => !p.hidden);
+      $('.hit-page', g).hidden = !any;
+      g.hidden = !any;
     });
     $('#no-match').hidden = hits > 0;
   });
+}
+
+// The head: Settings on the first screen, a crumb back to it over a page one row further.
+function heading(id) {
+  const sub = id && id !== 'first';
+  $('#crumb').hidden = !sub;
+  $('#settings-head .crumb-sep').hidden = !sub;
+  $('#page-title').textContent = sub ? PAGE[id] : 'Settings';
+  $('#page-sub').hidden = sub;
+}
+
+const CHEV = '<svg class="icon chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3.5 10.5 8 6 12.5"/></svg>';
+function rowLink(attrs, name, state) {
+  const a = document.createElement('a');
+  a.className = 'row-link';
+  a.href = '#';
+  Object.assign(a.dataset, attrs);
+  const b = document.createElement('b');
+  b.append(...name);
+  a.append(b, state, document.createRange().createContextualFragment(CHEV));
+  return a;
+}
+
+// More: this PC's pages, each with what is set there.
+let moreKey = '';
+function renderMore() {
+  if (!status) return;
+  const here = status.mode === 'standalone';
+  const lines = (status.pages && status.pages.lines) || {};
+  const key = JSON.stringify([here, lines, status.unsorted, status.state_tone]);
+  if (key === moreKey) return;
+  moreKey = key;
+  const rows = NAV[0][1].map(pageOf).filter((p) => shows(p, here)).map((p) => {
+    const name = [PAGE[p.id]];
+    if (p.id === 'games' && status.unsorted) {
+      const n = document.createElement('span');
+      n.className = 'n to-sort';
+      n.textContent = `${status.unsorted} to sort`;
+      name.push(' ', n);
+    }
+    const state = document.createElement('span');
+    state.className = 'state';
+    if (p.id === 'status') {
+      const dot = document.createElement('i');
+      dot.className = `dot ${status.state_tone || ''}`;
+      state.append(dot);
+    }
+    state.append(lines[p.id] || '');
+    return rowLink({ appSection: p.id }, name, state);
+  });
+  $('#more').replaceChildren(...rows);
+  if ($('#settings-filter')?.value.trim()) $('#settings-filter').dispatchEvent(new Event('input'));
+}
+
+// The foot: reel's pages, the server's or the library's on this PC, with the app's pages that
+// belong among them; they open as reel draws them.
+function renderFoot() {
+  const box = $('#more-reel');
+  if (!box || !shape) return;
+  const here = !!(status ? status.mode === 'standalone' : document.body.hasAttribute('data-standalone'));
+  const sections = shape.sections || [];
+  const placed = [];
+  const rows = [];
+  const reels = (s) => {
+    const name = [s.label];
+    if (s.changed > 0) {
+      const n = document.createElement('span');
+      n.className = 'n';
+      n.textContent = s.changed;
+      name.push(' ', n);
+    }
+    const line = document.createElement('span');
+    line.className = 'line';
+    line.textContent = s.state || s.line || '';
+    const a = rowLink({ page: `/settings/${s.id}`, section: s.id }, name, line);
+    a.href = serverHref(`/settings/${s.id}`);
+    if (s.state) a.classList.add('stated');
+    return a;
+  };
+  for (const [, pages] of NAV.slice(1)) {
+    for (const p of pages.map(pageOf).filter((x) => shows(x, here))) {
+      if (p.app) {
+        const state = document.createElement('span');
+        state.className = 'state';
+        state.textContent = ((status && status.pages && status.pages.lines) || {})[p.id] || '';
+        rows.push(rowLink({ appSection: p.id }, [PAGE[p.id]], state));
+      } else {
+        const s = sections.find((x) => x.id === p.id);
+        if (s) { rows.push(reels(s)); placed.push(s.id); }
+      }
+    }
+  }
+  rows.push(...sections.filter((s) => !placed.includes(s.id)).map(reels));
+  if (!sections.length) { box.replaceChildren(); return; }
+  const h = document.createElement('h2');
+  h.className = 'q-h';
+  const aside = document.createElement('span');
+  aside.className = 'q-aside';
+  let host = '';
+  try { host = status && status.server_url ? new URL(status.server_url).host : ''; } catch { host = ''; }
+  const name = status && status.server_name && status.server_name.trim() !== 'reel' ? status.server_name : host;
+  aside.textContent = here ? 'reel on this PC' : `${name ? `${name}, ` : ''}for every PC and browser`;
+  h.append(here ? 'Library' : 'Server', ' ', aside);
+  const nav = document.createElement('nav');
+  nav.className = 'panel rows';
+  nav.setAttribute('aria-label', here ? 'The library\'s pages' : 'The server\'s pages');
+  nav.append(...rows);
+  box.replaceChildren(h, nav);
+  if (status) renderParts(status);
+}
+
+// The first screen's sentence: what saves a clip, how much, when, at what, and where it goes.
+function renderSummary() {
+  const el = $('#summary');
+  const text = (status && status.pages && status.pages.summary) || '';
+  el.replaceChildren(...text.split('**').map((t, i) => {
+    if (i % 2 === 0) return t;
+    const b = document.createElement('b');
+    b.textContent = t;
+    return b;
+  }));
+  off(el, !text);
+}
+
+// The two cards' words carry the key and the length as they are now.
+const lenWords = (secs) => (secs >= 120 && secs % 60 === 0 ? `${secs / 60} min` : `${secs} s`);
+function renderModes() {
+  if (!settings) return;
+  const own = !(status && status.obs_box);
+  const secs = own ? status && status.obs_state && status.obs_state.replay_seconds : settings.obs.setup.clip_seconds;
+  const len = secs ? `the last ${lenWords(secs)}` : 'the last seconds';
+  const key = settings.hotkeys.save.trim();
+  const saves = key ? `${key} saves ${len}` : `Save clip saves ${len}`;
+  const grace = settings.session.grace_seconds;
+  $('#mode-always').textContent = `${saves} at any time, also on the desktop.`;
+  $('#mode-games').textContent = `The buffer runs while a game runs, and stops ${grace ? `${lenWords(grace)} after the last one closes` : 'once the last one closes'}. ${saves}.`;
 }
 
 // A row whose switch is off hides the rows that depend on it, as reel's own settings pages do.
@@ -229,7 +456,7 @@ async function bufferForGames() {
   const row = $('.srow[data-key="obs.start_replay"]');
   setOn($(CTL, row), true);
   await save(row);
-  if (settings.obs.start_replay) toast('Start the replay buffer is on now: reel starts OBS\'s replay buffer with a game and stops it after.', 'ok');
+  if (settings.obs.start_replay) toast('Start it in OBS, under Clips, is on now: reel starts your OBS\'s replay buffer with a game and stops it after.', 'ok');
   renderBufferNote();
 }
 
@@ -238,7 +465,7 @@ function renderBufferNote() {
   if (!note || !settings) return;
   const own = !(status && status.obs_box);
   const show = settings.obs.replay_buffer === 'games' && own && !settings.obs.start_replay;
-  note.textContent = show ? 'Start the replay buffer, under obs-websocket below, is off: reel cannot start OBS\'s replay buffer with a game until it is on.' : '';
+  note.textContent = show ? 'Start it in OBS, under Clips, is off: reel cannot start your OBS\'s replay buffer with a game until it is on.' : '';
   note.classList.toggle('st-warn', show);
   note.hidden = !show;
 }
@@ -277,7 +504,7 @@ function renderMode() {
   const here = status.mode === 'standalone', os = status.linux ? 'linux' : 'windows';
   for (const el of $$('[data-standalone], [data-os]')) {
     const w = el.dataset.standalone;
-    const mode = w === 'hide' ? here : w === 'paired' ? here && !status.paired : w === 'only' ? !here : false;
+    const mode = w === 'hide' ? here : w === 'paired' ? here && !status.paired : w === 'only' ? !here : w === 'paired-only' ? !(here && status.paired) : false;
     off(el, mode || (!!el.dataset.os && el.dataset.os !== os));
   }
   for (const el of $$('[data-standalone-text]')) {
@@ -287,6 +514,17 @@ function renderMode() {
   for (const el of $$('[data-linux-text]')) {
     if (el.dataset.windowsText == null) el.dataset.windowsText = el.textContent;
     el.textContent = status.linux ? el.dataset.linuxText : el.dataset.windowsText;
+  }
+  for (const el of $$('[data-linux-label]')) {
+    if (el.dataset.windowsLabel == null) el.dataset.windowsLabel = el.getAttribute('aria-label');
+    el.setAttribute('aria-label', status.linux ? el.dataset.linuxLabel : el.dataset.windowsLabel);
+  }
+  // standalone, the waits are the library's (Encoding) and a paired server's sending is Connection's
+  if (here) {
+    $('#encoder-waits').append($('#waits-row'), $('#wan-row'));
+    $('#send-rows').append($('#bandwidth-row'), $('#chunk-row'));
+  } else {
+    $('#upload-rows').append($('#waits-row'), $('#wan-row'), $('#bandwidth-row'), $('#chunk-row'));
   }
   // beside a server, each page's line says it is this PC's (app.css); reel's say theirs are the server's
   $('#settings')?.toggleAttribute('data-paired', !here);
@@ -308,7 +546,7 @@ function renderObs() {
   const dl = $('#obs-kv');
   $('#obs-kv-empty').hidden = !!st;
   $('#obs-state-line').textContent = st ? `OBS ${st.obs_version}, obs-websocket ${st.ws_version}` : 'read over the WebSocket once OBS is connected';
-  $$('#obs-change-panel .srow').forEach(row => {
+  $$('.srow[data-obs]').forEach(row => {
     const ctl = $(CTL, row);
     ctl.disabled = !st;
     if (row.dataset.obs === 'video_kbit') {
@@ -334,7 +572,7 @@ function renderObs() {
     ['Video size', `${st.base[0]} \u00d7 ${st.base[1]} canvas, ${st.output[0]} \u00d7 ${st.output[1]} output, ${Math.round(st.fps * 100) / 100} fps`],
   ]);
   $('#obs-bitrate-help').textContent = 'simple output mode with the recording quality "same as stream"';
-  for (const row of $$('#obs-change-panel .srow')) {
+  for (const row of $$('.srow[data-obs]')) {
     const ctl = $(CTL, row);
     if (document.activeElement === ctl) continue;
     const v = st[row.dataset.obs];
@@ -363,7 +601,7 @@ async function applyObs(row, change) {
 }
 
 function bindObs() {
-  for (const row of $$('#obs-change-panel .srow')) {
+  for (const row of $$('.srow[data-obs]')) {
     const ctl = $(CTL, row);
     const key = row.dataset.obs;
     const fire = () => {
@@ -391,7 +629,8 @@ function renderLocal() {
   for (const id of ['#local-panel', '#library-panel', '#cap-panel', '#encoder-panel']) off($(id), !standalone);
   renderLibrary(status);
   $('#mode-line').textContent = standalone ? (status.local ? 'reel runs on this PC' : status.local_line || 'standalone') : 'connected to a server';
-  if (!standalone) { if (STANDALONE_ONLY.includes(current)) window.openSection?.('status'); return; }
+  if (standalone && current === 'upload') window.openSection?.('clips');
+  if (!standalone) { if (STANDALONE_ONLY.includes(current)) window.openSection?.('first'); return; }
   $('#local-line').textContent = status.local_line || '';
   const l = status.local;
   $('#encoder-line').textContent = l ? `in use: ${HW_WORD[l.backend] || l.backend}` : '';
@@ -431,11 +670,11 @@ let ownMicApp = null;
 function renderChoicesApp() {
   if (!settings || !status) return;
   const s = settings.obs.setup;
-  syncCustom($('.srow[data-key="obs.setup.quality"] select'), s);
   ensureOption($('.srow[data-key="obs.setup.encoder"] select'), s.encoder);
   renderEncoderChoices(s);
   ensureOption($('.srow[data-key="obs.setup.format"] select'), s.format);
-  for (const [k, v] of [['obs.setup.quality', s.quality], ['obs.setup.encoder', s.encoder || 'obs_x264'], ['obs.setup.format', s.format]]) {
+  pick($('#quality-row'), s.quality);
+  for (const [k, v] of [['obs.setup.encoder', s.encoder || 'obs_x264'], ['obs.setup.format', s.format]]) {
     const sel = $(`.srow[data-key="${k}"] select`);
     if (sel !== document.activeElement && sel.value !== v) sel.value = v;
   }
@@ -494,22 +733,59 @@ async function saveLevel(name, db) {
   catch (e) { toast(String(e.message || e), 'err'); }
 }
 
-let memoryMbApp;
-async function renderLengthApp() {
-  if (!settings || !status || !status.bundled) return;
+const size = (mb) => (mb >= 1000 ? `${(mb / 1024).toLocaleString('en', { maximumFractionDigits: 1 })}\u00a0GB` : `${Math.round(mb)}\u00a0MB`);
+let memoryMbApp, costsKey = '';
+// What the clip length and the quality cost: the replay buffer's memory and a clip's size, from
+// the setup's own figures (ObsSetup::video), as the setup says them.
+async function renderCosts() {
+  if (!settings || !status) return;
+  const row = $('#length-row'), effect = $('#length-effect'), n = $('#length-n'), range = $('#length-stops');
+  const own = !status.obs_box;
+  row.dataset.own = own ? '1' : '';
+  if (own) {
+    const st = status.obs_state;
+    n.min = 1; n.max = 3600;
+    n.disabled = range.disabled = !st;
+    if (st) showLength(st.replay_seconds);
+    $('#length-help').textContent = st ? 'what a save keeps: your OBS\'s replay length, written into its profile' : 'what a save keeps: your OBS\'s replay length, once OBS is connected';
+    effect.textContent = '';
+    effect.hidden = true;
+    costsKey = '';
+    const kbit = st && st.video_kbit;
+    $('#quality-own').textContent = `your own OBS sets the picture${st ? `: ${st.output[0]} \u00d7 ${st.output[1]}, ${Math.round(st.fps)} frames a second${kbit ? `, ${kbit} kbit/s` : ''}` : ''}; under Capture, the format and the bitrate`;
+    return;
+  }
+  n.min = 5; n.max = 1800;
+  n.disabled = range.disabled = false;
+  $('#length-help').textContent = 'what a save keeps, up to 30 minutes';
   const s = settings.obs.setup;
-  let v = null;
-  try { v = await invoke('obs_video', { setup: s }); } catch (e) { return; }
-  if (!v) return;
+  const secs = Math.round(+n.value) || s.clip_seconds;
+  const key = JSON.stringify([s, secs, status.server_upload_max_bytes, settings.mode]);
+  if (key === costsKey) return;
+  costsKey = key;
+  const ask = (q, t) => invoke('obs_video', { setup: { ...s, quality: q, clip_seconds: t } }).catch(() => null);
+  const v = await ask(s.quality, secs);
   if (memoryMbApp === undefined) memoryMbApp = await invoke('system_memory').catch(() => null);
-  const gb = (mb) => (mb >= 1000 ? `${(mb / 1024).toLocaleString('en', { maximumFractionDigits: 1 })} GB` : `${Math.round(mb)} MB`);
-  const words = [`what the replay buffer keeps before a save, up to 30 minutes; about ${gb(v.buffer_mb)} of memory now`];
-  if (memoryMbApp && v.buffer_mb > memoryMbApp / 4) words.push(`more than a quarter of this PC's ${gb(memoryMbApp)}`);
-  const limit = status.server_upload_max_bytes;
-  if (limit && settings.mode !== 'standalone' && (v.buffer_mb / 1.25) * 1048576 > limit) words.push(`a clip is about ${gb(v.buffer_mb / 1.25)}, more than the ${gb(limit / 1048576)} your server takes`);
-  const help = $('#length-app-help');
-  help.textContent = words.join('; ');
-  help.classList.toggle('st-warn', words.length > 1);
+  if (v) {
+    const words = [`${lenWords(secs)} \u00d7 ${QUALITY_WORD[s.quality] || s.quality} = about ${size(v.buffer_mb)} of memory; a clip of about ${size(v.buffer_mb / 1.25)}`];
+    if (memoryMbApp && v.buffer_mb > memoryMbApp / 4) words.push(`more than a quarter of this PC's ${size(memoryMbApp)}`);
+    const limit = status.server_upload_max_bytes;
+    if (limit && settings.mode !== 'standalone' && (v.buffer_mb / 1.25) * 1048576 > limit) words.push(`more than the ${size(limit / 1048576)} your server takes`);
+    effect.textContent = words.join('; ');
+    effect.classList.toggle('st-warn', words.length > 1);
+    effect.hidden = false;
+  }
+  const custom = s.quality === 'custom';
+  const cv = custom && s.custom_video;
+  $('#quality-help').textContent = custom
+    ? `as set in OBS${cv ? `: ${cv.output[0]} \u00d7 ${cv.output[1]}, ${Math.round(cv.fps[0] / (cv.fps[1] || 1))} frames a second` : ''}; a card sets one of reel's instead`
+    : 'the picture every clip and session recording gets, and what it costs';
+  for (const q of ['light', 'smooth', 'sharp', 'native']) {
+    const m = await ask(q, 60);
+    if (!m) continue;
+    $(`.p-res[data-res="${q}"]`).textContent = `${m.output[1]}p${m.fps}`;
+    $(`.p-size[data-size="${q}"]`).textContent = `${size(m.buffer_mb / 1.25)} a minute`;
+  }
 }
 
 function renderNoiseApp() {
@@ -526,9 +802,11 @@ function renderNoiseApp() {
 function renderCopyApp() {
   const c = status.obs_copy, s = settings && settings.obs.setup;
   const elevated = !!(s && s.elevated && status.obs_box);
-  $('#setup-app-desc').textContent = elevated
-    ? 'each change is written into the copy of OBS in Program Files and OBS starts again with it; Windows asks once for each change'
-    : 'each change is written into OBS\'s settings and OBS starts again with it, a few seconds';
+  $('#setup-app-desc').textContent = !status.obs_box
+    ? 'written into your OBS\'s profile; refused while OBS records; a running replay buffer starts again so the change takes'
+    : elevated
+      ? 'each change is written into the copy of OBS in Program Files and OBS starts again with it; Windows asks once for each change'
+      : 'each change is written into OBS\'s settings and OBS starts again with it, a few seconds';
   off($('#copy-app-row'), !c);
   if (!c) return;
   const btn = $('#copy-app-put');
@@ -593,7 +871,7 @@ function renderBundled() {
   renderChoicesApp();
   renderNoiseApp();
   renderLevelsApp();
-  renderLengthApp();
+  renderCosts();
   renderCopyApp();
   const doing = status.obs_step;
   for (const b of [$('#elevated-app-row .switch'), $('#copy-app-put'), $('#bundled-setup')]) b.disabled = !!doing;
@@ -603,15 +881,17 @@ function renderBundled() {
   $('#elevated-why').hidden = !why;
   $('#elevated-why').textContent = why || '';
   off($('#obs-ws-panel'), inUse);
-  off($('#bundled-setup-panel'), !inUse);
-  off($('#obs-change-panel'), inUse);
+  for (const el of $$('[data-box]')) off(el, el.dataset.box === 'reel' ? !inUse : inUse);
+  off($('#quality-row'), !inUse);
+  off($('#quality-own-row'), inUse);
+  renderModes();
   $('#obs-section-line').textContent = inUse
     ? (!box.can_show
       ? 'OBS runs as administrator: open it from its tray icon to change anything there; reel keeps working as long as its WebSocket and the replay buffer stay on.'
       : lin
         ? 'OBS\'s window opens from its own tray icon: change anything there; reel keeps working as long as its WebSocket and the replay buffer stay on.'
         : 'Change anything in OBS itself; reel keeps working as long as its WebSocket and the replay buffer stay on.')
-    : 'OBS tells the app the moment a replay is saved (Tools, WebSocket Server Settings, enable the server). The folder watch below stays on as a safety net.';
+    : 'OBS tells the app the moment a replay is saved (Tools, WebSocket Server Settings, enable the server). The folder watch stays on as a safety net.';
 }
 
 async function doneInObs(r, always, quiet) {
@@ -639,6 +919,8 @@ function renderStatus() {
   renderWaits();
   renderBufferNote();
   renderPresence(status);
+  renderSummary();
+  renderMore();
   const here = status.mode === 'standalone';
   renderObs();
   renderLocal();
@@ -658,7 +940,10 @@ function renderStatus() {
   ]);
   off($('#obs-checks-panel'), !(status.obs_checks || []).length);
   kv($('#obs-checks'), (status.obs_checks || []).map((c) => [c.name, c.line, c.ok ? 'st-ok' : 'st-warn']));
-  if (status.hotkeys_how) $('#hotkeys-section-line').textContent = status.hotkeys_how;
+  // what reel needs from an OBS of one's own opens by itself while something is missing
+  if ((status.obs_checks || []).some((c) => !c.ok)) $('#obs-more').open = true;
+  $('#hotkeys-how').textContent = status.hotkeys_how || '';
+  $('#hotkeys-how').hidden = !status.hotkeys_how;
   const q = $('#queue tbody');
   q.innerHTML = '';
   $('#queue-empty').hidden = status.queue.length > 0;
@@ -729,7 +1014,10 @@ function renderStatus() {
   $('#paired-as').textContent = status.paired ? `${status.device_name}, as ${status.user} on ${status.server_name || status.server_url}` : '';
   $('#obs-line').textContent = status.obs.line;
   $('#watch-line').textContent = status.watcher.line;
-  $('#hotkey-line').textContent = status.hotkey_line;
+  // under Save a clip, the keys' line says only what went wrong
+  $('#hotkey-line').textContent = status.hotkey_ok ? '' : status.hotkey_line;
+  $('#hotkey-line').classList.toggle('st-warn', !status.hotkey_ok);
+  $('#hotkey-line').hidden = status.hotkey_ok;
   kv($('#about'), [['Version', [status.version, status.versions?.kind].filter(Boolean).join(', ')], ...(status.bundled ? [['OBS', `OBS Studio ${status.obs_version}, included`]] : []), ['Settings', status.config_dir], ['Data', status.data_dir]]);
   $('#about-obs').hidden = !status.bundled;
   $('#uninstall').hidden = !status.uninstaller;
@@ -738,9 +1026,8 @@ function renderStatus() {
   renderBundled();
   renderSave();
   renderDiscord();
-  $('#normalize-state span').textContent = here ? 'in the library on this PC' : status.normalize_new == null ? (status.paired ? 'not said by this server' : 'not paired')
-    : status.normalize_new ? `on, to ${status.loudness_target} LUFS` : 'off';
-  $('#normalize-open').hidden = here || !status.server_admin;
+  setOn($('#look'), !!status.update_check);
+  $('#look').disabled = status.update_check == null;
   const v = status.versions;
   if (v) kv($('#versions-kv'), [
     ['This app', `${v.app}, ${v.kind}${v.obs ? ` (OBS ${v.obs})` : ''}`],
@@ -748,8 +1035,6 @@ function renderStatus() {
     ['Newest release', v.newest || 'not known yet'],
     ['Updates', [status.updated_from ? `updated from ${status.updated_from}` : '', status.update_line].filter(Boolean).join('; ')],
   ]);
-  $('#versions-help').textContent = !v ? '' : here ? `this app ${v.app}, ${v.kind}${v.obs ? ` (OBS ${v.obs})` : ''}; the newest release ${v.newest || 'not known yet'}`
-    : `this app ${v.app}, ${v.kind}${v.obs ? ` (OBS ${v.obs})` : ''}; ${v.server ? `its server ${v.server}` : 'no server known yet'}${v.newest ? `; the newest release ${v.newest}` : ''}`;
   const asked = status.update_checked_at ? new Date(status.update_checked_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
   $('#update-help').textContent = [status.updated_from ? `updated from ${status.updated_from}` : '', status.update_line, asked && !here ? `the server asked at ${asked}` : ''].filter(Boolean).join('; ');
   $('#update-before').textContent = status.update_before || '';
@@ -808,7 +1093,7 @@ function bindButtons() {
       $$('.srow[data-key]').forEach(fill);
       renderStatus();
       if ((status.obs_checks || []).some((c) => !c.ok)) {
-        window.openSection('obs');
+        window.openSection('capture');
         toast(`Paired with ${status.server_name || url}. Next, OBS: what reel needs from it is at the top.`, 'ok');
       } else {
         toast(`Paired with ${status.server_name || url}.`, 'ok');
@@ -893,9 +1178,11 @@ function bindButtons() {
       show(r.ok, r.line, r.detail);
     } catch (e) { show(false, String(e.message || e), ''); }
   };
-  $('#normalize-open').onclick = () => invoke('open_page', { path: '/settings/ingest' }).catch(e => toast(String(e.message || e), 'err'));
-  $('#normalize-open-here').onclick = () => invoke('open_page', { path: '/settings/ingest' }).catch(e => toast(String(e.message || e), 'err'));
-  $('#versions-updates').onclick = () => window.openSection?.('startup');
+  $('#look').addEventListener('change', async () => {
+    const on = isOn($('#look')), err = $('#look-err');
+    try { await invoke('update_check_set', { on }); err.hidden = true; status = await invoke('status_get'); renderStatus(); }
+    catch (e) { setOn($('#look'), !on); err.textContent = String(e.message || e); err.hidden = false; }
+  });
   $('#update-check').onclick = async () => {
     try { status = await invoke('update_check'); renderStatus(); toast(status.update_line, 'ok'); } catch (e) { toast(String(e.message || e), 'err'); }
   };
@@ -905,6 +1192,15 @@ function bindButtons() {
   $('#log-folder').onclick = () => invoke('open_log_folder').catch(e => toast(String(e.message || e), 'err'));
 }
 
+// The foot's app rows (Library folder, Encoding) carry their lines too.
+function renderFootLines() {
+  const lines = (status.pages && status.pages.lines) || {};
+  for (const a of $$('#more-reel a[data-app-section]')) {
+    const st = $('.state', a);
+    if (st && st.textContent !== (lines[a.dataset.appSection] || '')) st.textContent = lines[a.dataset.appSection] || '';
+  }
+}
+
 async function reshape() {
   const key = status ? `${status.mode}|${status.server_url}|${status.paired}|${!!status.offline}` : '';
   if (key === shapeKey) return;
@@ -912,8 +1208,8 @@ async function reshape() {
   try {
     const ps = await invoke('page_shape_get');
     applyShape(ps.shape, ps.base);
-    sectionsNav(ps.shape, current, status?.mode === 'standalone');
-    if (status) renderParts(status);
+    shape = ps.shape;
+    renderFoot();
   } catch (e) { /* the shell is gone; the page stays as it is */ }
 }
 
@@ -940,16 +1236,16 @@ async function main() {
   } catch (e) {
     toast(`no shell: ${String(e.message || e)}`, 'err');
   }
-  sectionsNav(await shaped, current, status?.mode === 'standalone');
-  if (status) renderParts(status);
+  shape = await shaped;
+  renderFoot();
   delete document.documentElement.dataset.wait;
-  await listen('status', (ev) => { status = ev.payload; renderStatus(); reshape(); gamesRefresh(); if (Date.now() - capAt > 5000) capAsk(); });
+  await listen('status', (ev) => { status = ev.payload; renderStatus(); reshape(); gamesRefresh(); if (Date.now() - capAt > 5000) capAsk(); if (shape) renderFootLines(); });
   await listen('open-section', (ev) => { if (window.openSection) window.openSection(ev.payload); });
   await listen('settings', (ev) => takeSettings(ev.payload));
   await listen('obs-meters', (ev) => {
     for (const [name, db] of ev.payload || []) meterIn($('#levels-app'), name, db);
   });
-  setInterval(() => { if (current === 'log') loadLog(); }, 5000);
+  setInterval(() => { if (current === 'status') loadLog(); }, 5000);
 }
 
 main();

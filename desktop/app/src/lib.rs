@@ -14,6 +14,7 @@ mod media;
 mod notify;
 mod obsbox;
 mod page_errors;
+mod pages;
 #[cfg(target_os = "linux")]
 mod portal;
 mod presence;
@@ -358,7 +359,7 @@ pub fn run() {
             if wizard {
                 shell::show(app.handle(), shell::View::Setup, None);
             } else if first_run && standalone {
-                shell::show(app.handle(), shell::View::Settings, Some("obs"));
+                shell::show(app.handle(), shell::View::Settings, Some("capture"));
             } else if first_run {
                 shell::show(app.handle(), shell::View::Settings, Some("server"));
             } else if !hidden {

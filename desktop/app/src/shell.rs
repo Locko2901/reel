@@ -197,6 +197,19 @@ pub fn section_ok(s: &str) -> bool {
         }
 }
 
+/// A page of the app's Settings by the id it has now. Links of older servers, the tray, the
+/// bar's fixes and the place kept across an update may carry an id the app had before.
+pub fn alias(id: &str, standalone: bool) -> &str {
+    match id {
+        "obs" => "capture",
+        "hotkeys" => "first",
+        "sounds" => "clips",
+        "log" => "status/log",
+        "upload" if standalone => "clips",
+        _ => id,
+    }
+}
+
 /// The server's front page, or a blank page while no server is set.
 pub fn library_url(server_url: &str, path: &str) -> Url {
     let base = server_url.trim_end_matches('/');
@@ -406,7 +419,12 @@ pub fn go(app: &AppHandle, view: View, section: Option<&str>) {
         return;
     };
     let on = wv.url().ok().and_then(|u| page_of(&u));
-    let section = section.filter(|s| section_ok(s));
+    let standalone = app
+        .try_state::<Runtime>()
+        .is_some_and(|rt| rt.is_standalone());
+    let section = section
+        .map(|s| alias(s, standalone))
+        .filter(|s| section_ok(s));
     match view {
         View::Settings => {
             if on == Some(View::Settings) {
@@ -715,6 +733,42 @@ mod tests {
             assert!(js.contains(part), "{part}");
         }
         assert_eq!(code.filter(|l| l.starts_with("const NAV = [")).count(), 1);
+    }
+
+    #[test]
+    fn an_older_id_opens_the_page_that_holds_it_now() {
+        for (old, standalone, now) in [
+            ("obs", false, "capture"),
+            ("obs", true, "capture"),
+            ("hotkeys", false, "first"),
+            ("sounds", true, "clips"),
+            ("log", false, "status/log"),
+            ("upload", true, "clips"),
+            ("upload", false, "upload"),
+        ] {
+            assert_eq!(
+                alias(old, standalone),
+                now,
+                "{old}, standalone {standalone}"
+            );
+            assert!(section_ok(alias(old, standalone)), "{old}");
+        }
+        for kept in [
+            "first",
+            "clips",
+            "session",
+            "capture",
+            "games",
+            "games/steam-570",
+            "server",
+            "startup",
+            "status",
+            "library",
+            "encoder",
+        ] {
+            assert_eq!(alias(kept, false), kept);
+            assert_eq!(alias(kept, true), kept);
+        }
     }
 
     #[test]

@@ -740,7 +740,7 @@ impl Session {
         .map(|_| ())
     }
 
-    /// Everything the OBS page shows, in one round of requests.
+    /// Everything Settings shows of OBS, in one round of requests.
     pub async fn state(&mut self) -> Result<ObsState, ObsError> {
         let mut st = ObsState {
             obs_version: self.version.obs_version.clone(),

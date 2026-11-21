@@ -87,19 +87,21 @@ const fn app(id: &'static str) -> NavPage {
     (id, true, Shows::Always)
 }
 
-/// The nav by what a person does, the sections and the desktop app's pages side by side; the
-/// app's own pages draw the same nav from desktop/ui/nav.js, which a test holds this to.
+/// The nav by what a person does: the desktop app's own pages first, then the sections with the
+/// app's pages that belong among them. The app's Settings draws the same groups from
+/// desktop/ui/nav.js, which a test holds this to.
 const NAV: [(&str, &[NavPage]); 4] = [
     (
-        "Recording",
+        "This PC",
         &[
-            app("obs"),
             app("clips"),
-            app("upload"),
-            app("hotkeys"),
             app("session"),
+            app("capture"),
             app("games"),
-            app("sounds"),
+            ("upload", true, Shows::WithServer),
+            app("server"),
+            app("startup"),
+            app("status"),
         ],
     ),
     (
@@ -116,7 +118,6 @@ const NAV: [(&str, &[NavPage]); 4] = [
     (
         "Server",
         &[
-            app("server"),
             ("sharing", false, Shows::WithServer),
             reel("devices"),
             reel("access"),
@@ -125,34 +126,22 @@ const NAV: [(&str, &[NavPage]); 4] = [
     ),
     (
         "System",
-        &[
-            reel("general"),
-            reel("appearance"),
-            app("startup"),
-            app("status"),
-            app("log"),
-            reel("advanced"),
-        ],
+        &[reel("general"), reel("appearance"), reel("advanced")],
     ),
 ];
 
-fn app_label(id: &str, standalone: bool) -> &'static str {
+fn app_label(id: &str) -> &'static str {
     match id {
-        "status" => "Status",
-        "server" => "Server",
-        "obs" => "OBS",
-        "clips" if standalone => "Clips folder",
-        "clips" => "Clips folder and cache",
-        "upload" if standalone => "New clips",
-        "upload" => "Upload",
-        "hotkeys" => "Hotkeys",
+        "clips" => "Clips",
         "session" => "Session recording",
+        "capture" => "Capture",
         "games" => "Games and apps",
-        "sounds" => "Sounds",
-        "startup" => "Startup",
-        "log" => "Log",
+        "upload" => "Uploads",
+        "server" => "Connection",
+        "startup" => "App",
+        "status" => "Status",
         "library" => "Library folder",
-        "encoder" => "Encoder",
+        "encoder" => "Encoding",
         _ => "",
     }
 }
@@ -177,7 +166,7 @@ fn nav_of(mut sections: Vec<SectionView>, standalone: bool) -> (Vec<SectionView>
         let mut entries = Vec::new();
         for (id, is_app, _) in pages.iter().filter(|(_, _, w)| shows(*w)) {
             if *is_app {
-                entries.push(NavEntry::app(id, app_label(id, standalone)));
+                entries.push(NavEntry::app(id, app_label(id)));
             } else if let Some(s) = sections.iter().find(|s| s.id == *id) {
                 entries.push(NavEntry::section(s));
             }
@@ -686,10 +675,11 @@ pub fn folder_notes(rows: &mut [RowView], disk: &crate::disk::DiskInfo, ctx: &re
 
 fn panels(eff: &Effective, under: &Config) -> Vec<PanelView> {
     let mut out: Vec<PanelView> = Vec::new();
-    // the unsent rule is the standalone library's alone, set under Library folder there
+    // the unsent rule is the standalone library's alone, set under Library folder there; the
+    // app draws the library's check for new versions on its own App page, beside New versions
     let here = |d: &&catalog::Def| {
         if eff.config.standalone() {
-            catalog::in_standalone(d.key)
+            catalog::in_standalone(d.key) && d.key != "advanced.update_check"
         } else {
             d.key != "storage.cap_keeps_unsent"
         }
@@ -1083,9 +1073,8 @@ pub async fn history(State(st): State<AppState>) -> AppResult<Json<Value>> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::collections::HashMap;
 
-    /// The app's own pages draw the same nav from desktop/ui/nav.js.
+    /// The app's Settings draws the same groups from desktop/ui/nav.js.
     #[test]
     fn the_nav_is_the_apps_own() {
         let js = include_str!("../../../../desktop/ui/nav.js");
@@ -1130,15 +1119,6 @@ mod tests {
             .collect();
         assert_eq!(ours, apps, "the groups, their pages and their order");
 
-        let labels = block("STANDALONE_LABELS");
-        let standalone: HashMap<String, String> = labels
-            [labels.find('{').expect("an object") + 1..]
-            .split(',')
-            .filter_map(|pair| {
-                let (id, label) = pair.split_once(':')?;
-                Some((id.trim().to_string(), quoted(label).first()?.clone()))
-            })
-            .collect();
         let sections = quoted(block("APP_SECTIONS"));
         assert!(!sections.is_empty() && sections.len().is_multiple_of(2));
         for pair in sections.chunks(2) {
@@ -1149,12 +1129,7 @@ mod tests {
                     .any(|(p, app, _)| *app && p == id),
                 "{id} has a place in the nav"
             );
-            assert_eq!(app_label(id, false), label, "{id}");
-            assert_eq!(
-                app_label(id, true),
-                standalone.get(id).unwrap_or(label),
-                "{id} in standalone"
-            );
+            assert_eq!(app_label(id), label, "{id}");
         }
         for (id, _, _) in NAV
             .iter()

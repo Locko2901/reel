@@ -134,8 +134,9 @@ impl Local {
         })
     }
 
-    /// Settings, Advanced, Check for updates of this library, as the app's setup leaves it. Off
-    /// is standalone's own default, so off takes the library's row away.
+    /// This library's check for new releases, as the app's setup or its App page sets it (Look
+    /// for new versions on GitHub). Off is standalone's own default, so off takes the library's
+    /// row away.
     pub async fn set_update_check(&self, on: bool) -> anyhow::Result<()> {
         const KEY: &str = "advanced.update_check";
         let was = self.ctx.config().advanced.update_check;
@@ -152,10 +153,14 @@ impl Local {
             let (old, new) = (was.to_string(), on.to_string());
             self.ctx
                 .store
-                .add_setting_history(KEY, Some(&old), Some(&new), "the app's setup")
+                .add_setting_history(KEY, Some(&old), Some(&new), "the app")
                 .await?;
         }
-        tracing::info!(on, was, "standalone: the setup set Check for updates");
+        tracing::info!(
+            on,
+            was,
+            "standalone: the app set Look for new versions on GitHub"
+        );
         Ok(())
     }
 

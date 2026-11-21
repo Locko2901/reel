@@ -74,17 +74,20 @@ impl Who {
         who.health_word = health_word(health);
         who.health_line = health_line;
         let updates = st.ctx.updates.read().await.clone();
+        let cfg = st.ctx.config();
         (who.version_dot, who.version_line) =
-            version_words(&updates, st.ctx.config().advanced.update_check);
+            version_words(&updates, cfg.advanced.update_check, cfg.standalone());
         who
     }
 }
 
 /// The server's version against the newest release, in the words and the colour of the app's
-/// Versions row: pink while a newer one is out.
+/// Versions row: pink while a newer one is out. The app on this PC sets the check of its library
+/// (`standalone`) on its own App page.
 pub fn version_words(
     u: &reel_pipeline::updates::UpdateState,
     check_on: bool,
+    standalone: bool,
 ) -> (&'static str, String) {
     match (u.newer(), &u.latest, &u.error) {
         (Some(r), _, _) => ("active", format!("reel {} is out", r.version)),
@@ -96,6 +99,11 @@ pub fn version_words(
         (None, None, None) if check_on => (
             "",
             "the newest release is read a minute after the start, then once a day".into(),
+        ),
+        _ if standalone => (
+            "",
+            "the check for new releases is off (Settings, App, Look for new versions on GitHub)"
+                .into(),
         ),
         _ => (
             "",

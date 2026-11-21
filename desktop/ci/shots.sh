@@ -91,9 +91,9 @@ wait_more 20 "the app's Status page" "library loaded at=localhost/index.html" "$
 sleep 1
 shoot this-app
 n=$(log_n "library loaded at=localhost/index.html")
-"$APP" --section=obs >/dev/null 2>&1 &
+"$APP" --section=capture >/dev/null 2>&1 &
 sleep 2
-shoot this-app-obs
+shoot this-app-capture
 
 kill $APP_PID 2>/dev/null || true
 sleep 2
