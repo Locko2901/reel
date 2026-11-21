@@ -451,20 +451,6 @@ impl Inner {
         Some((e, g))
     }
 
-    /// The one Game that runs, when one alone does: it names a clip that nothing in front names,
-    /// as on Linux, where no program in front can be read.
-    pub(crate) fn game_running_alone(&self) -> Option<String> {
-        let mut games = self.runs.ids().filter_map(|id| {
-            let run = self.runs.get(id)?;
-            let e = self.programs.get(id)?;
-            (run.gone_at.is_none() && e.class == Class::Game).then(|| e.name.clone())
-        });
-        match (games.next(), games.next()) {
-            (Some(one), None) => Some(one),
-            _ => None,
-        }
-    }
-
     /// A program not sorted yet with the whole screen now.
     pub(crate) fn newcomer(&self) -> Option<Newcomer> {
         let (id, full) = self.front_entry.as_ref()?;
@@ -476,6 +462,23 @@ impl Inner {
             id: e.id.clone(),
             name: e.name.clone(),
         })
+    }
+}
+
+/// The one Game that runs, when one alone does: it names a clip that nothing in front names,
+/// as on Linux, where no program in front can be read.
+pub(crate) fn game_running_alone(
+    runs: &programs::Runs,
+    list: &programs::Programs,
+) -> Option<String> {
+    let mut games = runs.ids().filter_map(|id| {
+        let run = runs.get(id)?;
+        let e = list.get(id)?;
+        (run.gone_at.is_none() && e.class == Class::Game).then(|| e.name.clone())
+    });
+    match (games.next(), games.next()) {
+        (Some(one), None) => Some(one),
+        _ => None,
     }
 }
 
