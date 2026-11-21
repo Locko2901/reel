@@ -292,6 +292,14 @@ desktop-library: desktop-linux ## The library moved to another drive, copied, cu
 	mkdir -p "$(DESKTOP_OUT)"
 	$(DESKTOP_RUN) -w /work -e XVFB_SCREEN=1280x1200 -e REEL_SHOTS_OUT $(DESKTOP_IMAGE) /work/desktop/ci/xvfb.sh run sh /work/desktop/ci/check-library.sh
 
+.PHONY: desktop-docs-shots
+desktop-docs-shots: desktop-linux ## The docs' pictures of the app's pages: the real app under Xvfb against a fresh server (REEL_E2E_*), then the ones in Windows' words in Chromium
+	rm -rf "$(DESKTOP_OUT)/docs-home" && mkdir -p "$(DESKTOP_OUT)/docs-home"
+	$(DESKTOP_RUN) -w /work -v "$(DESKTOP_OUT)/docs-home":/home/sam -e XVFB_SCREEN=1280x900 -e REEL_E2E_SERVER=$(REEL_E2E_SERVER) \
+	  -e REEL_E2E_USER=$(REEL_E2E_USER) -e REEL_E2E_PASSWORD="$(REEL_E2E_PASSWORD)" $(DESKTOP_IMAGE) /work/desktop/ci/xvfb.sh run sh /work/desktop/ci/docs-shots.sh
+	FFMPEG=desktop/app/binaries/ffmpeg-x86_64-unknown-linux-gnu REEL_E2E_SERVER=$(REEL_E2E_SERVER) REEL_E2E_USER=$(REEL_E2E_USER) \
+	  REEL_E2E_PASSWORD="$(REEL_E2E_PASSWORD)" node ci/browser/app-pages.mjs docs
+
 desktop-shots: desktop-linux ## Screenshots of the window at 1280x800 and 720x850 against the demo (REEL_E2E_PASSWORD)
 	$(DESKTOP_RUN) -w /work -e XVFB_SCREEN=1280x900 -e REEL_E2E_SERVER=$(REEL_E2E_SERVER) -e REEL_E2E_USER=$(REEL_E2E_USER) \
 	  -e REEL_E2E_PASSWORD="$(REEL_E2E_PASSWORD)" -e REEL_SHOTS_OUT=/work/$(DESKTOP_SHOTS_OUT) $(DESKTOP_IMAGE) /work/desktop/ci/xvfb.sh run /work/desktop/ci/shots.sh
