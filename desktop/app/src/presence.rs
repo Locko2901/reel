@@ -2,9 +2,11 @@
 //! buffer and a session recording, sent to the Discord app on this PC as they change.
 use crate::detect::short;
 use crate::runtime::{Inner, Runtime};
-use reel_desktop_core::presence::{self, Facts, Report, Want};
+use reel_desktop_core::discord_games::{self, Asked, Games};
+use reel_desktop_core::presence::{self, Count, Facts, Report, Want};
 use reel_desktop_core::programs::Class;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::sync::Arc;
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use tokio::sync::watch;
 
 /// The line under Show on Discord: what reel sent to Discord, or why nothing.
@@ -54,6 +56,11 @@ pub struct Discord {
     pub line: Line,
     /// Discord has the presence now.
     pub sent: bool,
+    count: Count,
+    /// Discord's list of games, once read from the data folder.
+    games: Option<Arc<Games>>,
+    /// Show on Discord and Name the game are both on: the list is read, and asked for.
+    games_on: watch::Sender<bool>,
 }
 
 impl Default for Discord {
@@ -62,6 +69,9 @@ impl Default for Discord {
             want: watch::Sender::new(Want::Off),
             line: Line::default(),
             sent: false,
+            count: Count::default(),
+            games: None,
+            games_on: watch::Sender::new(false),
         }
     }
 }
@@ -107,6 +117,14 @@ impl Inner {
         Some((e.id, true))
     }
 
+    /// The run of that game: its id and its start, which a start again within the grace period
+    /// keeps.
+    fn discord_run(&self) -> Option<(String, Instant)> {
+        let (id, _) = self.discord_game()?;
+        let since = self.runs.get(&id)?.since;
+        Some((id, since))
+    }
+
     /// Discord has the game now, and whether it closed: what the bar's menu says of it.
     pub(crate) fn discord_told(&self) -> Option<bool> {
         if !self.discord.sent {
@@ -115,22 +133,36 @@ impl Inner {
         self.discord_game().map(|(_, closed)| closed)
     }
 
-    /// The moment for Discord: the game above, whether OBS's replay buffer runs, and a session
-    /// recording.
+    /// The moment for Discord: the game above, its picture from Discord's list, the clips saved,
+    /// whether OBS's replay buffer runs, and a session recording.
     fn discord_facts(&self) -> Facts {
         let s = &self.settings.discord;
-        let game = self.discord_game().and_then(|(id, _)| {
+        let entry = self.discord_game().and_then(|(id, _)| {
             let e = self.programs.get(&id).filter(|e| e.class == Class::Game)?;
-            let run = self.runs.get(&id)?;
+            Some((e, self.runs.get(&id)?))
+        });
+        let game = entry.map(|(e, run)| {
             let now = SystemTime::now();
             let started = now.checked_sub(run.since.elapsed()).unwrap_or(now);
-            Some((short(&e.name), secs(started)))
+            (short(&e.name), secs(started))
+        });
+        let picture = entry.filter(|_| s.name_game).and_then(|(e, _)| {
+            // a Steam game's entry is its folder, not the program that runs
+            let program = (!e.folder).then_some(e.path.as_path());
+            let found = self
+                .discord
+                .games
+                .as_ref()?
+                .find(e.steam_app, program, cfg!(windows));
+            found?.picture()
         });
         Facts {
             show: s.show,
             name_game: s.name_game,
             button: s.button,
             game,
+            picture,
+            clips: self.discord.count.of(self.discord_run().as_ref()),
             replay_buffer: self.obs.connected
                 && self.obs_state.as_ref().is_some_and(|o| o.replay_active),
             recording: self.session.as_ref().map(|r| secs(r.started)),
@@ -148,16 +180,104 @@ impl Runtime {
             presence::TIMING,
             move |r| rt.discord_report(&r),
         ));
+        let mut on = self.lock().discord.games_on.subscribe();
+        let rt = self.clone();
+        tauri::async_runtime::spawn(async move {
+            loop {
+                if *on.borrow_and_update() {
+                    rt.discord_games().await;
+                }
+                tokio::select! {
+                    changed = on.changed() => {
+                        if changed.is_err() {
+                            return;
+                        }
+                    }
+                    _ = tokio::time::sleep(Duration::from_secs(60 * 60)) => {}
+                }
+            }
+        });
+    }
+
+    /// Reads Discord's list of games from the data folder the first time, and asks Discord for
+    /// it again once a day; whatever goes wrong, the pictures come from the list kept, or are
+    /// reel's mark.
+    async fn discord_games(&self) {
+        let file = self.lock().paths.discord_games_file();
+        let kept = self.lock().discord.games.clone();
+        let kept = match kept {
+            Some(k) => k,
+            None => {
+                let from = file.clone();
+                let read = tokio::task::spawn_blocking(move || Games::load(&from))
+                    .await
+                    .ok()
+                    .flatten()
+                    .unwrap_or_default();
+                let read = Arc::new(read);
+                self.lock().discord.games = Some(read.clone());
+                self.push_status();
+                read
+            }
+        };
+        let now = secs(SystemTime::now());
+        if !kept.due(now) {
+            return;
+        }
+        let (games, asked) =
+            discord_games::refresh((*kept).clone(), &discord_games::url(), now).await;
+        match asked {
+            Asked::New { steam, paths } => tracing::info!(
+                "discord: read Discord's list of games: {steam} by Steam app id, {paths} by program"
+            ),
+            Asked::Same => tracing::info!("discord: Discord's list of games has not changed"),
+            Asked::Failed(why) => tracing::warn!(
+                "discord: Discord's list of games could not be read: {why}; reel asks again in a day"
+            ),
+        }
+        let games = Arc::new(games);
+        let keep = games.clone();
+        let saved = tokio::task::spawn_blocking(move || keep.save(&file)).await;
+        if let Ok(Err(e)) = saved {
+            tracing::warn!("discord: Discord's list of games was not kept: {e}");
+        }
+        self.lock().discord.games = Some(games);
+        self.push_status();
+    }
+
+    /// A clip saved: one more under the game, while the card shows it.
+    pub(crate) fn discord_saved(&self) {
+        let mut g = self.lock();
+        if crate::updates::leaving() || !matches!(presence::want(&g.discord_facts()), Want::Show(_))
+        {
+            return;
+        }
+        if let Some(run) = g.discord_run() {
+            g.discord.count.saved(&run);
+        }
     }
 
     /// With every status: what Discord is to show now, for the task to send once it changed.
     pub(crate) fn discord_poke(&self) {
-        let g = self.lock();
-        let next = if crate::updates::leaving() {
+        let mut g = self.lock();
+        let leaving = crate::updates::leaving();
+        let inner: &mut Inner = &mut g;
+        if inner.settings.discord.show {
+            inner.discord.count.keep(&inner.runs);
+        } else {
+            inner.discord.count = Count::default();
+        }
+        let next = if leaving {
             Want::Off
         } else {
             presence::want(&g.discord_facts())
         };
+        let on = !leaving && g.settings.discord.show && g.settings.discord.name_game;
+        g.discord.games_on.send_if_modified(|v| {
+            let changed = *v != on;
+            *v = on;
+            changed
+        });
         g.discord.want.send_if_modified(|w| {
             let changed = w.differs(&next);
             if changed {
@@ -240,12 +360,18 @@ mod tests {
         let s = Shown {
             doing: Doing::Clipping,
             game: Some("Starfall Tactics".into()),
+            picture: Some("https://cdn.discordapp.com/app-icons/1/a.png?size=256".into()),
+            clips: 2,
             since: 1,
             button: true,
         };
         assert_eq!(
             Line::of(&Report::Sent(s)),
-            Line::new("sent", "Sent to Discord:", "Starfall Tactics, Clipping")
+            Line::new(
+                "sent",
+                "Sent to Discord:",
+                "Starfall Tactics, Clipping with reel, 2 clips, with Discord's picture of the game"
+            )
         );
         assert_eq!(Line::of(&Report::Quiet(Want::Off)), Line::default());
         assert_eq!(

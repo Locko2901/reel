@@ -5,6 +5,7 @@ pub mod audio;
 pub mod bundled;
 pub mod cache;
 pub mod cues;
+pub mod discord_games;
 pub mod elevated;
 pub mod encoders;
 pub mod gaming;
