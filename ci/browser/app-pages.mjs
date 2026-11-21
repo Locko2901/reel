@@ -127,7 +127,8 @@ const shell = (flavour) => {
 
 // Each picture: the page, its flavour, the window, and the part of the page it shows.
 const PICTURES = {
-  'img/app-startup-updates.png': { page: 'index.html#startup', flavour: 'update', size: [1280, 900], part: '#update-help' },
+  'img/app-updates.png': { page: 'index.html#startup', flavour: 'update', size: [1280, 900], part: '#update-help' },
+  'img/app-settings.png': { page: 'index.html', flavour: 'connected', size: [1280, 820] },
   'setup/img/app-setup-0-choice.png': { page: 'setup.html', flavour: 'standalone choice', size: [1280, 800] },
   'setup/img/app-setup-9-new-versions.png': { page: 'setup.html#look', flavour: 'standalone first', size: [1280, 800] },
   'setup/img/app-linux-choice.png': { page: 'setup.html', flavour: 'standalone choice linux', size: [1280, 800] },

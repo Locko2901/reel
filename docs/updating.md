@@ -87,7 +87,7 @@ the backup from before an update until the new version has run a while.
 The server offers each paired app the app of its own version, so
 updating the server is what updates the apps. The app asks its server
 45 seconds after it starts and then every six hours, and **Check now**
-under Settings, Startup, **Updates** asks at once. Every installer is
+under Settings, App, **Updates** asks at once. Every installer is
 signed with reel's release key, and the app checks the signature before
 it installs anything. The signature also names the installer's version,
 and the app installs it only as that version and only when it is newer
@@ -99,7 +99,7 @@ ready to install" with **Install now** and **Later**, and while the
 window is open the same question sits at the top of its pages (the app's
 own, and the library, on this PC or on your server). **Later** asks again a day later,
 or at the next start; **Check now** asks at once. **Install reel
-1.10.1** also appears in the tray menu and under Settings, Startup,
+1.10.1** also appears in the tray menu and under Settings, App,
 **Updates**, which says what Install does before you press it. The app
 never opens or raises its window to ask. On Windows, reel closes, a small window shows the installer's
 progress, and reel opens again by itself about a minute later (half a
@@ -130,14 +130,14 @@ default) decides whether paired apps are offered updates at all.
 With no server, the app takes its updates from reel's releases on
 GitHub, and it asks only while you let it:
 
-- **Check now** under Settings, Startup, **Updates** asks for the newest
+- **Check now** under Settings, App, **Updates** asks for the newest
   release when you press it.
-- Settings, **Advanced**, **Check for updates** asks a minute after the
+- Settings, App, **Look for new versions on GitHub** asks a minute after the
   start, then once a day. While **New versions** is not off, the app asks
   again whenever the last answer is six hours old by the clock, so a new
   version reaches it within hours, also on a PC that sleeps at night. The
-  setup's **Look for new versions on GitHub** (its **New versions** step,
-  in reel light's setup too) is the same switch and is on unless you
+  setup's step **New versions** (in reel light's setup too) has the same
+  switch, which and is on unless you
   switch it off there; with the setup skipped, or on an app set up
   before the setup asked, it is off until you turn it on.
 
@@ -146,7 +146,7 @@ the app takes the installer of its own package from the release (reel
 for reel, reel light for reel light, the AppImage for the AppImage),
 checks its signature against the key built into it, and **Install**
 puts it in place. **New versions** in the same panel decides what a
-newer release found by **Check for updates** does; **Check now** offers one
+newer release found by **Look for new versions on GitHub** does; **Check now** offers one
 either way. Until the release job has put the installers on a new
 release, the panel says the release has none for this app yet.
 
@@ -158,7 +158,7 @@ first; from then on the app installs its updates itself.
 - **Windows**: download the installer of the package you have from the
   [releases page](https://github.com/Locko2901/reel/releases) (**Open
   the releases** under Updates opens it), **reel** over reel, **reel
-  light** over reel light (Settings, Startup, **Versions** names it),
+  light** over reel light (Settings, App, **Versions** names it),
   and run it. Its page says **Update reel** or **Update reel light** and
   names the version on this PC; press **Update**. It closes reel first,
   and your settings and your library stay.

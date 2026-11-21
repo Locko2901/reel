@@ -243,7 +243,7 @@ On the server, pull the new image and start it again; the database
 updates itself at start, and the Status page says when a newer release
 is out. A paired app is then offered the server's version, signed and
 checked before it installs. A standalone app installs the newest release
-when you press **Check now** under Settings, Startup, **Updates**, with
+when you press **Check now** under Settings, App, **Updates**, with
 the same signature check. The Linux `.deb` does not update itself: its
 new version is on the
 [releases page](https://github.com/Locko2901/reel/releases). See

@@ -29,7 +29,7 @@ What each needs:
   ([Windows protected your PC](troubleshooting.md#windows-protected-your-pc)). One installed over
   the other keeps your settings, your library and the pairing, and its page says **Switch to reel**
   or **Switch to reel light**. reel light over reel removes the OBS that came with it, and its
-  installer asks before it does ([All in one](setup/all-in-one.md#afterwards)). Settings, Startup
+  installer asks before it does ([All in one](setup/all-in-one.md#afterwards)). Settings, App
   names the package under **Versions**, and **About** next to the version.
 - **Linux** keeps one name for both files: reel, the AppImage or the `.deb`, with the OBS you
   install yourself.
@@ -43,7 +43,7 @@ What each needs:
 
 ## Standalone or connected
 
-The app runs in one of two modes, set under Settings, **Server**, **Mode**:
+The app runs in one of two modes, set under Settings, **Connection**, **Mode**:
 
 | | **standalone** | **connected** |
 |---|---|---|
@@ -59,10 +59,10 @@ what only a server needs: share links (the clip page's Share, a collection's lin
 clip's menu and in the Select bar, the Shares page), members and sign-in, the Devices page, the
 public address, notifications to ntfy or a webhook, external storage, the incoming folder, the
 first run and the restart. Their addresses answer "Not in standalone" with what to do instead.
-Settings keeps its groups, with the pages a library on one PC has: **Recording** (the app's
-five), **Library** (**Library and storage**, **Library folder**, **Ingest**, **Encoder**, **Copies
-under a size**, **Imports**), **Server** (the app's **Server** page alone, for a server later) and
-**System** (**General**, **Appearance**, **Startup**, **Status**, **Log**, **Advanced**).
+Settings is the same, with the pages a library on one PC has: its first page, **More** without
+**Uploads**, and at its foot **Library**, reel on this PC: **Library and storage**, **Library
+folder**, **Ingest**, **Encoding**, **Copies under a size**, **Imports**, **General**,
+**Appearance** and **Advanced**.
 
 A server can be paired while the app stays standalone: **Upload to the server** on Settings,
 **Status** then sends a clip to it. [Standalone](setup/standalone.md) has the whole picture, and
@@ -71,7 +71,7 @@ how to add a server later.
 ## What runs, and when
 
 - **At sign-in.** The app starts with your Windows or desktop session, hidden in the tray, without
-  a window (Settings, Startup, **Start at logon**, on by default). On Windows that is a Run entry
+  a window (Settings, **Start with Windows**, on Linux **Start at logon**, on by default). On Windows that is a Run entry
   for your user; on Linux an entry in your desktop's autostart.
 - **In the tray.** Double-click reel's icon to open the library. Its menu's first line says what
   the app does in the words of the window's bar (**ready, last 60 s**, **recording, 12 min**,
@@ -83,7 +83,7 @@ how to add a server later.
   standalone the menu keeps what makes sense on one PC: that line, **Last clips** (each with
   **Open**), **Save clip**, **Record a session**, **Pause clips**, **Open library**, **Open settings**, OBS's entry
   and **Quit**, with **Pause uploads** once a server is paired. For a tray whose icons are all one
-  colour, Settings, Startup, **Tray icon** shows reel's mark alone in white or in black. On Linux,
+  colour, Settings, App, **Tray icon** shows reel's mark alone in white or in black. On Linux,
   reel's own OBS has a tray icon of its own, which opens its window.
 - **Pause clips**, in the tray and in the menu of the window's bar, stops OBS's replay
   buffer: OBS no longer encodes, and the buffer gives back its memory. OBS stays open, so **Resume
@@ -139,9 +139,9 @@ does is in a bar along the window's foot:
   on this PC runs; its dot turns red only for a check of the PC's own (its room, ffmpeg, the
   database), and **Pause uploads** shows once a server is paired. Esc closes the menu, and the
   keyboard reaches all of it.
-- **Settings** holds the app's own pages and the server's in one nav, grouped by what you do:
-  **Recording**, **Library**, **Server** and **System**. Ctrl+, opens Settings from anywhere in the
-  window.
+- **Settings** opens on what is set and the few settings most people change, each with what it
+  costs; **More** lists the app's other pages, and the server's pages (in standalone, the
+  library's) follow at its foot. Ctrl+, opens Settings from anywhere in the window.
 
 The window has no address bar. A clip's page has its own back button above the player, and the
 mouse's back and forward buttons, Alt+Left and Alt+Right walk back and forth through the pages,
@@ -183,8 +183,8 @@ and its upload waits while a game has the screen when uploads do.
 - **It stops by itself** before the disk is full: when the disk OBS records to has less than 5 GB
   left, or in standalone when the library would have no room left to take the recording in. A
   notification says so, and the recording so far goes into the library.
-- **If OBS stops** mid recording (a crash, your own OBS closed, or a change under Settings, OBS
-  that starts reel's OBS again), what it wrote is kept and goes into the library, and a
+- **If OBS stops** mid recording (a crash, your own OBS closed, or a change under Settings or
+  Settings, Capture that starts reel's OBS again), what it wrote is kept and goes into the library, and a
   notification says so.
 - **Quit** stops the recording first, so its file is whole; it does not ask. A recording you
   started in your own OBS goes on there. An update waits to install until the recording has
@@ -203,28 +203,41 @@ plays the recording.
 
 ## The app's pages
 
-Settings groups its pages by what you do, the app's own beside the server's (in standalone,
-the library's): **Recording** has OBS, the clips and session recordings, **Library** the library, **Server** the
-connection to a server and, from the server, Sharing, Devices, Access and Notifications, and
-**System** the rest. Beside a server, a page's line says where it is kept: the app's pages on
-this PC, each PC with its own, the server's on the server, the same for every PC and browser.
-The app's own pages:
+Settings opens on its first page: a sentence of what is set (the key that saves a clip, how long
+a clip is, when the replay buffer runs, the quality, and where a clip goes), then the settings
+most people change, each with what it costs:
 
-| Page | Group | What it holds |
+- **The replay buffer**: **Always**, or **While a game runs** ([Games and apps](games-and-apps.md)),
+- **Clip length**, with the memory the replay buffer takes and the size of a clip,
+- **Quality**, four presets, each with the size of a minute of clip,
+- **Save a clip**, its key,
+- **Microphone**,
+- connected, **Upload**: every clip, the last one on its key, or by hand,
+- **Start with Windows** (**Start at logon** on Linux).
+
+With your own OBS, **Clip length** is OBS's replay length, and the picture and the microphone are
+OBS's own: the first page says so, and points to **Capture**.
+
+**More** lists the app's other pages, each with what is set there, and opens each as a page of its
+own, with **Settings** above it to go back. They are kept on this PC, each PC with its own. The
+server's pages follow at the foot of the first page, under **Server**, kept on the server, the
+same for every PC and browser; in standalone the library's follow under **Library**, with
+**Library folder** and **Encoding** among them.
+
+![Settings, its first page](img/app-settings.png)
+
+| Page | Where | What it holds |
 |---|---|---|
-| **Status** | System | the connections (the server, OBS, the clips folder, the hotkeys, on Linux the tray), the versions, the queue with **Upload now** and **Retry**, and the last clips with **Copy link** and **Open**. In standalone: the library on this PC in place of the server, a **Standalone** panel (where the library lives, the encoder, ffmpeg), **Add now** and **Retry** to take a clip into the library, and the last clips with **Open**, and **Upload to the server** once a server is paired |
-| **Server** | Server | **Mode** (connected or standalone), the **Server URL**, the **Device name** and the pairing; in standalone under **A server, later** |
+| **Clips** | More | **Save a clip now**; with your own OBS **Start it in OBS**, which starts its replay buffer; **Keep the last**; connected, the keys **Save and share** and **Share the last clip**; the **Sounds** (clip captured, no clip, clip uploaded or in standalone clip in the library, and link copied), each on or off, with a volume, a WAV file of your own and **Preview**; and **On this PC**: the **Clips folder** and, connected, how long a clip stays on the PC after the server has it |
+| **Session recording** | More | **Record a session**, its key; **With a game**: every game records by itself, and the recording stops when its game closes; the reminders while a [session recording](#recording-a-whole-session) runs: **Remind every** and their sound, on or off, with a volume, a WAV file of your own and **Preview**; the sound also plays when a recording starts |
+| **Capture** | More | **Picture** (the encoder and the format; with your own OBS, the format and the bitrate), **What it captures** (the game in front, games that run as administrator), **Sound** (desktop audio, the game alone, Discord alone, the microphone's noise suppression and gate, a track for each source, the levels), and **The OBS behind it**: with reel's own OBS (the one that came with reel on Windows, the installed one run a second time on Linux) which OBS and how it runs, **Open OBS** on Windows and **Run the setup again**; with your own OBS the obs-websocket connection with **Run the setup**. Folded under it: **What reel needs from OBS**, **What OBS is set to** (its profile among it) and how reel finds a new clip (**Follow OBS**, the file endings, **Still for**) |
+| **Games and apps** | More | the programs reel has seen: which ones are games, and the name each gives its clips; Steam's installed games come in by themselves; **Show on Discord**; and **When a game closes**, its grace period. The count beside it is of those not sorted yet. See [Games and apps](games-and-apps.md) |
+| **Uploads** | More, connected | **Upload the last clip**, its key; on Windows **Uploads wait while a game has the screen**, off unless you turn it on (never for a Save and share, whose upload goes at once, ahead of the others); a bandwidth limit and the chunk size. See [The waits](games-and-apps.md#the-waits) |
+| **Connection** | More | **Mode** (connected or standalone), the **Server URL**, the **Device name** and the pairing; in standalone under **A server, later**, and with a server paired **Sending to it**, its bandwidth limit and chunk size |
+| **App** | More | the **Tray icon**, the app's **Updates**, its **Versions**, and **About** (the version, the folders the app keeps its settings and data in, and on Windows **Uninstall reel...**); in standalone **Look for new versions on GitHub** |
+| **Status** | More | the connections (the server, OBS, the clips folder, the hotkeys, on Linux the tray), the queue with **Upload now** and **Retry**, the last clips with **Copy link** and **Open**, and the **Log**: what the app did, newest at the bottom, the **Log level** and **Open the log folder**. In standalone: the library on this PC in place of the server, a **Standalone** panel (where the library lives, the encoder, ffmpeg), **Add now** and **Retry** to take a clip into the library, the last clips with **Open**, and **Upload to the server** once a server is paired |
 | **Library folder** (standalone) | Library | where the library is on this PC, with **Move** and **Make a copy**, the **Library cap** and **The cap spares unsent clips** |
-| **Encoder** (standalone) | Library | the **GPU encoder** and the one in use, and **Copies on the GPU** |
-| **OBS** | Recording | with reel's own OBS (the one that came with reel on Windows, the installed one run a second time on Linux): which OBS and how it runs, **Open OBS** on Windows, and **Its setup** (clip length, quality, encoder, capture, audio, format), where a change made in OBS shows once OBS is hidden again. With your own OBS: **What reel needs from OBS**, the obs-websocket connection with **Run the setup**, **What OBS is set to** (its profile among it) and **Change in OBS** |
-| **Clips folder and cache** (in standalone **Clips folder**) | Recording | the folder watched for clips (it follows OBS's recording folder unless you turn **Follow OBS** off) and, connected, how long a clip stays on the PC after the server has it |
-| **Upload** (in standalone **New clips**) | Recording | connected: every clip automatically, the last clip on a hotkey, or by hand; a bandwidth limit; on Windows **Uploads wait while a game has the screen**, off unless you turn it on (never for a Save and share, whose upload goes at once, ahead of the others); **Keep the last**. In standalone: **Keep the last**, on Windows **Encoding waits while a game has the screen**, also off unless turned on, and the loudness of new clips. See [The waits](games-and-apps.md#the-waits) |
-| **Hotkeys** | Recording | the five keys, and a line saying how keys reach the app on this desktop; in standalone **Save a clip** and **Record a session** |
-| **Games and apps** | Recording | the programs reel has seen: which ones are games, and the name each gives its clips; Steam's installed games come in by themselves. The count beside it is of those not sorted yet. See [Games and apps](games-and-apps.md) |
-| **Session recording** | Recording | the reminders while a [session recording](#recording-a-whole-session) runs: **Remind every** and their sound, on or off, with a volume, a WAV file of your own and **Preview**; the sound also plays when a recording starts |
-| **Sounds** | Recording | the clips' cues, each on or off, with a volume, a WAV file of your own and **Preview**: clip captured, clip uploaded and link copied; in standalone clip captured and clip in the library |
-| **Startup** | System | **Start at logon**, **Tray icon**, the app's **Updates**, and **About** (the version, the folders the app keeps its settings and data in, and on Windows **Uninstall reel...**) |
-| **Log** | System | what the app did, newest at the bottom, the **Log level**, **Open the log folder** |
+| **Encoding** (standalone) | Library | the **GPU encoder** and the one in use, **Copies on the GPU**, and on Windows **Encoding waits while a game has the screen**, off unless you turn it on. See [The waits](games-and-apps.md#the-waits) |
 
 ![Settings, Status](img/app-status.png)
 
@@ -234,7 +247,9 @@ user can read, in the app's settings folder.
 
 ## Hotkeys
 
-The five hotkeys, under Settings, **Hotkeys**:
+The five hotkeys: **Save a clip** on Settings' first page, **Save and share** and **Share the last
+clip** under Settings, **Clips**, **Upload the last clip** under **Uploads** and **Record a session**
+under **Session recording**:
 
 | Hotkey | Default | What it does |
 |---|---|---|
@@ -265,8 +280,8 @@ One exception: a game that runs as administrator does not pass its keys to the a
 
 **On Linux** global hotkeys depend on your desktop: they may not work, or may need to be set up in
 the desktop's own keyboard settings. There you can bind a key to `reel-desktop --save-and-share`
-(or `--save`, `--share-last`, `--pause-recording`, `--resume-recording`, `--record-session`). With the AppImage the command is the AppImage's path, which the
-Hotkeys page shows.
+(or `--save`, `--share-last`, `--pause-recording`, `--resume-recording`, `--record-session`). With the AppImage the command is the AppImage's path, which
+Settings shows under **Save a clip**.
 
 ## Updates
 
@@ -281,11 +296,11 @@ releases, and you see each step:
   against the key built into it before it runs anything. The signature names the installer's
   version, and the app takes it only as that version and only when it is newer than its own.
 - **When.** Paired, the app asks its server 45 seconds after it starts, then every six hours.
-  Standalone, it asks GitHub only when you ask: **Check now**, or by itself when Settings,
-  **Advanced**, **Check for updates** is on (the setup's **Look for new versions on GitHub** leaves
-  it on unless you switch it off there): a minute after the start, then every six hours by the
+  Standalone, it asks GitHub only when you ask: **Check now**, or by itself when Settings, App,
+  **Look for new versions on GitHub** is on (the setup leaves it on unless you switch it off
+  there): a minute after the start, then every six hours by the
   clock, once a day with **New versions** off ([What leaves your PC](privacy.md#what-leaves-your-pc)).
-  **Check now** under Settings, Startup, **Updates** asks at once. **New versions** there decides
+  **Check now** under Settings, App, **Updates** asks at once. **New versions** there decides
   what happens with a version found without it: **ask, then install** (the default) asks in a
   notification with **Install now** and **Later**, and at the top of the window's pages while it is
   open (the library too, on this PC or on your server), and offers it in the tray menu and on the
@@ -297,7 +312,7 @@ releases, and you see each step:
   again by itself, in about a minute with reel and half a minute with reel light. A
   notification says the same as it starts.
 
-    ![Settings, Startup, Updates: an update ready, and what Install does](img/app-startup-updates.png)
+    ![Settings, App, Updates: an update ready, and what Install does](img/app-updates.png)
 
 - **While it installs**, a small window shows "Updating reel to" the new version ("Updating reel
   light to" with reel light), with a bar and
@@ -322,7 +337,7 @@ releases, and you see each step:
   that installs it.
 - **If an update does not install**, for example because another program holds one of reel's
   files and you pressed **Cancel** at its question, the reel you had starts again and says why
-  ("reel 1.10.1 did not install: ..."). **Install** under Settings, Startup tries again.
+  ("reel 1.10.1 did not install: ..."). **Install** under Settings, App tries again.
 - **The AppImage** puts the new version in place of its own file and opens again by itself, in a
   few seconds.
 - **The .deb** does not update itself: install the next version's `.deb` the same way as the first.
@@ -330,7 +345,7 @@ releases, and you see each step:
   update: it says the new version is out, and **Open the releases** opens the page with its
   installers. Install that one by hand, once; from then on the app installs its updates itself.
 
-The **Versions** panel on Settings, Status names this app's version and kind, the server's, and
+The **Versions** panel on Settings, App names this app's version and kind, the server's, and
 the newest release. The **Versions** line of the bar's menu shows the version, or both while the app
 and its server differ ("app 1.4.1, server 1.4.0"). On the server, Settings, Devices,
 **App updates** has [Offer app updates](configuration.md#offer-app-updates), on by default, and a
@@ -340,7 +355,7 @@ and its server differ ("app 1.4.1, server 1.4.0"). On the server, Settings, Devi
 
 === "Windows"
 
-    Open Windows Settings, **Apps**, **reel**, **Uninstall**, or in the app Settings, Startup,
+    Open Windows Settings, **Apps**, **reel**, **Uninstall**, or in the app Settings, App,
     About, **Uninstall reel...**, which starts the same uninstaller and quits. Its page says what
     goes: the app, the OBS that came with it and OBS's settings, the desktop shortcut and the start
     at sign-in. Two boxes, both off, decide what else goes:
@@ -365,7 +380,7 @@ and its server differ ("app 1.4.1, server 1.4.0"). On the server, Settings, Devi
 
 === "AppImage"
 
-    Turn **Start at logon** off (Settings, Startup), quit the app from the tray, and delete the
+    Turn **Start at logon** off (Settings), quit the app from the tray, and delete the
     AppImage. The settings live in `~/.config/reel`, and the app's data (the log, the list of clips
     sent, the library on this PC) in `~/.local/share/reel`; delete both if you want nothing left.
     Your clips folder stays.
