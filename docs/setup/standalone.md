@@ -42,7 +42,7 @@ app, with a key that changes at each start ([Privacy](../privacy.md#the-library-
 ## 3. The first clip
 
 1. Play a game and press **Save a clip**: Alt+F10 after the setup of reel's own OBS. With your own
-   OBS, set a key under Settings, **Hotkeys**, or use OBS's own **Save Replay** hotkey. The "clip
+   OBS, set a key under Settings, **Save a clip**, or use OBS's own **Save Replay** hotkey. The "clip
    captured" sound plays.
 2. A second or two later the notification "Clip in the library" appears. Click **Open**.
 3. On the clip's page, under **Send**, press **Show in folder**: the folder opens with the file
@@ -77,13 +77,13 @@ downloading a copy:
 
 - **Low priority.** Every ffmpeg runs at the lowest priority: Windows' idle class, `nice 10` on
   Linux.
-- **Heavy work can wait for the game.** On Windows, with Settings, New clips, **Encoding waits
+- **Heavy work can wait for the game.** On Windows, with Settings, Encoding, **Encoding waits
   while a game has the screen** on, a re-encode, the hover loop and the filmstrip, and the copies
   under a size wait while a game has the screen, and run when it lets go. It is off unless you
   turn it on, for every game or for one game alone ([Games and apps](../games-and-apps.md#the-waits)).
 - **The graphics card where it can.** When it starts, reel tests the encoders with a short encode
   and takes the first that works: on Windows NVIDIA NVENC, AMD AMF, then Intel Quick Sync; on
-  Linux Intel Quick Sync, then VAAPI; else the CPU. Settings, **Encoder** shows which one, and its
+  Linux Intel Quick Sync, then VAAPI; else the CPU. Settings, **Encoding** shows which one, and its
   **GPU encoder** picks another; Settings, **Status** names the ffmpeg that came with the app, with
   its licence.
 - **A cap on its size.** **Library cap** (Settings, Library folder, 100 GB to start with) moves
@@ -141,8 +141,8 @@ first, and pick that one. The copy's `README.txt` says the same.
 
 ## New versions
 
-Under Settings, **Startup**, **Updates**, **Check now** asks GitHub for the newest release.
-Settings, **Advanced**, **Check for updates** asks by itself while it is on: a minute after the
+Under Settings, **App**, **Updates**, **Check now** asks GitHub for the newest release.
+Settings, **App**, **Look for new versions on GitHub** asks by itself while it is on: a minute after the
 start, then every six hours by the clock (once a day with **New versions** off). The setup's
 **Look for new versions on GitHub**, on its **New versions** step (reel light's setup has it too), is
 the same switch, on unless you switch it off there; with the setup skipped, or on an app set up
@@ -164,7 +164,7 @@ A server of your own adds share links that play in the chat
 
 1. On the server, open Settings, Devices and press **Pair a device**. A code appears, good for ten
    minutes and one use.
-2. In the app, open Settings, **Server**. Under **A server, later**, enter the **Server
+2. In the app, open Settings, **Connection**. Under **A server, later**, enter the **Server
    URL** (`https://clips.example.com`).
 3. Under **Pairing**, enter the **Pairing code** and press **Pair**. When it worked, **Pairing**
    says "paired".

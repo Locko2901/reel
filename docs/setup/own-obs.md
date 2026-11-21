@@ -85,17 +85,19 @@ before you begin.
 
     ![Done, the summary, with the replay buffer only while a game runs](img/app-light-7-done.png)
 
-**Skip for now**, on every step, leaves the setup for later: the app opens on Settings, **OBS**,
-and **Run the setup**, in its **obs-websocket** panel, opens it again. An app that was set up
+**Skip for now**, on every step, leaves the setup for later: the app opens on Settings, and **Run
+the setup**, under **Capture**, **The OBS behind it**, opens it again. An app that was set up
 before an update opens as it did, without the setup.
 
 ## 3. OBS's settings, later
 
-Settings, **OBS** has what the setup set and more: the **obs-websocket** panel (the connection
-and **Start the replay buffer**), **What OBS is set to**, and **Change in OBS**, which sets the
-recording folder, the replay length, the format and the bitrate in OBS for you.
+Settings has what the setup set and more, and writes into OBS for you what it sets there. On its
+first page, **Clip length** is OBS's replay length. Under **Clips**, **Start it in OBS** starts
+OBS's replay buffer, and **On this PC** has OBS's **Recording folder**. Under **Capture**,
+**Picture** has OBS's format and bitrate, and **The OBS behind it** the **obs-websocket**
+connection, with **What OBS is set to** folded under it.
 
-![Settings, OBS, connected to OBS](img/app-settings-obs.png)
+![Settings, Capture, connected to OBS](img/app-settings-capture.png)
 
 For the recording format, pick **Hybrid MP4** or **MKV** in OBS: both survive a crash of OBS. For
 the encoder, any **H.264** one works (NVENC, AMF, Quick Sync or x264). Clips in H.264 up to 1440p
@@ -105,10 +107,10 @@ again.
 reel never starts or ends your OBS. While it is closed, or after it crashed, the OBS line under
 Settings, **Status** says what reel waits for ("waiting for OBS at 127.0.0.1:4455: it is not
 running, or its WebSocket server is off"), and reel connects again within a few seconds of OBS
-being back, with the replay buffer started again when **Start the replay buffer** is on.
+being back, with the replay buffer started again when **Start it in OBS** is on.
 
 The clips folder follows OBS's recording folder unless you turn **Follow OBS** off under Settings,
-**Clips folder** (**Clips folder and cache** when connected). The app watches that folder as a
+**Capture**, **The OBS behind it**. The app watches that folder as a
 safety net too, so a clip saved while OBS and the app were not talking is still found.
 
 !!! tip "Discord's Streamer Mode"
@@ -116,12 +118,12 @@ safety net too, so a clip saved while OBS and the app were not talking is still 
     runs whenever you play. To keep Streamer Mode off: in Discord, **User Settings**, **Streamer
     Mode** (in newer versions under **Appearance**), turn off **Automatically Enable/Disable**.
 
-The app's keys are under Settings, **Hotkeys** later: click a field and press the keys. A
+**Save a clip**, its key, is on Settings' first page later: click the field and press the keys. A
 combination another program holds is refused with a reason, and the field keeps what it had. With
-a server, the page has three more keys: **Save and share**, **Share the last clip** and **Upload
-the last clip** ([Hotkeys](../desktop-app.md#hotkeys)).
+a server there are three more keys: **Save and share** and **Share the last clip** under **Clips**,
+and **Upload the last clip** under **Uploads** ([Hotkeys](../desktop-app.md#hotkeys)).
 
-![Settings, Hotkeys](img/app-settings-hotkeys.png)
+![Settings, its first page](img/app-settings.png)
 
 ## 4. The first clip
 
@@ -146,12 +148,12 @@ With a server of your own ([The server](server.md)), every clip goes up as you s
 2. In the setup, on **Where clips go**, pick **A reel server**, enter the **Server URL**
    (`https://clips.example.com`) and the **Pairing code**, and press **Pair**. The setup moves on
    to **Done**, whose summary names your server; press **Finish**.
-3. Set up already? In the app, open Settings, **Server**. Under **A server, later**, enter the
+3. Set up already? In the app, open Settings, **Connection**. Under **A server, later**, enter the
    **Server URL** and a **Device name** for this PC (how it shows on the server). Under
    **Pairing**, enter the **Pairing code** and press **Pair**. When it worked, **Pairing** says
    "paired", and **This device** names this PC, your user and your server.
 
-    ![Paired](img/app-settings-server.png)
+    ![Paired](img/app-settings-connection.png)
 
 4. With the app set up already, set **Mode** to **connected**, so new clips go to the server.
    Clips already in the library on this PC can go up from Settings, **Status**, each with

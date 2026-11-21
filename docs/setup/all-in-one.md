@@ -55,11 +55,11 @@ The first page offers three ways:
 
 - **Set it up for me** (recommended): press **Set it up**. Eight short steps follow (seven with a
   server), each with a sensible default, so pressing **Next** through them gives a working setup. Everything stays
-  changeable later under Settings, **OBS**.
+  changeable later under Settings.
 - **Use my own OBS**: for an OBS you have set up already. The setup goes on with the five steps
   for your own OBS instead, the ones of [Your own OBS](own-obs.md#2-the-setup).
-- **Later**: press **Skip for now**, and the app opens on its own pages. Settings, **OBS** has the
-  setup whenever you want it.
+- **Later**: press **Skip for now**, and the app opens on its own pages. Settings has the setup
+  whenever you want it (**Run the setup again**, under **Capture**).
 
 If OBS is slow to answer, or something is wrong with it, a line at the top of the step says what,
 with **Show the log**. If OBS does not answer at all, reel shows OBS's own window, where OBS's
@@ -85,7 +85,7 @@ error appears.
    For the try in OBS, OBS starts again with the encoder, a few seconds each, and its replay
    buffer has to run with it. **OBS cannot use it** means OBS does not have that encoder or could
    not start it, with OBS's own lines under **details**. Only an encoder that works in both can
-   be picked, here and later under Settings, OBS, where the others are listed with the reason.
+   be picked, here and later under Settings, Capture, where the others are listed with the reason.
    **Test again** runs the test once more.
 
     ![Encoder, after the test](img/app-setup-3-encoder.png)
@@ -157,7 +157,7 @@ When it worked, OBS starts with your setup, hidden (no window, no second tray ic
 opens on your library. From now on OBS starts and stops with the app. If one part could not be
 done (Windows refused the task for games that run as administrator, say), Finish still saves
 everything else and says which part failed and why. You can try that part again under Settings,
-**OBS**.
+**Capture**.
 
 ## 4. The first clip
 
@@ -205,16 +205,17 @@ as well.
 
 ## Afterwards
 
-- **Change the setup**: Settings, **OBS** has every choice of the setup, the sources a
-  clip hears among them, and **Run the setup again**. Its values are OBS's own: reel reads them
+- **Change the setup**: Settings has every choice of the setup: the clip length, the quality and
+  the microphone on its first page, the rest under **Capture**, the sources a clip hears among
+  them, with **Run the setup again**. Its values are OBS's own: reel reads them
   from OBS, so a change you make in OBS shows there too. A change made here goes into OBS, that
   setting alone. When it starts, reel writes nothing into OBS; it only makes sure the WebSocket and
   the replay buffer are on.
-- **Open OBS**, at the top of Settings, OBS, opens OBS's own window, for anything reel's choices
+- **Open OBS**, under Settings, Capture, **The OBS behind it**, opens OBS's own window, for anything reel's choices
   do not name. Change what you like there; reel keeps working as long as the WebSocket and the
   replay buffer stay on. While OBS's window is up, a bar at the top of every page says where reel's
   settings are in OBS (Settings, Output, Replay Buffer for the clip length, and so on). Press
-  **Hide OBS** to hide it again; what you changed shows under Settings, OBS.
+  **Hide OBS** to hide it again; what you changed shows under Settings or Settings, Capture.
 - **Your own OBS at the same time**: while it is open, reel's OBS waits ("your own OBS is running
   ...; reel's OBS starts once it is closed"), so two captures never run at once.
 - **If OBS crashes**, also when its crash dialog keeps it open, or stops answering for 20
@@ -224,20 +225,20 @@ as well.
   was saved with yet counts against that encoder: reel changes it back, as the next point says,
   and says OBS stopped right after it started with it. With the encoder of the last replay it is
   not the encoder's: after five stops in a row reel stops trying and says why; **Start OBS
-  again**, in the tray or at the top of Settings, OBS, tries once more. An OBS with the highest
+  again**, in the tray or under Settings, Capture, tries once more. An OBS with the highest
   rights that its task does not bring up is waited for instead: reel says so and takes it over
   once it runs.
 - **If another encoder does not record**: after the encoder changes (in the setup, under Settings,
-  OBS, or in OBS itself), reel watches OBS's next start. If the replay buffer does not run with
+  Capture, or in OBS itself), reel watches OBS's next start. If the replay buffer does not run with
   it, or a save fails before any replay was saved with it, reel goes back to the encoder the last
   replay was saved with (x264 on the CPU if none was) and says so in its status, the tray's tooltip
   and a notification. That encoder is not offered again until **Run the setup again** tests it.
-  OBS's own lines about it go into reel's log (Settings, Log), as they do when a save fails.
+  OBS's own lines about it go into reel's log (Settings, Status, Log), as they do when a save fails.
 - **Its name**: reel runs the OBS that comes with it as `reel-capture.exe`, so Discord does not
   switch to Streamer Mode while it records in the background. The files are OBS's own, unchanged,
   and their source ships with every release. The OBS for games that run as administrator, when an
   earlier reel put it in place, keeps OBS's name (`obs64.exe`) until you press **Update the copy**
-  under Settings, OBS.
+  under Settings, Capture.
 - **Updates** keep the package: reel stays reel, with its OBS. Press **Install** and reel
   closes, a small window shows the installer's progress, and reel opens again by itself about a
   minute later ([Updates](../desktop-app.md#updates)).
@@ -257,7 +258,7 @@ as well.
   keep OBS, cancel and run `reel_<version>_x64-setup.exe` instead. Run silently (`/S`), it stops
   without touching anything unless it is also given `/WITHOUTOBS`. reel over reel light says
   **Switch to reel** and brings the OBS back.
-- **Uninstall** (Windows Settings, Apps, **reel**, or in the app Settings, Startup, About,
+- **Uninstall** (Windows Settings, Apps, **reel**, or in the app Settings, App, About,
   **Uninstall reel...**) removes the app, the OBS that came with it and OBS's settings. reel's own
   settings, the pairing and your clips folder go only when you tick them on its page
   ([Uninstalling](../desktop-app.md#uninstalling)).
@@ -266,7 +267,7 @@ as well.
 
 A few games run with administrator rights, and OBS can only capture them when it runs with those
 rights too. Turn on **Capture games that run as administrator**, in the setup's step 4 or under
-Settings, **OBS**:
+Settings, **Capture**:
 
 - **Windows asks once**, when you press **Finish** or flip the switch, to run `reel-elevate.exe`,
   reel's own small helper, as administrator. It puts a copy of OBS, its settings included, in
@@ -275,24 +276,24 @@ Settings, **OBS**:
   never reel, with the highest rights at logon, hidden and loading no plugin but OBS's own. "reel
   OBS window (games that run as administrator)" shows, hides and closes it when reel asks. There is
   no prompt at every start. If it fails, the switch stays off and says why.
-- **A change of the setup** under Settings, OBS (the clip length, the quality, the encoder ...)
+- **A change of the setup** under Settings or Settings, Capture (the clip length, the quality, the encoder ...)
   is written into the copy while the switch is on, and Windows asks once for each, as the page
   says. The levels and the microphone's filters change without asking.
 - **When an update of reel brings another OBS**, reel updates the copy itself at its first start
   after the update, once no game or other fullscreen app is in front. Windows asks once, and on
-  **Yes** OBS starts again from the updated copy. Settings, OBS says so in its first line while it
+  **Yes** OBS starts again from the updated copy. Settings, Capture says so in its first line while it
   waits and while Windows asks. If you say **No**, or it fails, the copy keeps the OBS it had:
-  Settings, OBS names its version, a notification says so each time reel starts, and **Update the
+  Settings, Capture names its version, a notification says so each time reel starts, and **Update the
   copy** does it whenever you like. reel asks by itself again only after its next update, never at
   every start.
 - **If the copy or its task is gone** while the switch is on (reel light was installed over reel,
   or reel was uninstalled and installed again with its settings kept), OBS runs without
   the highest rights: your other games are captured as before, games that run as administrator
-  are not. Settings, OBS and a notification say so, with **Put it in place**, or **Update the
+  are not. Settings, Capture and a notification say so, with **Put it in place**, or **Update the
   copy** when only the task is missing. Windows asks once.
 - **Open OBS** and **Hide OBS** work as without the switch, through the second task: Windows does
   not let reel itself show or hide a program with more rights. A copy an earlier reel put in place
-  starts OBS in its own tray icon until Settings, OBS, **Update the copy** (Windows asks once).
+  starts OBS in its own tray icon until Settings, Capture, **Update the copy** (Windows asks once).
 - **The Save a clip key** is taken by OBS itself, since Windows does not pass keys pressed in such
   a game to reel. Save and share and Share the last clip work again once the game is not in front.
 - **Turning the switch off** removes the task and the copy. Windows asks once more for that, and
@@ -303,4 +304,4 @@ Settings, **OBS**:
   they end, or not at all when the switch is back where it was. If you say **No**, the switch goes
   back to what is there and says so.
 - **A copy or task left in Program Files** with the switch off (a step that stopped halfway, for
-  example) shows on Settings, OBS, with **Remove it**. Windows asks once.
+  example) shows on Settings, Capture, with **Remove it**. Windows asks once.

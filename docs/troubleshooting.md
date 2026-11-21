@@ -39,13 +39,13 @@ SHA256, which must match the one in the `.sha256` file.
 
 ### The app
 
-Settings, **Log** shows what the app did, newest at the
+Settings, **Status**, **Log** shows what the app did, newest at the
 bottom. Tokens never appear in it. **Open the log folder** opens the
 folder with the files, one per day (`reel-desktop.log.` followed by the
 date). For a problem that is hard to catch, set **Log level** to **debug,
 everything**, make it happen again, then set it back.
 
-![Settings, Log](img/app-log.png)
+![Settings, Status, Log](img/app-log.png)
 
 === "Windows"
 
@@ -63,7 +63,7 @@ everything**, make it happen again, then set it back.
     `~/.config/reel`. Started from a terminal, the app also prints what
     WebKitGTK says there.
 
-Settings, Startup, **About** lists the app's version and both folders.
+Settings, App, **About** lists the app's version and both folders.
 With your own OBS, OBS's logs are under its **Help**, **Log Files**.
 
 ### The server
@@ -111,8 +111,8 @@ The app starts its own OBS again by itself after a crash, a little later
 each time; an OBS that stops answering for 20 seconds is ended first.
 After five stops in a row it stops trying and tells you in a
 notification: "The OBS that came with reel stopped 5 times in a row, so
-reel stopped starting it. Start OBS again is in the tray; Settings, Log
-has what OBS said." The app's log then holds the end of OBS's own log and
+reel stopped starting it. Start OBS again is in the tray; Settings, Status,
+Log has what OBS said." The app's log then holds the end of OBS's own log and
 the start of its crash report, so the log you send names the cause.
 
 **"Encoder changed back: OBS stopped right after it started with ..."**
@@ -144,7 +144,7 @@ its reverse proxy and enter the `https://` address, such as
 
 **"the server does not know this device any more; pair again"**: the PC
 was revoked on the server (Settings, Devices, **Revoke**). Make a new
-code and pair again under Settings, **Server**.
+code and pair again under Settings, **Connection**.
 
 ## The app cannot reach the server
 
@@ -213,8 +213,8 @@ sees it in the library.
 
 ## OBS
 
-With your own OBS, Settings, **OBS** has **What reel needs from OBS**,
-checked as long as the app runs. Each line says what to do:
+With your own OBS, Settings, **Capture**, **The OBS behind it** has
+**What reel needs from OBS**, checked as long as the app runs. Each line says what to do:
 
 - **"nothing answers at 127.0.0.1:4455: start OBS; in OBS, Tools,
   WebSocket Server Settings, tick Enable WebSocket server and check that
@@ -237,17 +237,17 @@ app, **OBS** says so in its first line.
   administrator** is on, but its copy of OBS in Program Files, or the task
   that starts it, is gone (reel light was installed over reel, or reel
   was installed again). Press **Put it in place**, or **Update the
-  copy**, under Settings, **OBS**; Windows asks once. reel 1.4.1 and
+  copy**, under Settings, **Capture**; Windows asks once. reel 1.4.1 and
   earlier did not start OBS at all then: the app's log said "OBS did not
   start: the task for games that run as administrator is missing" again
   and again. On those versions, turn the switch off and on again under
-  Settings, **OBS**.
+  Settings, **Capture**.
 - **"the copy is OBS 32.2.2, and this version of reel brought OBS
   33.0.0"**: an update of reel replaced its own OBS and left the copy for
   games that run as administrator as it was. reel updates the copy itself
   at the first start after an update. If you answered No to Windows'
   question then, or the step failed (the line says why), press **Update
-  the copy** under Settings, **OBS**; Windows asks once.
+  the copy** under Settings, **Capture**; Windows asks once.
 
 Each time OBS starts, the app's log (`%LOCALAPPDATA%\reel\logs`) has a
 line "the bundled OBS started" with `from_copy` and `version`, then
@@ -292,8 +292,8 @@ with reel runs under a name of reel's own, `reel-capture.exe` on Windows
 and `reel-capture` on Linux: Discord does not take it for OBS.
 
 Discord still sees your own OBS, OBS from Flathub, and on Linux an `obs`
-that is a script rather than the program itself; Settings, **OBS** says
-so then. To keep Streamer Mode off, in Discord: **User Settings**,
+that is a script rather than the program itself; Settings, **Capture**
+says so then. To keep Streamer Mode off, in Discord: **User Settings**,
 **Streamer Mode** (in newer versions under **Appearance**), turn off
 **Automatically Enable/Disable**. Discord from Flathub never turns it on
 by itself: it cannot see other programs.
@@ -313,7 +313,7 @@ to a program without those rights, so reel's hotkeys do nothing while
 such a game is in front.
 
 - **reel**, with its own OBS: turn on **Capture games that run as administrator**
-  (Settings, **OBS**). OBS then runs with those rights and takes the
+  (Settings, **Capture**). OBS then runs with those rights and takes the
   **Save a clip** key itself
   ([All in one](setup/all-in-one.md#games-that-run-as-administrator)).
 - **reel light**, with your own OBS: run OBS as administrator and use OBS's own **Save
@@ -325,7 +325,7 @@ such a game is in front.
 When an update of the app stops on the way, the reel you had starts
 again and says why in a notification ("reel 1.10.1 did not install:
 ..."), with its window open where it was. **Install** under Settings,
-Startup, **Updates** tries again.
+App, **Updates** tries again.
 
 - **A file is in use**: another program holds one of reel's files, for
   example a program that has a file of reel's OBS open, and the
@@ -342,8 +342,8 @@ Startup, **Updates** tries again.
 **Hotkeys do nothing on Linux.** Global hotkeys depend on your desktop,
 so they may not work, or may need setting up in the desktop's own
 keyboard settings. There you can bind a key to `reel-desktop
---save-and-share` (or `--save`, `--share-last`); the Hotkeys page shows
-the exact command for the AppImage
+--save-and-share` (or `--save`, `--share-last`); Settings shows the exact
+command for the AppImage under **Save a clip**
 ([The desktop app](desktop-app.md#hotkeys)).
 
 **No tray icon.** GNOME shows no tray icons without the AppIndicator
@@ -374,7 +374,7 @@ is missing: the video still plays, with a copy of each frame on the way.
 The AppImage carries it; for the .deb it is `gstreamer1.0-gl`. A warning
 about WebVTT is about subtitles, and reel's clips have none.
 
-**reel's own OBS keeps stopping.** Settings, **OBS** shows its line
+**reel's own OBS keeps stopping.** Settings, **Capture** shows its line
 ("OBS stopped (exit code 1); starting it again in ..."), and after the
 fifth stop in a row the app stops starting it and a notification says
 so; **Start OBS again** in the tray tries once more. The app's log has
@@ -383,7 +383,7 @@ copy of its settings: `~/.local/share/reel/obs/obs-studio/logs`, or for
 OBS from Flathub `~/.var/app/com.obsproject.Studio/reel/obs-studio/logs`.
 Start your own OBS once to see whether it starts at all. To leave reel's
 OBS off, turn off **Run a second OBS of reel's** under Settings,
-**OBS**.
+**Capture**.
 
 **On Wayland the screen stays black in reel's clips.** The desktop asks
 which screen to share the first time reel's OBS starts. If that was
@@ -428,8 +428,8 @@ reel a folder that really is new.
 
 ## "Is not there: is its drive plugged in?"
 
-In standalone, with the library moved to another drive (Settings, This
-app, **Server**, **Library folder**), reel on this PC waits for that
+In standalone, with the library moved to another drive (Settings,
+**Library folder**), reel on this PC waits for that
 drive: it is unplugged, off, or has another letter now. **Save clip**
 still saves, and the clips wait in the clips folder. Plug the drive in:
 within ten seconds reel on this PC starts by itself, and the waiting
@@ -492,7 +492,7 @@ each mode, and how to undo a user made by mistake.
 
 ## Asking for help
 
-Include the app's version (Settings, Startup, **About**) and the
+Include the app's version (Settings, App, **About**) and the
 server's (the Status page), what you did and what you saw, the app's log
 of that day, and for a crash on Windows the Reliability Monitor's
 details. Logs never hold tokens or passwords, but they do hold your

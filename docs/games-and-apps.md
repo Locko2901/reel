@@ -1,6 +1,6 @@
 # Games and apps
 
-Settings, **Games and apps**, in the app's **Recording** group, is the list of the programs reel
+Settings, **Games and apps**, under **More**, is the list of the programs reel
 has seen on this PC: which ones are games, the name each gives its clips, and what each does
 while it runs: whether the replay buffer runs, whether a session recording starts by itself and
 stops when it closes, and whether uploads and encoding wait. Steam's installed games come into it
@@ -68,7 +68,7 @@ setup's switch decides.
 
 Steam's own client, `steam.exe`, is no Steam app: it comes in as any program does.
 
-Each read writes a line to the app's Log (Settings, **Log**) that says how the types were read
+Each read writes a line to the app's Log (Settings, **Status**, **Log**) that says how the types were read
 and what came of it, for example `Steam read in C:\Program Files (x86)\Steam: 2 libraries, the
 types from appinfo.vdf version 41; 23 as Game, 2 as Not sorted yet, 9 stayed out, 0 still
 installing`, or `the types from the fallback rules (...)` with why.
@@ -123,10 +123,10 @@ says each start and close of a program of the list, for example `game: Ember Pas
 
 ### The replay buffer
 
-Settings, **OBS**, **The replay buffer**, **Runs**:
+On Settings' first page, **The replay buffer**, its two cards:
 
-- **always**, the default: as before, a clip can be saved at any time.
-- **only while a game runs**: OBS's replay buffer starts with a game and stops once the last
+- **Always**, the default: as before, a clip can be saved at any time.
+- **While a game runs**: OBS's replay buffer starts with a game and stops once the last
   one closed and the [grace period](#the-grace-period) passed. It leaves the PC its memory and
   its encoder while no game runs.
 
@@ -134,9 +134,8 @@ A game can also stop it while it runs, with its own **Replay buffer** set to **O
 game that needs every bit of the PC. Such an Off wins over every other program that runs: the
 buffer stays stopped until that game closes.
 
-With an OBS of your own, reel starts and stops OBS's replay buffer only with **Start the
-replay buffer** on (OBS, obs-websocket); choosing **only while a game runs** turns it on, and
-says so. The setup's step **Games** asks the same, **Always** pressed.
+With an OBS of your own, reel starts and stops OBS's replay buffer only with **Start it in
+OBS** on (Settings, **Clips**); choosing **While a game runs** turns it on, and says so. The setup's step **Games** asks the same, **Always** pressed.
 
 ### Session recordings
 
@@ -147,7 +146,6 @@ Settings, **Session recording**, **With a game**:
 - **Stop the session recording when its game closes**, on by default: a recording stops once its
   game closed and the grace period passed. That is also one you started by hand while the game
   ran. With several such games running, it stops once the last of them closed.
-- **Grace period**, 60 s by default (0 to 600).
 - **Record by itself now** names the games that do, as the list sets them.
 
 One recording covers every game: a second game that starts while one runs does not start
@@ -159,8 +157,8 @@ any recording.
 
 ### The grace period
 
-A game that closes and starts again within the grace period counts as still running: a
-launcher that restarts the game, a crash and a quick start again, a change of graphics
+Settings, **Games and apps**, **When a game closes**, **Grace period**, 60 s by default (0 to
+600): a game that closes and starts again within it counts as still running: a launcher that restarts the game, a crash and a quick start again, a change of graphics
 settings that restarts it. The recording goes on as one, and a buffer that runs only while a
 game runs stays. The Log says `game: Ember Pass closed; the session recording stops in 60 s
 unless it starts again`.
@@ -180,7 +178,7 @@ buffer stops right then.
 While the replay buffer is stopped by these rules, the Save hotkey saves nothing. reel says so
 at once, as a game in full screen may hold notifications back:
 
-- the sound **No clip** (Settings, **Sounds**), a short falling tone, which can be turned off or
+- the sound **No clip** (Settings, **Clips**, **Sounds**), a short falling tone, which can be turned off or
   changed there;
 - the notification **No clip saved**: `The replay buffer is off while Starfall Tactics runs, as
   set for it under Games and apps. Alt+F9 records a session instead.`, with **Open Games and
@@ -230,9 +228,9 @@ keeps busy or a slow connection. They are off unless you turn them on (Windows):
 
 | On this PC | Where | Its words | What waits |
 |---|---|---|---|
-| standalone | Settings, **New clips** | **Encoding waits while a game has the screen** | the library's heavy work: a re-encode, the copies under a size, the hover loop and the filmstrip |
-| standalone, with a server paired | Settings, **New clips** | **Uploads and encoding wait while a game has the screen** | that, and the uploads to the server |
-| connected | Settings, **Upload** | **Uploads wait while a game has the screen** | the uploads; a Save and share's goes at once all the same |
+| standalone | Settings, **Encoding** | **Encoding waits while a game has the screen** | the library's heavy work: a re-encode, the copies under a size, the hover loop and the filmstrip |
+| standalone, with a server paired | Settings, **Encoding** | **Uploads and encoding wait while a game has the screen** | that, and the uploads to the server |
+| connected | Settings, **Uploads** | **Uploads wait while a game has the screen** | the uploads; a Save and share's goes at once all the same |
 
 Connected, **Only on the internet, not on the LAN** shows under it while it is on: then an
 upload to a server on the local network goes on during a game. An install updated from a
@@ -312,19 +310,19 @@ What a program does while it runs comes in three layers, each changing the one b
 
 | | Every game, set under | Off by its class | Its own On | Its own Off |
 |---|---|---|---|---|
-| **Replay buffer** | OBS, The replay buffer: always, or only while a game runs | Not a game and Ignored never start it; Ignored is as if it were not there | it runs while it runs | stopped while it runs, whatever runs beside it |
+| **Replay buffer** | Settings, The replay buffer: Always, or While a game runs | Not a game and Ignored never start it; Ignored is as if it were not there | it runs while it runs | stopped while it runs, whatever runs beside it |
 | **Record by itself** | Session recording, Every game records by itself | every class but Game | it records when it starts | never |
 | **Stop when it closes** | Session recording, Stop the session recording when its game closes | every class but Game | the recording stops when it closes | the recording goes on after it |
-| **The waits** (Windows) | New clips (Upload when connected) | Not a game and Ignored | they wait while it is in front | never |
+| **The waits** (Windows) | Encoding (Uploads when connected) | Not a game and Ignored | they wait while it is in front | never |
 
 Ignored overrides its own settings: an Ignored program does nothing. A program's page shows the
-layers as a line under each row, the one that counts in white: `Every game, set under New
-clips: off › Starfall Tactics: on`. At the top of the list, **What happens while a program
+layers as a line under each row, the one that counts in white: `Every game, set under
+Encoding: off › Starfall Tactics: on`. At the top of the list, **What happens while a program
 runs** shows the order.
 
 ## What stays on the PC
 
-The list lives in `programs.json` in the app's settings folder (Settings, Startup, **About**
+The list lives in `programs.json` in the app's settings folder (Settings, App, **About**
 names it). Steam's files are read on this PC, and nothing about them, or about the programs
 you run, leaves it, but with **Show on Discord** on: then the name of the Game that runs goes
 to Discord, [as above](#discord). See [Privacy and security](privacy.md).
@@ -345,8 +343,8 @@ it on its own (**Add a program**, its file) as **Ignored**. Steam's client in Bi
 takes the whole screen, comes in as Not sorted yet: sort it as **Not a game**.
 
 **A heavy game.** One game keeps the PC so busy that a re-encode beside it stutters, while the
-others are fine. Leave the waits off under New clips, and on that game's page set **Encoding
-waits** to **On**: the line reads `Every game, set under New clips: off › Starfall Tactics: on`.
+others are fine. Leave the waits off under Encoding, and on that game's page set **Encoding
+waits** to **On**: the line reads `Every game, set under Encoding: off › Starfall Tactics: on`.
 
 **A heavy game with its replay buffer off.** Starfall Tactics needs all of the PC's memory, and
 clips of it are not wanted. On its page set **Replay buffer** to **Off**. While it runs, OBS's
