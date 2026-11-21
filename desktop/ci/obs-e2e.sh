@@ -87,10 +87,24 @@ cat > "$ROOT/config/settings.json" <<JSON
   "stable_seconds": 2,
   "cache": { "gb": 5, "days": 14 },
   "hotkeys": { "share_last": "", "save_share": "", "upload_last": "", "save": "Alt+F10", "record": "Alt+F9" },
-  "session": { "remind_minutes": 1 },
+  "session": { "remind_minutes": 1, "grace_seconds": 5 },
   "startup": { "autostart": false, "elevated": false },
   "log_level": "debug"
 }
+JSON
+# Two games of Games and apps, stand-ins started only where the rules for games are tried: a heavy
+# one with its replay buffer off, and one that records by itself.
+mkdir -p "$ROOT/games/heavy" "$ROOT/games/ember"
+# copies of python3: a coreutils of one binary for all (uutils) runs nothing under another name
+cp "$(readlink -f "$(command -v python3)")" "$ROOT/games/heavy/heavygame"
+cp "$(readlink -f "$(command -v python3)")" "$ROOT/games/ember/emberpass"
+cat > "$ROOT/config/programs.json" <<JSON
+{ "entries": [
+  { "id": "p-heavy", "path": "$ROOT/games/heavy/heavygame", "name": "Heavy Game", "class": "game",
+    "own": { "buffer": "off" }, "came": "hand", "came_at": "2026-11-01T10:00:00Z" },
+  { "id": "p-ember", "path": "$ROOT/games/ember/emberpass", "name": "Ember Pass", "class": "game",
+    "own": { "record": "on" }, "came": "hand", "came_at": "2026-11-01T10:00:00Z" }
+] }
 JSON
 
 # SVT-AV1 as the setup's test would leave it: one this OBS lists, so it may be chosen.
@@ -538,6 +552,46 @@ ok "killed while paused: started again without --startreplaybuffer, the buffer s
 "$APP" --resume-recording >>"$ROOT/app.out" 2>&1 || true
 wait_for 20 "the replay buffer to run again" buffer_is true
 ok "Pause clips: OBS's replay buffer stopped (outputActive false), the Save hotkey saved nothing and said why; Resume clips: it runs again"
+
+say "a game with its replay buffer off stops it while it runs, and a game that records by itself records until it closes"
+wait_for 20 "the replay buffer to run before the games" buffer_is true
+"$ROOT/games/heavy/heavygame" -c 'import time; time.sleep(600)' &
+HEAVY=$!
+wait_for 15 "the heavy game to stop the replay buffer" buffer_is false
+log_has "game: Heavy Game started ($ROOT/games/heavy/heavygame), a Game" || fail "the running check did not see the heavy game"
+log_has "replay buffer stopped: Heavy Game runs, its own setting says off" || fail "the Log does not say why the buffer stopped"
+n=$(log_n "obs saved a replay")
+xdotool key --clearmodifiers alt+F10
+wait_for 10 "the Save hotkey to be refused" log_has "save refused: no replay buffer while Heavy Game runs"
+wait_for 10 "the No clip notification" notified "No clip saved"
+sleep 2
+[ "$(log_n "obs saved a replay")" -eq "$n" ] || fail "a save while the heavy game ran saved a replay"
+r=$(log_n "clips paused by the user paused=false")
+"$APP" --pause-recording >>"$ROOT/app.out" 2>&1 || true
+"$APP" --resume-recording >>"$ROOT/app.out" 2>&1 || true
+wait_for 10 "Resume clips" sh -c "[ \$(cat $LOG/reel-desktop.log* | grep -c 'clips paused by the user paused=false') -gt $r ]"
+sleep 4
+buffer_is false || fail "Resume clips started the replay buffer while the heavy game holds it: $(buffer)"
+T0=$(date +%s)
+kill "$HEAVY"
+wait_for 30 "the replay buffer to run again once the heavy game closed" buffer_is true
+T1=$(date +%s)
+[ $((T1 - T0)) -ge 5 ] || fail "the buffer ran again $((T1 - T0)) s after the heavy game closed, inside the grace period of 5 s"
+ok "the heavy game: the buffer stopped while it ran, the Save hotkey was refused with the No clip notification, Pause and Resume clips left it stopped, and the buffer ran again $((T1 - T0)) s after it closed (the grace period, 5 s)"
+c=$(log_n "session recording started")
+"$ROOT/games/ember/emberpass" -c 'import time; time.sleep(600)' &
+EMBER=$!
+wait_for 20 "Ember Pass to start a session recording" sh -c "[ \$(cat $LOG/reel-desktop.log* | grep -c 'session recording started') -gt $c ]"
+log_has "session recording started by a game" || fail "the recording was not started by the game: $(cat "$LOG"/reel-desktop.log* | grep 'session recording started' | tail -1)"
+wait_for 10 "its notification" notified "Session recording started"
+sleep 4
+kill "$EMBER"
+wait_for 30 "the recording to stop as Ember Pass closed" log_has "session recording stopped as its game closed"
+wait_for 10 "its notification" notified "Session recording stopped: Ember Pass closed"
+log_has "game: Ember Pass closed; the session recording stops in 5 s unless it starts again" || fail "the Log does not say the grace period"
+wait_for 30 "the recording to go into the ledger" python3 -c "import json,sys; sys.exit(not any(c.get('recording') and c.get('game') == 'Ember Pass' for c in json.load(open('$ROOT/data/ledger.json'))['clips']))"
+buffer_is true || fail "the buffer does not run after the games: $(buffer)"
+ok "Ember Pass started a session recording by itself, named after it, and it stopped once Ember Pass closed and the grace period passed; the buffer ran throughout"
 
 n=$(log_n "the bundled OBS started")
 "$APP" --clip-length=25 >>"$ROOT/app.out" 2>&1 || true

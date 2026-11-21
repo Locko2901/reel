@@ -589,7 +589,7 @@ fn link_answer(link: &Link, value: &str, ready: bool) -> Option<bool> {
     let (install, given) = match link {
         Link::Install(v) => (true, v),
         Link::Later(v) => (false, v),
-        Link::Copy(_) | Link::Open(_) => return None,
+        Link::Copy(_) | Link::Open(_) | Link::Games => return None,
     };
     let same = given.len() == value.len()
         && given
@@ -1220,6 +1220,9 @@ pub fn leave(rt: &Runtime, from: &'static str, then: Then) {
     std::thread::spawn(move || {
         if let Some(what) = rt.session_before_quit() {
             steps.step(&what);
+        }
+        if rt.discord_quit() {
+            steps.step("Discord's presence is cleared");
         }
         if rt.stop_bundled() {
             steps.step("OBS is stopped");

@@ -9970,6 +9970,94 @@ async fn a_device_sees_only_its_own_clips() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn a_device_renames_its_own_clips_and_a_title_changed_by_hand_stays() {
+    let Some(env) = start(AuthMode::Single, vec![]).await else {
+        return;
+    };
+    let (a, _) = pair(&env, "a").await;
+    let (b, _) = pair(&env, "b").await;
+    let (_, who) = dev_json(&env, &a, reqwest::Method::GET, "/api/device/whoami", None).await;
+    assert_eq!(
+        who["clip_titles"], true,
+        "the app asks before it offers the rename: {who}"
+    );
+    let pc = env._dir.path().join("pc");
+    std::fs::create_dir_all(&pc).unwrap();
+    let file = env
+        .synth_at(&pc, "libvm.mp4", Synth::h264_1080p(2.0, "libvm"))
+        .await;
+    let (s, v) = upload_whole(
+        &env,
+        &a,
+        &file,
+        300_000,
+        serde_json::json!({ "title": "De Libvm, Nov 9, 21:14", "game": "De Libvm" }),
+    )
+    .await;
+    assert_eq!(s, 200, "{v}");
+    let clip_id = v["clip_id"].as_str().unwrap().to_string();
+    env.wait_ready(Duration::from_secs(90)).await;
+    let path = format!("/api/device/clips/{clip_id}");
+    let body = |title: &str, was: &str| serde_json::json!({ "title": title, "was": was });
+    let (s, v) = dev_json(
+        &env,
+        &b,
+        reqwest::Method::PATCH,
+        &path,
+        Some(body("libvmcst, Nov 9, 21:14", "De Libvm, Nov 9, 21:14")),
+    )
+    .await;
+    assert_eq!(s, 404, "another device's clip: {v}");
+    let (s, v) = dev_json(
+        &env,
+        &a,
+        reqwest::Method::PATCH,
+        &path,
+        Some(body("  ", "x")),
+    )
+    .await;
+    assert_eq!(s, 400, "{v}");
+    let (s, v) = dev_json(
+        &env,
+        &a,
+        reqwest::Method::PATCH,
+        &path,
+        Some(body("libvmcst, Nov 9, 21:14", "De Libvm, Nov 9, 21:14")),
+    )
+    .await;
+    assert_eq!(s, 200, "{v}");
+    assert_eq!(v["changed"], true);
+    let c = env.store().clip(&clip_id).await.unwrap().unwrap();
+    assert_eq!(c.title, "libvmcst, Nov 9, 21:14");
+    env.store()
+        .update_clip_text(&clip_id, Some("The round we won"), None)
+        .await
+        .unwrap();
+    let (s, v) = dev_json(
+        &env,
+        &a,
+        reqwest::Method::PATCH,
+        &path,
+        Some(body("vmtool, Nov 9, 21:14", "libvmcst, Nov 9, 21:14")),
+    )
+    .await;
+    assert_eq!((s, &v["changed"]), (200, &serde_json::json!(false)), "{v}");
+    let c = env.store().clip(&clip_id).await.unwrap().unwrap();
+    assert_eq!(
+        c.title, "The round we won",
+        "a title changed by hand on the server stays"
+    );
+    let r = env
+        .client
+        .patch(format!("{}{path}", env.base))
+        .json(&body("x", "y"))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(r.status(), 401, "no device token, no change");
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn the_same_file_through_the_relay_and_the_app_is_one_clip() {
     let Some(env) = start(AuthMode::Single, vec![]).await else {
         return;

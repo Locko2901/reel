@@ -71,6 +71,69 @@ pub fn show_clip(app: &AppHandle, title: &str, body: &str, clip: &str, copy: boo
     }
 }
 
+/// A notification with Open Games and apps, where the desktop's notifications have buttons.
+pub fn show_games(app: &AppHandle, title: &str, body: &str) {
+    #[cfg(windows)]
+    {
+        let (app, title, body) = (app.clone(), title.to_string(), body.to_string());
+        std::thread::spawn(move || {
+            let xml = reel_desktop_core::links::games_toast_xml(&title, &body);
+            if let Err(e) = toast(&xml, &app.config().identifier) {
+                tracing::warn!(error = %e, "the notification with its button; without it");
+                by_plugin(&app, &title, &body);
+            }
+        });
+    }
+    #[cfg(target_os = "linux")]
+    {
+        let (app, title, body) = (app.clone(), title.to_string(), body.to_string());
+        std::thread::spawn(move || deliver_games(app, &title, &body));
+    }
+    #[cfg(not(any(windows, target_os = "linux")))]
+    {
+        show(app, title, body);
+    }
+}
+
+#[cfg(target_os = "linux")]
+fn deliver_games(app: AppHandle, title: &str, body: &str) {
+    use reel_desktop_core::links::Link;
+    use tauri::Manager;
+    let actions = notify_rust::get_capabilities()
+        .map(|c| c.iter().any(|x| x == "actions"))
+        .unwrap_or(false);
+    let mut n = notify_rust::Notification::new();
+    n.appname("reel")
+        .summary(title)
+        .body(body)
+        .auto_icon()
+        .hint(notify_rust::Hint::SuppressSound(true));
+    if actions {
+        n.action(&Link::Games.url(), "Open Games and apps");
+    }
+    let handle = match n.show() {
+        Ok(h) => h,
+        Err(e) => {
+            tracing::warn!(error = %e, "notification");
+            return;
+        }
+    };
+    if !actions {
+        return;
+    }
+    handle.wait_for_action(move |action| {
+        if reel_desktop_core::links::parse(action) != Some(Link::Games) {
+            return;
+        }
+        let on_main = app.clone();
+        let _ = app.run_on_main_thread(move || {
+            if let Some(rt) = on_main.try_state::<crate::runtime::Runtime>() {
+                rt.run_link(Link::Games);
+            }
+        });
+    });
+}
+
 /// The update's question with Install now and Later, where the desktop's notifications have
 /// buttons; without them it says where to install. `value` is this run's, which the buttons'
 /// links carry.

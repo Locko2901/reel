@@ -105,6 +105,12 @@
           <header><h2>Save a clip now</h2><span class="desc" data-standalone-text="what the hotkey Save a clip does">what the hotkeys Save a clip and Save and share do</span><div class="actions"><button class="small" id="obs-save" type="button" disabled>Save clip</button><button class="small" id="obs-save-share" type="button" data-standalone="hide" disabled>Save and share</button></div></header>
           <div class="body"><p class="muted" id="save-state"></p></div>
         </div>
+        <div class="panel" id="buffer-panel">
+          <header><h2>The replay buffer</h2><span class="desc">for every game; a program's class and its own setting, under Games and apps, change it for that program</span><div class="actions"><button class="small" type="button" data-go-section="games">Games and apps</button></div></header>
+          <div class="body flush">
+            <div class="srow" data-key="obs.replay_buffer" data-kind="select" id="buffer-row"><div class="slabel"><b>Runs</b><span class="shelp" data-linux-text="always: as before, a clip can be saved at any time. Only while a game runs: it starts with a game and stops once the last one has closed and the grace period under Session recording has passed, which leaves the PC its memory and encoder when no game runs">always: as before, a clip can be saved at any time. Only while a game runs: it starts with a game and stops once the last one has closed and the grace period under Session recording has passed, which leaves the PC its memory and encoder when no game runs; a program not sorted yet counts while it has the whole screen</span><span class="snote" id="buffer-note" aria-live="polite" hidden></span></div><div class="sctl"><select aria-label="Runs"><option value="always">always</option><option value="games">only while a game runs</option></select><span class="err" hidden></span></div></div>
+          </div>
+        </div>
         <div class="panel" id="bundled-panel" data-off hidden>
           <header><h2 id="bundled-title">The OBS that came with reel</h2><span class="desc" id="bundled-line"></span><div class="actions"><button class="small" id="bundled-setup" type="button" hidden>Set it up</button><button class="small" id="bundled-again" type="button" hidden>Start OBS again</button><button class="small" id="bundled-show" type="button" title="OBS's own window: change anything there">Open OBS</button><button class="small" id="bundled-hide" type="button" hidden>Hide OBS</button></div></header>
           <div class="body flush">
@@ -215,7 +221,16 @@
       </div>
 
       <div class="group" id="g-session" data-app-section="session" hidden>
-        <p class="section-line" data-standalone-text="A recording of the whole session, from Record until Stop: in the window's header, the tray, or its hotkey under Hotkeys. It goes into the library like a clip.">A recording of the whole session, from Record until Stop: in the window's header, the tray, or its hotkey under Hotkeys. It goes up as any clip does once it stops.</p>
+        <p class="section-line" data-standalone-text="A recording of the whole session, from Record until Stop: in the window's bar, the tray, or its hotkey under Hotkeys; or by itself with a game. It goes into the library like a clip.">A recording of the whole session, from Record until Stop: in the window's bar, the tray, or its hotkey under Hotkeys; or by itself with a game. It goes up as any clip does once it stops.</p>
+        <div class="panel" id="with-game-panel">
+          <header><h2>With a game</h2><span class="desc">for every game; a program's class and its own setting, under Games and apps, change it for that program</span><div class="actions"><button class="small" type="button" data-go-section="games">Games and apps</button></div></header>
+          <div class="body flush">
+            <div class="srow" data-key="session.record_by_itself" data-kind="bool"><div class="slabel"><b>Every game records by itself</b><span class="shelp">off: only the games you choose, with Record by itself on their page under Games and apps. On: every game, but the ones set off there</span></div><div class="sctl"><button type="button" class="switch" role="switch" aria-checked="false" aria-label="Every game records by itself"><i></i></button><span class="err" hidden></span></div></div>
+            <div class="srow" data-key="session.stop_with_game" data-kind="bool"><div class="slabel"><b>Stop the session recording when its game closes</b><span class="shelp">also one you started by hand while the game ran; with several games, once the last of them closed</span></div><div class="sctl"><button type="button" class="switch" role="switch" aria-checked="false" aria-label="Stop the session recording when its game closes"><i></i></button><span class="err" hidden></span></div></div>
+            <div class="srow" data-key="session.grace_seconds" data-kind="int" data-min="0" data-max="600"><div class="slabel"><b>Grace period</b><span class="shelp">a game that closes and starts again within this counts as still running: the recording goes on, and a buffer that runs only while a game runs stays</span></div><div class="sctl"><span class="ctl-group"><input type="number" class="in-num" min="0" max="600" aria-label="Grace period"><span class="unit">s</span></span><span class="err" hidden></span></div></div>
+            <div class="srow" id="record-now-row"><div class="slabel"><b>Record by itself now</b><span class="shelp">the games that record by themselves, as Games and apps sets them</span></div><div class="sctl"><span class="muted small record-now" id="record-now"></span></div></div>
+          </div>
+        </div>
         <div class="panel" data-cue="session">
           <header><h2>Reminders</h2><div class="actions"><button class="small" type="button" data-preview="session">Preview</button></div></header>
           <div class="body flush">
@@ -238,6 +253,14 @@
               <div class="srow" id="not-again-row" data-off hidden><div class="slabel"><b>Not added again</b><span class="shelp">removed from the list by you, so Steam does not add them back</span></div><div class="sctl" id="not-again"></div></div>
             </div>
           </div>
+          <div class="panel" id="discord-panel">
+            <header><h2>Discord</h2><span class="desc">what your friends see while you play; only a Game counts</span></header>
+            <div class="body flush">
+              <div class="srow" data-key="discord.show" data-kind="bool"><div class="slabel"><b>Show on Discord</b><span class="shelp">while a game runs, your friends see it on your Discord profile with Clipping, or Recording during a session recording, and a button to reel. It goes to Discord through the Discord app on this PC, and only while that runs</span><span class="snote" id="presence-note" aria-live="polite"></span></div><div class="sctl"><button type="button" class="switch" role="switch" aria-checked="false" aria-label="Show on Discord"><i></i></button><span class="err" hidden></span></div></div>
+              <div class="srow" data-key="discord.name_game" data-kind="bool" data-depends="discord.show"><div class="slabel"><b>Name the game</b><span class="shelp">off: Discord says Clipping or Recording, without the game's name</span></div><div class="sctl"><button type="button" class="switch" role="switch" aria-checked="false" aria-label="Name the game"><i></i></button><span class="err" hidden></span></div></div>
+              <div class="srow" data-key="discord.button" data-kind="bool" data-depends="discord.show"><div class="slabel"><b>Button to reel</b><span class="shelp"><i>reel on GitHub</i> under it, for your friends: Discord shows no button to you</span></div><div class="sctl"><button type="button" class="switch" role="switch" aria-checked="false" aria-label="Button to reel"><i></i></button><span class="err" hidden></span></div></div>
+            </div>
+          </div>
           <div class="row wrap games-head"><h2>The list</h2><span class="muted small" id="games-count"></span><span class="grow"></span><input type="search" id="games-find" placeholder="Find a program" aria-label="Find a program" autocomplete="off"><button type="button" class="small" id="games-add">Add a program</button></div>
           <div class="panel" id="games-panel"><div class="body flush" id="games-rows"></div></div>
         </div>
@@ -245,7 +268,7 @@
       </div>
 
       <div class="group" id="g-sounds" data-app-section="sounds" hidden>
-        <p class="section-line" data-standalone-text="Two cues: a clip was captured, a clip is in the library. WAV files only; the session recording's sound is under Session recording.">Three cues: a clip was captured, a clip is safe on the server, a link was copied. WAV files only; the session recording's sound is under Session recording.</p>
+        <p class="section-line" data-standalone-text="Three cues: a clip was captured, a clip is in the library, no clip saved. WAV files only; the session recording's sound is under Session recording.">Four cues: a clip was captured, a clip is safe on the server, a link was copied, no clip saved. WAV files only; the session recording's sound is under Session recording.</p>
         <div class="panel" data-cue="captured">
           <header><h2>Clip captured</h2><div class="actions"><button class="small" type="button" data-preview="captured">Preview</button></div></header>
           <div class="body flush">
@@ -268,6 +291,14 @@
             <div class="srow" data-key="sounds.link_copied.enabled" data-kind="bool"><div class="slabel"><b>Play</b><span class="shelp">when the hotkey put a link on the clipboard</span></div><div class="sctl"><button type="button" class="switch" role="switch" aria-checked="false" aria-label="Play link copied"><i></i></button><span class="err" hidden></span></div></div>
             <div class="srow" data-key="sounds.link_copied.volume" data-kind="volume"><div class="slabel"><b>Volume</b></div><div class="sctl"><input type="range" class="in-short" min="0" max="100" aria-label="Volume link copied"><span class="unit vol">50</span><span class="err" hidden></span></div></div>
             <div class="srow" data-key="sounds.link_copied.file" data-kind="file"><div class="slabel"><b>Sound</b><span class="shelp">empty plays the bundled uploaded.wav, quieter</span></div><div class="sctl"><span class="ctl-group in-path"><input type="text" class="mono" aria-label="Sound link copied" placeholder="uploaded.wav (bundled)"><button class="small" type="button" data-browse="sounds.link_copied.file">Browse</button></span><span class="err" hidden></span></div></div>
+          </div>
+        </div>
+        <div class="panel" data-cue="no_clip">
+          <header><h2>No clip</h2><div class="actions"><button class="small" type="button" data-preview="no_clip">Preview</button></div></header>
+          <div class="body flush">
+            <div class="srow" data-key="sounds.no_clip.enabled" data-kind="bool"><div class="slabel"><b>Play</b><span class="shelp">when the Save hotkey finds no replay buffer: a game's own setting under Games and apps keeps it off, or it runs only while a game runs and none runs; the sound reaches a game in full screen, where Windows holds notifications back</span></div><div class="sctl"><button type="button" class="switch" role="switch" aria-checked="false" aria-label="Play no clip"><i></i></button><span class="err" hidden></span></div></div>
+            <div class="srow" data-key="sounds.no_clip.volume" data-kind="volume"><div class="slabel"><b>Volume</b></div><div class="sctl"><input type="range" class="in-short" min="0" max="100" aria-label="Volume no clip"><span class="unit vol">100</span><span class="err" hidden></span></div></div>
+            <div class="srow" data-key="sounds.no_clip.file" data-kind="file"><div class="slabel"><b>Sound</b><span class="shelp">empty plays the bundled no_clip.wav</span></div><div class="sctl"><span class="ctl-group in-path"><input type="text" class="mono" aria-label="Sound no clip" placeholder="no_clip.wav (bundled)"><button class="small" type="button" data-browse="sounds.no_clip.file">Browse</button></span><span class="err" hidden></span></div></div>
           </div>
         </div>
       </div>

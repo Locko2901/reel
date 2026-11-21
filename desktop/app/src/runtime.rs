@@ -114,6 +114,18 @@ pub struct Inner {
     pub steam: crate::games::SteamSeen,
     /// Wakes the reader of Steam's files.
     pub steam_wake: Option<mpsc::UnboundedSender<()>>,
+    /// The listed programs that run, each kept for the grace period after it closed.
+    pub runs: reel_desktop_core::programs::Runs,
+    /// The running check has looked once: what ran before reel started starts no recording.
+    pub runs_looked: bool,
+    /// Why the rules for games keep the replay buffer off; None while they let it run.
+    pub buffer_held: Option<crate::detect::Held>,
+    /// The programs a session recording stops with, seen running while it records.
+    pub stop_with: Vec<String>,
+    /// The listed program in front at the last look, and whether in full screen.
+    pub front_entry: Option<(String, bool)>,
+    /// The game a session recording asked for now starts with.
+    pub session_with: Option<String>,
     /// OBS's recording folder, kept from the last connection; the clips folder follows it.
     pub obs_dir: Option<PathBuf>,
     pub foreground: Arc<dyn Foreground>,
@@ -203,6 +215,8 @@ pub struct Inner {
     pub obs_seen: watch::Sender<crate::encoders::Seen>,
     /// When the app last connected to OBS: the log of that OBS's run is written after it.
     pub obs_since: Option<std::time::SystemTime>,
+    /// What Discord shows friends, and the task that tells it.
+    pub discord: crate::presence::Discord,
 }
 
 /// What went wrong with the server, in words and in code, and when the next try is.
@@ -502,6 +516,12 @@ impl Runtime {
             programs,
             steam: crate::games::SteamSeen::default(),
             steam_wake: None,
+            runs: reel_desktop_core::programs::Runs::default(),
+            runs_looked: false,
+            buffer_held: None,
+            stop_with: Vec::new(),
+            front_entry: None,
+            session_with: None,
             obs_dir: None,
             foreground: Arc::new(gaming::System),
             share_running: false,
@@ -548,8 +568,11 @@ impl Runtime {
             encoder_back: None,
             obs_seen: watch::Sender::new(Default::default()),
             obs_since: None,
+            discord: Default::default(),
         };
         let mut inner = inner;
+        // what the rules for games say before the first look, so reel's OBS starts as they want
+        inner.buffer_held = inner.buffer_rule();
         inner.encoders = reel_desktop_core::encoders::Known::load(&inner.paths.encoders_file());
         if inner
             .bundled
@@ -569,6 +592,8 @@ impl Runtime {
         rt.lane.start(Steps(rt.clone()));
         rt.spawn_upload_worker(queue_rx);
         rt.spawn_front_poll();
+        rt.spawn_running_check();
+        rt.spawn_discord();
         rt.spawn_steam();
         rt.restart_watcher();
         rt.register_hotkeys();
@@ -676,6 +701,15 @@ impl Runtime {
         let bundled = g.bundled.is_some() && g.settings.obs.bundled;
         let obs_set_up = g.settings.obs.enabled || bundled;
         let box_line = g.obs_box.as_ref().map(|b| b.line());
+        let playing = g.playing();
+        let grace = g.grace();
+        let told = g.discord_told();
+        let sentence = playing
+            .as_ref()
+            .map(|p| crate::presence::sentence(&p.sentence, told == Some(false)));
+        let grace_said = grace
+            .as_ref()
+            .map(|(_, x)| crate::presence::after_grace(&x.said, told == Some(true)));
         let facts = crate::status::Facts {
             standalone,
             paired,
@@ -719,8 +753,15 @@ impl Runtime {
             last_error: g.last_error.as_deref(),
             waiting: g.ledger.pending().len(),
             save_key: &g.settings.hotkeys.save,
+            held: g.buffer_held.as_ref(),
+            playing: sentence.as_deref(),
+            grace: grace_said.as_deref(),
         };
         let said = crate::status::said(&facts);
+        let grace = grace.map(|(e, mut x)| {
+            x.bar = crate::detect::grace_bar(&e, said.state);
+            x
+        });
         let obs_row = crate::status::obs_row(&facts);
         let keys = {
             let k = &g.settings.hotkeys;
@@ -814,8 +855,10 @@ impl Runtime {
         // A copy left is said once nothing runs or waits in the lane, against the setting the
         // last step ended with.
         let left = g.copy_left && self.lane.idle();
+        let held = g.buffer_held.as_ref().map(|h| h.why());
         let (save, save_share) = crate::status::save_actions(
             g.recording_paused,
+            held.as_deref(),
             g.settings.obs.enabled || (g.bundled.is_some() && g.settings.obs.bundled),
             g.obs.connected,
             g.obs_state.as_ref(),
@@ -823,7 +866,11 @@ impl Runtime {
             standalone,
         );
         let mut st = Status {
+            presence: g.discord.line.clone(),
             unsorted: g.programs.unsorted(),
+            playing: playing.clone(),
+            grace,
+            newcomer: g.newcomer(),
             paired,
             offline,
             mode: if standalone {
@@ -945,7 +992,17 @@ impl Runtime {
             {
                 Vec::new()
             } else {
-                crate::status::obs_checks(&g.obs, g.obs_state.as_ref(), &g.settings.obs)
+                crate::status::obs_checks(
+                    &g.obs,
+                    g.obs_state.as_ref(),
+                    &g.settings.obs,
+                    if g.recording_paused {
+                        Some("clips are paused".to_string())
+                    } else {
+                        g.buffer_held.as_ref().map(|h| h.why())
+                    }
+                    .as_deref(),
+                )
             },
             server_admin: g.who.as_ref().map(|w| w.admin).unwrap_or(false),
             normalize_new: g.who.as_ref().and_then(|w| w.normalize_new),
@@ -1030,6 +1087,7 @@ impl Runtime {
     /// Sends the snapshot to the tray and to the app's own page; a server page asks with
     /// `app_status` instead.
     pub fn push_status(&self) {
+        self.discord_poke();
         let st = self.status();
         shell::emit_local(&self.app, "status", &st);
         tray::refresh(&self.app, &st);
@@ -1045,11 +1103,17 @@ impl Runtime {
         let st = self.status();
         let can_share =
             st.mode != "standalone" && st.paired && self.lock().ledger.last_confirmed().is_some();
+        // A server's page from before the countdown draws the bar from the state's words alone:
+        // there the countdown is the state's detail, as of each read (such a page reads every 2 s).
+        let detail = match &st.grace {
+            Some(g) => format!("{} {}", g.bar, g.left),
+            None => st.state_detail.clone(),
+        };
         serde_json::json!({
             "state": st.state,
             "state_tone": st.state_tone,
             "state_word": st.state_word,
-            "state_detail": st.state_detail,
+            "state_detail": detail,
             "state_line": st.state_line,
             "state_fix": st.state_fix,
             "obs_row": st.obs_row,
@@ -1071,6 +1135,8 @@ impl Runtime {
             "update_line": st.update_line,
             "update_ask": st.update_ask.as_ref().filter(|_| own),
             "unsorted": st.unsorted,
+            "playing": st.playing,
+            "grace": st.grace,
         })
     }
 
@@ -1200,6 +1266,9 @@ impl Runtime {
         }
         if !(5..=1800).contains(&new.obs.setup.clip_seconds) {
             return Err("a clip of 5 seconds to 30 minutes".into());
+        }
+        if new.session.grace_seconds > 600 {
+            return Err("a grace period of 0 to 600 seconds".into());
         }
         let mut new = new;
         new.server_url = if new.server_url.trim().is_empty() {
@@ -1799,7 +1868,7 @@ impl Runtime {
                     move || knows.lock().encoders.clone(),
                 );
                 let mut g = self.lock();
-                bx.paused(g.recording_paused);
+                bx.paused(g.buffer_off());
                 g.obs_box = Some(bx);
             }
         }
@@ -2639,7 +2708,7 @@ impl Runtime {
                         rt.buffer_seen(active);
                         tracing::info!(active, "obs replay buffer");
                         rt.push_status();
-                        if let Some(st) = st.filter(|_| active && rt.lock().recording_paused) {
+                        if let Some(st) = st.filter(|_| active && rt.lock().buffer_off()) {
                             let rt = rt.clone();
                             tauri::async_runtime::spawn(async move {
                                 rt.ensure_replay_buffer(&st).await;
@@ -2843,7 +2912,7 @@ impl Runtime {
         if self.lock().encoder_trial.is_some() {
             return;
         }
-        let paused = self.lock().recording_paused;
+        let paused = self.lock().buffer_off();
         match crate::status::buffer_step(paused, self.settings().obs.start_replay, st) {
             BufferStep::Start => self.start_replay_buffer(st).await,
             BufferStep::Stop => self.stop_replay_buffer().await,
@@ -2852,8 +2921,17 @@ impl Runtime {
     }
 
     async fn stop_replay_buffer(&self) {
+        let why = if self.lock().recording_paused {
+            "clips are paused".to_string()
+        } else {
+            self.lock()
+                .buffer_held
+                .as_ref()
+                .map(|h| h.why())
+                .unwrap_or_default()
+        };
         match self.obs_command(ObsCommand::StopReplayBuffer).await {
-            Ok(()) => tracing::info!("the replay buffer was stopped: clips are paused"),
+            Ok(()) => tracing::info!("the replay buffer was stopped: {why}"),
             Err(e) => tracing::warn!(error = %e, "the replay buffer did not stop"),
         }
         let _ = self.obs_state(true).await;
@@ -3621,7 +3699,7 @@ impl Runtime {
 
     /// The Save hotkey: OBS saves the replay, and it goes up as every clip OBS saves does.
     pub fn save_clip(&self) {
-        if self.double_tap() || self.recording_is_paused() {
+        if self.double_tap() || self.recording_is_paused() || self.buffer_is_held() {
             return;
         }
         let rt = self.clone();
@@ -3690,7 +3768,11 @@ impl Runtime {
     /// A press while one runs is a Save and share too, with its own sound: each saves its
     /// replay, and the newest's link is the one copied.
     pub fn save_and_share(&self) {
-        if self.not_here("Save and share") || self.double_tap() || self.recording_is_paused() {
+        if self.not_here("Save and share")
+            || self.double_tap()
+            || self.recording_is_paused()
+            || self.buffer_is_held()
+        {
             return;
         }
         let token = CancellationToken::new();
@@ -3848,6 +3930,10 @@ impl Runtime {
     /// One of the app's links from a notification's button: for a clip of this app's own only,
     /// or the update's question's answer.
     pub fn run_link(&self, link: Link) {
+        if link == Link::Games {
+            shell::show(&self.app, shell::View::Settings, Some("games"));
+            return;
+        }
         let Some(clip) = link.clip() else {
             crate::updates::answer_link(self, link, "a reel-desktop link");
             return;
@@ -3873,7 +3959,7 @@ impl Runtime {
                     "The clip is in the library on this PC, and the app is connected to a server now.",
                 ),
             },
-            Link::Install(_) | Link::Later(_) => {}
+            Link::Install(_) | Link::Later(_) | Link::Games => {}
             Link::Open(_) => {
                 let page = if standalone { local } else { server };
                 let opened = match page {
@@ -3990,7 +4076,7 @@ impl Runtime {
             let mut g = self.lock();
             g.recording_paused = paused;
             if let Some(bx) = &g.obs_box {
-                bx.paused(paused);
+                bx.paused(g.buffer_off());
             }
         }
         self.push_status();
@@ -3998,7 +4084,10 @@ impl Runtime {
         tauri::async_runtime::spawn(async move {
             match rt.obs_state(true).await {
                 Ok(Some(st)) if paused => rt.ensure_replay_buffer(&st).await,
-                Ok(Some(st)) if !st.replay_active => rt.start_replay_buffer(&st).await,
+                // the rules for games may still hold it
+                Ok(Some(st)) if !st.replay_active && !rt.lock().buffer_off() => {
+                    rt.start_replay_buffer(&st).await
+                }
                 Ok(_) => {}
                 Err(e) => tracing::warn!(error = %e, "OBS state not read"),
             }

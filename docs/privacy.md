@@ -144,6 +144,14 @@ pairing tries are limited per address.
   a server on the same PC, so the token never crosses the network
   unencrypted.
 
+The token reaches the clips that device sent, and nothing else of the
+library: the app sends clips, reads how they went, makes a link to one,
+and looks for a new version of itself. For a rename under [Games and
+apps](games-and-apps.md#renaming) it can also change a clip's title,
+with `PATCH /api/device/clips/{id}` and the title before and after: only
+for a clip that device sent and its user may edit, and only while the
+title still reads as before, so a title changed on the server stays.
+
 **Revoke** next to the device under Settings, **Devices** signs that app
 out at once, and it asks to be paired again. The list shows each device's
 name, whose it is, when it was last seen and how many clips it sent.
@@ -205,6 +213,12 @@ its installed games: where its libraries are, each app's manifest and the
 app types in Steam's cache. Nothing of it, and nothing about the programs
 you run, leaves the PC; the list stays in the app's settings folder
 ([Games and apps](games-and-apps.md#what-stays-on-the-pc)).
+
+With **Show on Discord** on (Settings, Games and apps; off unless you turn it on), the app
+tells the Discord app on this PC the name of the Game that runs and whether reel clips it or
+records it, and Discord shows that to your friends
+([Discord](games-and-apps.md#discord)). It goes to Discord through Discord's own app, over a
+connection on this PC; the app itself sends nothing over the network for it.
 
 Nothing else: no telemetry, no analytics, no crash reports, no account
 with anyone.

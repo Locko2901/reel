@@ -2,7 +2,7 @@
 // Record, and one menu that its words and its "..." both open. The server's pages and the app's
 // own pages draw it from the app's status; `acts` does what each asks of the app there.
 import { isOn, setOn } from './switch.js';
-import { recordControl } from './record.js';
+import { clock, recordControl } from './record.js';
 
 const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
@@ -70,6 +70,7 @@ export function appBar(acts) {
   let shownFix = null;
   fix.addEventListener('click', () => { if (shownFix) acts.fix(shownFix.act); });
   const record = recordControl($('#app-record'), null, acts.record, acts.fail);
+  let graceTimer = 0;
   for (const [id, which] of [['#app-save', 'save'], ['#app-save-share', 'save_share']]) {
     $(id)?.addEventListener('click', () => { close(false); acts.save(which); });
   }
@@ -92,6 +93,10 @@ export function appBar(acts) {
       line = server.line ? `${server.line.charAt(0).toUpperCase()}${server.line.slice(1)}` : line;
       fixNow = { word: 'Status', act: 'status' };
     }
+    // A grace period after a game closed: what its end changes, counted down to it each second
+    // on the page's own clock. The state's number and key give way to it.
+    const grace = st.grace || null;
+    if (grace) { detail = ''; hint = ''; }
     if (tone === 'rec') detail = '';
     bar.classList.remove(...DOTS);
     bar.classList.add(tone);
@@ -101,8 +106,25 @@ export function appBar(acts) {
     w.className = tone === 'ok' || tone === 'neutral' || tone === 'rec' ? '' : tone;
     $('#appbar-detail').textContent = detail;
     $('#appbar-hint').textContent = hint || '';
-    words.setAttribute('aria-label', `${word}${detail ? `, ${detail}` : ''}: this PC's menu`);
+    // The game that runs, quiet after the words; it is the first to give way to Record and the fix.
+    const game = st.playing && !grace ? st.playing.short : '';
+    const playing = $('#appbar-game');
+    if (playing) { playing.textContent = game; playing.title = st.playing ? st.playing.name : ''; }
+    words.setAttribute('aria-label', `${word}${detail ? `, ${detail}` : ''}${game ? `, ${game} runs` : ''}${grace ? `, ${grace.bar} ${grace.left}` : ''}: this PC's menu`);
     $('#appbar-say').textContent = line;
+    clearTimeout(graceTimer);
+    const counter = $('#appbar-grace');
+    const tick = () => {
+      const ms = Math.max(0, grace.until_ms - Date.now());
+      const left = clock(Math.ceil(ms / 1000) * 1000);
+      if (counter) counter.textContent = `${grace.bar} ${left}`;
+      $('#appbar-say').textContent = line.replace(grace.said, grace.sentence.replace('{left}', left));
+      // the next second's turn; at the end the app's next status takes the countdown away
+      if (ms > 0) graceTimer = setTimeout(tick, (ms % 1000 || 1000) + 5);
+    };
+    if (counter) counter.title = grace ? grace.line : '';
+    if (grace) tick();
+    else if (counter) counter.textContent = '';
     shownFix = fixNow;
     fix.hidden = !fixNow;
     fix.textContent = fixNow ? fixNow.word : '';

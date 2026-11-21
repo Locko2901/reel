@@ -36,6 +36,36 @@ function waits() {
   return { page: 'New clips', page_id: 'upload', row: 'Encoding waits', on: 'encoding waits', off: 'encoding goes on', help: 'the library\'s heavy work, while it has the screen', never: 'encoding never waits for it', sub: 'Encoding waits' };
 }
 
+// The four behaviours of a program, the page each one's setting for every game lives on, and
+// the words of a program's own setting in the list's lines.
+function behaviours() {
+  const w = waits();
+  const out = [
+    { key: 'buffer', row: 'Replay buffer', help: 'runs while it runs, or stops while it runs', page: 'OBS', page_id: 'obs', on: 'replay buffer while it runs', off: 'no replay buffer' },
+    { key: 'record', row: 'Record by itself', help: 'a session recording starts when it starts', page: 'Session recording', page_id: 'session', on: 'records by itself', off: 'never records by itself' },
+    { key: 'stop', row: 'Stop when it closes', help: 'the session recording stops when it closes', page: 'Session recording', page_id: 'session', on: 'stops the recording when it closes', off: 'recording goes on after it closes' },
+  ];
+  if (!page.linux) out.push({ key: 'wait', row: w.row, help: w.help, page: w.page, page_id: w.page_id, on: w.on, off: w.off });
+  return out;
+}
+
+// What every game gets of a behaviour, and what a class makes of it; null where the class takes it as it is.
+function everyWord(k) {
+  const e = page.every;
+  if (k === 'buffer') return e.buffer_always ? 'always' : 'only while a game runs';
+  return e[k] ? 'on' : 'off';
+}
+function classWord(c, k) {
+  const e = page.every;
+  if (c === 'game') return null;
+  if (k === 'buffer') {
+    if (e.buffer_always) return c === 'ignored' ? 'as if it were not there' : null;
+    return c === 'not_sorted' ? (page.linux ? 'not started by it' : 'in full screen') : 'not started by it';
+  }
+  if (k === 'wait' && c === 'not_sorted') return e.wait ? 'in full screen' : null;
+  return e[k] ? 'off' : null;
+}
+
 function sameDay(a, b) { return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate(); }
 function dayWord(ts) {
   const d = new Date(ts), now = new Date(), y = new Date(now);
@@ -58,9 +88,11 @@ function clipsWords(e) {
 
 // The line under a program's name: its class, its own settings, where it came from, its clips, when seen.
 function line(e) {
-  const w = waits();
   const bits = [e.class === 'not_sorted' ? h('span', { class: 'st-warn' }, 'not sorted yet') : CLASS[e.class]];
-  if (!page.linux && e.own.wait !== 'as_class') bits.push(h('span', { class: 'own' }, e.own.wait === 'on' ? w.on : w.off));
+  for (const b of behaviours()) {
+    const own = e.own[b.key];
+    if (own !== 'as_class') bits.push(h('span', { class: 'own' }, own === 'on' ? b.on : b.off));
+  }
   if (!page.linux && e.naming === 'window') bits.push(h('span', { class: 'own' }, 'named by its window'));
   if (e.fresh) bits.push(`new from Steam ${dayWord(e.came_at)}`);
   if (e.application) bits.push('from Steam, an application');
@@ -68,7 +100,8 @@ function line(e) {
   if (e.uninstalled) bits.push('not installed in Steam');
   const clips = clipsWords(e);
   if (clips) bits.push(clips);
-  bits.push(e.seen_at ? `seen ${whenWord(e.seen_at)}` : e.steam_app ? 'not played yet' : 'not seen yet');
+  if ((page.running || []).includes(e.id)) bits.push(h('span', { class: 'st-ok' }, 'running now'));
+  else bits.push(e.seen_at ? `seen ${whenWord(e.seen_at)}` : e.steam_app ? 'not played yet' : 'not seen yet');
   const out = [];
   bits.forEach((b, i) => { if (i) out.push(sep()); out.push(b); });
   return out;
@@ -104,13 +137,13 @@ function guide() {
 function renderTop() {
   const w = waits(), line = $('#games-line');
   line.replaceChildren(
-    'Which programs are games, the name each gives its clips, and what one program does apart from its class.',
+    'Which programs are games, the name each gives its clips, and what one program does apart from its class. What every game gets is set where it belongs: the replay buffer under ',
+    link('OBS', 'obs'), ', recording by itself under ', link('Session recording', 'session'),
     ...(page.linux
-      ? [' On Linux reel cannot tell which program is in front: the list fills from Steam and by hand, and clips there are named as before.']
-      : [' What every game gets is set where it belongs: the waits under ', link(w.page, w.page_id), '.']),
+      ? ['. On Linux reel cannot tell which program is in front: the list fills from Steam and by hand, and a clip takes the name of the game that runs.']
+      : [', the waits under ', link(w.page, w.page_id), '.']),
     ' ', guide(), '.',
   );
-  $('#games-order').hidden = page.linux;
 }
 
 function renderSteam() {
@@ -189,34 +222,34 @@ function cardWords(c) {
   const w = waits();
   if (page.linux) {
     return {
-      game: 'counts as a game',
-      not_a_game: 'a full screen tool, a player, a VM',
-      not_sorted: 'new in the list, until sorted',
-      ignored: 'as if it were not there, and it is not listed again',
+      game: 'counts as a game: clips take its name while it runs, a session recording stops when it closes, and Record by itself, below, records it whenever it runs',
+      not_a_game: 'a full screen tool, a player, a VM: no recording starts or stops with it',
+      not_sorted: 'new in the list, until sorted: it never starts a recording',
+      ignored: 'as if it were not there: nothing starts with it, and it is not listed again',
     }[c];
   }
   return {
-    game: `counts as a game: clips saved in front of it take its name. ${w.sub} while it has the screen only when that is on under ${w.page}`,
-    not_a_game: `a full screen tool, a player, a VM: ${w.never}; clips saved in front of it take its name`,
-    not_sorted: `new in the list, and acting as before until sorted: in full screen it counts as a game for the waits, when they are on under ${w.page}`,
+    game: `counts as a game: clips take its name, a session recording stops when it closes, and Record by itself, below, records it whenever it runs. ${w.sub} while it has the screen only when that is on under ${w.page}`,
+    not_a_game: `a full screen tool, a player, a VM: ${w.never}, and no recording starts or stops with it; clips saved in front of it take its name`,
+    not_sorted: `new in the list, and acting as before until sorted: in full screen it counts as a game for the waits, when they are on under ${w.page}; it never starts a recording`,
     ignored: 'as if it were not there: no clip takes its name, nothing waits for it, and it is not listed again',
   }[c];
 }
 
 function short(name) {
-  const cut = name.split(/[:(\u2013-]/)[0].trim();
+  const cut = name.split(/[:(]| [\u2013-] /)[0].trim();
   return cut.length >= 3 && cut.length < name.length ? cut : name;
 }
 
-// Where the waits' value comes from: every game, then its class, then its own setting.
-function trace(e) {
-  const w = waits(), every = page.waits_on;
-  const own = e.own.wait;
-  const byClass = e.class === 'game' ? every : e.class === 'not_sorted' ? (every ? 'in full screen' : false) : false;
-  const showClass = e.class !== 'game' && (e.class === 'ignored' || String(byClass) !== String(every));
-  const steps = [h('span', { class: own !== 'as_class' || showClass ? 'lost' : 'won' }, 'Every game, set under ', link(w.page, w.page_id), `: ${every ? 'on' : 'off'}`)];
-  if (showClass) steps.push(h('span', { class: own !== 'as_class' && e.class !== 'ignored' ? 'lost' : 'won' }, `${CLASS[e.class]}: ${byClass === true ? 'on' : byClass || 'off'}`));
-  if (own !== 'as_class' && e.class !== 'ignored') steps.push(h('span', { class: 'won' }, `${short(e.name)}: ${own}`));
+// Where a behaviour's value comes from: every game, then its class, then its own setting.
+function trace(e, b) {
+  const own = e.own[b.key];
+  const ignored = e.class === 'ignored';
+  const byClass = ignored ? (b.key === 'buffer' && page.every.buffer_always ? 'as if it were not there' : 'off') : classWord(e.class, b.key);
+  const ownCounts = own !== 'as_class' && !ignored;
+  const steps = [h('span', { class: ownCounts || byClass ? 'lost' : 'won' }, 'Every game, set under ', link(b.page, b.page_id), `: ${everyWord(b.key)}`)];
+  if (byClass) steps.push(h('span', { class: ownCounts ? 'lost' : 'won' }, `${CLASS[e.class]}: ${byClass}`));
+  if (ownCounts) steps.push(h('span', { class: 'won' }, `${short(e.name)}: ${own}`));
   return h('span', { class: 'trace' }, steps);
 }
 
@@ -257,9 +290,10 @@ function renderProgram() {
   const e = page.entries.find((x) => x.id === shown);
   if (!e) { show(null); return; }
   if (box.contains(document.activeElement) && document.activeElement.matches('input')) return;
-  const w = waits();
   const owns = [];
-  if (!page.linux && e.own.wait !== 'as_class') owns.push(e.own.wait === 'on' ? w.on : w.off);
+  for (const b of behaviours()) {
+    if (e.own[b.key] !== 'as_class') owns.push(e.own[b.key] === 'on' ? b.on : b.off);
+  }
   if (!page.linux && e.naming === 'window') owns.push('named by its window');
   const name = h('input', { type: 'text', class: 'in-text', 'aria-label': 'Name', value: e.name, maxlength: '80' });
   name.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') name.blur(); if (ev.key === 'Escape') { name.value = e.name; name.blur(); } });
@@ -287,15 +321,16 @@ function renderProgram() {
     h('div', { class: 'program-title' }, h('h2', null, e.name), h('span', { class: 'muted small' }, [CLASS[e.class], ...owns].join(', '))),
     panel('The program', cameWords(e), h('button', { class: 'small', type: 'button', onclick: () => invoke('open_folder', { path: String(e.path) }).catch(fail) }, 'Show in folder'),
       h('div', { class: 'body flush' }, programRows)),
-    panel('Class', page.linux ? 'what it is' : 'what it is; its own settings below change what the class gives it', null, cards),
+    panel('Class', 'what it is; its own settings below change what the class gives it', null, cards),
   ];
-  if (!page.linux) {
-    const tri = h('div', { class: 'seg tri', role: 'group', 'aria-label': w.row }, [['as_class', 'As its class'], ['on', 'On'], ['off', 'Off']].map(([v, words]) =>
-      h('button', { type: 'button', 'aria-pressed': String(e.own.wait === v), disabled: e.class === 'ignored', onclick: () => { if (v !== e.own.wait) set(e, { wait: v }); } }, words)));
-    const label = h('b', null, w.row, e.own.wait !== 'as_class' ? h('span', { class: 'badge own' }, 'own setting') : null);
-    parts.push(panel('This program', 'each as its class, or on or off for this program alone', null, h('div', { class: 'body flush' },
-      h('div', { class: 'srow' }, h('div', { class: 'slabel' }, label, h('span', { class: 'shelp' }, w.help), trace(e)), h('div', { class: 'sctl' }, tri)))));
-  }
+  const ownRows = behaviours().map((b) => {
+    const own = e.own[b.key];
+    const tri = h('div', { class: 'seg tri', role: 'group', 'aria-label': b.row }, [['as_class', 'As its class'], ['on', 'On'], ['off', 'Off']].map(([v, words]) =>
+      h('button', { type: 'button', 'aria-pressed': String(own === v), disabled: e.class === 'ignored', onclick: () => { if (v !== own) set(e, { [b.key]: v }); } }, words)));
+    const label = h('b', null, b.row, own !== 'as_class' ? h('span', { class: 'badge own' }, 'own setting') : null);
+    return h('div', { class: 'srow', 'data-own': b.key }, h('div', { class: 'slabel' }, label, h('span', { class: 'shelp' }, b.help), trace(e, b)), h('div', { class: 'sctl' }, tri));
+  });
+  parts.push(panel('This program', 'each as its class, or on or off for this program alone', null, h('div', { class: 'body flush' }, ownRows)));
   parts.push(h('div', { class: 'row remove-row' },
     h('button', { class: 'small quiet', type: 'button', onclick: () => remove(e) }, 'Remove from the list'),
     h('span', { class: 'muted small' }, removeWords(e))));
@@ -341,11 +376,23 @@ async function rename(e, input) {
   const list = h('div', { class: 'ask-list' });
   for (const [was, now] of plan.examples) list.append(h('span', { class: 'was' }, was), h('span', { class: 'now' }, now));
   if (n > plan.examples.length) list.append(h('span', { class: 'faint more' }, plan.examples.length ? `and ${n - plan.examples.length} more` : `${what}, their titles changed by hand`));
-  const server = plan.on_server
-    ? h('p', { class: 'muted small' }, plan.on_server === 1
-      ? 'On the server, the one this PC sent keeps its title: the app cannot change a title there. Change it on its page on the server.'
-      : `On the server, the ${plan.on_server} this PC sent keep their titles: the app cannot change a title there. Change one on its page on the server.`)
-    : null;
+  // a server new enough to take a clip's title from the app is asked each time; an older one keeps them
+  let onServer = null;
+  const ask = plan.server_can && plan.server_titles > 0;
+  if (ask) {
+    onServer = h('button', { type: 'button', class: 'switch', role: 'switch', 'aria-checked': 'true', 'aria-label': 'On the server too' }, h('i'));
+    onServer.addEventListener('click', () => onServer.setAttribute('aria-checked', String(onServer.getAttribute('aria-checked') !== 'true')));
+  }
+  const server = ask
+    ? h('div', { class: 'srow server-titles' },
+      h('div', { class: 'slabel' }, h('b', null, plan.server_titles === 1 ? 'And its title on the server' : `And the ${plan.server_titles} on the server`),
+        h('span', { class: 'shelp' }, `this PC sent them; a title changed on the server since stays${plan.on_server > plan.server_titles ? `, as ${plan.on_server - plan.server_titles === 1 ? 'does one' : `do ${plan.on_server - plan.server_titles}`} whose title was not reel's` : ''}`)),
+      h('div', { class: 'sctl' }, onServer))
+    : plan.on_server
+      ? h('p', { class: 'muted small' }, plan.on_server === 1
+        ? 'On the server, the one this PC sent keeps its title: the app cannot change a title there. Change it on its page on the server.'
+        : `On the server, the ${plan.on_server} this PC sent keep their titles: the app cannot change a title there. Change one on its page on the server.`)
+      : null;
   const only = h('button', { type: 'button' }, 'New clips only');
   const all = h('button', { type: 'button', class: 'primary' }, n === 1 ? 'Rename it too' : `Rename these ${n} too`);
   d.replaceChildren(
@@ -368,14 +415,19 @@ async function rename(e, input) {
   d.onclose = null;
   if (d.open) d.close();
   if (answer === null) { input.value = e.name; return; }
-  await doRename(e, plan.name, answer, n);
+  await doRename(e, plan.name, answer, n, !!(answer && onServer && onServer.getAttribute('aria-checked') === 'true'));
 }
 
-async function doRename(e, name, older, n = 0) {
+async function doRename(e, name, older, n = 0, server = false) {
   try {
-    const v = await invoke('program_rename', { id: e.id, name, older });
+    const v = await invoke('program_rename', { id: e.id, name, older, server });
+    const sv = v.server || {};
+    delete v.server;
     Object.assign(e, v);
-    toast(older ? `Renamed, and ${count(n, 'older one')} with it.` : `Renamed: clips take ${name} from now on.`, 'ok');
+    const there = server
+      ? ` On the server ${count(sv.changed || 0, 'title')} changed${sv.kept ? `; ${sv.kept} changed there by hand stayed` : ''}${sv.failed ? `; ${sv.failed} did not change (the Log says why)` : ''}.`
+      : '';
+    toast(older ? `Renamed, and ${count(n, 'older one')} with it.${there}` : `Renamed: clips take ${name} from now on.`, sv.failed ? 'err' : 'ok');
     document.activeElement?.blur();
     renderProgram();
     refresh(true);
@@ -471,13 +523,15 @@ function draw() {
 
 // Shows the list, or a program's page; with `push` the window's Back comes back.
 export function show(id, push = false) {
+  const was = shown;
   shown = id || null;
   const list = $('#games-list'), prog = $('#games-program');
   if (!list) return;
   list.hidden = !!shown;
   prog.hidden = !shown;
   if (push) history.pushState(null, '', shown ? `#games/${shown}` : '#games');
-  if (shown) { renderProgram(); window.scrollTo(0, 0); }
+  if (shown) renderProgram();
+  if (shown || was) window.scrollTo(0, 0);
 }
 
 export async function refresh(force = false) {

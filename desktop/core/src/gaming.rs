@@ -12,6 +12,9 @@ pub struct ProcessInfo {
 pub trait Foreground: Send + Sync {
     fn fullscreen_app(&self) -> bool;
     fn foreground_process(&self) -> Option<ProcessInfo>;
+    /// Every program that runs, by its path; by its file name alone where the path cannot be
+    /// read (another user's or a protected process on Windows).
+    fn running(&self) -> Vec<PathBuf>;
 }
 
 /// `waits` is called once if a fullscreen app is in front; whether it had to wait.
@@ -34,6 +37,7 @@ pub fn wait_while_fullscreen(
 pub struct Fake {
     pub fullscreen: std::sync::atomic::AtomicBool,
     pub process: std::sync::Mutex<Option<ProcessInfo>>,
+    pub running: std::sync::Mutex<Vec<PathBuf>>,
 }
 
 impl Foreground for Fake {
@@ -42,6 +46,9 @@ impl Foreground for Fake {
     }
     fn foreground_process(&self) -> Option<ProcessInfo> {
         self.process.lock().unwrap().clone()
+    }
+    fn running(&self) -> Vec<PathBuf> {
+        self.running.lock().unwrap().clone()
     }
 }
 
@@ -55,6 +62,21 @@ impl Foreground for System {
     }
     fn foreground_process(&self) -> Option<ProcessInfo> {
         None
+    }
+    fn running(&self) -> Vec<PathBuf> {
+        let Ok(dir) = std::fs::read_dir("/proc") else {
+            return Vec::new();
+        };
+        dir.filter_map(Result::ok)
+            .filter(|e| {
+                e.file_name()
+                    .to_string_lossy()
+                    .bytes()
+                    .all(|b| b.is_ascii_digit())
+            })
+            .filter_map(|e| std::fs::read_link(e.path().join("exe")).ok())
+            .filter(|p| !p.to_string_lossy().ends_with(" (deleted)"))
+            .collect()
     }
 }
 
@@ -120,6 +142,62 @@ impl Foreground for System {
                 path: PathBuf::from(full),
             })
         }
+    }
+
+    fn running(&self) -> Vec<PathBuf> {
+        use windows::core::PWSTR;
+        use windows::Win32::Foundation::CloseHandle;
+        use windows::Win32::System::Diagnostics::ToolHelp::{
+            CreateToolhelp32Snapshot, Process32FirstW, Process32NextW, PROCESSENTRY32W,
+            TH32CS_SNAPPROCESS,
+        };
+        use windows::Win32::System::Threading::{
+            OpenProcess, QueryFullProcessImageNameW, PROCESS_NAME_WIN32,
+            PROCESS_QUERY_LIMITED_INFORMATION,
+        };
+        let mut out = Vec::new();
+        unsafe {
+            let Ok(snap) = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0) else {
+                return out;
+            };
+            let mut e = PROCESSENTRY32W {
+                dwSize: std::mem::size_of::<PROCESSENTRY32W>() as u32,
+                ..Default::default()
+            };
+            let mut more = Process32FirstW(snap, &mut e).is_ok();
+            while more {
+                let n = e
+                    .szExeFile
+                    .iter()
+                    .position(|&c| c == 0)
+                    .unwrap_or(e.szExeFile.len());
+                let name = String::from_utf16_lossy(&e.szExeFile[..n]);
+                let mut full = None;
+                if let Ok(h) =
+                    OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, e.th32ProcessID)
+                {
+                    let mut buf = [0u16; 1024];
+                    let mut len = buf.len() as u32;
+                    if QueryFullProcessImageNameW(
+                        h,
+                        PROCESS_NAME_WIN32,
+                        PWSTR(buf.as_mut_ptr()),
+                        &mut len,
+                    )
+                    .is_ok()
+                    {
+                        full = Some(String::from_utf16_lossy(&buf[..len as usize]));
+                    }
+                    let _ = CloseHandle(h);
+                }
+                if e.th32ProcessID != 0 {
+                    out.push(PathBuf::from(full.unwrap_or(name)));
+                }
+                more = Process32NextW(snap, &mut e).is_ok();
+            }
+            let _ = CloseHandle(snap);
+        }
+        out
     }
 }
 
@@ -523,6 +601,14 @@ mod tests {
             Some("Counter-Strike 2")
         );
         assert!(!System.fullscreen_app() || cfg!(windows));
+        *f.running.lock().unwrap() = vec![PathBuf::from("/g/ember")];
+        assert_eq!(f.running(), vec![PathBuf::from("/g/ember")]);
+        let me = std::env::current_exe().unwrap();
+        let me = std::fs::canonicalize(&me).unwrap_or(me);
+        assert!(
+            System.running().iter().any(|p| p == &me) || cfg!(windows),
+            "this test's own program runs"
+        );
     }
 
     #[test]

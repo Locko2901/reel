@@ -537,7 +537,10 @@ pub fn router(state: AppState, bound: SocketAddr) -> Router {
             post(routes::device::finish_upload),
         )
         .route("/api/device/clips", get(routes::device::clips))
-        .route("/api/device/clips/{id}", get(routes::device::clip))
+        .route(
+            "/api/device/clips/{id}",
+            get(routes::device::clip).patch(routes::device::set_title),
+        )
         .route("/api/device/share", post(routes::device::share))
         .route("/api/device/update", get(routes::device::update))
         .route(

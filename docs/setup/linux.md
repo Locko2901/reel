@@ -133,7 +133,8 @@ Start OBS first.
    Settings, **OBS**, for as long as the app runs.
 3. **Hotkeys**, **Games**, **Where clips go**, **New versions** and **Done**, as on Windows. On
    Linux the list of games fills from Steam and by hand: the app cannot tell which program is in
-   front there.
+   front there, only which programs of the list run, which is what the replay buffer's choice
+   needs.
 
 The recording format and the encoder are OBS's: any H.264 encoder (VAAPI, NVENC or x264) with AAC
 audio keeps clips as they are, never encoded again. [Your own OBS](own-obs.md#3-obss-settings-later)

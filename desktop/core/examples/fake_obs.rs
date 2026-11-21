@@ -5,7 +5,8 @@
 //! [--config <XDG_CONFIG_HOME>] [--password <its WebSocket's>] [--profile <name>]. With --config
 //! it logs its encoders as OBS does (`encoders` in the record folder, x264 without), and its
 //! replay buffer runs only with an encoder `starts` names (all listed ones without); with one it
-//! does not list it never answers, as OBS held by its "Missing Encoders" dialog.
+//! does not list it never answers, as OBS held by its "Missing Encoders" dialog. Its replay buffer
+//! stops and starts on request, with OBS's event, and a save while it is stopped is refused.
 use futures_util::{SinkExt, StreamExt};
 use serde_json::{json, Value};
 use std::path::PathBuf;
@@ -98,6 +99,7 @@ async fn main() {
     let recording: std::sync::Arc<std::sync::Mutex<Option<(PathBuf, std::time::Instant)>>> =
         Default::default();
     let mut recorded = 0u32;
+    let mut active = runs;
     loop {
         let Ok((stream, _)) = listener.accept().await else {
             continue;
@@ -128,7 +130,7 @@ async fn main() {
             .send(send(json!({ "op": 2, "d": { "negotiatedRpcVersion": 1 } })))
             .await;
         println!("fake obs: a client identified");
-        if runs {
+        if active {
             let _ = ws
                 .send(send(json!({ "op": 5, "d": { "eventType": "ReplayBufferStateChanged", "eventIntent": 64, "eventData": { "outputActive": true, "outputState": "OBS_WEBSOCKET_OUTPUT_STARTED" } } })))
                 .await;
@@ -157,7 +159,7 @@ async fn main() {
                     json!({ "currentProfileName": profile, "profiles": [profile] })
                 }
                 "GetRecordDirectory" => json!({ "recordDirectory": dir.to_string_lossy() }),
-                "GetReplayBufferStatus" => json!({ "outputActive": runs }),
+                "GetReplayBufferStatus" => json!({ "outputActive": active }),
                 "GetCurrentProgramScene" => {
                     json!({ "sceneName": "Game", "currentProgramSceneName": "Game" })
                 }
@@ -243,6 +245,28 @@ async fn main() {
                     let refused = json!({ "op": 7, "d": { "requestType": kind, "requestId": id, "requestStatus": { "result": false, "code": 501, "comment": "The replay buffer is not active." } } });
                     let _ = out.send(send(refused));
                     continue;
+                }
+                "SaveReplayBuffer" | "StopReplayBuffer" if !active => {
+                    let refused = json!({ "op": 7, "d": { "requestType": kind, "requestId": id, "requestStatus": { "result": false, "code": 501, "comment": "The replay buffer is not active." } } });
+                    let _ = out.send(send(refused));
+                    continue;
+                }
+                "StopReplayBuffer" | "StartReplayBuffer" => {
+                    let on = kind == "StartReplayBuffer";
+                    if on != active {
+                        active = on;
+                        let state = if on {
+                            "OBS_WEBSOCKET_OUTPUT_STARTED"
+                        } else {
+                            "OBS_WEBSOCKET_OUTPUT_STOPPED"
+                        };
+                        let _ = out.send(send(json!({ "op": 5, "d": { "eventType": "ReplayBufferStateChanged", "eventIntent": 64, "eventData": { "outputActive": on, "outputState": state } } })));
+                        println!(
+                            "fake obs: its replay buffer {}",
+                            if on { "started" } else { "stopped" }
+                        );
+                    }
+                    json!({})
                 }
                 "SaveReplayBuffer" if dir.join("fail-next").exists() => {
                     let _ = std::fs::remove_file(dir.join("fail-next"));

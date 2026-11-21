@@ -68,8 +68,13 @@ before you begin.
    saves, and the app takes the clip in. Pick a key here that OBS does not use. With a server (the
    next step), **Save and share** shows here too. **Record a session**, Alt+F9, starts and stops
    a [session recording](../desktop-app.md#recording-a-whole-session).
-4. **Games**: the same step as in [All in one](all-in-one.md#3-the-setup): **Add my Steam
-   games to the list** is on, and Settings, **Games and apps** changes it later.
+4. **Games**: the same step as in [All in one](all-in-one.md#3-the-setup): **Replay buffer** is
+   **Always**, **Add my Steam games to the list** is on, and Settings, **Games and apps** changes
+   them later. **Only while a game runs** needs **Start the replay buffer** (step 2) to start and
+   stop OBS's replay buffer: choosing it turns that on, and says so.
+
+    ![Games, without Steam on this PC](img/app-light-4-games.png)
+
 5. **Where clips go**: **This PC only** is chosen already: the library on this PC
    ([Standalone](standalone.md)). For a server, see [Add a server for links](#add-a-server-for-links).
    **Clips folder** is OBS's recording folder, as OBS says; a folder picked here is set in OBS.
@@ -78,7 +83,7 @@ before you begin.
    is not there.
 7. **Done** shows a summary. Press **Finish**, and the window opens on your library.
 
-    ![Done, the summary](img/app-light-6-done.png)
+    ![Done, the summary, with the replay buffer only while a game runs](img/app-light-7-done.png)
 
 **Skip for now**, on every step, leaves the setup for later: the app opens on Settings, **OBS**,
 and **Run the setup**, in its **obs-websocket** panel, opens it again. An app that was set up

@@ -93,6 +93,14 @@ pub struct Status {
     pub paused_fullscreen: bool,
     /// Programs in Settings, Games and apps not sorted yet, for the nav's count.
     pub unsorted: usize,
+    /// The game that runs, which the bar and the tray name.
+    pub playing: Option<crate::detect::Playing>,
+    /// The countdown to what a grace period ends, while one runs.
+    pub grace: Option<crate::detect::Grace>,
+    /// The line under Settings, Games and apps, Show on Discord.
+    pub presence: crate::presence::Line,
+    /// A program not sorted yet with the whole screen, which the tray offers to sort.
+    pub newcomer: Option<crate::detect::Newcomer>,
     /// Pause clips: the replay buffer is stopped on purpose until Resume clips.
     pub recording_paused: bool,
     /// A session recording that runs or starts.
@@ -287,7 +295,10 @@ impl Status {
 
     /// The tray's tooltip.
     pub fn tooltip(&self) -> String {
-        format!("reel: {}", self.state_short())
+        match &self.playing {
+            Some(p) => format!("reel: {}; {} runs", self.state_short(), p.short),
+            None => format!("reel: {}", self.state_short()),
+        }
     }
 }
 
@@ -314,6 +325,7 @@ impl Action {
 /// share also needs a server, or standalone.
 pub fn save_actions(
     recording_paused: bool,
+    held: Option<&str>,
     obs_set_up: bool,
     connected: bool,
     state: Option<&reel_desktop_core::obs::ObsState>,
@@ -322,6 +334,8 @@ pub fn save_actions(
 ) -> (Action, Action) {
     let save = if recording_paused {
         Some(RECORDING_PAUSED)
+    } else if let Some(why) = held {
+        Some(why)
     } else if !obs_set_up {
         Some("no OBS is set up for reel")
     } else if !connected {
@@ -391,6 +405,10 @@ pub const PAIR: Fix = Fix {
     word: "Pair",
     act: "settings:server",
 };
+pub const GAMES: Fix = Fix {
+    word: "Games and apps",
+    act: "settings:games",
+};
 pub const LOG: Fix = Fix {
     word: "Log",
     act: "settings:log",
@@ -453,6 +471,12 @@ pub struct Facts<'a> {
     pub waiting: usize,
     /// Save a clip's hotkey; empty when it has none.
     pub save_key: &'a str,
+    /// Why the rules for games keep the replay buffer off, while they do.
+    pub held: Option<&'a crate::detect::Held>,
+    /// The sentence about the game that runs, which ends the menu's first.
+    pub playing: Option<&'a str>,
+    /// The sentence about what a grace period ends, after the game's.
+    pub grace: Option<&'a str>,
 }
 
 /// A row of the bar's menu: its dot, word and line.
@@ -504,11 +528,24 @@ pub fn obs_row(f: &Facts) -> Row {
     } else {
         f.obs_line.to_string()
     };
+    let held = if f.recording_paused {
+        Some("clips are paused".to_string())
+    } else {
+        f.held.map(|h| h.why())
+    };
     match f.replay {
         Some((true, secs)) => row(
             "ok",
             "connected",
             format!("{whose}, the replay buffer keeps {}", replay_words(secs)),
+        ),
+        Some((false, _)) if held.is_some() => row(
+            "neutral",
+            "connected",
+            format!(
+                "{whose}, its replay buffer stopped by reel: {}",
+                held.unwrap_or_default()
+            ),
         ),
         Some((false, _)) => row(
             "warn",
@@ -538,8 +575,20 @@ fn sentence(s: &str) -> String {
 }
 
 /// The first state that holds is the one said: what wants a hand first, then what runs, then
-/// ready.
+/// ready; the game that runs ends its sentence, and what a grace period ends after it.
 pub fn said(f: &Facts) -> Said {
+    let mut s = said_alone(f);
+    for more in [f.playing, f.grace].into_iter().flatten() {
+        s.line = if s.line.is_empty() {
+            more.to_string()
+        } else {
+            format!("{} {more}", s.line)
+        };
+    }
+    s
+}
+
+fn said_alone(f: &Facts) -> Said {
     let say = |state, tone, word: &str, detail: String, line: String, fix| Said {
         state,
         tone,
@@ -648,6 +697,30 @@ pub fn said(f: &Facts) -> Said {
                     "OBS is connected and has not said yet whether its replay buffer runs.".into(),
                     None,
                 )
+            }
+            Some((false, _)) if f.held.is_some() => {
+                return match f.held {
+                    Some(crate::detect::Held::Off(name)) => say(
+                        "buffer_off",
+                        "neutral",
+                        "no replay buffer",
+                        none(),
+                        format!(
+                            "No replay buffer while {} runs, as set for it under Games and apps; a session recording still works.",
+                            crate::detect::short(name)
+                        ),
+                        Some(GAMES),
+                    ),
+                    _ => say(
+                        "waiting",
+                        "neutral",
+                        "waiting for a game",
+                        none(),
+                        "The replay buffer runs only while a game runs: it starts with the next one."
+                            .into(),
+                        None,
+                    ),
+                };
             }
             Some((false, _)) => {
                 return say(
@@ -971,10 +1044,12 @@ pub fn found(st: &reel_desktop_core::obs::ObsState) -> Vec<Found> {
 }
 
 /// What an OBS of the user's own needs for reel: its WebSocket server and its replay buffer.
+/// `held` says why reel keeps the buffer stopped now (Pause clips, the rules for games).
 pub fn obs_checks(
     obs: &ObsLine,
     state: Option<&reel_desktop_core::obs::ObsState>,
     s: &reel_desktop_core::settings::ObsSettings,
+    held: Option<&str>,
 ) -> Vec<CheckLine> {
     let at = format!("{}:{}", s.host, s.port);
     let reason = obs.line.to_lowercase();
@@ -996,6 +1071,10 @@ pub fn obs_checks(
         (true, Some(st)) if st.replay_active => (
             true,
             format!("running, it keeps the last {} s", st.replay_seconds),
+        ),
+        (true, Some(st)) if st.replay_enabled && s.start_replay && held.is_some() => (
+            true,
+            format!("on in OBS, stopped by reel: {}", held.unwrap_or_default()),
         ),
         (true, Some(st)) if st.replay_enabled && s.start_replay => {
             (false, "on in OBS, not running yet: reel starts it".into())
@@ -1048,7 +1127,7 @@ mod tests {
             ..ObsSettings::default()
         };
         let refused = "not connected: cannot reach OBS at ws://127.0.0.1:4455: Connection refused (os error 111)";
-        let off = obs_checks(&line(false, refused), None, &s);
+        let off = obs_checks(&line(false, refused), None, &s, None);
         assert!(!off[0].ok);
         assert!(off[0]
             .line
@@ -1058,24 +1137,39 @@ mod tests {
             &line(false, "not connected: OBS needs a password and none is set"),
             None,
             &s,
+            None,
         );
         assert!(pw[0].line.contains("Show Connect Info"));
         let mut st = ObsState::default();
         let on = line(true, "OBS 32.0.1, websocket 5.6.2");
-        let c = obs_checks(&on, Some(&st), &s);
+        let c = obs_checks(&on, Some(&st), &s, None);
         assert!(c[0].ok && c[0].line == "on, OBS 32.0.1, websocket 5.6.2");
         assert!(!c[1].ok);
         assert!(c[1]
             .line
             .contains("Settings, Output, Replay Buffer, tick Enable Replay Buffer"));
         s.start_replay = true;
-        assert!(obs_checks(&on, Some(&st), &s)[1]
+        assert!(obs_checks(&on, Some(&st), &s, None)[1]
             .line
             .contains("reel turns it on"));
         st.replay_enabled = true;
+        let held = obs_checks(
+            &on,
+            Some(&st),
+            &s,
+            Some("the replay buffer runs only while a game runs"),
+        );
+        assert_eq!(
+            (held[1].ok, held[1].line.as_str()),
+            (
+                true,
+                "on in OBS, stopped by reel: the replay buffer runs only while a game runs"
+            ),
+            "held on purpose: no promise to start it, no warning"
+        );
         st.replay_active = true;
         st.replay_seconds = 60;
-        let c = obs_checks(&on, Some(&st), &s);
+        let c = obs_checks(&on, Some(&st), &s, None);
         assert!(c[1].ok && c[1].line == "running, it keeps the last 60 s");
     }
 
@@ -1134,33 +1228,35 @@ mod tests {
     fn the_save_actions_run_only_while_the_replay_buffer_runs_and_say_why_not() {
         let mut st = ObsState::default();
         let why = |a: &Action| (a.ok, a.why.clone());
-        let (save, share) = save_actions(false, false, false, None, true, false);
+        let (save, share) = save_actions(false, None, false, false, None, true, false);
         assert_eq!(why(&save), (false, "no OBS is set up for reel".into()));
         assert_eq!(why(&share), why(&save));
-        let (save, _) = save_actions(false, true, false, None, true, false);
+        let (save, _) = save_actions(false, None, true, false, None, true, false);
         assert_eq!(why(&save), (false, "OBS is not connected".into()));
-        let (save, _) = save_actions(false, true, true, None, true, false);
+        let (save, _) = save_actions(false, None, true, true, None, true, false);
         assert!(!save.ok && save.why.contains("has not said yet"));
-        let (save, share) = save_actions(false, true, true, Some(&st), true, false);
+        let (save, share) = save_actions(false, None, true, true, Some(&st), true, false);
         assert_eq!(
             why(&save),
             (false, "OBS's replay buffer is not running".into())
         );
         assert_eq!(why(&share), why(&save));
         st.replay_active = true;
-        let (save, share) = save_actions(false, true, true, Some(&st), true, false);
+        let (save, share) = save_actions(false, None, true, true, Some(&st), true, false);
         assert_eq!(
             (why(&save), why(&share)),
             ((true, String::new()), (true, String::new()))
         );
-        let (save, share) = save_actions(false, true, true, Some(&st), false, false);
+        let (save, share) = save_actions(false, None, true, true, Some(&st), false, false);
         assert!(save.ok);
         assert_eq!(
             why(&share),
             (false, "the app is not paired with a server".into())
         );
         assert!(
-            save_actions(false, true, true, Some(&st), false, true).1.ok,
+            save_actions(false, None, true, true, Some(&st), false, true)
+                .1
+                .ok,
             "standalone saves into its library"
         );
     }
@@ -1171,10 +1267,10 @@ mod tests {
             replay_active: true,
             ..ObsState::default()
         };
-        let (save, share) = save_actions(true, true, true, Some(&running), true, false);
+        let (save, share) = save_actions(true, None, true, true, Some(&running), true, false);
         assert_eq!((save.ok, save.why.as_str()), (false, "clips are paused"));
         assert_eq!(share, save);
-        let (save, _) = save_actions(true, false, false, None, false, true);
+        let (save, _) = save_actions(true, None, false, false, None, false, true);
         assert_eq!(save.why, "clips are paused", "before what else is missing");
     }
 
@@ -1204,6 +1300,89 @@ mod tests {
     fn short(f: &Facts) -> (String, String, Option<&'static str>) {
         let s = said(f);
         (s.word, s.detail, s.fix.map(|f| f.act))
+    }
+
+    #[test]
+    fn the_rules_for_games_say_why_the_buffer_is_off_and_the_game_ends_the_sentence() {
+        let none = crate::detect::Held::NoGame;
+        let off = crate::detect::Held::Off(
+            "Starfall Tactics: The Definitive Remastered Collection".into(),
+        );
+        let held = |h| Facts {
+            replay: Some((false, 60)),
+            held: Some(h),
+            ..ready(false)
+        };
+        assert_eq!(
+            short(&held(&none)),
+            ("waiting for a game".into(), String::new(), None),
+            "only while a game runs, and none runs"
+        );
+        let r = obs_row(&held(&none));
+        assert_eq!(r.tone, "neutral", "held on purpose is no warning");
+        assert!(
+            r.line.ends_with(
+                "its replay buffer stopped by reel: the replay buffer runs only while a game runs"
+            ),
+            "{}",
+            r.line
+        );
+        let s = said(&held(&off));
+        assert_eq!(
+            (s.word.as_str(), s.fix.map(|f| f.act)),
+            ("no replay buffer", Some("settings:games"))
+        );
+        assert!(
+            s.line
+                .starts_with("No replay buffer while Starfall Tactics runs"),
+            "{}",
+            s.line
+        );
+        let paused = Facts {
+            recording_paused: true,
+            ..held(&off)
+        };
+        assert_eq!(short(&paused).0, "clips paused", "Pause clips says its own");
+        let game = "Ember Pass runs for 14 min, a Game: the replay buffer runs.";
+        let s = said(&Facts {
+            playing: Some(game),
+            ..ready(false)
+        });
+        assert_eq!(
+            (s.word.as_str(), s.detail.as_str()),
+            ("ready", "last 60 s"),
+            "the words stay the state's"
+        );
+        assert!(
+            s.line.ends_with(game) && s.line.starts_with("OBS keeps the last 60 s"),
+            "{}",
+            s.line
+        );
+        let grace = "Hollow Pines closed: the replay buffer stops in 0:45; if a game starts before then, it goes on.";
+        let s = said(&Facts {
+            grace: Some(grace),
+            ..ready(false)
+        });
+        assert_eq!(
+            (s.state, s.word.as_str(), s.detail.as_str()),
+            ("idle", "ready", "last 60 s"),
+            "a grace period: the state stays, clips can still be saved"
+        );
+        assert!(
+            s.line.starts_with("OBS keeps the last 60 s") && s.line.ends_with(grace),
+            "{}",
+            s.line
+        );
+        let s = said(&Facts {
+            playing: Some(game),
+            grace: Some(grace),
+            ..ready(false)
+        });
+        assert!(
+            s.line.ends_with(&format!("{game} {grace}")),
+            "the game that runs, then what the grace period ends: {}",
+            s.line
+        );
     }
 
     #[test]

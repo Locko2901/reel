@@ -3,7 +3,9 @@
 use crate::steam::{SteamApp, SteamKind};
 use jiff::Timestamp;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
+use std::time::{Duration, Instant};
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
 #[serde(rename_all = "snake_case")]
@@ -163,6 +165,18 @@ pub struct Every {
     pub wait: bool,
 }
 
+impl Every {
+    /// The settings for every game, each on the page of its subject.
+    pub fn of(s: &crate::settings::Settings) -> Every {
+        Every {
+            buffer_always: s.obs.replay_buffer != crate::settings::ReplayBuffer::Games,
+            record: s.session.record_by_itself,
+            stop: s.session.stop_with_game,
+            wait: s.upload.wait_for_games,
+        }
+    }
+}
+
 impl Default for Every {
     fn default() -> Self {
         Self {
@@ -286,6 +300,219 @@ pub fn stoppers<'a>(every: &Every, running: &[Running<'a>]) -> Vec<&'a Entry> {
         .filter(|r| r.entry.resolve(every).stop)
         .map(|r| r.entry)
         .collect()
+}
+
+/// The running program whose own setting stops the replay buffer, when one does.
+pub fn buffer_stopper<'a>(every: &Every, running: &[Running<'a>]) -> Option<&'a Entry> {
+    running
+        .iter()
+        .find(|r| r.entry.resolve(every).buffer == Buffer::Stops)
+        .map(|r| r.entry)
+}
+
+/// The programs of the list that run, each one kept for the grace period after it closed: a
+/// game that closes and starts again within it counts as still running.
+#[derive(Debug, Default, Clone)]
+pub struct Runs {
+    seen: HashMap<String, Run>,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct Run {
+    pub since: Instant,
+    /// When it was last not found running; None while it runs.
+    pub gone_at: Option<Instant>,
+}
+
+/// What a look at the running programs changed.
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
+pub struct Looked {
+    /// Started, and not within the grace period of a run before.
+    pub started: Vec<String>,
+    /// Closed now; counted as running until the grace period is over.
+    pub closing: Vec<String>,
+    /// Back within the grace period: the same run goes on.
+    pub back: Vec<String>,
+    /// The grace period is over: no longer running.
+    pub closed: Vec<String>,
+}
+
+impl Runs {
+    pub fn look(&mut self, running: &[String], now: Instant, grace: Duration) -> Looked {
+        let mut out = Looked::default();
+        for id in running {
+            match self.seen.get_mut(id) {
+                Some(r) => {
+                    if r.gone_at.take().is_some() {
+                        out.back.push(id.clone());
+                    }
+                }
+                None => {
+                    self.seen.insert(
+                        id.clone(),
+                        Run {
+                            since: now,
+                            gone_at: None,
+                        },
+                    );
+                    out.started.push(id.clone());
+                }
+            }
+        }
+        for (id, r) in self.seen.iter_mut() {
+            if running.contains(id) {
+                continue;
+            }
+            match r.gone_at {
+                None => {
+                    r.gone_at = Some(now);
+                    out.closing.push(id.clone());
+                }
+                Some(at) if now.duration_since(at) >= grace => out.closed.push(id.clone()),
+                Some(_) => {}
+            }
+        }
+        for id in &out.closed {
+            self.seen.remove(id);
+        }
+        for v in [
+            &mut out.started,
+            &mut out.closing,
+            &mut out.back,
+            &mut out.closed,
+        ] {
+            v.sort();
+        }
+        out
+    }
+
+    /// Running, or within the grace period after it closed.
+    pub fn ids(&self) -> impl Iterator<Item = &String> {
+        self.seen.keys()
+    }
+
+    pub fn get(&self, id: &str) -> Option<&Run> {
+        self.seen.get(id)
+    }
+
+    pub fn contains(&self, id: &str) -> bool {
+        self.seen.contains_key(id)
+    }
+
+    /// The one that started last, of these.
+    pub fn newest<'a>(&self, ids: impl Iterator<Item = &'a String>) -> Option<&'a String> {
+        ids.filter_map(|id| self.seen.get(id).map(|r| (id, r.since)))
+            .max_by_key(|(_, since)| *since)
+            .map(|(id, _)| id)
+    }
+
+    pub fn forget(&mut self, id: &str) {
+        self.seen.remove(id);
+    }
+
+    /// When the grace period of a program that closed is over; None while it runs.
+    pub fn ends(&self, id: &str, grace: Duration) -> Option<Instant> {
+        self.seen.get(id)?.gone_at.map(|at| at + grace)
+    }
+
+    /// The first grace period to be over, so the running check looks then and not up to a
+    /// look later.
+    pub fn next_end(&self, grace: Duration) -> Option<Instant> {
+        self.seen
+            .values()
+            .filter_map(|r| r.gone_at)
+            .min()
+            .map(|at| at + grace)
+    }
+}
+
+/// What the end of a grace period does to the replay buffer.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Turn {
+    Stops,
+    /// It runs again: the program whose own setting kept it off no longer counts.
+    Starts,
+}
+
+/// The next change the end of a grace period makes, and when: the bar counts down to it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Ending {
+    pub at: Instant,
+    /// The program that closed whose grace period ends then.
+    pub id: String,
+    /// A session recording stops.
+    pub recording: bool,
+    pub buffer: Option<Turn>,
+}
+
+/// The next change a grace period makes: the replay buffer once the programs that closed no
+/// longer count, when the rules for games decide it (`buffer`), and a session recording once
+/// every program it stops with (`stops_with`, while one runs) closed. `running` holds the
+/// programs counted now, those within their grace period too. None while a program that keeps
+/// things as they are runs, and with no grace period.
+pub fn ending(
+    every: &Every,
+    runs: &Runs,
+    running: &[Running],
+    buffer: bool,
+    stops_with: Option<&[String]>,
+    grace: Duration,
+) -> Option<Ending> {
+    if grace.is_zero() {
+        return None;
+    }
+    let end = |id: &str| runs.ends(id, grace);
+    let mut out: Option<Ending> = None;
+    if buffer {
+        let now = buffer_runs(every, running);
+        let mut ends: Vec<(Instant, &str)> = running
+            .iter()
+            .filter_map(|r| end(&r.entry.id).map(|t| (t, r.entry.id.as_str())))
+            .collect();
+        ends.sort();
+        for &(t, id) in &ends {
+            let left: Vec<Running> = running
+                .iter()
+                .filter(|r| end(&r.entry.id).is_none_or(|e| e > t))
+                .copied()
+                .collect();
+            if buffer_runs(every, &left) != now {
+                out = Some(Ending {
+                    at: t,
+                    id: id.to_string(),
+                    recording: false,
+                    buffer: Some(if now { Turn::Stops } else { Turn::Starts }),
+                });
+                break;
+            }
+        }
+    }
+    let counted: Vec<&String> = stops_with
+        .unwrap_or_default()
+        .iter()
+        .filter(|id| runs.contains(id))
+        .collect();
+    // it stops once the last of them is over; while one runs, nothing ends
+    let last = counted
+        .iter()
+        .map(|id| end(id).map(|t| (t, *id)))
+        .collect::<Option<Vec<_>>>()
+        .and_then(|v| v.into_iter().max());
+    if let Some((t, id)) = last {
+        match &mut out {
+            Some(o) if o.at == t => o.recording = true,
+            Some(o) if o.at < t => {}
+            _ => {
+                out = Some(Ending {
+                    at: t,
+                    id: id.clone(),
+                    recording: true,
+                    buffer: None,
+                })
+            }
+        }
+    }
+    out
 }
 
 /// The program in front, as the waits see it.
@@ -761,6 +988,315 @@ mod tests {
         let mut keeps = c.clone();
         keeps.own.stop = Own::Off;
         assert!(stoppers(&e, &[behind(&keeps), behind(&tool)]).is_empty());
+    }
+
+    #[test]
+    fn the_settings_for_every_game_come_from_their_pages() {
+        let mut s = crate::settings::Settings::default();
+        assert_eq!(Every::of(&s), Every::default());
+        s.obs.replay_buffer = crate::settings::ReplayBuffer::Games;
+        s.session.record_by_itself = true;
+        s.session.stop_with_game = false;
+        s.upload.wait_for_games = true;
+        assert_eq!(Every::of(&s), every(false, true, false, true));
+    }
+
+    #[test]
+    fn the_off_that_stops_the_buffer_is_named() {
+        let game = entry("/g/game", Class::Game);
+        let mut heavy = entry("/g/heavy", Class::Game);
+        heavy.name = "Starfall Tactics".into();
+        heavy.own.buffer = Own::Off;
+        let e = Every::default();
+        assert!(buffer_stopper(&e, &[run(&game, false)]).is_none());
+        assert_eq!(
+            buffer_stopper(&e, &[run(&game, false), run(&heavy, false)]).map(|x| x.name.as_str()),
+            Some("Starfall Tactics")
+        );
+        let mut ignored = heavy.clone();
+        ignored.class = Class::Ignored;
+        assert!(
+            buffer_stopper(&e, &[run(&ignored, false)]).is_none(),
+            "Ignored: as if not there"
+        );
+    }
+
+    #[test]
+    fn a_game_that_closes_counts_as_running_for_the_grace_period() {
+        let grace = Duration::from_secs(60);
+        let t0 = Instant::now();
+        let s = |n: u64| t0 + Duration::from_secs(n);
+        let ids = |v: &[&str]| v.iter().map(|x| x.to_string()).collect::<Vec<_>>();
+        let mut r = Runs::default();
+        let a = r.look(&ids(&["ember"]), s(0), grace);
+        assert_eq!(a.started, ids(&["ember"]));
+        assert!(
+            r.look(&ids(&["ember"]), s(3), grace) == Looked::default(),
+            "it runs on"
+        );
+        let b = r.look(&[], s(6), grace);
+        assert_eq!(b.closing, ids(&["ember"]));
+        assert!(
+            r.contains("ember"),
+            "within the grace period it still counts"
+        );
+        let c = r.look(&ids(&["ember"]), s(40), grace);
+        assert_eq!(
+            (c.back.clone(), c.started.clone()),
+            (ids(&["ember"]), vec![]),
+            "back: the same run"
+        );
+        assert_eq!(r.get("ember").unwrap().since, s(0));
+        r.look(&[], s(50), grace);
+        assert!(
+            r.look(&[], s(100), grace).closed.is_empty(),
+            "50 s after it closed"
+        );
+        let d = r.look(&[], s(111), grace);
+        assert_eq!(d.closed, ids(&["ember"]), "the grace period is over");
+        assert!(!r.contains("ember"));
+        assert_eq!(
+            r.look(&ids(&["ember"]), s(120), grace).started,
+            ids(&["ember"]),
+            "a new run"
+        );
+        let mut zero = Runs::default();
+        zero.look(&ids(&["x"]), s(0), Duration::ZERO);
+        zero.look(&[], s(3), Duration::ZERO);
+        assert_eq!(
+            zero.look(&[], s(6), Duration::ZERO).closed,
+            ids(&["x"]),
+            "no grace: closed at the next look"
+        );
+    }
+
+    #[test]
+    fn several_programs_through_the_grace_period() {
+        let grace = Duration::from_secs(60);
+        let t0 = Instant::now();
+        let s = |n: u64| t0 + Duration::from_secs(n);
+        let ids = |v: &[&str]| v.iter().map(|x| x.to_string()).collect::<Vec<_>>();
+        let games = every(false, false, true, false);
+        let game = entry("/g/game", Class::Game);
+        let mut heavy = entry("/g/heavy", Class::Game);
+        heavy.own.buffer = Own::Off;
+        let list = [("game", &game), ("heavy", &heavy)];
+        let running = |r: &Runs| -> Vec<Running> {
+            list.iter()
+                .filter(|(id, _)| r.contains(id))
+                .map(|(_, e)| run(e, false))
+                .collect()
+        };
+        let mut r = Runs::default();
+        r.look(&ids(&["game"]), s(0), grace);
+        assert!(
+            buffer_runs(&games, &running(&r)),
+            "a game runs: the buffer runs"
+        );
+        r.look(&ids(&["game", "heavy"]), s(3), grace);
+        assert!(
+            !buffer_runs(&games, &running(&r)),
+            "the heavy game's Off wins"
+        );
+        r.look(&ids(&["game"]), s(6), grace);
+        assert!(
+            !buffer_runs(&games, &running(&r)),
+            "closed, it still holds for the grace period"
+        );
+        r.look(&ids(&["game"]), s(70), grace);
+        assert!(
+            buffer_runs(&games, &running(&r)),
+            "after it, the buffer starts again"
+        );
+        r.look(&[], s(73), grace);
+        assert!(
+            buffer_runs(&games, &running(&r)),
+            "a minute after the last game closes"
+        );
+        r.look(&[], s(140), grace);
+        assert!(!buffer_runs(&games, &running(&r)), "then it stops");
+        let mut a = game.clone();
+        a.own.record = Own::On;
+        a.name = "Ember Pass".into();
+        let mut b = game.clone();
+        b.own.record = Own::On;
+        let rec = [run(&a, false), run(&b, false)];
+        assert_eq!(
+            records(&Every::default(), &rec).map(|e| e.name.as_str()),
+            Some("Ember Pass"),
+            "one recording for two"
+        );
+        assert_eq!(
+            stoppers(&Every::default(), &rec).len(),
+            2,
+            "it stops once both closed"
+        );
+    }
+
+    fn named(id: &str) -> Entry {
+        let mut e = entry(&format!("/g/{id}"), Class::Game);
+        e.id = id.into();
+        e
+    }
+
+    #[test]
+    fn the_grace_period_counts_down_to_what_it_ends() {
+        let grace = Duration::from_secs(60);
+        let t0 = Instant::now();
+        let s = |n: u64| t0 + Duration::from_secs(n);
+        let ids = |v: &[&str]| v.iter().map(|x| x.to_string()).collect::<Vec<_>>();
+        let (hollow, ember) = (named("hollow"), named("ember"));
+        let running = |r: &Runs| -> Vec<Running> {
+            [&hollow, &ember]
+                .into_iter()
+                .filter(|e| r.contains(&e.id))
+                .map(|e| run(e, false))
+                .collect()
+        };
+        let games = every(false, false, true, false);
+        let always = Every::default();
+        let mut r = Runs::default();
+        r.look(&ids(&["hollow"]), s(0), grace);
+        let with = ids(&["hollow"]);
+        assert_eq!(
+            ending(&games, &r, &running(&r), true, Some(&with), grace),
+            None,
+            "while it runs nothing counts down"
+        );
+        assert_eq!(r.next_end(grace), None);
+
+        // it closes: the countdown starts
+        r.look(&[], s(6), grace);
+        assert_eq!(
+            ending(&games, &r, &running(&r), true, None, grace),
+            Some(Ending {
+                at: s(66),
+                id: "hollow".into(),
+                recording: false,
+                buffer: Some(Turn::Stops),
+            }),
+            "only while a game runs: the buffer stops a grace period after the last game closed"
+        );
+        assert_eq!(
+            r.next_end(grace),
+            Some(s(66)),
+            "the running check looks then"
+        );
+        assert_eq!(
+            ending(&always, &r, &running(&r), true, None, grace),
+            None,
+            "always: the buffer goes on"
+        );
+        assert_eq!(
+            ending(&games, &r, &running(&r), false, None, grace),
+            None,
+            "clips paused: the rules for games do not decide the buffer"
+        );
+        assert_eq!(
+            ending(&games, &r, &running(&r), true, Some(&with), grace).map(|e| (
+                e.at,
+                e.recording,
+                e.buffer
+            )),
+            Some((s(66), true, Some(Turn::Stops))),
+            "a recording that stops with it ends with the buffer: one countdown"
+        );
+        assert_eq!(
+            ending(&always, &r, &running(&r), true, Some(&with), grace)
+                .map(|e| (e.recording, e.buffer)),
+            Some((true, None)),
+            "the recording alone"
+        );
+
+        // back within the grace period: no countdown
+        r.look(&ids(&["hollow"]), s(40), grace);
+        assert_eq!(
+            ending(&games, &r, &running(&r), true, Some(&with), grace),
+            None,
+            "back: as before it closed"
+        );
+        assert_eq!(r.next_end(grace), None);
+
+        // another game starts within it, then closes: the last to close sets the end
+        r.look(&[], s(43), grace);
+        r.look(&ids(&["ember"]), s(50), grace);
+        let both = ids(&["hollow", "ember"]);
+        assert_eq!(
+            ending(&games, &r, &running(&r), true, Some(&both), grace),
+            None,
+            "another game keeps the buffer and the recording"
+        );
+        r.look(&[], s(80), grace);
+        assert_eq!(
+            ending(&games, &r, &running(&r), true, Some(&both), grace).map(|e| (
+                e.at,
+                e.id,
+                e.recording,
+                e.buffer
+            )),
+            Some((s(140), "ember".into(), true, Some(Turn::Stops))),
+            "both end a grace period after the last one closed"
+        );
+        assert_eq!(r.next_end(grace), Some(s(103)), "the first one's end");
+
+        // the end
+        r.look(&[], s(103), grace);
+        assert!(!r.contains("hollow"));
+        assert_eq!(
+            ending(&games, &r, &running(&r), true, Some(&both), grace).map(|e| e.at),
+            Some(s(140))
+        );
+        assert_eq!(r.look(&[], s(140), grace).closed, ids(&["ember"]));
+        assert_eq!(
+            ending(&games, &r, &running(&r), true, Some(&both), grace),
+            None,
+            "over: nothing left to count down"
+        );
+        assert_eq!(r.next_end(grace), None);
+    }
+
+    #[test]
+    fn a_game_that_kept_the_buffer_off_counts_down_to_it_running_again() {
+        let grace = Duration::from_secs(60);
+        let t0 = Instant::now();
+        let s = |n: u64| t0 + Duration::from_secs(n);
+        let ids = |v: &[&str]| v.iter().map(|x| x.to_string()).collect::<Vec<_>>();
+        let hollow = named("hollow");
+        let mut heavy = named("heavy");
+        heavy.own.buffer = Own::Off;
+        let running = |r: &Runs| -> Vec<Running> {
+            [&hollow, &heavy]
+                .into_iter()
+                .filter(|e| r.contains(&e.id))
+                .map(|e| run(e, false))
+                .collect()
+        };
+        let games = every(false, false, true, false);
+        let always = Every::default();
+        let mut r = Runs::default();
+        r.look(&ids(&["heavy"]), s(0), grace);
+        r.look(&[], s(3), grace);
+        assert_eq!(
+            ending(&always, &r, &running(&r), true, None, grace).map(|e| (e.at, e.buffer)),
+            Some((s(63), Some(Turn::Starts))),
+            "always: it runs again"
+        );
+        assert_eq!(
+            ending(&games, &r, &running(&r), true, None, grace),
+            None,
+            "only while a game runs, and none does: it stays off, nothing to count down"
+        );
+        r.look(&ids(&["hollow"]), s(10), grace);
+        assert_eq!(
+            ending(&games, &r, &running(&r), true, None, grace).map(|e| (e.id, e.buffer)),
+            Some(("heavy".into(), Some(Turn::Starts))),
+            "with another game it runs again"
+        );
+        assert_eq!(
+            ending(&always, &r, &running(&r), true, None, Duration::ZERO),
+            None,
+            "no grace period, no countdown"
+        );
     }
 
     #[test]

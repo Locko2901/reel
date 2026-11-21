@@ -110,6 +110,7 @@ dialog.games-dialog .add-body { display: flex; flex-direction: column; gap: var(
 .ask-list .now + .was { margin-top: 4px; }
 .ask-list .more { margin-top: 4px; }
 .steam-names { color: var(--text); margin: 0; }
+#presence-note.sent .what { color: var(--text); }
 #steam-step-found:not([hidden]) + .body.flush { border-top: 1px solid var(--line); }
 .wizard .panel + .games-after { margin-top: var(--gap-panels); }
 .games-after { color: var(--text-2); font-size: var(--fs-s); max-width: 70ch; }
@@ -123,3 +124,4 @@ dialog.games-dialog .add-body { display: flex; flex-direction: column; gap: var(
   .dfield .hint { grid-column: 1; }
   .games-head #games-find { width: 100%; }
 }
+.games-dialog .server-titles { padding: 6px 0 0; border-top: 1px solid var(--line); border-bottom: 0; }
