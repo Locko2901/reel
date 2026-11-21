@@ -144,6 +144,11 @@ mod windows_list {
         {
             return BOOL(1);
         }
+        let mut pid = 0u32;
+        GetWindowThreadProcessId(hwnd, Some(&mut pid));
+        if crate::gaming::own(pid) {
+            return BOOL(1);
+        }
         let mut buf = [0u16; 512];
         let n = GetWindowTextW(hwnd, &mut buf) as usize;
         let title = String::from_utf16_lossy(&buf[..n]);
@@ -152,8 +157,6 @@ mod windows_list {
         }
         let n = GetClassNameW(hwnd, &mut buf) as usize;
         let class = String::from_utf16_lossy(&buf[..n]);
-        let mut pid = 0u32;
-        GetWindowThreadProcessId(hwnd, Some(&mut pid));
         let Ok(h) = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid) else {
             return BOOL(1);
         };

@@ -83,6 +83,14 @@ impl Foreground for System {
 #[cfg(windows)]
 pub struct System;
 
+/// Whether a window's process is reel itself. Such a window's title is never read:
+/// GetWindowTextW sends WM_GETTEXT to the thread that owns a window of the calling process and
+/// waits for it, and that thread, the app's main thread, may be waiting for the caller.
+#[cfg(windows)]
+pub(crate) fn own(pid: u32) -> bool {
+    pid == std::process::id()
+}
+
 #[cfg(windows)]
 impl Foreground for System {
     fn fullscreen_app(&self) -> bool {
@@ -100,6 +108,7 @@ impl Foreground for System {
         }
     }
 
+    /// reel's own window in front is reel's program with no title: it is no game.
     fn foreground_process(&self) -> Option<ProcessInfo> {
         use windows::core::PWSTR;
         use windows::Win32::Foundation::CloseHandle;
@@ -120,9 +129,12 @@ impl Foreground for System {
             if pid == 0 {
                 return None;
             }
-            let mut title_buf = [0u16; 512];
-            let n = GetWindowTextW(hwnd, &mut title_buf);
-            let title = String::from_utf16_lossy(&title_buf[..n.max(0) as usize]);
+            let mut title = String::new();
+            if !own(pid) {
+                let mut title_buf = [0u16; 512];
+                let n = GetWindowTextW(hwnd, &mut title_buf);
+                title = String::from_utf16_lossy(&title_buf[..n.max(0) as usize]);
+            }
             let handle = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid).ok()?;
             let mut path_buf = [0u16; 1024];
             let mut len = path_buf.len() as u32;
@@ -259,14 +271,17 @@ fn sys_running() -> Vec<Program> {
         {
             return BOOL(1);
         }
+        let mut pid = 0u32;
+        GetWindowThreadProcessId(hwnd, Some(&mut pid));
+        if own(pid) {
+            return BOOL(1);
+        }
         let mut buf = [0u16; 512];
         let n = GetWindowTextW(hwnd, &mut buf) as usize;
         let title = String::from_utf16_lossy(&buf[..n]);
         if title.trim().is_empty() {
             return BOOL(1);
         }
-        let mut pid = 0u32;
-        GetWindowThreadProcessId(hwnd, Some(&mut pid));
         let Ok(h) = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid) else {
             return BOOL(1);
         };

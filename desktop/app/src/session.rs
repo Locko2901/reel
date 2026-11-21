@@ -280,6 +280,7 @@ impl Runtime {
 
     /// A recording runs: reel's own start, one started in OBS, or one found at a connection.
     fn session_began(&self, file: Option<PathBuf>, cue: bool) {
+        let front = self.front();
         let (by, started) = {
             let mut g = self.lock();
             let asked = g.session_asked.take();
@@ -289,7 +290,9 @@ impl Runtime {
             r.with = g.session_with.take().filter(|_| by == By::Game);
             r.game = match &r.with {
                 Some(game) => Some(game.clone()),
-                None => g.name_in_front(reel_desktop_core::programs::Came::Recording),
+                None => {
+                    g.name_in_front(front.as_ref(), reel_desktop_core::programs::Came::Recording)
+                }
             };
             let started = r.started;
             g.session = Some(r);
@@ -519,11 +522,12 @@ impl Runtime {
     /// The game a recording is named after: the one seen last while it ran, or the game it
     /// started with.
     fn session_game(&self) {
+        let front = self.front();
         let mut g = self.lock();
         if g.session.as_ref().is_some_and(|r| r.with.is_some()) {
             return;
         }
-        let seen = g.name_in_front(reel_desktop_core::programs::Came::Recording);
+        let seen = g.name_in_front(front.as_ref(), reel_desktop_core::programs::Came::Recording);
         if let (Some(game), Some(r)) = (seen, g.session.as_mut()) {
             r.game = Some(game);
         }

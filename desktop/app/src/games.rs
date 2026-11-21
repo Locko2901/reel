@@ -1,10 +1,11 @@
 //! Settings, Games and apps in the app: the list beside the settings, Steam's games read into
 //! it, the name a clip saved now takes, the waits, and what the page asks.
+use crate::detect::game_running_alone;
 use crate::runtime::{Inner, Runtime};
 use jiff::Timestamp;
 use reel_desktop_core::gaming::{self, ProcessInfo};
 use reel_desktop_core::programs::{
-    self, Came, Class, Entry, Every, Front, NameFrom, Naming, Own, Programs,
+    self, Came, Class, Entry, Every, Front, NameFrom, Naming, Own, Programs, Runs,
 };
 use reel_desktop_core::steam;
 use serde::Deserialize;
@@ -63,90 +64,125 @@ fn word(c: Came) -> &'static str {
     }
 }
 
+fn keep(programs: &Programs) {
+    if let Err(e) = programs.save() {
+        tracing::warn!(error = %e, "games and apps: the list was not written");
+    }
+}
+
+/// A program not in the list comes in as Not sorted yet, named from its file.
+fn take_in(programs: &mut Programs, p: &ProcessInfo, came: Came) -> Option<String> {
+    if p.path.as_os_str().is_empty() || no_game(p) {
+        return None;
+    }
+    let guess = gaming::game_name(&p.exe_name, &p.title)?;
+    let e = Entry::program(&p.path, &guess, Class::NotSorted, came, Timestamp::now());
+    let id = e.id.clone();
+    if programs.add(e).is_ok() {
+        programs.seen(&id, Timestamp::now());
+        tracing::info!(program = %p.path.display(), name = %guess, "games and apps: it came in as Not sorted yet: {}", word(came));
+        keep(programs);
+    }
+    Some(id)
+}
+
+/// The name a clip or a session recording saved now takes: the program in front as the list
+/// names it, else OBS's game capture window's as the list names it, else as before (OBS's
+/// window, then a name from the program in front), and a program in front that is not in the
+/// list comes in as Not sorted yet. `front` is read before, with the lock free
+/// ([`Runtime::front`]).
+fn name_now(
+    programs: &mut Programs,
+    runs: &Runs,
+    obs_game: Option<&str>,
+    obs_game_exe: Option<&str>,
+    front: Option<&ProcessInfo>,
+    came: Came,
+) -> Option<String> {
+    let now = Timestamp::now();
+    if let Some(p) = front {
+        if let Some(e) = programs.find(&p.path) {
+            let (id, class) = (e.id.clone(), e.class);
+            let named = match e.naming {
+                Naming::Window => {
+                    reel_core::games::clean(Some(&p.title)).or_else(|| Some(e.name.clone()))
+                }
+                Naming::Name => Some(e.name.clone()),
+            };
+            if programs.seen(&id, now) {
+                keep(programs);
+            }
+            if class != Class::Ignored {
+                return named;
+            }
+        }
+    }
+    let by_window = obs_game_exe.and_then(|exe| {
+        let listed: Vec<&Entry> = programs
+            .entries
+            .iter()
+            .filter(|e| {
+                !e.folder
+                    && e.path
+                        .file_name()
+                        .is_some_and(|n| n.to_string_lossy().eq_ignore_ascii_case(exe))
+            })
+            .collect();
+        match listed[..] {
+            [one] if one.class != Class::Ignored => Some(one.name.clone()),
+            _ => None,
+        }
+    });
+    if by_window.is_some() {
+        return by_window;
+    }
+    // with no program in front to read (Linux), the one Game that runs comes before OBS's window
+    if front.is_none() {
+        if let Some(game) = game_running_alone(runs, programs) {
+            return Some(game);
+        }
+    }
+    let guess = front
+        .filter(|p| programs.find(&p.path).is_none())
+        .and_then(|p| {
+            take_in(programs, p, came);
+            gaming::game_name(&p.exe_name, &p.title)
+        });
+    obs_game
+        .map(str::to_string)
+        .or(guess)
+        .or_else(|| game_running_alone(runs, programs))
+}
+
+impl Runtime {
+    /// The program in front, read with the lock free: reading a window's title can wait on the
+    /// thread that owns the window, and reel's own main thread may be waiting for the lock.
+    pub(crate) fn front(&self) -> Option<ProcessInfo> {
+        let fg = self.lock().foreground.clone();
+        fg.foreground_process()
+    }
+}
+
 impl Inner {
     fn keep_programs(&self) {
-        if let Err(e) = self.programs.save() {
-            tracing::warn!(error = %e, "games and apps: the list was not written");
-        }
+        keep(&self.programs);
     }
 
-    /// A program not in the list comes in as Not sorted yet, named from its file.
-    fn take_in(&mut self, p: &ProcessInfo, came: Came) -> Option<String> {
-        if p.path.as_os_str().is_empty() || no_game(p) {
-            return None;
-        }
-        let guess = gaming::game_name(&p.exe_name, &p.title)?;
-        let e = Entry::program(&p.path, &guess, Class::NotSorted, came, Timestamp::now());
-        let id = e.id.clone();
-        if self.programs.add(e).is_ok() {
-            self.programs.seen(&id, Timestamp::now());
-            tracing::info!(program = %p.path.display(), name = %guess, "games and apps: it came in as Not sorted yet: {}", word(came));
-            self.keep_programs();
-        }
-        Some(id)
-    }
-
-    /// The name a clip or a session recording saved now takes: the program in front as the
-    /// list names it, else OBS's game capture window's as the list names it, else as before
-    /// (OBS's window, then a name from the program in front), and a program in front that is
-    /// not in the list comes in as Not sorted yet.
-    pub(crate) fn name_in_front(&mut self, came: Came) -> Option<String> {
-        let front = self.foreground.foreground_process();
-        let now = Timestamp::now();
-        if let Some(p) = &front {
-            if let Some(e) = self.programs.find(&p.path) {
-                let (id, class) = (e.id.clone(), e.class);
-                let named = match e.naming {
-                    Naming::Window => {
-                        reel_core::games::clean(Some(&p.title)).or_else(|| Some(e.name.clone()))
-                    }
-                    Naming::Name => Some(e.name.clone()),
-                };
-                if self.programs.seen(&id, now) {
-                    self.keep_programs();
-                }
-                if class != Class::Ignored {
-                    return named;
-                }
-            }
-        }
-        let by_window = self.obs_game_exe.as_deref().and_then(|exe| {
-            let listed: Vec<&Entry> = self
-                .programs
-                .entries
-                .iter()
-                .filter(|e| {
-                    !e.folder
-                        && e.path
-                            .file_name()
-                            .is_some_and(|n| n.to_string_lossy().eq_ignore_ascii_case(exe))
-                })
-                .collect();
-            match listed[..] {
-                [one] if one.class != Class::Ignored => Some(one.name.clone()),
-                _ => None,
-            }
-        });
-        if by_window.is_some() {
-            return by_window;
-        }
-        // with no program in front to read (Linux), the one Game that runs comes before OBS's window
-        if front.is_none() {
-            if let Some(game) = self.game_running_alone() {
-                return Some(game);
-            }
-        }
-        let guess = front
-            .as_ref()
-            .filter(|p| self.programs.find(&p.path).is_none())
-            .and_then(|p| {
-                self.take_in(p, came);
-                gaming::game_name(&p.exe_name, &p.title)
-            });
-        self.obs_game
-            .clone()
-            .or(guess)
-            .or_else(|| self.game_running_alone())
+    /// The name a clip or a session recording saved now takes, with `front` from
+    /// [`Runtime::front`]: no window is read under the lock.
+    pub(crate) fn name_in_front(
+        &mut self,
+        front: Option<&ProcessInfo>,
+        came: Came,
+    ) -> Option<String> {
+        name_now(
+            &mut self.programs,
+            &self.runs,
+            self.obs_game.as_deref(),
+            self.obs_game_exe.as_deref(),
+            front,
+            came,
+        )
     }
 
     /// Whether uploads and the library's heavy work wait now; the program in front is seen,
@@ -168,7 +204,7 @@ impl Inner {
                 return false;
             }
             if fullscreen {
-                self.take_in(p, Came::Fullscreen);
+                take_in(&mut self.programs, p, Came::Fullscreen);
             }
         }
         self.front_entry = self
@@ -720,5 +756,105 @@ mod tests {
         assert!(no_game(&p("/apps/firefox")));
         assert!(no_game(&p("/apps/Discord.exe")));
         assert!(!no_game(&p("/games/emberpass")));
+    }
+
+    fn process(path: &str, title: &str) -> ProcessInfo {
+        ProcessInfo {
+            exe_name: path.rsplit(['/', '\\']).next().unwrap().to_string(),
+            title: title.into(),
+            path: PathBuf::from(path),
+        }
+    }
+
+    /// Ember Pass in the list as a Game, and running.
+    fn ember_pass() -> (Programs, Runs) {
+        let mut list = Programs::default();
+        let e = Entry::program(
+            Path::new("/games/emberpass"),
+            "Ember Pass",
+            Class::Game,
+            Came::Hand,
+            Timestamp::now(),
+        );
+        let id = e.id.clone();
+        list.add(e).unwrap();
+        let mut runs = Runs::default();
+        runs.look(&[id], std::time::Instant::now(), Duration::from_secs(30));
+        (list, runs)
+    }
+
+    #[test]
+    fn the_name_follows_the_program_in_front_it_is_handed() {
+        let (mut list, runs) = ember_pass();
+        let ember = process("/games/emberpass", "EMBER PASS v1.2");
+        assert_eq!(
+            name_now(&mut list, &runs, None, None, Some(&ember), Came::Clip).as_deref(),
+            Some("Ember Pass")
+        );
+        assert!(list.find(&ember.path).unwrap().seen_at.is_some());
+        let racer = process("/games/moonlit_racer", "");
+        assert_eq!(
+            name_now(&mut list, &runs, None, None, Some(&racer), Came::Recording).as_deref(),
+            Some("Moonlit Racer")
+        );
+        let e = list.find(&racer.path).expect("it came in");
+        assert_eq!((e.class, e.came), (Class::NotSorted, Came::Recording));
+        assert_eq!(
+            name_now(&mut list, &runs, Some("Dust Road"), None, None, Came::Clip).as_deref(),
+            Some("Ember Pass"),
+            "nothing in front: the one Game that runs, before OBS's window"
+        );
+        assert_eq!(
+            name_now(
+                &mut list,
+                &runs,
+                Some("Dust Road"),
+                Some("moonlit_racer"),
+                None,
+                Came::Clip
+            )
+            .as_deref(),
+            Some("Moonlit Racer"),
+            "OBS's window on a listed program: the list's name, first"
+        );
+    }
+
+    #[test]
+    fn reels_own_window_in_front_names_nothing_and_never_comes_in() {
+        let fg = gaming::Fake::default();
+        for own in [
+            r"C:\Program Files\reel\reel.exe",
+            r"C:\Program Files\reel\reel-desktop.exe",
+            "/usr/bin/reel-desktop",
+        ] {
+            // as gaming::System gives reel's own window: its program, its title not read
+            *fg.process.lock().unwrap() = Some(process(own, ""));
+            let front = gaming::Foreground::foreground_process(&fg);
+            let front = front.as_ref();
+            assert!(
+                front.is_some_and(no_game),
+                "{own}: no wait, no Not sorted yet"
+            );
+            let (mut list, runs) = ember_pass();
+            assert_eq!(
+                name_now(
+                    &mut list,
+                    &runs,
+                    Some("Dust Road"),
+                    None,
+                    front,
+                    Came::Recording
+                )
+                .as_deref(),
+                Some("Dust Road"),
+                "{own}: OBS's window, as before"
+            );
+            assert_eq!(
+                name_now(&mut list, &runs, None, None, front, Came::Clip).as_deref(),
+                Some("Ember Pass"),
+                "{own}: the one Game that runs"
+            );
+            assert_eq!(list.entries.len(), 1, "{own}: reel is not taken in");
+        }
     }
 }

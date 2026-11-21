@@ -2990,6 +2990,12 @@ impl Runtime {
     ) {
         let mode;
         let is_new;
+        let given = recording.as_ref().and_then(|r| r.as_ref());
+        let front = if given.is_none() && self.lock().ledger.get(path).is_none() {
+            self.front()
+        } else {
+            None
+        };
         {
             let mut g = self.lock();
             let known = g.ledger.get(path).is_some();
@@ -3002,14 +3008,16 @@ impl Runtime {
                 let _ = g.ledger.set_recording(path);
             }
             if !known {
-                let given = recording.as_ref().and_then(|r| r.as_ref());
                 let game = match given {
                     Some(f) => f.game.clone(),
-                    None => g.name_in_front(if recording.is_some() {
-                        Came::Recording
-                    } else {
-                        Came::Clip
-                    }),
+                    None => g.name_in_front(
+                        front.as_ref(),
+                        if recording.is_some() {
+                            Came::Recording
+                        } else {
+                            Came::Clip
+                        },
+                    ),
                 };
                 let now = given
                     .map(|f| f.recorded)
