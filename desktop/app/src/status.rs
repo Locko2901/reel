@@ -97,6 +97,8 @@ pub struct Status {
     pub playing: Option<crate::detect::Playing>,
     /// The countdown to what a grace period ends, while one runs.
     pub grace: Option<crate::detect::Grace>,
+    /// The line under Settings, Games and apps, Show on Discord.
+    pub presence: crate::presence::Line,
     /// A program not sorted yet with the whole screen, which the tray offers to sort.
     pub newcomer: Option<crate::detect::Newcomer>,
     /// Pause clips: the replay buffer is stopped on purpose until Resume clips.
