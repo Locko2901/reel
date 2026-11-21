@@ -13,6 +13,8 @@ use tokio::time::Instant;
 pub const APPLICATION_ID: &str = "1573628367599697921";
 /// The application's art, uploaded under this key.
 const ART: &str = "reel";
+/// The game in the card with Name the game off.
+const SOME_GAME: &str = "A game";
 const BUTTON: &str = "reel on GitHub";
 const REPOSITORY: &str = "https://github.com/Locko2901/reel";
 const ANSWER: Duration = Duration::from_secs(10);
@@ -38,6 +40,11 @@ impl Doing {
             Doing::Recording => "Recording",
         }
     }
+
+    /// The card's title, in place of the application's name.
+    pub fn title(self) -> String {
+        format!("{} with reel", self.word())
+    }
 }
 
 /// What friends see.
@@ -46,6 +53,10 @@ pub struct Shown {
     pub doing: Doing,
     /// None with Name the game off, or for a name Discord would refuse.
     pub game: Option<String>,
+    /// The game's picture from Discord's list, when it is named and Discord has one.
+    pub picture: Option<String>,
+    /// The clips saved while the card shows this run of the game.
+    pub clips: u32,
     /// Unix seconds the time counts from: the game's start, or the recording's.
     pub since: u64,
     pub button: bool,
@@ -79,6 +90,10 @@ pub struct Facts {
     pub button: bool,
     /// The Game that runs, as the bar names it, and when it started, in Unix seconds.
     pub game: Option<(String, u64)>,
+    /// Its picture's address, from Discord's list.
+    pub picture: Option<String>,
+    /// The clips saved while the card shows this run of the game.
+    pub clips: u32,
     pub replay_buffer: bool,
     /// A session recording runs, since then.
     pub recording: Option<u64>,
@@ -96,9 +111,12 @@ pub fn want(f: &Facts) -> Want {
         (None, true) => (Doing::Clipping, *started),
         (None, false) => return Want::Nothing(format!("{name} runs without the replay buffer")),
     };
+    let game = if f.name_game { field(name) } else { None };
     Want::Show(Shown {
         doing,
-        game: if f.name_game { field(name) } else { None },
+        picture: game.as_ref().and(f.picture.clone()),
+        game,
+        clips: f.clips,
         since,
         button: f.button,
     })
@@ -119,39 +137,107 @@ fn field(s: &str) -> Option<String> {
     )
 }
 
+fn clips(n: u32) -> String {
+    if n == 1 {
+        "1 clip".to_string()
+    } else {
+        format!("{n} clips")
+    }
+}
+
 impl Shown {
-    /// "Starfall Tactics, Clipping", or "Clipping" without the game.
+    /// "Starfall Tactics, Clipping with reel, 2 clips, with Discord's picture of the game".
     pub fn words(&self) -> String {
-        match &self.game {
-            Some(g) => format!("{g}, {}", self.doing.word()),
-            None => self.doing.word().to_string(),
+        let mut w = format!(
+            "{}, {}",
+            self.game.as_deref().unwrap_or(SOME_GAME),
+            self.doing.title()
+        );
+        if self.clips > 0 {
+            w = format!("{w}, {}", clips(self.clips));
         }
+        if self.picture.is_some() {
+            w.push_str(", with Discord's picture of the game");
+        }
+        w
     }
 
     /// A start read again a moment later moves by a second; a new run of the game moves more.
     pub fn differs(&self, o: &Shown) -> bool {
         self.doing != o.doing
             || self.game != o.game
+            || self.picture != o.picture
+            || self.clips != o.clips
             || self.button != o.button
             || self.since.abs_diff(o.since) > 2
     }
 
     pub fn activity(&self) -> Value {
+        let game = self.game.as_deref().unwrap_or(SOME_GAME);
+        let assets = match &self.picture {
+            Some(url) => json!({
+                "large_image": url,
+                "large_text": game,
+                "small_image": ART,
+                "small_text": "reel",
+            }),
+            None => json!({ "large_image": ART, "large_text": "reel" }),
+        };
         let mut a = json!({
+            "name": self.doing.title(),
             "type": 0,
-            "state": self.doing.word(),
-            "timestamps": { "start": self.since },
-            "assets": { "large_image": ART, "large_text": "reel" },
-        });
-        if let Some(g) = &self.game {
-            a["details"] = json!(g);
+            "details": game,
             // the member list then says "Playing <game>", as for a game Discord finds itself
-            a["status_display_type"] = json!(2);
+            "status_display_type": 2,
+            "timestamps": { "start": self.since },
+            "assets": assets,
+        });
+        if self.clips > 0 {
+            a["state"] = json!(format!("Saved {}", clips(self.clips)));
         }
         if self.button {
             a["buttons"] = json!([{ "label": BUTTON, "url": REPOSITORY }]);
         }
         a
+    }
+}
+
+/// The clips saved while the card shows one run of a game: the run is the program's id and
+/// its start, which a game that starts again within the grace period keeps, so its card comes
+/// back with the count. Another run has none, and nothing of it is kept anywhere but here.
+#[derive(Debug, Clone, Default)]
+pub struct Count {
+    run: Option<(String, std::time::Instant)>,
+    clips: u32,
+}
+
+impl Count {
+    /// A clip saved while the card shows `run`.
+    pub fn saved(&mut self, run: &(String, std::time::Instant)) {
+        if self.run.as_ref() != Some(run) {
+            self.run = Some(run.clone());
+            self.clips = 0;
+        }
+        self.clips += 1;
+    }
+
+    /// The clips of `run`, the run the card shows now, if any.
+    pub fn of(&self, run: Option<&(String, std::time::Instant)>) -> u32 {
+        match run {
+            Some(r) if self.run.as_ref() == Some(r) => self.clips,
+            _ => 0,
+        }
+    }
+
+    /// Forgets the count once its run is over: the game closed and its grace period passed.
+    pub fn keep(&mut self, runs: &crate::programs::Runs) {
+        let over = self
+            .run
+            .as_ref()
+            .is_some_and(|(id, since)| runs.get(id).is_none_or(|r| r.since != *since));
+        if over {
+            *self = Count::default();
+        }
     }
 }
 
@@ -557,10 +643,14 @@ mod tests {
             name_game: true,
             button: true,
             game: Some(("Starfall Tactics".into(), 1_700_000_000)),
+            picture: None,
+            clips: 0,
             replay_buffer: true,
             recording: None,
         }
     }
+
+    const PICTURE: &str = "https://cdn.discordapp.com/app-icons/1100000000000000001/a1b2c3d4e5f60718293a4b5c6d7e8f90.png?size=256";
 
     fn shown(w: Want) -> Shown {
         match w {
@@ -593,12 +683,12 @@ mod tests {
             s.since, 1_700_000_000,
             "the time counts from the game's start"
         );
-        assert_eq!(s.words(), "Starfall Tactics, Clipping");
+        assert_eq!(s.words(), "Starfall Tactics, Clipping with reel");
         let rec = shown(want(&Facts {
             recording: Some(1_700_000_600),
             ..facts()
         }));
-        assert_eq!(rec.words(), "Starfall Tactics, Recording");
+        assert_eq!(rec.words(), "Starfall Tactics, Recording with reel");
         assert_eq!(
             rec.since, 1_700_000_600,
             "and from the recording's while it runs"
@@ -639,30 +729,163 @@ mod tests {
     }
 
     #[test]
-    fn the_activity_names_the_game_and_keeps_it_in_the_member_list() {
+    fn clipping_with_reel_the_game_and_reels_mark_without_a_picture() {
         let a = shown(want(&facts())).activity();
         assert_eq!(
             a,
             json!({
+                "name": "Clipping with reel",
                 "type": 0,
                 "details": "Starfall Tactics",
-                "state": "Clipping",
                 "status_display_type": 2,
                 "timestamps": { "start": 1_700_000_000u64 },
                 "assets": { "large_image": "reel", "large_text": "reel" },
                 "buttons": [{ "label": "reel on GitHub", "url": "https://github.com/Locko2901/reel" }],
-            })
+            }),
+            "no line under the game before the first clip, no badge"
         );
-        let bare = shown(want(&Facts {
-            name_game: false,
-            button: false,
+    }
+
+    #[test]
+    fn the_games_picture_large_reels_mark_as_the_badge_and_the_clips_saved() {
+        let s = shown(want(&Facts {
+            picture: Some(PICTURE.into()),
+            clips: 2,
             ..facts()
         }));
-        assert_eq!(bare.words(), "Clipping");
-        let a = bare.activity();
-        assert!(a.get("details").is_none() && a.get("status_display_type").is_none());
-        assert!(a.get("buttons").is_none());
-        assert_eq!(a["state"], "Clipping");
+        assert_eq!(
+            s.activity(),
+            json!({
+                "name": "Clipping with reel",
+                "type": 0,
+                "details": "Starfall Tactics",
+                "state": "Saved 2 clips",
+                "status_display_type": 2,
+                "timestamps": { "start": 1_700_000_000u64 },
+                "assets": {
+                    "large_image": PICTURE,
+                    "large_text": "Starfall Tactics",
+                    "small_image": "reel",
+                    "small_text": "reel",
+                },
+                "buttons": [{ "label": "reel on GitHub", "url": "https://github.com/Locko2901/reel" }],
+            })
+        );
+        assert_eq!(
+            s.words(),
+            "Starfall Tactics, Clipping with reel, 2 clips, with Discord's picture of the game"
+        );
+        let one = shown(want(&Facts {
+            clips: 1,
+            ..facts()
+        }));
+        assert_eq!(one.activity()["state"], "Saved 1 clip");
+        assert_eq!(one.words(), "Starfall Tactics, Clipping with reel, 1 clip");
+    }
+
+    #[test]
+    fn recording_with_reel_counts_from_the_recording_and_keeps_the_clips() {
+        let a = shown(want(&Facts {
+            recording: Some(1_700_000_600),
+            picture: Some(PICTURE.into()),
+            clips: 3,
+            ..facts()
+        }))
+        .activity();
+        assert_eq!(a["name"], "Recording with reel");
+        assert_eq!(a["details"], "Starfall Tactics");
+        assert_eq!(a["state"], "Saved 3 clips");
+        assert_eq!(a["timestamps"]["start"], 1_700_000_600u64);
+        assert_eq!(a["assets"]["large_image"], PICTURE);
+    }
+
+    #[test]
+    fn name_the_game_off_says_a_game_with_reels_mark_and_no_picture() {
+        let s = shown(want(&Facts {
+            name_game: false,
+            button: false,
+            picture: Some(PICTURE.into()),
+            clips: 2,
+            ..facts()
+        }));
+        assert_eq!(s.picture, None, "a picture would name the game");
+        assert_eq!(s.words(), "A game, Clipping with reel, 2 clips");
+        let a = s.activity();
+        assert_eq!(
+            a,
+            json!({
+                "name": "Clipping with reel",
+                "type": 0,
+                "details": "A game",
+                "state": "Saved 2 clips",
+                "status_display_type": 2,
+                "timestamps": { "start": 1_700_000_000u64 },
+                "assets": { "large_image": "reel", "large_text": "reel" },
+            }),
+            "the member list says Playing A game; no button"
+        );
+    }
+
+    #[test]
+    fn the_count_starts_at_the_first_save_and_goes_with_the_run() {
+        use crate::programs::Runs;
+        let grace = Duration::from_secs(30);
+        let t0 = std::time::Instant::now();
+        let at = |s: u64| t0 + Duration::from_secs(s);
+        let game = vec!["starfall".to_string()];
+        let mut runs = Runs::default();
+        let run = |runs: &Runs| {
+            runs.get("starfall")
+                .map(|r| ("starfall".to_string(), r.since))
+        };
+        let mut count = Count::default();
+        runs.look(&game, at(0), grace);
+        assert_eq!(
+            count.of(run(&runs).as_ref()),
+            0,
+            "nothing before the first save"
+        );
+        count.saved(&run(&runs).unwrap());
+        count.saved(&run(&runs).unwrap());
+        assert_eq!(count.of(run(&runs).as_ref()), 2);
+        runs.look(&[], at(60), grace);
+        count.keep(&runs);
+        assert_eq!(
+            count.of(None),
+            0,
+            "closed, with nothing counted down: no card"
+        );
+        runs.look(&game, at(75), grace);
+        count.keep(&runs);
+        assert_eq!(
+            count.of(run(&runs).as_ref()),
+            2,
+            "started again within the grace period: the card comes back with its count"
+        );
+        count.saved(&run(&runs).unwrap());
+        runs.look(&[], at(100), grace);
+        runs.look(&[], at(130), grace);
+        assert_eq!(run(&runs), None, "the grace period passed");
+        count.keep(&runs);
+        runs.look(&game, at(140), grace);
+        assert_eq!(
+            count.of(run(&runs).as_ref()),
+            0,
+            "the next run starts with no line"
+        );
+        count.saved(&run(&runs).unwrap());
+        assert_eq!(count.of(run(&runs).as_ref()), 1);
+        let other = ("ember".to_string(), at(150));
+        assert_eq!(count.of(Some(&other)), 0, "another game's card");
+        let mut stale = count.clone();
+        stale.saved(&other);
+        assert_eq!(stale.of(Some(&other)), 1, "a save there starts its own");
+        stale.keep(&runs);
+        assert_eq!(
+            stale.of(Some(&other)),
+            0,
+            "a run Runs does not have is over"
+        );
     }
 
     #[test]
@@ -692,6 +915,12 @@ mod tests {
         let mut c = a.clone();
         c.doing = Doing::Recording;
         assert!(a.differs(&c));
+        let mut d = a.clone();
+        d.clips += 1;
+        assert!(a.differs(&d), "a save is an update");
+        let mut e = a.clone();
+        e.picture = Some(PICTURE.into());
+        assert!(a.differs(&e));
         assert!(Want::Off.differs(&Want::Nothing("no game runs".into())));
         assert!(!Want::Off.differs(&Want::Off));
     }
@@ -800,6 +1029,8 @@ mod tests {
                 name_game: true,
                 button: true,
                 game: Some(("Starfall Tactics".into(), 1_700_000_000)),
+                picture: None,
+                clips: 0,
                 replay_buffer: true,
                 recording: None,
             });
@@ -917,6 +1148,8 @@ mod tests {
             Want::Show(Shown {
                 doing: Doing::Clipping,
                 game: Some(game.into()),
+                picture: None,
+                clips: 0,
                 since: 1_700_000_000,
                 button: true,
             })

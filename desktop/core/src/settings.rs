@@ -542,6 +542,10 @@ impl Paths {
     pub fn encoders_file(&self) -> PathBuf {
         self.data_dir.join("encoders.json")
     }
+    /// Discord's list of games, trimmed, for Show on Discord's pictures.
+    pub fn discord_games_file(&self) -> PathBuf {
+        self.data_dir.join("discord-games.json")
+    }
     /// Standalone: reel's data folder (its library, cache, trash and database) where it starts
     /// out; `Settings::library_dir` says where it is.
     pub fn library_dir(&self) -> PathBuf {

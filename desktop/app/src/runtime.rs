@@ -2736,6 +2736,7 @@ impl Runtime {
                         tracing::info!(path = %path, "obs saved a replay");
                         let size = std::fs::metadata(&p).map(|m| m.len()).unwrap_or(0);
                         rt.replay_saved();
+                        rt.discord_saved();
                         let waiting = {
                             let mut g = rt.lock();
                             g.save_problem = None;
