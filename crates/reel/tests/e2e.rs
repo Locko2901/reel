@@ -14060,6 +14060,250 @@ async fn the_apps_link_waits_for_its_preview_in_the_external_storage() {
     );
 }
 
+/// What the app reads of a clip it sent, as it follows the clip after the upload.
+async fn followed(env: &Env, token: &str, clip_id: &str) -> serde_json::Value {
+    let (s, v) = dev_json(
+        env,
+        token,
+        reqwest::Method::GET,
+        &format!("/api/device/clips/{clip_id}"),
+        None,
+    )
+    .await;
+    assert_eq!(s, 200, "{v}");
+    v
+}
+
+async fn current_of(env: &Env, clip_id: &str) -> String {
+    let clip = env.store().clip(clip_id).await.unwrap().unwrap();
+    clip.current_id.unwrap()
+}
+
+/// A replay saved without a link, then a session recording: the app's wait for the replay
+/// ends once its preview copy (of `copy_kind`) is made, the recording's at once, and the wait
+/// makes no copy of the recording. The replay's id.
+async fn the_apps_waits_end_without_a_link(env: &Env, token: &str, copy_kind: &str) -> String {
+    use std::sync::atomic::Ordering::SeqCst;
+    let pc = env._dir.path().join("pc");
+    std::fs::create_dir_all(&pc).unwrap();
+    let replay = env
+        .synth_at(
+            &pc,
+            "Replay_2026-11-21_21-29-07.mp4",
+            Synth::h264_1080p(4.0, "plain save"),
+        )
+        .await;
+    assert!(std::fs::metadata(&replay).unwrap().len() > 1_000_000);
+    env.ctx.hold_heavy.store(true, SeqCst);
+    let (s, v) = upload_whole(env, token, &replay, 4_000_000, serde_json::json!({})).await;
+    assert_eq!(s, 200, "{v}");
+    let replay_id = v["clip_id"].as_str().unwrap().to_string();
+    env.wait_clip(
+        |c| c.id == replay_id && c.state == "ready",
+        Duration::from_secs(120),
+    )
+    .await;
+    let v = followed(env, token, &replay_id).await;
+    assert_eq!(v["ready"], true, "{v}");
+    assert_eq!(
+        v["preview_ready"], false,
+        "its preview copy is being made: {v}"
+    );
+    assert!(v["preview_progress"].is_number(), "{v}");
+    env.ctx.hold_heavy.store(false, SeqCst);
+    let deadline = Instant::now() + Duration::from_secs(120) * SLOW;
+    loop {
+        let v = followed(env, token, &replay_id).await;
+        if v["preview_ready"] == true {
+            assert!(v["preview_progress"].is_null(), "{v}");
+            assert!(v["preview_error"].is_null(), "{v}");
+            break;
+        }
+        assert!(
+            Instant::now() < deadline,
+            "the app still waits for a preview nothing makes: {v}"
+        );
+        tokio::time::sleep(Duration::from_millis(300)).await;
+    }
+    let clip = env.store().clip(&replay_id).await.unwrap().unwrap();
+    assert!(
+        env.store()
+            .derived_rendition(clip.current_id.as_deref().unwrap(), copy_kind, None)
+            .await
+            .unwrap()
+            .is_some_and(|c| c.is_ready()),
+        "the wait ended with its {copy_kind} copy made"
+    );
+
+    let session = env
+        .synth_at(
+            &pc,
+            "2026-11-21 21-27-00.mp4",
+            Synth::h264_1080p(6.0, "session"),
+        )
+        .await;
+    let (s, v) = upload_whole(
+        env,
+        token,
+        &session,
+        4_000_000,
+        serde_json::json!({ "kind": "recording" }),
+    )
+    .await;
+    assert_eq!(s, 200, "{v}");
+    let session_id = v["clip_id"].as_str().unwrap().to_string();
+    env.wait_clip(
+        |c| c.id == session_id && c.state == "ready",
+        Duration::from_secs(120),
+    )
+    .await;
+    for _ in 0..3 {
+        let v = followed(env, token, &session_id).await;
+        assert_eq!(
+            v["preview_ready"], true,
+            "nothing is made for a recording no link wants: {v}"
+        );
+        assert!(v["preview_progress"].is_null(), "{v}");
+    }
+    env.wait_no_jobs(Duration::from_secs(120)).await;
+    let kinds: Vec<String> = env
+        .store()
+        .renditions_of(&session_id)
+        .await
+        .unwrap()
+        .into_iter()
+        .map(|r| r.kind)
+        .collect();
+    assert!(
+        !kinds.iter().any(|k| k == "embed" || k == "embed_ext"),
+        "and the app's wait made no copy of the recording: {kinds:?}"
+    );
+    replay_id
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn the_apps_wait_for_a_clip_sent_without_a_link_ends_with_the_storage_off() {
+    let Some(env) = start_with(AuthMode::Single, vec![], |c| c.share.embed_mb = 1).await else {
+        return;
+    };
+    let (token, _) = pair(&env, "pc").await;
+    let replay_id = the_apps_waits_end_without_a_link(&env, &token, "embed").await;
+    assert!(env.store().shares_of(&replay_id).await.unwrap().is_empty());
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn the_apps_wait_ends_for_a_clip_no_link_wants_and_follows_a_link_made_later() {
+    use std::sync::atomic::Ordering::SeqCst;
+    let s3 = fake_s3().await;
+    s3.put_ms.store(3000, SeqCst);
+    let (endpoint, public_url) = (s3.base.clone(), format!("{}/previews", s3.base));
+    let Some(env) = start_with(AuthMode::Single, vec![], move |c| {
+        c.external.on = true;
+        c.external.endpoint = endpoint;
+        c.external.bucket = "previews".into();
+        c.external.access_key = "test".into();
+        c.external.secret_key = "test-secret".into();
+        c.external.public_url = public_url;
+        c.external.embed_mb = 1;
+    })
+    .await
+    else {
+        return;
+    };
+    let (token, _) = pair(&env, "pc").await;
+    let replay_id = the_apps_waits_end_without_a_link(&env, &token, "embed_ext").await;
+    let version = current_of(&env, &replay_id).await;
+    assert!(s3.keys().is_empty(), "nothing went up for it");
+    assert!(env
+        .store()
+        .external_fallback(&version)
+        .await
+        .unwrap()
+        .is_none());
+
+    let share = |id: String| {
+        let (env, token) = (&env, token.clone());
+        async move {
+            let mut seen = None;
+            let start_at = Instant::now();
+            loop {
+                let (s, v) = dev_json(
+                    env,
+                    &token,
+                    reqwest::Method::POST,
+                    "/api/device/share",
+                    Some(serde_json::json!({ "clip_id": id })),
+                )
+                .await;
+                if s == 200 {
+                    return seen;
+                }
+                assert_eq!(s, 202, "{v}");
+                if v["step"] == "upload" && seen.is_none() {
+                    seen = Some(followed(env, &token, &id).await);
+                }
+                assert!(
+                    start_at.elapsed() < Duration::from_secs(120) * SLOW,
+                    "no link in time: {v}"
+                );
+                tokio::time::sleep(Duration::from_millis(150)).await;
+            }
+        }
+    };
+    let waiting = share(replay_id.clone())
+        .await
+        .expect("the link made later waited for its upload");
+    assert_eq!(
+        waiting["preview_ready"], false,
+        "while the link waits for its upload, the app's view of the clip waits too: {waiting}"
+    );
+    let v = followed(&env, &token, &replay_id).await;
+    assert_eq!(v["preview_ready"], true, "once it is there: {v}");
+    assert!(v["preview_progress"].is_null(), "{v}");
+    assert_eq!(s3.keys().len(), 1);
+    assert!(
+        env.store()
+            .stored_external_object(&version)
+            .await
+            .unwrap()
+            .is_some(),
+        "the link's preview is in the storage"
+    );
+
+    s3.down.store(true, SeqCst);
+    let pc = env._dir.path().join("pc");
+    let file = env
+        .synth_at(
+            &pc,
+            "Replay_2026-11-21_21-40-00.mp4",
+            Synth::h264_1080p(4.0, "served from here"),
+        )
+        .await;
+    let (s, v) = upload_whole(&env, &token, &file, 4_000_000, serde_json::json!({})).await;
+    assert_eq!(s, 200, "{v}");
+    let here_id = v["clip_id"].as_str().unwrap().to_string();
+    env.wait_clip(
+        |c| c.id == here_id && c.state == "ready",
+        Duration::from_secs(120),
+    )
+    .await;
+    env.wait_no_jobs(Duration::from_secs(120)).await;
+    let v = followed(&env, &token, &here_id).await;
+    assert_eq!(v["preview_ready"], true, "no link, its copy made: {v}");
+    share(here_id.clone()).await;
+    let version = current_of(&env, &here_id).await;
+    let fallback = env.store().external_fallback(&version).await.unwrap();
+    assert_eq!(
+        fallback.map(|f| f.why).as_deref(),
+        Some("failed"),
+        "the link's preview is served from here"
+    );
+    let v = followed(&env, &token, &here_id).await;
+    assert_eq!(v["preview_ready"], true, "served from here: {v}");
+    assert!(v["preview_progress"].is_null(), "{v}");
+    assert_eq!(s3.keys().len(), 1);
+}
+
 #[tokio::test(flavor = "multi_thread")]
 async fn a_link_waiting_for_its_preview_from_here_raises_its_copy_and_gets_it() {
     let s3 = fake_s3().await;

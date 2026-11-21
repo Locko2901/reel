@@ -174,8 +174,9 @@ async fn active_progress(st: &AppState, clip_id: &str) -> AppResult<Option<(Stri
         .map(|j| (j.kind, j.progress)))
 }
 
-/// Whether the share page would embed in Discord right now; when not, the copy's progress,
-/// or the reason when the copy failed.
+/// Whether the share page would embed in Discord right now, or with the storage on and no
+/// link, whether nothing is being made for one; when not, the copy's progress, or the reason
+/// when the copy failed.
 #[derive(Default)]
 struct Preview {
     ready: bool,
@@ -194,7 +195,7 @@ async fn preview_state(st: &AppState, clip: &Clip) -> AppResult<Preview> {
         return Ok(Preview::default());
     };
     if st.ctx.config().external_on() {
-        let r = reel_pipeline::external::readiness(&st.ctx, &current).await?;
+        let r = reel_pipeline::external::app_readiness(&st.ctx, &current).await?;
         return Ok(Preview {
             ready: r.ready,
             progress: (!r.ready).then_some(r.progress),
