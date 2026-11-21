@@ -215,10 +215,16 @@ you run, leaves the PC; the list stays in the app's settings folder
 ([Games and apps](games-and-apps.md#what-stays-on-the-pc)).
 
 With **Show on Discord** on (Settings, Games and apps; off unless you turn it on), the app
-tells the Discord app on this PC the name of the Game that runs and whether reel clips it or
-records it, and Discord shows that to your friends
-([Discord](games-and-apps.md#discord)). It goes to Discord through Discord's own app, over a
-connection on this PC; the app itself sends nothing over the network for it.
+tells the Discord app on this PC the name of the Game that runs, whether reel clips it or
+records it, how many clips you saved in it this session, and the address of its picture, and
+Discord shows that to your friends ([Discord](games-and-apps.md#discord)). It goes to Discord
+through Discord's own app, over a connection on this PC.
+
+With **Name the game** on too, the app reads Discord's list of the games it knows from
+`discord.com`, at most once a day, without signing in
+([Discord's list of games](games-and-apps.md#discords-list-of-games)). That request names no
+game and no account; Discord sees the app's version, in its User-Agent, and your address. The
+game's picture then comes from Discord's own servers, to you and to your friends.
 
 Nothing else: no telemetry, no analytics, no crash reports, no account
 with anyone.
