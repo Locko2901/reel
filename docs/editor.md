@@ -57,7 +57,7 @@ under the filmstrip are the original's keyframes.
 - **stream copy**: the start sits on a keyframe, so the cut is taken out of the original as it
   is. It takes about a second and loses nothing.
 - **re-encode**: the start is between keyframes. The whole cut is encoded again (at the
-  [Re-encode at](configuration.md#re-encode-at) bitrate, on the graphics card when there is
+  [Re-encode at](settings/ingest.md#media-encode-mbit) bitrate, on the graphics card when there is
   one), which takes a while but starts exactly where you put it. The line names the nearest
   keyframe.
 
@@ -71,7 +71,7 @@ A replay often holds more than the play. The **keep the last** buttons, **15 s**
 **60 s**, keep the end of the clip in one click: the cut is rendered at once as a new version
 and made current. With **snap start to keyframes** on, the start moves back to a keyframe up to
 2.5 s earlier when there is one, so the cut is a stream copy. A button longer than the clip is
-greyed out. The seconds are the [Quick trims](configuration.md#quick-trims) setting, under
+greyed out. The seconds are the [Quick trims](settings/general.md#edit-quick-trims) setting, under
 Settings, General.
 
 ## Save a cut as its own clip {#a-new-clip-instead-of-a-version}
@@ -96,7 +96,7 @@ use. The row **All audio** under **Edit** changes the sound of the cut:
 - the volume, from -20 to +20 dB in half decibels, with the slider or the number; **Reset** goes
   back to 0.
 - **normalise loudness to -16 LUFS**: brings the clip to the
-  [Loudness target](configuration.md#loudness-target), -16 LUFS by default, the usual level for
+  [Loudness target](settings/ingest.md#media-loudness-target), -16 LUFS by default, the usual level for
   phones and streaming. While it is on, it sets the volume.
 
 The line under the rows says how loud the original is and how much room it has: "The original
@@ -110,7 +110,7 @@ A sound too quiet to measure, such as a faint hiss, has a peak but no loudness: 
 under the -70 LUFS gate loudness is measured by. The line gives its peak and says it is too
 quiet for its loudness to be measured, and **normalise** is off for it, with the reason next to
 the switch; the volume and the tracks work as usual. A cut asked to normalise such a sound (an
-older version edited again, or [Normalise new clips](configuration.md#normalise-new-clips))
+older version edited again, or [Normalise new clips](settings/ingest.md#media-normalize-new))
 keeps it at its level, and the version says **too quiet to normalise**.
 
 A change of the sound alone never encodes the video again: without a trim, or with the start on
@@ -239,7 +239,7 @@ Under **The montage**:
 - **Fill the frame**: a clip of another shape fills the frame and what is over is cut off,
   instead of black bars around it.
 - **Every clip at one loudness** (on): every clip's sound is brought to the same loudness, the
-  [Loudness target](configuration.md#loudness-target); off, each keeps its own. A clip too quiet
+  [Loudness target](settings/ingest.md#media-loudness-target); off, each keeps its own. A clip too quiet
   to measure keeps its own either way.
 
 ### Render it

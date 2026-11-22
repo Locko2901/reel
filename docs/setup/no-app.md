@@ -119,9 +119,9 @@ with JSON naming the clip:
 
 - **The cookie is your whole sign-in.** Anyone who sees your ShareX
   settings is signed in as you. It stops working when that session ends:
-  after 30 days unused ([Idle timeout](../configuration.md#idle-timeout)),
+  after 30 days unused ([Idle timeout](../settings/access.md#auth-session-days)),
   after 90 days however active
-  ([Session lifetime](../configuration.md#session-lifetime)), or when you
+  ([Session lifetime](../settings/access.md#auth-session-max-days)), or when you
   press **Sign out everywhere**.
 - **No way past a sign-in proxy.** With a sign-in in front of reel
   (Authentik and the like, in proxy mode), ShareX does not get through.

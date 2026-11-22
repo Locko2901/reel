@@ -25,6 +25,7 @@ The name on the pages, the address links carry, the clock the dates follow, and 
 On the pages, in the share page's footer and in link previews as the site name.
 
 - Under Settings: General, Site
+- What it does and when to change it: [General, Site name](settings/general.md#site-name)
 - In `config.toml`: `site_name`, at the top
 - Environment: `REEL_SITE_NAME`
 - Accepts: text
@@ -35,6 +36,7 @@ On the pages, in the share page's footer and in link previews as the site name.
 What every share link starts with; must be reachable from the internet for link previews to play.
 
 - Under Settings: General, Site
+- What it does and when to change it: [General, Public URL](settings/general.md#public-url)
 - In `config.toml`: `public_url`, at the top
 - Environment: `REEL_PUBLIC_URL`
 - Accepts: a URL starting with http:// or https://
@@ -45,6 +47,7 @@ What every share link starts with; must be reachable from the internet for link 
 The address and port the server binds; set when the process starts.
 
 - Under Settings: General, Site
+- What it does and when to change it: [General, Listen address](settings/general.md#listen)
 - In `config.toml`: `listen`, at the top
 - Environment: `REEL_LISTEN`
 - Accepts: text
@@ -57,6 +60,7 @@ The address and port the server binds; set when the process starts.
 An IANA name such as Europe/Berlin for the dates on the pages; empty follows the host's clock.
 
 - Under Settings: General, Site
+- What it does and when to change it: [General, Time zone](settings/general.md#timezone)
 - In `config.toml`: `timezone`, at the top
 - Environment: `REEL_TIMEZONE`
 - Accepts: text
@@ -67,6 +71,7 @@ An IANA name such as Europe/Berlin for the dates on the pages; empty follows the
 The editor's Keep the last buttons, in seconds: each keeps the end of the clip as a new version; 1 to 4 values from 5 to 600.
 
 - Under Settings: General, Clip editor
+- What it does and when to change it: [General, Quick trims](settings/general.md#edit-quick-trims)
 - In `config.toml`: `quick_trims` under `[edit]`
 - Environment: `REEL_QUICK_TRIMS`
 - Accepts: a list: comma separated in the environment, an array in `config.toml`
@@ -81,6 +86,7 @@ Where the library, the incoming clips and the kept originals live, how long the 
 The database and the caches live here, and the library unless the Library folder says otherwise; a fast local disk; set when the process starts.
 
 - Under Settings: Library and storage, Folders
+- What it does and when to change it: [Library and storage, Data folder](settings/storage.md#data-dir)
 - In `config.toml`: `data_dir`, at the top
 - Environment: `REEL_DATA_DIR`
 - Accepts: a path
@@ -93,6 +99,7 @@ The database and the caches live here, and the library unless the Library folder
 The clips themselves, every version with its posters, loops and filmstrips, and the trash: the bulk, which may live on a NAS or a big slow drive; a .reel-library file in it tells reel it is the right folder; set when the process starts.
 
 - Under Settings: Library and storage, Folders
+- What it does and when to change it: [Library and storage, Library folder](settings/storage.md#library-dir)
 - In `config.toml`: `library_dir`, at the top
 - Environment: `REEL_LIBRARY_DIR`
 - Accepts: a path
@@ -104,6 +111,7 @@ The clips themselves, every version with its posters, loops and filmstrips, and 
 Raw clips dropped here are picked up, published, then removed; a failed subfolder takes what ffmpeg cannot read.
 
 - Under Settings: Library and storage, Folders
+- What it does and when to change it: [Library and storage, Incoming folder](settings/storage.md#ingest-incoming-dir)
 - In `config.toml`: `incoming_dir` under `[ingest]`
 - Environment: `REEL_INCOMING_DIR`
 - Accepts: a path
@@ -115,6 +123,7 @@ Raw clips dropped here are picked up, published, then removed; a failed subfolde
 Where the raw file of a re-encoded clip is kept.
 
 - Under Settings: Library and storage, Folders
+- What it does and when to change it: [Library and storage, Originals folder](settings/storage.md#ingest-originals-dir)
 - In `config.toml`: `originals_dir` under `[ingest]`
 - Environment: `REEL_ORIGINALS_DIR`
 - Accepts: a path
@@ -126,6 +135,7 @@ Where the raw file of a re-encoded clip is kept.
 The raw file of re-encoded clips only, of every clip, or of none.
 
 - Under Settings: Library and storage, Folders
+- What it does and when to change it: [Library and storage, Keep originals](settings/storage.md#ingest-keep-originals)
 - In `config.toml`: `keep_originals` under `[ingest]`
 - Environment: `REEL_KEEP_ORIGINALS`
 - Accepts: one of `reencoded` (re-encoded clips only), `all` (every clip), `none`
@@ -136,6 +146,7 @@ The raw file of re-encoded clips only, of every clip, or of none.
 A deleted clip stays in the trash this long, with Undo, before it is purged; the trash is .trash in the library folder, so a delete is a rename on any disk.
 
 - Under Settings: Library and storage, Trash and caches
+- What it does and when to change it: [Library and storage, Trash](settings/storage.md#share-trash-days)
 - In `config.toml`: `trash_days` under `[share]`
 - Environment: `REEL_TRASH_DAYS`
 - Accepts: a whole number, 1 to 365 days
@@ -146,6 +157,7 @@ A deleted clip stays in the trash this long, with Undo, before it is purged; the
 The copies made for downloads under a size, and the animated pictures, are kept up to this much; the oldest go first.
 
 - Under Settings: Library and storage, Trash and caches
+- What it does and when to change it: [Library and storage, Copies under a size](settings/storage.md#share-discord-cache-gb)
 - In `config.toml`: `discord_cache_gb` under `[share]`
 - Environment: `REEL_DISCORD_CACHE_GB`
 - Accepts: a whole number, 1 to 500 GB
@@ -156,6 +168,7 @@ The copies made for downloads under a size, and the animated pictures, are kept 
 Each disk that holds reel's data (the data folder's, the library's, the kept originals') turns amber under this much free space, and Notifications may send; 0 turns it off.
 
 - Under Settings: Library and storage, Trash and caches
+- What it does and when to change it: [Library and storage, Disk warning](settings/storage.md#storage-disk-warn-gb)
 - In `config.toml`: `disk_warn_gb` under `[storage]`
 - Environment: `REEL_DISK_WARN_GB`
 - Accepts: a whole number, 0 to 10000 GB free
@@ -166,6 +179,7 @@ Each disk that holds reel's data (the data folder's, the library's, the kept ori
 Housekeeping keeps the library (each clip's versions and its preview video) under this size: the oldest clips go to the trash first, the ones without a live link before the others; a starred clip or one in a collection never goes; 0 is no cap.
 
 - Under Settings: Library and storage, Trash and caches
+- What it does and when to change it: [Library and storage, Library cap](settings/storage.md#storage-cap-gb)
 - In `config.toml`: `cap_gb` under `[storage]`
 - Environment: `REEL_LIBRARY_CAP_GB`
 - Accepts: a whole number, 0 to 100000 GB
@@ -175,7 +189,8 @@ Housekeeping keeps the library (each clip's versions and its preview video) unde
 
 The app's standalone library: a clip that is not on a server too is never trimmed by the cap; a server leaves this out, every clip being on it.
 
-- Under Settings: Library and storage, Trash and caches
+- Under Settings: not on a server's pages; the desktop app's standalone library has its own, under Library folder
+- What it does and when to change it: [Library and storage, The cap spares unsent clips](settings/storage.md#storage-cap-keeps-unsent)
 - In `config.toml`: `cap_keeps_unsent` under `[storage]`
 - Environment: `REEL_LIBRARY_CAP_KEEPS_UNSENT`
 - Accepts: `true` or `false`
@@ -190,6 +205,7 @@ How the incoming folder is read, what is copied and what is re-encoded, and the 
 How often the folder is read; a file is taken once its size holds still for the stable polls.
 
 - Under Settings: Ingest, Incoming folder
+- What it does and when to change it: [Ingest, Poll every](settings/ingest.md#ingest-poll-seconds)
 - In `config.toml`: `poll_seconds` under `[ingest]`
 - Environment: `REEL_POLL_SECONDS`
 - Accepts: a whole number, 1 to 3600 s
@@ -200,6 +216,7 @@ How often the folder is read; a file is taken once its size holds still for the 
 Polls a file must keep the same size before it is read, for slow copies over the network.
 
 - Under Settings: Ingest, Incoming folder
+- What it does and when to change it: [Ingest, Stable polls](settings/ingest.md#ingest-stable-polls)
 - In `config.toml`: `stable_polls` under `[ingest]`
 - Environment: `REEL_STABLE_POLLS`
 - Accepts: a whole number, 1 to 20 polls
@@ -210,6 +227,7 @@ Polls a file must keep the same size before it is read, for slow copies over the
 File endings the watcher and the upload take; anything else is ignored.
 
 - Under Settings: Ingest, Incoming folder
+- What it does and when to change it: [Ingest, Extensions](settings/ingest.md#ingest-extensions)
 - In `config.toml`: `extensions` under `[ingest]`
 - Environment: `REEL_EXTENSIONS`
 - Accepts: a list: comma separated in the environment, an array in `config.toml`
@@ -220,6 +238,7 @@ File endings the watcher and the upload take; anything else is ignored.
 H.264 at most this tall is copied untouched, never re-encoded.
 
 - Under Settings: Ingest, Copy or re-encode
+- What it does and when to change it: [Ingest, Copy video up to](settings/ingest.md#media-copy-max-height)
 - In `config.toml`: `copy_max_height` under `[media]`
 - Environment: `REEL_COPY_MAX_HEIGHT`
 - Accepts: a whole number, 480 to 4320 p
@@ -230,6 +249,7 @@ H.264 at most this tall is copied untouched, never re-encoded.
 And at most this fast; anything above is re-encoded.
 
 - Under Settings: Ingest, Copy or re-encode
+- What it does and when to change it: [Ingest, Copy video under](settings/ingest.md#media-copy-max-mbit)
 - In `config.toml`: `copy_max_mbit` under `[media]`
 - Environment: `REEL_COPY_MAX_MBIT`
 - Accepts: a whole number, 1 to 200 Mbit/s
@@ -240,6 +260,7 @@ And at most this fast; anything above is re-encoded.
 The video bitrate for everything that is not copied.
 
 - Under Settings: Ingest, Copy or re-encode
+- What it does and when to change it: [Ingest, Re-encode at](settings/ingest.md#media-encode-mbit)
 - In `config.toml`: `encode_mbit` under `[media]`
 - Environment: `REEL_ENCODE_MBIT`
 - Accepts: a whole number, 1 to 100 Mbit/s
@@ -250,6 +271,7 @@ The video bitrate for everything that is not copied.
 AAC at this rate when the audio is re-encoded, or the source rate when lower; AAC is copied as it is.
 
 - Under Settings: Ingest, Copy or re-encode
+- What it does and when to change it: [Ingest, Audio](settings/ingest.md#media-audio-kbit)
 - In `config.toml`: `audio_kbit` under `[media]`
 - Environment: `REEL_AUDIO_KBIT`
 - Accepts: a whole number, 64 to 512 kbit/s
@@ -260,6 +282,7 @@ AAC at this rate when the audio is re-encoded, or the source rate when lower; AA
 Forces an audio re-encode for every clip.
 
 - Under Settings: Ingest, Copy or re-encode
+- What it does and when to change it: [Ingest, Normalise loudness](settings/ingest.md#media-normalize-audio)
 - In `config.toml`: `normalize_audio` under `[media]`
 - Environment: `REEL_NORMALIZE_AUDIO`
 - Accepts: `true` or `false`
@@ -270,6 +293,7 @@ Forces an audio re-encode for every clip.
 Every new clip, from the app, the incoming folder or an upload, gets a version levelled to the loudness target right after the ingest, made current, the video copied and only the audio encoded again; the original stays as it is.
 
 - Under Settings: Ingest, Copy or re-encode
+- What it does and when to change it: [Ingest, Normalise new clips](settings/ingest.md#media-normalize-new)
 - In `config.toml`: `normalize_new` under `[media]`
 - Environment: `REEL_NORMALIZE_NEW`
 - Accepts: `true` or `false`
@@ -280,6 +304,7 @@ Every new clip, from the app, the incoming folder or an upload, gets a version l
 The integrated loudness Normalise loudness brings a clip to, here at ingest, in the clip editor and for each clip of a montage; -16 is the usual level for phones and streaming, -23 for broadcast.
 
 - Under Settings: Ingest, Copy or re-encode
+- What it does and when to change it: [Ingest, Loudness target](settings/ingest.md#media-loudness-target)
 - In `config.toml`: `loudness_target` under `[media]`
 - Environment: `REEL_LOUDNESS_TARGET`
 - Accepts: a whole number, -30 to -5 LUFS
@@ -290,6 +315,7 @@ The integrated loudness Normalise loudness brings a clip to, here at ingest, in 
 Copies under a size on the hardware encoder in one pass instead of two-pass x264: faster, a little larger.
 
 - Under Settings: Ingest, Hardware and workers
+- What it does and when to change it: [Ingest, Copies on the GPU](settings/ingest.md#media-copies-on-hardware)
 - In `config.toml`: `copies_on_hardware` under `[media]`
 - Environment: `REEL_COPIES_ON_HARDWARE`
 - Accepts: `true` or `false`
@@ -300,6 +326,7 @@ Copies under a size on the hardware encoder in one pass instead of two-pass x264
 The copies under a size and the preview videos keep the source audio untouched when it is AAC (copy), else AAC at the source rate up to 320; a number forces that AAC rate; only when the video would fall below a watchable floor is the audio stepped down, and the copy says so.
 
 - Under Settings: Ingest, Copy or re-encode
+- What it does and when to change it: [Ingest, Audio for copies](settings/ingest.md#media-copy-audio)
 - In `config.toml`: `copy_audio` under `[media]`
 - Environment: `REEL_COPY_AUDIO`
 - Accepts: one of `copy` (as it is), `320` (AAC at 320 kbit/s), `256` (AAC at 256 kbit/s), `192` (AAC at 192 kbit/s), `160` (AAC at 160 kbit/s)
@@ -310,6 +337,7 @@ The copies under a size and the preview videos keep the source audio untouched w
 The two-pass libx264 of the copies under a size; slow is about half the speed of medium on an N100 and worth it at these sizes; faster presets trade quality for time.
 
 - Under Settings: Ingest, Copy or re-encode
+- What it does and when to change it: [Ingest, x264 preset for copies](settings/ingest.md#media-x264-preset)
 - In `config.toml`: `x264_preset` under `[media]`
 - Environment: `REEL_X264_PRESET`
 - Accepts: one of `faster`, `fast`, `medium`, `slow`, `slower`
@@ -320,6 +348,7 @@ The two-pass libx264 of the copies under a size; slow is about half the speed of
 The GPU route for re-encodes, probed at startup: QSV and VAAPI on Linux, NVENC, AMF and QSV on Windows; the copies under a size use the CPU unless Copies on the GPU is on.
 
 - Under Settings: Ingest, Hardware and workers
+- What it does and when to change it: [Ingest, Hardware encoding](settings/ingest.md#media-hwaccel)
 - In `config.toml`: `hwaccel` under `[media]`
 - Environment: `REEL_HWACCEL`
 - Accepts: one of `auto` (automatic), `qsv` (Intel Quick Sync), `vaapi` (VAAPI), `nvenc` (NVIDIA NVENC), `amf` (AMD AMF), `none` (none, the CPU)
@@ -331,6 +360,7 @@ The GPU route for re-encodes, probed at startup: QSV and VAAPI on Linux, NVENC, 
 The DRI device the container was given.
 
 - Under Settings: Ingest, Hardware and workers
+- What it does and when to change it: [Ingest, Render device](settings/ingest.md#media-render-device)
 - In `config.toml`: `render_device` under `[media]`
 - Environment: `REEL_RENDER_DEVICE`
 - Accepts: a path
@@ -342,6 +372,7 @@ The DRI device the container was given.
 The binary reel runs; the image sets it.
 
 - Under Settings: Ingest, Hardware and workers
+- What it does and when to change it: [Ingest, ffmpeg](settings/ingest.md#media-ffmpeg)
 - In `config.toml`: `ffmpeg` under `[media]`
 - Environment: `REEL_FFMPEG`
 - Accepts: text
@@ -354,6 +385,7 @@ The binary reel runs; the image sets it.
 The probe reel runs; the image sets it.
 
 - Under Settings: Ingest, Hardware and workers
+- What it does and when to change it: [Ingest, ffprobe](settings/ingest.md#media-ffprobe)
 - In `config.toml`: `ffprobe` under `[media]`
 - Environment: `REEL_FFPROBE`
 - Accepts: text
@@ -366,6 +398,7 @@ The probe reel runs; the image sets it.
 Ffmpeg runs at a time; more than one competes with a media server for the GPU. A job someone waits for (a link's preview, a cut, a copy under a size, an upload's ingest) does not wait for them: it runs at once and pauses the others meanwhile.
 
 - Under Settings: Ingest, Hardware and workers
+- What it does and when to change it: [Ingest, Workers](settings/ingest.md#pipeline-workers)
 - In `config.toml`: `workers` under `[pipeline]`
 - Environment: `REEL_WORKERS`
 - Accepts: a whole number, 1 to 8
@@ -377,6 +410,7 @@ Ffmpeg runs at a time; more than one competes with a media server for the GPU. A
 CPU priority of every ffmpeg, 0 to 19; higher gives way sooner.
 
 - Under Settings: Ingest, Hardware and workers
+- What it does and when to change it: [Ingest, Niceness](settings/ingest.md#pipeline-nice)
 - In `config.toml`: `nice` under `[pipeline]`
 - Environment: `REEL_NICE`
 - Accepts: a whole number, 0 to 19
@@ -388,6 +422,7 @@ CPU priority of every ffmpeg, 0 to 19; higher gives way sooner.
 A job running longer is killed and marked failed.
 
 - Under Settings: Ingest, Hardware and workers
+- What it does and when to change it: [Ingest, Job timeout](settings/ingest.md#pipeline-job-timeout-minutes)
 - In `config.toml`: `job_timeout_minutes` under `[pipeline]`
 - Environment: `REEL_JOB_TIMEOUT_MINUTES`
 - Accepts: a whole number, 5 to 1440 min
@@ -403,6 +438,7 @@ The defaults a new link gets, the copies under a size, and where link previews l
 The video file link previews (og:video) play inline, in Discord and other apps, when this server serves it; a version over this size, or one that is not H.264 with AAC, gets a smaller copy for it. Previewers give up fetching after a few seconds, so the file has to arrive within about five seconds of the server's upload: 20 MB suits 30 to 35 Mbit/s.
 
 - Under Settings: Sharing, Link preview
+- What it does and when to change it: [Sharing, Preview video size from the server](settings/sharing.md#share-embed-mb)
 - In `config.toml`: `embed_mb` under `[share]`
 - Environment: `REEL_EMBED_MB`
 - Accepts: a whole number, 5 to 95 MB
@@ -413,6 +449,7 @@ The video file link previews (og:video) play inline, in Discord and other apps, 
 Discord and other apps give up on a link's preview video after about nine seconds, and from a home upload a large one often comes too late. With this on, reel puts each link's preview video in an S3-compatible storage (Cloudflare R2 is recommended; Backblaze B2, Wasabi, MinIO and AWS work) and the previews load from there in a moment, whatever the upload is doing. The preview videos are then stored with that service; the pages, the clips and the web copies stay here. On R2's free tier (10 GB, no fee for downloads) the default limit costs nothing. A new link waits for its preview's upload, about as long as the file takes at the upload's speed, unless it went up ahead. Discord keeps a link's preview for a while, so a message already posted keeps the embed it had.
 
 - Under Settings: Sharing, External storage
+- What it does and when to change it: [Sharing, Link previews from external storage](settings/sharing.md#external-on)
 - In `config.toml`: `on` under `[external]`
 - Environment: `REEL_EXTERNAL`
 - Accepts: `true` or `false`
@@ -423,6 +460,7 @@ Discord and other apps give up on a link's preview video after about nine second
 The service's S3 address; for R2 https://ACCOUNT_ID.r2.cloudflarestorage.com, on the bucket's settings page.
 
 - Under Settings: Sharing, External storage
+- What it does and when to change it: [Sharing, S3 endpoint](settings/sharing.md#external-endpoint)
 - Shows while [Link previews from external storage](#link-previews-from-external-storage) is on; its value stays when that is off
 - In `config.toml`: `endpoint` under `[external]`
 - Environment: `REEL_EXTERNAL_ENDPOINT`
@@ -434,6 +472,7 @@ The service's S3 address; for R2 https://ACCOUNT_ID.r2.cloudflarestorage.com, on
 The bucket's region: auto for R2 and MinIO, the bucket's own on the others.
 
 - Under Settings: Sharing, External storage
+- What it does and when to change it: [Sharing, Region](settings/sharing.md#external-region)
 - Shows while [Link previews from external storage](#link-previews-from-external-storage) is on; its value stays when that is off
 - In `config.toml`: `region` under `[external]`
 - Environment: `REEL_EXTERNAL_REGION`
@@ -445,6 +484,7 @@ The bucket's region: auto for R2 and MinIO, the bucket's own on the others.
 A bucket of reel's own is best; reel writes under reel/ in it and never touches what it did not write.
 
 - Under Settings: Sharing, External storage
+- What it does and when to change it: [Sharing, Bucket](settings/sharing.md#external-bucket)
 - Shows while [Link previews from external storage](#link-previews-from-external-storage) is on; its value stays when that is off
 - In `config.toml`: `bucket` under `[external]`
 - Environment: `REEL_EXTERNAL_BUCKET`
@@ -456,6 +496,7 @@ A bucket of reel's own is best; reel writes under reel/ in it and never touches 
 The id of a token that may read and write this bucket only.
 
 - Under Settings: Sharing, External storage
+- What it does and when to change it: [Sharing, Access key](settings/sharing.md#external-access-key)
 - Shows while [Link previews from external storage](#link-previews-from-external-storage) is on; its value stays when that is off
 - In `config.toml`: `access_key` under `[external]`
 - Environment: `REEL_EXTERNAL_ACCESS_KEY`
@@ -467,6 +508,7 @@ The id of a token that may read and write this bucket only.
 The token's secret; written, never shown again.
 
 - Under Settings: Sharing, External storage
+- What it does and when to change it: [Sharing, Secret key](settings/sharing.md#external-secret-key)
 - Shows while [Link previews from external storage](#link-previews-from-external-storage) is on; its value stays when that is off
 - In `config.toml`: `secret_key` under `[external]`
 - Environment: `REEL_EXTERNAL_SECRET_KEY`
@@ -477,6 +519,7 @@ The token's secret; written, never shown again.
 Where the bucket's files are served from, such as https://media.example.com on a custom domain; R2's r2.dev address works for a test, but Cloudflare limits its rate.
 
 - Under Settings: Sharing, External storage
+- What it does and when to change it: [Sharing, Public address](settings/sharing.md#external-public-url)
 - Shows while [Link previews from external storage](#link-previews-from-external-storage) is on; its value stays when that is off
 - In `config.toml`: `public_url` under `[external]`
 - Environment: `REEL_EXTERNAL_PUBLIC_URL`
@@ -488,6 +531,7 @@ Where the bucket's files are served from, such as https://media.example.com on a
 The preview video of a link served from the storage; the storage has no upload limit, so it can be sharper than the server's, and chat apps still fetch it in time.
 
 - Under Settings: Sharing, External storage
+- What it does and when to change it: [Sharing, Preview video size from storage](settings/sharing.md#external-embed-mb)
 - Shows while [Link previews from external storage](#link-previews-from-external-storage) is on; its value stays when that is off
 - In `config.toml`: `embed_mb` under `[external]`
 - Environment: `REEL_EXTERNAL_EMBED_MB`
@@ -499,6 +543,7 @@ The preview video of a link served from the storage; the storage has no upload l
 The most reel keeps there, counted from what it wrote. R2's free 10 GB are shared by every bucket of the account, so with others there keep this under what they leave. At the limit the previews made ahead go first, then the links' previews, the least used first; a link inside the protected window keeps its own.
 
 - Under Settings: Sharing, External storage
+- What it does and when to change it: [Sharing, Limit](settings/sharing.md#external-limit-gb)
 - Shows while [Link previews from external storage](#link-previews-from-external-storage) is on; its value stays when that is off
 - In `config.toml`: `limit_gb` under `[external]`
 - Environment: `REEL_EXTERNAL_LIMIT_GB`
@@ -510,6 +555,7 @@ The most reel keeps there, counted from what it wrote. R2's free 10 GB are share
 Previews that go up before a link exists, so a later link is instant; they make room first.
 
 - Under Settings: Sharing, External storage
+- What it does and when to change it: [Sharing, Made ahead](settings/sharing.md#external-ahead)
 - Shows while [Link previews from external storage](#link-previews-from-external-storage) is on; its value stays when that is off
 - In `config.toml`: `ahead` under `[external]`
 - Environment: `REEL_EXTERNAL_AHEAD`
@@ -521,6 +567,7 @@ Previews that go up before a link exists, so a later link is instant; they make 
 How long a clip counts as new after it came in, for Made ahead.
 
 - Under Settings: Sharing, External storage
+- What it does and when to change it: [Sharing, New for](settings/sharing.md#external-new-days)
 - Shows while [Link previews from external storage](#link-previews-from-external-storage) is on; its value stays when that is off
 - In `config.toml`: `new_days` under `[external]`
 - Environment: `REEL_EXTERNAL_NEW_DAYS`
@@ -532,6 +579,7 @@ How long a clip counts as new after it came in, for Made ahead.
 A link's preview stays in the storage this long after the link is made, whatever the order; when these alone fill the limit, a new link's preview comes from this server and Status says so; 0 protects none.
 
 - Under Settings: Sharing, External storage
+- What it does and when to change it: [Sharing, Protected window](settings/sharing.md#external-protect-days)
 - Shows while [Link previews from external storage](#link-previews-from-external-storage) is on; its value stays when that is off
 - In `config.toml`: `protect_days` under `[external]`
 - Environment: `REEL_EXTERNAL_PROTECT_DAYS`
@@ -543,6 +591,7 @@ A link's preview stays in the storage this long after the link is made, whatever
 Revokes a link no chat app ever fetched and no one ever opened, once it is as old as the days below, and its preview leaves the storage. A link posted or opened even once is never revoked, however quiet it goes, so an old chat never shows a broken link; nor is one with an expiry of its own. A link pasted where no preview is built and never opened looks never shared.
 
 - Under Settings: Sharing, External storage
+- What it does and when to change it: [Sharing, Revoke links never shared](settings/sharing.md#share-cleanup)
 - Shows while [Link previews from external storage](#link-previews-from-external-storage) is on; its value stays when that is off
 - In `config.toml`: `cleanup` under `[share]`
 - Environment: `REEL_LINK_CLEANUP`
@@ -554,6 +603,7 @@ Revokes a link no chat app ever fetched and no one ever opened, once it is as ol
 How many days after it was made a link never shared is revoked.
 
 - Under Settings: Sharing, External storage
+- What it does and when to change it: [Sharing, Revoke after](settings/sharing.md#share-cleanup-days)
 - Shows while [Revoke links never shared](#revoke-links-never-shared) is on; its value stays when that is off
 - In `config.toml`: `cleanup_days` under `[share]`
 - Environment: `REEL_LINK_CLEANUP_DAYS`
@@ -565,6 +615,7 @@ How many days after it was made a link never shared is revoked.
 A link's page plays a copy of its version at this rate, video and audio together, once the copy is made, and the preview video until then. Everyone watching shares the home upload: at about 30 Mbit/s up, 10 Mbit/s carries two or three viewers at once. A version already under it, H.264 with AAC and no taller than the height below, plays as it is.
 
 - Under Settings: Sharing, Link page
+- What it does and when to change it: [Sharing, Web copy bitrate](settings/sharing.md#share-web-mbit)
 - In `config.toml`: `web_mbit` under `[share]`
 - Environment: `REEL_WEB_MBIT`
 - Accepts: a whole number, 2 to 50 Mbit/s
@@ -575,6 +626,7 @@ A link's page plays a copy of its version at this rate, video and audio together
 The tallest a web copy is; a shorter version keeps its own height.
 
 - Under Settings: Sharing, Link page
+- What it does and when to change it: [Sharing, Web copy height](settings/sharing.md#share-web-max-height)
 - In `config.toml`: `web_max_height` under `[share]`
 - Environment: `REEL_WEB_MAX_HEIGHT`
 - Accepts: one of `720` (720p), `1080` (1080p), `1440` (1440p), `2160` (2160p)
@@ -585,6 +637,7 @@ The tallest a web copy is; a shorter version keeps its own height.
 The limit of a copy under a size asked for without naming one, such as a bare discord.mp4 address; one of the list. Unless set, it is 20, Discord's without Nitro, or the largest limit under 20 when the list has no 20.
 
 - Under Settings: Sharing, Copies under a size
+- What it does and when to change it: [Sharing, Default limit](settings/sharing.md#share-discord-limit-mb)
 - In `config.toml`: `discord_limit_mb` under `[share]`
 - Environment: `REEL_DISCORD_LIMIT_MB`
 - Accepts: a whole number, 1 to 500 MB
@@ -595,6 +648,7 @@ The limit of a copy under a size asked for without naming one, such as a bare di
 The limits the picker offers, in MB; chat apps' upload limits are the point of them: Discord takes 20 MB without Nitro, 50 with Nitro Basic and 500 with Nitro, and some apps still stop at 10.
 
 - Under Settings: Sharing, Copies under a size
+- What it does and when to change it: [Sharing, Limit list](settings/sharing.md#share-discord-limits-mb)
 - In `config.toml`: `discord_limits_mb` under `[share]`
 - Environment: `REEL_DISCORD_LIMITS_MB`
 - Accepts: a list: comma separated in the environment, an array in `config.toml`
@@ -605,6 +659,7 @@ The limits the picker offers, in MB; chat apps' upload limits are the point of t
 Whether a new link's page offers the full file, until changed in the link dialog.
 
 - Under Settings: Sharing, New links
+- What it does and when to change it: [Sharing, Allow the download](settings/sharing.md#share-download-default)
 - In `config.toml`: `download_default` under `[share]`
 - Environment: `REEL_SHARE_DOWNLOAD_DEFAULT`
 - Accepts: `true` or `false`
@@ -615,6 +670,7 @@ Whether a new link's page offers the full file, until changed in the link dialog
 What a new link's expiry starts on in the dialog.
 
 - Under Settings: Sharing, New links
+- What it does and when to change it: [Sharing, Expire](settings/sharing.md#share-expiry-default)
 - In `config.toml`: `expiry_default` under `[share]`
 - Environment: `REEL_SHARE_EXPIRY_DEFAULT`
 - Accepts: one of `never`, `1d` (after 1 day), `7d` (after 7 days), `30d` (after 30 days)
@@ -629,6 +685,7 @@ A folder to scan and how big an upload may be.
 An upload bigger than this is refused; the proxy in front has a limit of its own.
 
 - Under Settings: Imports, Upload
+- What it does and when to change it: [Imports, Upload size limit](settings/imports.md#import-upload-max-gb)
 - In `config.toml`: `upload_max_gb` under `[import]`
 - Environment: `REEL_UPLOAD_MAX_GB`
 - Accepts: a whole number, 1 to 1000 GB
@@ -643,6 +700,7 @@ Where reel tells you about failures, a full disk and new versions: ntfy or a web
 Off, an ntfy topic, or a webhook that takes JSON.
 
 - Under Settings: Notifications, Where
+- What it does and when to change it: [Notifications, Send to](settings/notifications.md#notify-kind)
 - In `config.toml`: `kind` under `[notify]`
 - Environment: `REEL_NOTIFY_KIND`
 - Accepts: one of `off`, `ntfy` (an ntfy topic), `webhook` (a webhook)
@@ -653,6 +711,7 @@ Off, an ntfy topic, or a webhook that takes JSON.
 The server's address, such as https://ntfy.example.org; a new address clears the token below, which is then entered again for that server.
 
 - Under Settings: Notifications, Where
+- What it does and when to change it: [Notifications, ntfy server](settings/notifications.md#notify-ntfy-url)
 - In `config.toml`: `ntfy_url` under `[notify]`
 - Environment: `REEL_NTFY_URL`
 - Accepts: a URL, https (plain http only for a host on the private network)
@@ -663,6 +722,7 @@ The server's address, such as https://ntfy.example.org; a new address clears the
 The topic reel posts to.
 
 - Under Settings: Notifications, Where
+- What it does and when to change it: [Notifications, ntfy topic](settings/notifications.md#notify-ntfy-topic)
 - In `config.toml`: `ntfy_topic` under `[notify]`
 - Environment: `REEL_NTFY_TOPIC`
 - Accepts: text
@@ -673,6 +733,7 @@ The topic reel posts to.
 An access token when the topic is protected; written, never shown again.
 
 - Under Settings: Notifications, Where
+- What it does and when to change it: [Notifications, ntfy token](settings/notifications.md#notify-ntfy-token)
 - In `config.toml`: `ntfy_token` under `[notify]`
 - Environment: `REEL_NTFY_TOKEN`
 - Accepts: a secret, never shown again once saved
@@ -682,6 +743,7 @@ An access token when the topic is protected; written, never shown again.
 Receives a JSON body with the event, the clip, the reason and a link.
 
 - Under Settings: Notifications, Where
+- What it does and when to change it: [Notifications, Webhook URL](settings/notifications.md#notify-webhook-url)
 - In `config.toml`: `webhook_url` under `[notify]`
 - Environment: `REEL_WEBHOOK_URL`
 - Accepts: a URL, https (plain http only for a host on the private network)
@@ -692,6 +754,7 @@ Receives a JSON body with the event, the clip, the reason and a link.
 What reel tells about; the first five are on for a new install.
 
 - Under Settings: Notifications, Events
+- What it does and when to change it: [Notifications, Events](settings/notifications.md#notify-events)
 - In `config.toml`: `events` under `[notify]`
 - Environment: `REEL_NOTIFY_EVENTS`
 - Accepts: any of `job_failed` (a job failed), `file_unreadable` (a file could not be read), `disk_low` (the disk is low), `storage` (the external storage needs a look), `library_cap` (the library cap moved clips), `update_available` (an update is available), `link_made` (a link was made), comma separated
@@ -706,6 +769,7 @@ Who gets in and how reel knows who they are. Share links stay public either way.
 Local: reel's own accounts; proxy: a proxy in front names the user; oidc: an identity provider signs in; single: no sign-in, only on a loopback address; set when the process starts.
 
 - Under Settings: Access, Identity
+- What it does and when to change it: [Access, Mode](settings/access.md#auth-mode)
 - In `config.toml`: `mode` under `[auth]`
 - Environment: `REEL_AUTH_MODE`
 - Accepts: one of `local` (local accounts), `proxy` (a proxy in front), `oidc` (an identity provider), `single` (single user)
@@ -718,6 +782,7 @@ Local: reel's own accounts; proxy: a proxy in front names the user; oidc: an ide
 Only these addresses may name the user; anything else answers 401.
 
 - Under Settings: Access, Identity
+- What it does and when to change it: [Access, Trusted proxies](settings/access.md#auth-trusted-proxies)
 - In `config.toml`: `trusted_proxies` under `[auth]`
 - Environment: `REEL_TRUSTED_PROXIES`
 - Accepts: a list: comma separated in the environment, an array in `config.toml`
@@ -729,6 +794,7 @@ Only these addresses may name the user; anything else answers 401.
 The name everyone is in single mode.
 
 - Under Settings: Access, Identity
+- What it does and when to change it: [Access, Single user](settings/access.md#auth-dev-user)
 - In `config.toml`: `dev_user` under `[auth]`
 - Environment: `REEL_DEV_USER`
 - Accepts: text
@@ -740,6 +806,7 @@ The name everyone is in single mode.
 Users with these names are admins, each exactly as reel gets it, case included; the first user ever seen is one too, except behind an identity provider, where the first admin is listed here, carries the admin value or types the setup code; with an identity provider, the subject the provider sends instead of a name (Authentik's is the username unless its client says otherwise), counted at the first sign-in, and at every sign-in with a role claim.
 
 - Under Settings: Access, Identity
+- What it does and when to change it: [Access, Admins](settings/access.md#auth-admins)
 - In `config.toml`: `admins` under `[auth]`
 - Environment: `REEL_ADMINS`
 - Accepts: a list: comma separated in the environment, an array in `config.toml`
@@ -750,6 +817,7 @@ Users with these names are admins, each exactly as reel gets it, case included; 
 A session ends this long after its last use; behind an identity provider the default is 7 days, elsewhere 30.
 
 - Under Settings: Access, Sessions
+- What it does and when to change it: [Access, Idle timeout](settings/access.md#auth-session-days)
 - In `config.toml`: `session_days` under `[auth]`
 - Environment: `REEL_SESSION_DAYS`
 - Accepts: a whole number, 1 to 365 days
@@ -761,6 +829,7 @@ A session ends this long after its last use; behind an identity provider the def
 A session ends this long after the sign-in, however active; 0 is no limit; behind an identity provider the default is 30 days, elsewhere 90.
 
 - Under Settings: Access, Sessions
+- What it does and when to change it: [Access, Session lifetime](settings/access.md#auth-session-max-days)
 - In `config.toml`: `session_max_days` under `[auth]`
 - Environment: `REEL_SESSION_MAX_DAYS`
 - Accepts: a whole number, 0 to 3650 days
@@ -771,6 +840,7 @@ A session ends this long after the sign-in, however active; 0 is no limit; behin
 The OpenID Connect issuer URL exactly as the provider gives it, its last slash included, such as https://auth.example.org/application/o/reel/; reel asks it for its metadata at start, again by itself until it answers, and every hour.
 
 - Under Settings: Access, Identity provider
+- What it does and when to change it: [Access, Issuer](settings/access.md#auth-oidc-issuer)
 - In `config.toml`: `oidc_issuer` under `[auth]`
 - Environment: `REEL_OIDC_ISSUER`
 - Accepts: a URL starting with http:// or https://
@@ -782,6 +852,7 @@ The OpenID Connect issuer URL exactly as the provider gives it, its last slash i
 What the sign-in page calls the provider, as in Sign in with Authentik; empty shows the issuer's host; shown as typed, at most 40 characters.
 
 - Under Settings: Access, Identity provider
+- What it does and when to change it: [Access, Provider name](settings/access.md#auth-oidc-name)
 - In `config.toml`: `oidc_name` under `[auth]`
 - Environment: `REEL_OIDC_NAME`
 - Accepts: text
@@ -792,6 +863,7 @@ What the sign-in page calls the provider, as in Sign in with Authentik; empty sh
 The client registered at the issuer; its secret comes from REEL_OIDC_CLIENT_SECRET or the file REEL_OIDC_CLIENT_SECRET_FILE names, never from here.
 
 - Under Settings: Access, Identity provider
+- What it does and when to change it: [Access, Client id](settings/access.md#auth-oidc-client-id)
 - In `config.toml`: `oidc_client_id` under `[auth]`
 - Environment: `REEL_OIDC_CLIENT_ID`
 - Accepts: text
@@ -803,6 +875,7 @@ The client registered at the issuer; its secret comes from REEL_OIDC_CLIENT_SECR
 What is asked of the issuer, space separated.
 
 - Under Settings: Access, Identity provider
+- What it does and when to change it: [Access, Scopes](settings/access.md#auth-oidc-scopes)
 - In `config.toml`: `oidc_scopes` under `[auth]`
 - Environment: `REEL_OIDC_SCOPES`
 - Accepts: text
@@ -814,6 +887,7 @@ What is asked of the issuer, space separated.
 The claim a user is named by when first seen (email only when the provider marks it verified); the subject when it is missing; a known user keeps their name: who the user is comes from the issuer and subject, never from the name.
 
 - Under Settings: Access, Identity provider
+- What it does and when to change it: [Access, Name claim](settings/access.md#auth-oidc-username-claim)
 - In `config.toml`: `oidc_username_claim` under `[auth]`
 - Environment: `REEL_OIDC_USERNAME_CLAIM`
 - Accepts: text
@@ -824,6 +898,7 @@ The claim a user is named by when first seen (email only when the provider marks
 A claim (a string or a list) that makes an admin when it holds the admin value, followed at every sign-in both ways; the Admins list and the last admin stay admins; empty means the Admins list alone, at first sight.
 
 - Under Settings: Access, Identity provider
+- What it does and when to change it: [Access, Role claim](settings/access.md#auth-oidc-role-claim)
 - In `config.toml`: `oidc_role_claim` under `[auth]`
 - Environment: `REEL_OIDC_ROLE_CLAIM`
 - Accepts: text
@@ -834,6 +909,7 @@ A claim (a string or a list) that makes an admin when it holds the admin value, 
 The value in the role claim that means admin; it cannot be empty while a role claim is set.
 
 - Under Settings: Access, Identity provider
+- What it does and when to change it: [Access, Admin value](settings/access.md#auth-oidc-admin-value)
 - In `config.toml`: `oidc_admin_value` under `[auth]`
 - Environment: `REEL_OIDC_ADMIN_VALUE`
 - Accepts: text
@@ -848,6 +924,7 @@ The paired apps: a code to pair one, their tokens, what they upload, and the chu
 A paired app sends a clip in chunks of this size and resumes at the last one after a drop; 90 is the most, so a chunk passes Cloudflare's 100 MB request limit; on the LAN larger is faster.
 
 - Under Settings: Devices, Uploads from devices
+- What it does and when to change it: [Devices, Chunk size](settings/devices.md#device-chunk-mb)
 - In `config.toml`: `chunk_mb` under `[device]`
 - Environment: `REEL_DEVICE_CHUNK_MB`
 - Accepts: a whole number, 1 to 90 MB
@@ -858,6 +935,7 @@ A paired app sends a clip in chunks of this size and resumes at the last one aft
 An upload in pieces, the app's or the browser's, that nothing has touched for this long is removed with its file; it starts again from the beginning.
 
 - Under Settings: Devices, Uploads from devices
+- What it does and when to change it: [Devices, Unfinished uploads expire](settings/devices.md#device-upload-expiry-hours)
 - In `config.toml`: `upload_expiry_hours` under `[device]`
 - Environment: `REEL_DEVICE_UPLOAD_EXPIRY_HOURS`
 - Accepts: a whole number, 1 to 720 h
@@ -868,6 +946,7 @@ An upload in pieces, the app's or the browser's, that nothing has touched for th
 A paired app older than this server, on Windows or the Linux AppImage, is offered the app of the server's version, signed, from the app-updates folder in the data folder; the .deb does not update itself.
 
 - Under Settings: Devices, App updates
+- What it does and when to change it: [Devices, Offer app updates](settings/devices.md#device-app-updates)
 - In `config.toml`: `app_updates` under `[device]`
 - Environment: `REEL_APP_UPDATES`
 - Accepts: `true` or `false`
@@ -878,6 +957,7 @@ A paired app older than this server, on Windows or the Linux AppImage, is offere
 For a private fork only: a GitHub token that reads its releases; the server fetches its own version's installers and their signatures from the release at start and once a day while they are missing, and a public repository's releases need none; written, never shown again.
 
 - Under Settings: Devices, App updates
+- What it does and when to change it: [Devices, Release token](settings/devices.md#device-updates-token)
 - In `config.toml`: `updates_token` under `[device]`
 - Environment: `REEL_UPDATES_TOKEN`
 - Accepts: a secret, never shown again once saved
@@ -891,6 +971,7 @@ The look of the pages, and what this browser remembers.
 Dark is the only theme so far; the light one is on the roadmap.
 
 - Under Settings: Appearance, Theme
+- What it does and when to change it: [Appearance, Theme](settings/appearance.md#appearance-theme)
 - In `config.toml`: `theme` under `[appearance]`
 - Environment: `REEL_THEME`
 - Accepts: one of `dark`
@@ -905,6 +986,7 @@ Logs, the update check, the history of every change, exports and the restart.
 How much the log says; RUST_LOG wins when it is set.
 
 - Under Settings: Advanced, Logs
+- What it does and when to change it: [Advanced, Log level](settings/advanced.md#advanced-log-level)
 - In `config.toml`: `log_level` under `[advanced]`
 - Environment: `REEL_LOG_LEVEL`
 - Accepts: one of `error` (errors only), `warn` (warnings), `info`, `debug` (debug, everything)
@@ -915,6 +997,7 @@ How much the log says; RUST_LOG wins when it is set.
 Once a day, against the public releases of the repository, nothing else.
 
 - Under Settings: Advanced, Updates
+- What it does and when to change it: [Advanced, Check for updates](settings/advanced.md#advanced-update-check)
 - In `config.toml`: `update_check` under `[advanced]`
 - Environment: `REEL_UPDATE_CHECK`
 - Accepts: `true` or `false`
@@ -925,6 +1008,7 @@ Once a day, against the public releases of the repository, nothing else.
 The GitHub repository whose releases are checked, as owner/name.
 
 - Under Settings: Advanced, Updates
+- What it does and when to change it: [Advanced, Repository](settings/advanced.md#advanced-update-repo)
 - In `config.toml`: `update_repo` under `[advanced]`
 - Environment: `REEL_UPDATE_REPO`
 - Accepts: text

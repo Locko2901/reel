@@ -68,6 +68,34 @@ nav:
       - The editor: editor.md
       - The desktop app: desktop-app.md
       - Games and apps: games-and-apps.md
+  - Settings:
+      - settings/index.md
+      - Essentials: settings/essentials.md
+      - This PC:
+          - Clips: settings/clips.md
+          - Session recording: settings/session.md
+          - Capture: settings/capture.md
+          - Hotkeys: settings/hotkeys.md
+          - Games and apps: settings/games.md
+          - Uploads: settings/uploads.md
+          - Connection: settings/connection.md
+          - App: settings/app.md
+          - Status: settings/status.md
+          - Library folder: settings/library-folder.md
+          - Encoding: settings/encoding.md
+      - Library:
+          - Library and storage: settings/storage.md
+          - Ingest: settings/ingest.md
+          - Imports: settings/imports.md
+      - Server:
+          - Sharing: settings/sharing.md
+          - Devices: settings/devices.md
+          - Access: settings/access.md
+          - Notifications: settings/notifications.md
+      - System:
+          - General: settings/general.md
+          - Appearance: settings/appearance.md
+          - Advanced: settings/advanced.md
   - Looking after reel:
       - Updating: updating.md
       - Switching the sign-in method: switching-sign-in.md

@@ -11,7 +11,7 @@ someone is:
 | `local` | your name and your password |
 | `proxy` | the name the proxy in front sends, in any case |
 | `oidc` | your account at the identity provider, never your name |
-| `single` | nothing: everyone is the user named by [Single user](configuration.md#single-user) |
+| `single` | nothing: everyone is the user named by [Single user](settings/access.md#auth-dev-user) |
 
 The mode itself is set in the compose file (`REEL_AUTH_MODE`) and takes
 effect when the container starts, as on
@@ -39,7 +39,7 @@ What stays through every switch:
   `single` have no sessions.
 - **Paired devices** keep uploading: the app signs in with its own token,
   not with the sign-in mode, and stays with the user who paired it.
-- **Admins** stay admins. With a [Role claim](configuration.md#role-claim),
+- **Admins** stay admins. With a [Role claim](settings/access.md#auth-oidc-role-claim),
   the provider decides at every sign-in, but the last admin stays one.
 
 The server's log says what to run when no admin can sign in under the new
@@ -110,7 +110,7 @@ The proxy names each person, so reel's names have to be the proxy's,
 exactly, case included: a name that differs from a user's only in case is
 refused. Before the switch, under Settings, **Access**, press **Rename** on
 each user whose name the proxy spells differently, and put yours in
-[Admins](configuration.md#admins) to be safe. Then set the proxy up as in
+[Admins](settings/access.md#auth-admins) to be safe. Then set the proxy up as in
 [A sign-in in front](setup/server.md#a-sign-in-in-front-authentik-authelia-oauth2-proxy),
 the five open paths included: the paired apps need `/api/device/`.
 

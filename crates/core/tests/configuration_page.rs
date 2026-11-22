@@ -44,6 +44,12 @@ const SEE: &[(&str, &str)] = &[(
     "Changing it on a server with users: [Switching the sign-in method](switching-sign-in.md)",
 )];
 
+/// A setting no page of the server shows, and where it is set instead.
+const ELSEWHERE: &[(&str, &str)] = &[(
+    "storage.cap_keeps_unsent",
+    "not on a server's pages; the desktop app's standalone library has its own, under Library folder",
+)];
+
 const NOT_FOR_USERS: &[&str] = &[
     "REEL_GIT_SHA",
     "REEL_BUILD_DATE",
@@ -174,7 +180,19 @@ fn render() -> String {
         let _ = writeln!(p, "## {}\n\n{}\n", section.label(), section.line());
         for d in defs {
             let _ = writeln!(p, "### {}\n\n{}\n", d.label, sentence(d.help));
-            let _ = writeln!(p, "- Under Settings: {}, {}", section.label(), d.panel);
+            if let Some((_, place)) = ELSEWHERE.iter().find(|(key, _)| *key == d.key) {
+                let _ = writeln!(p, "- Under Settings: {place}");
+            } else {
+                let _ = writeln!(p, "- Under Settings: {}, {}", section.label(), d.panel);
+            }
+            let _ = writeln!(
+                p,
+                "- What it does and when to change it: [{}, {}](settings/{}.md#{})",
+                section.label(),
+                d.label,
+                section.id(),
+                settings::anchor(d.key)
+            );
             if let Some(parent) = d.depends.and_then(settings::find) {
                 let _ = writeln!(
                     p,

@@ -22,7 +22,7 @@ line with its length, its height and its date, and nothing else. No sign-in, no 
 clips, and search engines are asked to leave it out.
 
 A link looks like `https://clips.example.com/s/8xQvT1n4wKpR9sLm2cHd7A`: your server's
-[Public URL](configuration.md#public-url), then `/s/` and 22 random letters and digits. Nobody
+[Public URL](settings/general.md#public-url), then `/s/` and 22 random letters and digits. Nobody
 can guess it. Anyone who has it can watch the clip and pass the link on, until you revoke it or
 it expires.
 
@@ -105,8 +105,8 @@ Each link keeps the choices it was made with:
   is no **Download** button.
 
 A new link starts on the server's defaults under Settings, Sharing:
-[Allow the download](configuration.md#allow-the-download) (on) and
-[Expire](configuration.md#expire) (never). A link's choices are fixed once it is made: to
+[Allow the download](settings/sharing.md#share-download-default) (on) and
+[Expire](settings/sharing.md#share-expiry-default) (never). A link's choices are fixed once it is made: to
 change them, make a new link and revoke the old one. A clip can have any number of links, each
 with its own choices, such as one for a friend that expires tomorrow and one that never does.
 
@@ -152,15 +152,15 @@ serves files made for it. reel makes them by itself; this is what they are:
 
 - **The preview video** is what a chat's preview plays (the page's `og:video` tag). A version
   that is H.264 with AAC audio and under
-  [Preview video size from the server](configuration.md#preview-video-size-from-the-server)
+  [Preview video size from the server](settings/sharing.md#share-embed-mb)
   (20 MB by default) is sent as it is; any other gets a smaller copy for it, at most 1080p.
   Previewers give up on a file that takes more than a few seconds to arrive, which is what the
   size is for. The copy is made right after a clip arrives and after every cut. With
   [Link previews from external storage](storage.md) on, the preview comes from your storage's
   CDN instead: larger, and on time whatever your upload is doing.
 - **The web copy** is what the link's page plays in a browser: the version at its own height,
-  up to [Web copy height](configuration.md#web-copy-height) (1440p by default), at
-  [Web copy bitrate](configuration.md#web-copy-bitrate) (10 Mbit/s by default), so two or three
+  up to [Web copy height](settings/sharing.md#share-web-max-height) (1440p by default), at
+  [Web copy bitrate](settings/sharing.md#share-web-mbit) (10 Mbit/s by default), so two or three
   people can watch at once over a home upload. It is made when a link to the version is made,
   or when its page is first opened without one. Until it is ready, the page plays the preview
   video and moves over by itself, still playing; the line under the title says what plays
@@ -228,7 +228,7 @@ how many clips it holds and a tile for each. Pasted in a chat, it previews with 
 count and the first clip's poster. Each tile opens that clip on a page like a share link's,
 playing its current version; that clip's own address previews in a chat as a share link does.
 Whether those pages offer the download follows
-[Allow the download](configuration.md#allow-the-download) when the link is made.
+[Allow the download](settings/sharing.md#share-download-default) when the link is made.
 
 - A collection has one link at a time: **New link** makes another and retires the one before
   ("Link made. The one before stopped working."). **Revoke** (press it twice) ends it.
@@ -253,7 +253,7 @@ limit.
 
 1. Pick a size in the list next to **Download**: the version as it is ("original as it is,
    84 MB"), then a copy under each upload limit the version does not fit under. The limits are
-   500, 100, 50, 20 and 10 MB by default ([Limit list](configuration.md#limit-list)), the upload
+   500, 100, 50, 20 and 10 MB by default ([Limit list](settings/sharing.md#share-discord-limits-mb)), the upload
    limits chat apps set: Discord takes 20 MB without Nitro, 50 MB with Nitro Basic and 500 MB
    with Nitro, and some apps still stop at 10 MB.
 2. Press **Download**. A copy that does not exist yet is made first, with its progress on the
@@ -274,13 +274,13 @@ audio, which the panel says. A clip too long to fit a limit even at 480p, 30 fps
 audio gets no copy under it, and the page says why.
 
 The copies are encoded with two-pass x264 on the CPU by default
-([Copies on the GPU](configuration.md#copies-on-the-gpu) makes them faster, a little larger),
+([Copies on the GPU](settings/ingest.md#media-copies-on-hardware) makes them faster, a little larger),
 the audio kept as it is when it is AAC. They take up to
-[Copies under a size](configuration.md#copies-under-a-size) on disk (5 GB by default), the
+[Copies under a size](settings/storage.md#share-discord-cache-gb) on disk (5 GB by default), the
 oldest going first.
 
 **Download** on a row under **Versions** gives that version's file as it is. When the server
-kept the raw file a re-encoded clip came from ([Keep originals](configuration.md#keep-originals)),
+kept the raw file a re-encoded clip came from ([Keep originals](settings/storage.md#ingest-keep-originals)),
 **Details** has **Download the original** for it. In standalone, both are **Open** and **Show in
 folder**.
 
@@ -402,7 +402,7 @@ A deleted clip waits in the trash before it goes for good, so a slip costs nothi
 **Delete clip** at the bottom of the clip's page, or **Delete** in a clip's menu on the library
 page, moves the clip with every version to the trash; press either twice. Its links stop at
 once. **Undo** in the message that appears brings back the clip and the links the delete
-stopped. Otherwise the clip stays in the trash for [Trash](configuration.md#trash) days (7 by
+stopped. Otherwise the clip stays in the trash for [Trash](settings/storage.md#share-trash-days) days (7 by
 default), then it is deleted for good.
 
 The words of that message, "In the trash for 7 days.", open the trash. It lists every deleted
@@ -421,7 +421,7 @@ shows it, **Purge now** empties it.
 ## The library cap
 
 Set a size, and reel keeps the library under it by itself, so old clips never fill the disk.
-Settings, Library and storage, [Library cap](configuration.md#library-cap) is off (0) until you
+Settings, Library and storage, [Library cap](settings/storage.md#storage-cap-gb) is off (0) until you
 set it. Housekeeping runs every 10 minutes and moves clips to the trash until the library is
 under the cap:
 
@@ -457,14 +457,14 @@ notification goes, whichever events are ticked.
 
 | Setting | Where | What it does |
 |---|---|---|
-| [Public URL](configuration.md#public-url) | General | every link starts with it; link previews must reach it from the internet |
-| [Allow the download](configuration.md#allow-the-download), [Expire](configuration.md#expire) | Sharing | what a new link starts with |
-| [Preview video size from the server](configuration.md#preview-video-size-from-the-server) | Sharing | the size of the file chat previews play |
-| [Web copy bitrate](configuration.md#web-copy-bitrate), [Web copy height](configuration.md#web-copy-height) | Sharing | what a link's page plays |
-| [Limit list](configuration.md#limit-list) | Sharing | the copies under a size the clip page offers |
-| [Copies under a size](configuration.md#copies-under-a-size) | Library and storage | how much disk those copies and the animated pictures may take |
-| [Trash](configuration.md#trash) | Library and storage | how long a deleted clip waits |
-| [Library cap](configuration.md#library-cap) | Library and storage | the size the library is kept under |
+| [Public URL](settings/general.md#public-url) | General | every link starts with it; link previews must reach it from the internet |
+| [Allow the download](settings/sharing.md#share-download-default), [Expire](settings/sharing.md#share-expiry-default) | Sharing | what a new link starts with |
+| [Preview video size from the server](settings/sharing.md#share-embed-mb) | Sharing | the size of the file chat previews play |
+| [Web copy bitrate](settings/sharing.md#share-web-mbit), [Web copy height](settings/sharing.md#share-web-max-height) | Sharing | what a link's page plays |
+| [Limit list](settings/sharing.md#share-discord-limits-mb) | Sharing | the copies under a size the clip page offers |
+| [Copies under a size](settings/storage.md#share-discord-cache-gb) | Library and storage | how much disk those copies and the animated pictures may take |
+| [Trash](settings/storage.md#share-trash-days) | Library and storage | how long a deleted clip waits |
+| [Library cap](settings/storage.md#storage-cap-gb) | Library and storage | the size the library is kept under |
 
 If a chat shows only the link and no video, open the link in a browser on mobile data. When
 that fails too, the server is not reachable from the internet at its Public URL (see
