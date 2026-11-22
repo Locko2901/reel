@@ -29,26 +29,72 @@ const fill = () => {
     return a;
   };
   let prev = null;
+  const put = (el) => { if (prev) prev.after(el); else nav.prepend(el); prev = el; };
   for (const [words, pages] of NAV) {
-    const head = [...nav.querySelectorAll('.sections-head')].find((h) => h.textContent.trim() === words);
+    const shown = pages.map(pageOf).filter(shows);
+    const head = words && [...nav.querySelectorAll('.sections-head')].find((h) => h.textContent.trim() === words);
     if (head) prev = head;
-    for (const p of pages.map(pageOf).filter(shows)) {
+    else if (words && shown.some((p) => p.app)) {
+      const h = document.createElement('span');
+      h.className = 'sections-head app-link';
+      h.hidden = true;
+      h.textContent = words;
+      put(h);
+    }
+    for (const p of shown) {
       const there = p.app ? null : nav.querySelector(`a[data-section="${p.id}"]`);
-      if (there) { prev = there; continue; }
-      if (!p.app) continue;
-      if (!prev) {
-        const h = document.createElement('span');
-        h.className = 'sections-head app-link';
-        h.hidden = true;
-        h.textContent = words;
-        nav.prepend(h);
-        prev = h;
-      }
-      const a = entry(p.id);
-      prev.after(a);
-      prev = a;
+      if (there) prev = there;
+      else if (p.app) put(entry(p.id));
     }
   }
+};
+
+// Under 960 px the nav is a select: the app's pages join the server's in it, in the nav's
+// groups, and open in the app.
+const choices = () => {
+  const select = document.getElementById('sections-select');
+  const call = window.__TAURI__?.core?.invoke;
+  if (!select || !call || select.querySelector('option[value^="app:"]')) return;
+  const standalone = document.body.hasAttribute('data-standalone');
+  const shows = (p) => !(p.standalone && !standalone) && !(p.paired && standalone);
+  const was = select.value;
+  const theirs = [...select.options];
+  const option = (value, label) => { const o = document.createElement('option'); o.value = value; o.textContent = label; return o; };
+  const out = [];
+  for (const [words, pages] of NAV) {
+    const items = pages.map(pageOf).filter(shows).map((p) => (p.app
+      ? option(`app:${p.id}`, APP_SECTIONS.find(([k]) => k === p.id)[1])
+      : theirs.find((o) => o.value === p.id))).filter(Boolean);
+    if (!items.length) continue;
+    if (!words) { out.push(...items); continue; }
+    const g = document.createElement('optgroup');
+    g.label = words;
+    g.append(...items);
+    out.push(g);
+  }
+  const placed = new Set(out.flatMap((x) => (x.tagName === 'OPTGROUP' ? [...x.children] : [x])));
+  out.push(...theirs.filter((o) => !placed.has(o)));
+  select.replaceChildren(...out);
+  select.value = was;
+  select.addEventListener('change', (e) => {
+    if (!select.value.startsWith('app:')) return;
+    e.stopImmediatePropagation();
+    const id = select.value.slice(4);
+    select.value = document.getElementById('settings')?.dataset.section || was;
+    call('app_open_settings', { section: id, shape: null }).catch(() => {});
+  }, true);
+};
+
+// A released server's Settings spread over the whole window: the same frame as the app's pages.
+const frame = () => {
+  if (!document.getElementById('settings')) return;
+  const style = document.createElement('style');
+  style.textContent = `.settings { max-width: 974px; margin-left: auto; margin-right: auto; }
+@media (min-width: 960px) { .settings { grid-template-columns: 190px minmax(0, 760px); gap: 24px; } }
+.page-head:has(~ .settings) { max-width: 974px; margin-left: auto; margin-right: auto; }
+.sections, body.has-appbar .sections { max-height: calc(100vh - 128px - var(--appbar)); }
+.sections > * { flex-shrink: 0; }`;
+  document.head.append(style);
 };
 
 const count = async () => {
@@ -91,7 +137,7 @@ document.addEventListener('click', sectionTop);
 document.addEventListener('change', (e) => { if (e.target.id === 'sections-select') setTimeout(() => scrollTo(0, 0)); });
 
 // before the page's scripts run, which show and bind the app's pages in the nav they find
-document.addEventListener('readystatechange', () => { if (document.readyState === 'interactive') fill(); });
+document.addEventListener('readystatechange', () => { if (document.readyState === 'interactive') { frame(); fill(); choices(); } });
 addEventListener('DOMContentLoaded', count);
 addEventListener('pageshow', (e) => { if (e.persisted) count(); });
 document.addEventListener('visibilitychange', () => { if (!document.hidden) count(); });

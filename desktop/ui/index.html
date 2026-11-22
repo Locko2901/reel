@@ -8,17 +8,18 @@
 <link rel="stylesheet" href="app.css">
 </head>
 <body data-page="settings">
-<main class="page one-page">
+<main class="page">
   <div class="notice active obs-bar" id="obs-bar" role="status" hidden><span class="grow"><b>OBS is open.</b> In its Settings: Output, Replay Buffer for the clip length; Video for the quality; Output, Recording for the encoder, the format and the tracks; Hotkeys. The levels: its Audio Mixer.</span><div class="actions"><button class="small primary" id="obs-bar-hide" type="button">Hide OBS</button></div></div>
   <div class="notice active update-ask" id="update-ask" role="status" hidden><span class="grow"><b id="update-ask-title"></b> <span id="update-ask-words"></span></span><div class="actions"><button class="small primary" id="update-ask-install" type="button">Install now</button><button class="small" id="update-ask-later" type="button">Later</button></div></div>
 
   <div class="page-head" id="settings-head">
-    <a class="crumb" href="#" id="crumb" hidden>Settings</a><span class="crumb-sep" aria-hidden="true" hidden>/</span>
-    <h1 id="page-title">Settings</h1>
-    <span class="sub" id="page-sub">a change saves as you make it</span>
+    <h1>Settings</h1>
+    <span class="sub">a change saves as you make it</span>
     <div class="tools"><input type="search" id="settings-filter" placeholder="Filter settings" aria-label="Filter settings" autocomplete="off"></div>
   </div>
-  <div class="settings one" id="settings" data-section="first">
+  <div class="settings" id="settings" data-section="first">
+    <nav class="sections" id="app-nav" aria-label="Sections"></nav>
+    <select class="sections-select" id="app-select" aria-label="Section"></select>
     <div id="sections-body">
 
       <div class="group first" id="g-first" data-app-section="first" hidden>
@@ -30,7 +31,7 @@
             <div class="srow length-row" data-key="obs.setup.clip_seconds" data-kind="length" id="length-row"><div class="slabel"><b>Clip length</b><span class="shelp" id="length-help">what a save keeps, up to 30 minutes</span><span class="snote effect" id="length-effect" aria-live="polite"></span></div><div class="sctl"><span class="len"><input type="range" min="0" max="5" step="1" value="2" aria-label="Clip length, in steps" id="length-stops"><span class="len-marks" aria-hidden="true"><span>15 s</span><span>30 s</span><span>1 min</span><span>2 min</span><span>5 min</span><span>10 min</span></span></span><span class="ctl-group"><input type="number" class="in-num" min="5" max="1800" aria-label="Clip length" id="length-n"><span class="unit">s</span></span><span class="err" hidden></span></div></div>
             <div class="srow cards-row" data-key="obs.setup.quality" data-kind="cards" id="quality-row"><div class="slabel"><b>Quality</b><span class="shelp" id="quality-help">the picture every clip and session recording gets, and what it costs</span></div><div class="cards presets" role="radiogroup" aria-label="Quality"><button type="button" class="card preset" role="radio" aria-checked="false" data-value="light"><b>Light</b><span class="p-res" data-res="light"></span><span class="p-line">half the load</span><span class="p-size" data-size="light"></span></button><button type="button" class="card preset" role="radio" aria-checked="false" data-value="smooth"><b>Smooth</b><span class="p-res" data-res="smooth"></span><span class="p-line">most games</span><span class="p-size" data-size="smooth"></span></button><button type="button" class="card preset" role="radio" aria-checked="false" data-value="sharp"><b>Sharp</b><span class="p-res" data-res="sharp"></span><span class="p-line">small text</span><span class="p-size" data-size="sharp"></span></button><button type="button" class="card preset" role="radio" aria-checked="false" data-value="native"><b>Native</b><span class="p-res" data-res="native"></span><span class="p-line">the screen as it is</span><span class="p-size" data-size="native"></span></button></div><span class="err" hidden></span></div>
             <div class="srow" id="quality-own-row" data-off hidden><div class="slabel"><b>Quality</b><span class="shelp" id="quality-own"></span></div><div class="sctl"><button class="small" type="button" data-go-section="capture">Capture</button></div></div>
-            <div class="srow" data-key="hotkeys.save" data-kind="hotkey"><div class="slabel"><b>Save a clip</b><span class="shelp" data-standalone-text="its key, anywhere, also in a game; OBS saves the replay and it goes into the library on this PC">its key, anywhere, also in a game; OBS saves the replay and it goes up as any clip does</span><span class="snote" id="hotkey-line" aria-live="polite"></span><span class="snote" id="hotkeys-how" hidden></span></div><div class="sctl"><button type="button" class="hotkey" aria-label="Hotkey: Save a clip"></button><span class="why" aria-live="polite" hidden></span><span class="err" hidden></span></div></div>
+            <div class="srow" data-key="hotkeys.save" data-kind="hotkey"><div class="slabel"><b>Save a clip</b><span class="shelp" data-standalone-text="its key, anywhere, also in a game; OBS saves the replay and it goes into the library on this PC">its key, anywhere, also in a game; OBS saves the replay and it goes up as any clip does</span><span class="snote hotkey-line" aria-live="polite" hidden></span><span class="snote hotkeys-how" hidden></span></div><div class="sctl"><button type="button" class="hotkey" aria-label="Hotkey: Save a clip"></button><span class="why" aria-live="polite" hidden></span><span class="err" hidden></span></div></div>
           </div>
         </div>
         <h2 class="q-h" data-box="reel">Sound</h2>
@@ -51,9 +52,6 @@
             <div class="srow" data-key="startup.autostart" data-kind="bool"><div class="slabel"><b data-linux-text="Start at logon">Start with Windows</b><span class="shelp">hidden in the tray, so no clip is missed</span></div><div class="sctl"><button type="button" class="switch" role="switch" aria-checked="false" aria-label="Start with Windows" data-linux-label="Start at logon"><i></i></button><span class="err" hidden></span></div></div>
           </div>
         </div>
-        <h2 class="q-h">More</h2>
-        <nav class="panel rows" id="more" aria-label="This PC's pages"></nav>
-        <div id="more-reel"></div>
       </div>
 
       <div class="group status" id="g-status" data-app-section="status" hidden>
@@ -161,7 +159,7 @@
           </div>
         </div>
         <div class="panel" data-standalone="hide">
-          <header><h2>Keys</h2><span class="desc">anywhere, also in a game; Save a clip is on Settings' first page</span></header>
+          <header><h2>Keys</h2><span class="desc">anywhere, also in a game; Save a clip is under Essentials, and every key under Hotkeys</span></header>
           <div class="body flush">
             <div class="srow" data-key="hotkeys.save_share" data-kind="hotkey" data-standalone="hide"><div class="slabel"><b>Save and share</b><span class="shelp">OBS saves the replay, the app uploads it (with Keep the last, when set), waits until it embeds, copies the link and plays the cue</span></div><div class="sctl"><button type="button" class="hotkey" aria-label="Hotkey: Save and share"></button><span class="why" aria-live="polite" hidden></span><span class="err" hidden></span></div></div>
             <div class="srow" data-key="hotkeys.share_last" data-kind="hotkey" data-standalone="hide"><div class="slabel"><b>Share the last clip</b><span class="shelp">asks the server for the link, waits until it embeds, copies it, plays the cue</span></div><div class="sctl"><button type="button" class="hotkey" aria-label="Hotkey: Share the last clip"></button><span class="why" aria-live="polite" hidden></span><span class="err" hidden></span></div></div>
@@ -303,6 +301,21 @@
         </details>
       </div>
 
+      <div class="group" id="g-hotkeys" data-app-section="hotkeys" hidden>
+        <p class="section-line">Every key of the app in one place. Each also sits with the settings it belongs to, on the page named under it: a change in either place is the same key.</p>
+        <div class="panel">
+          <header><h2>Keys</h2><span class="desc">anywhere, also in a game</span></header>
+          <div class="body flush">
+            <div class="srow" data-key="hotkeys.save" data-kind="hotkey"><div class="slabel"><b>Save a clip</b><span class="shelp" data-standalone-text="its key, anywhere, also in a game; OBS saves the replay and it goes into the library on this PC">its key, anywhere, also in a game; OBS saves the replay and it goes up as any clip does</span><span class="snote also">also under <a href="#" data-app-section="first">Essentials</a></span></div><div class="sctl"><button type="button" class="hotkey" aria-label="Hotkey: Save a clip"></button><span class="why" aria-live="polite" hidden></span><span class="err" hidden></span></div></div>
+            <div class="srow" data-key="hotkeys.save_share" data-kind="hotkey" data-standalone="hide"><div class="slabel"><b>Save and share</b><span class="shelp">OBS saves the replay, the app uploads it (with Keep the last, when set), waits until it embeds, copies the link and plays the cue</span><span class="snote also">also under <a href="#" data-app-section="clips">Clips</a></span></div><div class="sctl"><button type="button" class="hotkey" aria-label="Hotkey: Save and share"></button><span class="why" aria-live="polite" hidden></span><span class="err" hidden></span></div></div>
+            <div class="srow" data-key="hotkeys.share_last" data-kind="hotkey" data-standalone="hide"><div class="slabel"><b>Share the last clip</b><span class="shelp">asks the server for the link, waits until it embeds, copies it, plays the cue</span><span class="snote also">also under <a href="#" data-app-section="clips">Clips</a></span></div><div class="sctl"><button type="button" class="hotkey" aria-label="Hotkey: Share the last clip"></button><span class="why" aria-live="polite" hidden></span><span class="err" hidden></span></div></div>
+            <div class="srow" data-key="hotkeys.upload_last" data-kind="hotkey" data-standalone="hide"><div class="slabel"><b>Upload the last clip</b><span class="shelp">with Upload set to the last, on its key; harmless otherwise</span><span class="snote also">also under <a href="#" data-app-section="upload">Uploads</a></span></div><div class="sctl"><button type="button" class="hotkey" aria-label="Hotkey: Upload the last clip"></button><span class="why" aria-live="polite" hidden></span><span class="err" hidden></span></div></div>
+            <div class="srow" data-key="hotkeys.record" data-kind="hotkey"><div class="slabel"><b>Record a session</b><span class="shelp" data-standalone-text="starts a recording of the whole session, and stops it; the recording goes into the library on this PC">starts a recording of the whole session, and stops it; the recording goes up as any clip does once it stops</span><span class="snote also">also under <a href="#" data-app-section="session">Session recording</a></span></div><div class="sctl"><button type="button" class="hotkey" aria-label="Hotkey: Record a session"></button><span class="why" aria-live="polite" hidden></span><span class="err" hidden></span></div></div>
+          </div>
+          <div class="body" hidden><p class="small hotkey-line" aria-live="polite" hidden></p><p class="muted small hotkeys-how" hidden></p></div>
+        </div>
+      </div>
+
       <div class="group games" id="g-games" data-app-section="games" hidden>
         <div id="games-list">
           <p class="section-line" id="games-line">Which programs are games, the name each gives its clips, and what one program does apart from its class.</p>
@@ -335,7 +348,7 @@
       </div>
 
       <div class="group" id="g-upload" data-app-section="upload" hidden>
-        <p class="section-line">How clips go up to the server: chunked, resumed after a drop, checked by hash on both ends. Whether each goes up by itself is on Settings' first page.</p>
+        <p class="section-line">How clips go up to the server: chunked, resumed after a drop, checked by hash on both ends. Whether each goes up by itself is under Essentials.</p>
         <div class="panel" id="upload-panel">
           <header><h2>Uploads</h2></header>
           <div class="body flush" id="upload-rows">
@@ -349,7 +362,7 @@
       </div>
 
       <div class="group" id="g-startup" data-app-section="startup" hidden>
-        <p class="section-line">The app in the tray, its new versions, and what it is. Whether it starts with your session is on Settings' first page.</p>
+        <p class="section-line">The app in the tray, its new versions, and what it is. Whether it starts with your session is under Essentials.</p>
         <div class="panel">
           <header><h2>The tray</h2></header>
           <div class="body flush">

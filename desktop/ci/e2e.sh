@@ -155,18 +155,17 @@ kill $OBS_PID 2>/dev/null || true
 
 say "a hotkey recorded: Share the last clip's field listens, Ctrl+Alt+Y is tried, saved, and shares"
 settings_has() { python3 -c 'import json, sys; s = json.load(open(sys.argv[1])); sys.exit(0 if s["hotkeys"][sys.argv[2]] == sys.argv[3] else 1)' "$ROOT/config/settings.json" "$1" "$2"; }
-n=$(log_n 'app page section=clips')
-"$APP" --section=clips >/dev/null 2>&1 &
-wait_more 20 "Settings, Clips" 'app page section=clips' "$n"
+n=$(log_n 'app page section=hotkeys')
+"$APP" --section=hotkeys >/dev/null 2>&1 &
+wait_more 20 "Settings, Hotkeys" 'app page section=hotkeys' "$n"
 WIN=$(xdotool search --name '^reel$' | head -1 || true)
 [ -n "$WIN" ] || fail "no window for the hotkeys"
 xdotool windowmove "$WIN" 0 0 2>/dev/null || true
 xdotool windowactivate --sync "$WIN" 2>/dev/null || true
 sleep 1
 import -display "$DISPLAY" -window "$WIN" "$SHOTS/hotkeys.png"
-# Share the last clip's field, the last row of Clips' Keys, under Save a clip now, the replay
-# buffer of one's own OBS and What a clip keeps
-SHARE_FIELD="${REEL_E2E_SHARE_FIELD:-896 748}"
+# Share the last clip's field, the third row of Hotkeys
+SHARE_FIELD="${REEL_E2E_SHARE_FIELD:-1003 471}"
 n=$(log_n "hotkeys off while a field listens")
 xdotool mousemove $SHARE_FIELD click 1
 wait_more 10 "the app's hotkeys to go off while the field listens" "hotkeys off while a field listens" "$n"
@@ -271,61 +270,55 @@ n=$(log_n "$APP_PAGE")
 xdotool key --clearmodifiers alt+Right
 wait_more 15 "Forward to the app's page" "$APP_PAGE" "$n"
 sleep 1
-# General, among the server's pages at the foot of Settings' first page, at y=634 with the page at
-# its end; then Status, the last of This PC's eight in the server's nav, its rows 31 px apart from 167
+# Library and storage in the nav of Essentials; then Status in the server's page's nav, at the same
+# place as the app's. The nav's rows: under This PC, Clips at y=198 to Status at 446, 31 px apart;
+# Library and storage at 511
+NAV_X=${REEL_E2E_NAV_X:-200}
+STORAGE_PAGE="library loaded at=$HOST/settings/storage"
 n=$(log_n 'app page section=first')
 "$APP" --section=first >/dev/null 2>&1 &
-wait_more 15 "Settings' first page" 'app page section=first' "$n"
+wait_more 15 "Essentials" 'app page section=first' "$n"
 sleep 1
-xdotool mousemove 640 400 click --repeat 40 --delay 20 5
-sleep 1
-n=$(log_n "$REEL_PAGE")
-xdotool mousemove 640 "${REEL_E2E_FOOT_GENERAL:-634}" click 1
-wait_more 15 "General from the app's page" "$REEL_PAGE" "$n"
+n=$(log_n "$STORAGE_PAGE")
+xdotool mousemove "$NAV_X" "${REEL_E2E_NAV_STORAGE:-511}" click 1
+wait_more 15 "Library and storage from the app's page" "$STORAGE_PAGE" "$n"
 sleep 2
 n=$(log_n "$APP_PAGE")
-xdotool mousemove 60 "${REEL_E2E_NAV_STATUS:-384}" click 1
+xdotool mousemove "$NAV_X" "${REEL_E2E_NAV_STATUS:-446}" click 1
 wait_more 15 "Status from reel's page" "$APP_PAGE" "$n"
 log_has "handed over the shape" || fail "the server's page did not hand the shape over"
-n=$(log_n "$REEL_PAGE")
+n=$(log_n "$STORAGE_PAGE")
 xdotool key --clearmodifiers alt+Left
-wait_more 15 "Back to the server's page again" "$REEL_PAGE" "$n"
+wait_more 15 "Back to the server's page again" "$STORAGE_PAGE" "$n"
 xdotool mousemove 640 760
 echo "the switch works both ways, and so does Back"
 
-say "the app's pages open from More on Settings' first page, each with the crumb back, and Back walks them"
+say "the app's pages open from the nav, each at its top, and Back walks them"
 n=$(log_n 'app page section=first')
 "$APP" --section=first >/dev/null 2>&1 &
-wait_more 20 "Settings' first page" 'app page section=first' "$n"
+wait_more 20 "Essentials" 'app page section=first' "$n"
 sleep 1
-# with the first page at its end, More's last five rows are at the top, 43 px apart from y=72;
-# the crumb's Settings, over each page, goes back to the first page
-walk=(games:72 upload:115 server:158 startup:201 status:244)
+walk=(clips:198 session:229 capture:260 hotkeys:291 games:322 upload:353 server:384 startup:415 status:446)
 for entry in "${walk[@]}"; do
   sec=${entry%%:*}
-  xdotool mousemove 640 400 click --repeat 40 --delay 20 5
-  sleep 1
   n=$(log_n "app page section=$sec")
-  xdotool mousemove 640 "${entry#*:}" click 1
-  wait_more 10 "the $sec page by its row" "app page section=$sec" "$n"
+  xdotool mousemove "$NAV_X" "${entry#*:}" click 1
+  wait_more 10 "the $sec page from the nav" "app page section=$sec" "$n"
   sleep 1
-  n=$(log_n "app page section=first")
-  xdotool mousemove 300 81 click 1
-  wait_more 10 "the first page by the crumb over $sec" "app page section=first" "$n"
 done
-back=(status first startup first server first upload first games)
+back=(startup server upload games hotkeys capture session clips first)
 for sec in "${back[@]}"; do
   n=$(log_n "app page section=$sec")
   xdotool key --clearmodifiers alt+Left
   wait_more 10 "Back to the $sec page" "app page section=$sec" "$n"
 done
-for old in obs:capture hotkeys:first sounds:clips log:status; do
+for old in obs:capture hotkeys:hotkeys sounds:clips log:status; do
   n=$(log_n "app page section=${old#*:}")
   "$APP" "--section=${old%%:*}" >/dev/null 2>&1 &
   wait_more 10 "the page that holds ${old%%:*} now" "app page section=${old#*:}" "$n"
 done
 xdotool mousemove 640 760
-echo "More's rows open their pages, the crumb comes back, Back walks them, and the ids of the pages before open the pages that hold them now"
+echo "the nav opens each of this PC's pages, Back walks them, and the ids of the pages before open the pages that hold them now"
 
 say "cues played, from the log"
 cat "$LOG"/reel-desktop.log* | grep -o 'cue [a-z_]* played ([^)]*)' | sort | uniq -c

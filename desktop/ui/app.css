@@ -125,15 +125,9 @@ dialog.games-dialog .add-body { display: flex; flex-direction: column; gap: var(
   .games-head #games-find { width: 100%; }
 }
 .games-dialog .server-titles { padding: 6px 0 0; border-top: 1px solid var(--line); border-bottom: 0; }
-.one-page > .page-head, .one-page > .notice, .settings.one { max-width: 760px; margin-left: auto; margin-right: auto; }
-.settings.one { display: block; }
-.page-head .crumb { font-size: var(--fs-xl); color: var(--text-2); letter-spacing: -0.01em; line-height: 1.3; }
-.page-head .crumb:hover { color: var(--text); text-decoration: none; }
-.page-head .crumb-sep { font-size: var(--fs-xl); color: var(--text-3); margin: 0 -6px; line-height: 1.3; }
 .summary { margin: 0 0 var(--s5); padding: 14px 16px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); color: var(--text-2); font-size: var(--fs-l); line-height: 1.5; }
 .summary b { color: var(--text); font-weight: 500; }
 .q-h { display: flex; align-items: baseline; gap: 10px; font-size: var(--fs-s); font-weight: 400; color: var(--text-3); margin: 0 0 6px 2px; white-space: normal; }
-.q-h .q-aside { font-size: var(--fs-xs); }
 .group > .q-h:not(:first-child) { margin-top: var(--s5); }
 .group.first .panel { margin-bottom: 0; }
 .hit-page { font-size: var(--fs-s); font-weight: 400; color: var(--text-3); margin: var(--s4) 0 6px 2px; }
@@ -158,29 +152,21 @@ dialog.games-dialog .add-body { display: flex; flex-direction: column; gap: var(
 .length-row .len-marks { display: flex; justify-content: space-between; color: var(--text-3); font-size: var(--fs-xs); font-variant-numeric: tabular-nums; }
 .length-row .sctl .err { flex: none; }
 .srow.length-row { grid-template-columns: minmax(0, 1fr) auto; }
-.panel.rows { display: block; }
-.row-link { display: grid; grid-template-columns: auto minmax(0, 1fr) 14px; align-items: center; gap: var(--s4); padding: 11px var(--s3); border-bottom: 1px solid var(--line); color: var(--text); }
-.row-link:last-child { border-bottom: 0; }
-.row-link:hover { background: var(--raised); text-decoration: none; color: var(--text); }
-.row-link b { font-weight: 500; white-space: nowrap; }
-.row-link .n { color: var(--text-3); font-weight: 400; font-size: var(--fs-s); margin-left: 2px; }
-.row-link .n.to-sort { color: var(--warn); }
-.row-link .state, .row-link .line { color: var(--text-3); font-size: var(--fs-s); text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.row-link .state .dot { margin-right: 6px; }
-.row-link .chev { width: 14px; height: 14px; color: var(--text-3); }
-.row-link.disabled { opacity: 0.5; pointer-events: none; }
 .panel > .body.flush + .body.flush:not(:empty) { border-top: 1px solid var(--line); }
 #obs-more > .panel { margin-bottom: var(--gap-panels); }
 #discord-notice { margin-bottom: var(--gap-panels); }
 #log-panel { scroll-margin-top: 66px; }
+/* the server's frame, also under a released server's stylesheet, which the page takes when paired */
+.page > .notice, .settings, .page-head:has(~ .settings) { max-width: 974px; margin-left: auto; margin-right: auto; }
+@media (min-width: 960px) { .settings { grid-template-columns: 190px minmax(0, 760px); gap: 24px; } }
+.sections, body.has-appbar .sections { max-height: calc(100vh - 128px - var(--appbar)); }
+.sections > * { flex-shrink: 0; }
+.sections a.disabled { opacity: 0.5; pointer-events: none; }
+.srow .snote.also a { color: var(--text-2); text-decoration: underline; text-decoration-color: var(--text-3); text-underline-offset: 3px; }
 @media (max-width: 719px) {
   .cards.presets { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .cards.modes { grid-template-columns: minmax(0, 1fr); }
   .srow.length-row { grid-template-columns: minmax(0, 1fr); }
   .length-row .sctl { justify-content: flex-start; flex-wrap: wrap; }
   .length-row .len { flex: 1 1 200px; }
-  .row-link { grid-template-columns: minmax(0, 1fr) 14px; row-gap: 2px; }
-  .row-link .state, .row-link .line { grid-column: 1; grid-row: 2; text-align: left; white-space: normal; }
-  .row-link .chev { grid-column: 2; grid-row: 1 / span 2; }
-  .page-head .crumb, .page-head .crumb-sep { font-size: var(--fs-l); }
 }

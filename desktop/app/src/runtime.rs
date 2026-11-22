@@ -1078,7 +1078,7 @@ impl Runtime {
             panel: Default::default(),
             pages: Default::default(),
         };
-        st.pages = crate::pages::of(&g.settings, &st, &g.programs);
+        st.pages = crate::pages::of(&g.settings, &st);
         drop(g);
         st.library = self.library_line();
         st.panel = crate::status::panel(&st);

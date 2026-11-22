@@ -190,7 +190,7 @@ pub struct Status {
     pub data_dir: String,
     pub library: crate::library::LibraryLine,
     pub panel: Panel,
-    /// Settings in words: the first page's sentence and each page's line.
+    /// Settings in words: Essentials' sentence of what is set.
     pub pages: crate::pages::Pages,
 }
 

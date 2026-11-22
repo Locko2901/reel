@@ -202,7 +202,6 @@ pub fn section_ok(s: &str) -> bool {
 pub fn alias(id: &str, standalone: bool) -> &str {
     match id {
         "obs" => "capture",
-        "hotkeys" => "first",
         "sounds" => "clips",
         "log" => "status/log",
         "upload" if standalone => "clips",
@@ -740,7 +739,6 @@ mod tests {
         for (old, standalone, now) in [
             ("obs", false, "capture"),
             ("obs", true, "capture"),
-            ("hotkeys", false, "first"),
             ("sounds", true, "clips"),
             ("log", false, "status/log"),
             ("upload", true, "clips"),
@@ -758,6 +756,7 @@ mod tests {
             "clips",
             "session",
             "capture",
+            "hotkeys",
             "games",
             "games/steam-570",
             "server",
