@@ -225,8 +225,8 @@ With your own OBS, Settings, **Capture**, **The OBS behind it** has
   password. Copy it into **Password** in the app and press **Test**.
 - **The replay buffer, "off in OBS"**: in OBS, Settings, **Output**,
   **Replay Buffer**, tick **Enable Replay Buffer**, then press **Start
-  Replay Buffer**; or turn on **Start the replay buffer** in the app and
-  reel does both. reel does not change it while OBS records.
+  Replay Buffer**; or turn on Settings, Clips,
+  [**Start it in OBS**](settings/clips.md#obs-start-replay) in the app and reel does both. reel does not change it while OBS records.
 
 With reel's own OBS, the app runs OBS itself. If OBS does not answer,
 the setup's steps say so at the top, with **Show the log**, and This

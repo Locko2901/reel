@@ -25,10 +25,10 @@ incoming clips (`REEL_INCOMING_DIR`).
 
 | Folder | Setting | What lives there | Where it goes best |
 |---|---|---|---|
-| Data | [Data folder](configuration.md#data-folder) | `reel.db`, `cache/`, `uploads/` | a fast local disk |
-| Library | [Library folder](configuration.md#library-folder) | a folder per clip with every version, posters, loops and filmstrips; `.trash/`; `.reel-library` | a NAS or a big slow drive |
-| Originals | [Originals folder](configuration.md#originals-folder) | the raw file of a re-encoded clip | a NAS or a big slow drive |
-| Incoming | [Incoming folder](configuration.md#incoming-folder) | clips waiting to be taken in | wherever the recorder or the sync tool writes |
+| Data | [Data folder](settings/storage.md#data-dir) | `reel.db`, `cache/`, `uploads/` | a fast local disk |
+| Library | [Library folder](settings/storage.md#library-dir) | a folder per clip with every version, posters, loops and filmstrips; `.trash/`; `.reel-library` | a NAS or a big slow drive |
+| Originals | [Originals folder](settings/storage.md#ingest-originals-dir) | the raw file of a re-encoded clip | a NAS or a big slow drive |
+| Incoming | [Incoming folder](settings/storage.md#ingest-incoming-dir) | clips waiting to be taken in | wherever the recorder or the sync tool writes |
 
 ## A recommended layout
 
@@ -70,7 +70,7 @@ page's disk line, Settings, Status) name each disk once, for what is on
 it:
 `data disk 412.0 GB free of 485.2 GB; library and originals disk 9.8 TB free of 15.0 TB`.
 
-The [Disk warning](configuration.md#disk-warning) watches each of them:
+The [Disk warning](settings/storage.md#storage-disk-warn-gb) watches each of them:
 the data disk, the library's and the originals'.
 
 ## The trash lives in the library

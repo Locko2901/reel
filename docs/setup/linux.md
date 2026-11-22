@@ -175,7 +175,7 @@ With a server of your own ([The server](server.md)), every clip goes up as you s
    **Server URL** (`https://clips.example.com`) and the **Pairing code**, and press **Pair**. The
    setup moves on to **Done**, and the library opens once you finish it.
 3. Otherwise, follow [Add a server later](standalone.md#add-a-server-later): pair under Settings,
-   **Server**, then set **Mode** to **connected**.
+   [**Connection**](../settings/connection.md), then set **Mode** to **connected**.
 
 The device's token is kept in `~/.config/reel/token`, readable by your user alone. **Revoke** under
 Settings, Devices on the server signs the PC out.

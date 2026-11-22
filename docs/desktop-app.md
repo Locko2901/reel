@@ -227,21 +227,25 @@ to another changes the page and nothing around it. In a narrow window the nav is
 of the page. Back and Forward come back to where you were on a page; a page opened from the nav
 starts at its top.
 
+A setting shows its name and its control; the small question mark beside the name says what it
+does (hover it, or click it to keep it open), and its **More in the docs** link lands on the
+setting's entry in [Settings](settings/index.md), which explains every setting of every page.
+
 ![Settings, Essentials](img/app-settings.png)
 
 | Page | Where | What it holds |
 |---|---|---|
-| **Clips** | This PC | **Save a clip now**; with your own OBS **Start it in OBS**, which starts its replay buffer; **Keep the last**; connected, the keys **Save and share** and **Share the last clip**; the **Sounds** (clip captured, no clip, clip uploaded or in standalone clip in the library, and link copied), each on or off, with a volume, a WAV file of your own and **Preview**; and **On this PC**: the **Clips folder** and, connected, how long a clip stays on the PC after the server has it |
-| **Session recording** | This PC | **Record a session**, its key; **With a game**: every game records by itself, and the recording stops when its game closes; the reminders while a [session recording](#recording-a-whole-session) runs: **Remind every** and their sound, on or off, with a volume, a WAV file of your own and **Preview**; the sound also plays when a recording starts |
-| **Capture** | This PC | **Picture** (the encoder and the format; with your own OBS, the format and the bitrate), **What it captures** (the game in front, games that run as administrator), **Sound** (desktop audio, the game alone, Discord alone, the microphone's noise suppression and gate, a track for each source, the levels), and **The OBS behind it**: with reel's own OBS (the one that came with reel on Windows, the installed one run a second time on Linux) which OBS and how it runs, **Open OBS** on Windows and **Run the setup again**; with your own OBS the obs-websocket connection with **Run the setup**. Folded under it: **What reel needs from OBS**, **What OBS is set to** (its profile among it) and how reel finds a new clip (**Follow OBS**, the file endings, **Still for**) |
-| **Hotkeys** | This PC | every hotkey of the app, each set there or with the settings it belongs to: **Save a clip** (also under Essentials), **Save and share** and **Share the last clip** (also under Clips), **Upload the last clip** (also under Uploads) and **Record a session** (also under Session recording); on Linux, how a hotkey reaches the app. See [Hotkeys](#hotkeys) |
-| **Games and apps** | This PC | the programs reel has seen: which ones are games, and the name each gives its clips; Steam's installed games come in by themselves; **Show on Discord**; and **When a game closes**, its grace period. The count beside it is of those not sorted yet. See [Games and apps](games-and-apps.md) |
-| **Uploads** | This PC, connected | **Upload the last clip**, its key; on Windows **Uploads wait while a game has the screen**, off unless you turn it on (never for a Save and share, whose upload goes at once, ahead of the others); a bandwidth limit and the chunk size. See [The waits](games-and-apps.md#the-waits) |
-| **Connection** | This PC | **Mode** (connected or standalone), the **Server URL**, the **Device name** and the pairing; in standalone under **A server, later**, and with a server paired **Sending to it**, its bandwidth limit and chunk size |
-| **App** | This PC | the **Tray icon**, the app's **Updates**, its **Versions**, and **About** (the version, the folders the app keeps its settings and data in, and on Windows **Uninstall reel...**); in standalone **Look for new versions on GitHub** |
-| **Status** | This PC | the connections (the server, OBS, the clips folder, the hotkeys, on Linux the tray), the queue with **Upload now** and **Retry**, the last clips with **Copy link** and **Open**, and the **Log**: what the app did, newest at the bottom, the **Log level** and **Open the log folder**. In standalone: the library on this PC in place of the server, a **Standalone** panel (where the library lives, the encoder, ffmpeg), **Add now** and **Retry** to take a clip into the library, the last clips with **Open**, and **Upload to the server** once a server is paired |
-| **Library folder** (standalone) | Library | where the library is on this PC, with **Move** and **Make a copy**, the **Library cap** and **The cap spares unsent clips** |
-| **Encoding** (standalone) | Library | the **GPU encoder** and the one in use, **Copies on the GPU**, and on Windows **Encoding waits while a game has the screen**, off unless you turn it on. See [The waits](games-and-apps.md#the-waits) |
+| [Clips](settings/clips.md) | This PC | saving a clip now, what each clip keeps, the keys and the sounds of a clip, the clips folder and what stays on this PC |
+| [Session recording](settings/session.md) | This PC | recording a whole session, by hand or with a game, and its reminders |
+| [Capture](settings/capture.md) | This PC | the picture, what OBS captures, the sound and its tracks, the OBS behind it, how reel finds a new clip |
+| [Hotkeys](settings/hotkeys.md) | This PC | every key of the app; see [Hotkeys](#hotkeys) |
+| [Games and apps](settings/games.md) | This PC | which programs are games and the name each gives its clips, Steam, Discord, the grace period; see [Games and apps](games-and-apps.md) |
+| [Uploads](settings/uploads.md) | This PC, connected | the upload key, the waits while a game has the screen, the bandwidth and the chunk size; see [The waits](games-and-apps.md#the-waits) |
+| [Connection](settings/connection.md) | This PC | connected or standalone, the server, the device's name, the pairing |
+| [App](settings/app.md) | This PC | the tray icon, new versions, the versions in use, about the app |
+| [Status](settings/status.md) | This PC | the connections, the queue, the last clips, the log |
+| [Library folder](settings/library-folder.md) (standalone) | Library | where the library is on this PC, a copy of it, its cap |
+| [Encoding](settings/encoding.md) (standalone) | Library | the GPU encoder and the copies on it; see [The waits](games-and-apps.md#the-waits) |
 
 ![Settings, Status](img/app-status.png)
 
@@ -261,11 +265,11 @@ recording**. A key set in one place is the same key in the other.
 
 | Hotkey | Default | What it does |
 |---|---|---|
-| **Share the last clip** | Ctrl+Alt+S | asks the server for the newest clip's link, waits until its link preview is ready, copies it and plays the cue |
-| **Save and share** | Ctrl+Alt+Shift+S | OBS saves the replay, the app uploads it, waits until its link preview is ready and copies the link |
-| **Save a clip** | none (Alt+F10 after the setup) | OBS saves the replay; the clip goes into the library, or up to the server like any clip, without a link |
-| **Upload the last clip** | Ctrl+Alt+U | for the upload mode **the last clip, on the hotkey**; harmless otherwise |
-| **Record a session** | Alt+F9 | starts a [session recording](#recording-a-whole-session), and stops the one that runs |
+| [**Share the last clip**](settings/hotkeys.md#hotkeys-share-last) | Ctrl+Alt+S | asks the server for the newest clip's link, waits until its link preview is ready, copies it and plays the cue |
+| [**Save and share**](settings/hotkeys.md#hotkeys-save-share) | Ctrl+Alt+Shift+S | OBS saves the replay, the app uploads it, waits until its link preview is ready and copies the link |
+| [**Save a clip**](settings/hotkeys.md#hotkeys-save) | none (Alt+F10 after the setup) | OBS saves the replay; the clip goes into the library, or up to the server like any clip, without a link |
+| [**Upload the last clip**](settings/hotkeys.md#hotkeys-upload-last) | Ctrl+Alt+U | with **Upload** set to **the last, on its key**; harmless otherwise |
+| [**Record a session**](settings/hotkeys.md#hotkeys-record) | Alt+F9 | starts a [session recording](#recording-a-whole-session), and stops the one that runs |
 
 In standalone only **Save a clip** and **Record a session** are taken. The other three make or
 copy a link, or upload, and need a server; from a desktop's own shortcut or the command line they
@@ -356,8 +360,8 @@ releases, and you see each step:
 The **Versions** panel on Settings, App names this app's version and kind, the server's, and
 the newest release. The **Versions** line of the bar's menu shows the version, or both while the app
 and its server differ ("app 1.4.1, server 1.4.0"). On the server, Settings, Devices,
-**App updates** has [Offer app updates](configuration.md#offer-app-updates), on by default, and a
-[Release token](configuration.md#release-token) for a private fork.
+**App updates** has [Offer app updates](settings/devices.md#device-app-updates), on by default, and a
+[Release token](settings/devices.md#device-updates-token) for a private fork.
 
 ## Uninstalling
 

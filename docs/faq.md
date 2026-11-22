@@ -188,7 +188,7 @@ share link's page carries the tags (`og:video`) that tell such an app
 where its preview video is, and the app plays it inline. Previewers give
 up fetching after a few seconds, so that preview is a copy small enough
 to arrive in time: 20 MB by default
-([Preview video size from the server](configuration.md#preview-video-size-from-the-server)).
+([Preview video size from the server](settings/sharing.md#share-embed-mb)).
 Anywhere else the link opens its page, which plays the clip in better
 quality and can offer the full file for download. See
 [Sharing and links](sharing.md).
@@ -210,7 +210,7 @@ Yes. Under **Send**, a clip's page makes a copy under a size to download
 and drop into a chat: 10, 20, 50, 100 or 500 MB by default, the upload
 limits of apps such as Discord. A copy is made once and kept for the
 next time, up to a set amount
-([Copies under a size](configuration.md#copies-under-a-size)). **Send**
+([Copies under a size](settings/storage.md#share-discord-cache-gb)). **Send**
 also makes an animated GIF or WebP of up to 15 seconds, for places that
 show pictures but no video. See
 [Send the file itself](sharing.md#send-the-file-itself).
@@ -226,7 +226,7 @@ montage. See [The editor](editor.md).
 
 Yes. By default reel keeps the raw file of every clip it had to encode
 again, in the originals folder; it can keep every one, or none
-([Keep originals](configuration.md#keep-originals)).
+([Keep originals](settings/storage.md#ingest-keep-originals)).
 
 ## Running it
 

@@ -293,14 +293,14 @@ provider to sign in, with no proxy asking first.
     `REEL_OIDC_CLIENT_SECRET_FILE` names. It is never stored in the
     database.
 
-3. Optional: set a [Role claim](../configuration.md#role-claim) such as
-   `groups`, and the [Admin value](../configuration.md#admin-value) in it
+3. Optional: set a [Role claim](../settings/access.md#auth-oidc-role-claim) such as
+   `groups`, and the [Admin value](../settings/access.md#auth-oidc-admin-value) in it
    that makes an admin. reel follows it at every sign-in. Or list the
    admins in `REEL_ADMINS` by the subject the provider sends for them,
    exactly, not by a name: Authentik's subject is the username unless the
    client says otherwise.
 4. Optional: name the provider on the sign-in button with
-   `REEL_OIDC_NAME: Authentik` ([Provider name](../configuration.md#provider-name)).
+   `REEL_OIDC_NAME: Authentik` ([Provider name](../settings/access.md#auth-oidc-name)).
 
 When it worked, the sign-in page has a button **Sign in with** followed
 by that name, or by your provider's address without one. A user who
@@ -314,8 +314,8 @@ and subject, never to a name, so a renamed account stays the same user.
 reel asks the provider only at a sign-in. Someone you disable there, or
 take out of the admin group, keeps a session they have, and its role,
 until it ends: 7 days without use, 30 at most, unless
-[Idle timeout](../configuration.md#idle-timeout) and
-[Session lifetime](../configuration.md#session-lifetime) say otherwise.
+[Idle timeout](../settings/access.md#auth-session-days) and
+[Session lifetime](../settings/access.md#auth-session-max-days) say otherwise.
 To end it at once, disable the user under Settings, **Access** too.
 
 ### No sign-in (single)
@@ -379,7 +379,7 @@ server then get their updates from it.
 
 A private fork's releases need a GitHub token that can read them: set it
 under Settings, **Devices**, **Release token**
-([`REEL_UPDATES_TOKEN`](../configuration.md#release-token)). You can also
+([`REEL_UPDATES_TOKEN`](../settings/devices.md#device-updates-token)). You can also
 put the installers into the data folder's `app-updates` folder by hand,
 each with its `.sig` file.
 
@@ -446,7 +446,7 @@ docker exec reel reel doctor
 
 | Folder | What lives there | Back it up |
 |---|---|---|
-| `./data` | `reel.db` (every clip, version, link, user and setting); `library/` (the clips with every version and poster, `.trash/` and `.reel-library`; it can live elsewhere with the [Library folder](../configuration.md#library-folder)); `cache/`; `uploads/`; `app-updates/` | `reel.db` and `library/`. The rest comes back by itself: `cache/` holds copies that are made again when asked for, `uploads/` holds uploads in flight, and `app-updates/` is fetched again. `library/.trash/` holds deleted clips waiting out their days. The files next to each version (`*.loop.mp4`, `*.strip.jpg`, `*.tint`, `*.kf.json`) can be made again: Settings, **Library and storage**, **Rebuild posters, loops and filmstrips**. |
+| `./data` | `reel.db` (every clip, version, link, user and setting); `library/` (the clips with every version and poster, `.trash/` and `.reel-library`; it can live elsewhere with the [Library folder](../settings/storage.md#library-dir)); `cache/`; `uploads/`; `app-updates/` | `reel.db` and `library/`. The rest comes back by itself: `cache/` holds copies that are made again when asked for, `uploads/` holds uploads in flight, and `app-updates/` is fetched again. `library/.trash/` holds deleted clips waiting out their days. The files next to each version (`*.loop.mp4`, `*.strip.jpg`, `*.tint`, `*.kf.json`) can be made again: Settings, **Library and storage**, **Rebuild posters, loops and filmstrips**. |
 | `./incoming` | raw clips dropped by a recorder or a sync tool. reel takes each in and removes it; `failed/` takes what ffmpeg cannot read, with a note | nothing, it is a drop folder |
 | `./originals` | the raw file of every re-encoded clip, named by the clip's id | yes, if you want the raw files back |
 

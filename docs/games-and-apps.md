@@ -232,8 +232,9 @@ keeps busy or a slow connection. They are off unless you turn them on (Windows):
 | standalone, with a server paired | Settings, **Encoding** | **Uploads and encoding wait while a game has the screen** | that, and the uploads to the server |
 | connected | Settings, **Uploads** | **Uploads wait while a game has the screen** | the uploads; a Save and share's goes at once all the same |
 
-Connected, **Only on the internet, not on the LAN** shows under it while it is on: then an
-upload to a server on the local network goes on during a game. An install updated from a
+Connected, and in standalone with a server paired,
+[**Only on the internet, not on the LAN**](settings/uploads.md#upload-pause-only-on-wan) shows
+under it while it is on: then an upload to a server on the local network goes on during a game. An install updated from a
 version before Games and apps starts with the waits off too.
 
 What waits, while which program is in front, comes from the [three

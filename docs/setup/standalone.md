@@ -25,7 +25,7 @@ A new install starts standalone, so there is usually nothing to do:
   on its **Where clips go** too ([Your own OBS](own-obs.md#2-the-setup)). Press **Next** to
   **Done**, then **Finish**.
 - An app that was paired with a server keeps that through an update. To switch it, open Settings,
-  **Server** and set **Mode** to **standalone**.
+  [**Connection**](../settings/connection.md#mode) and set **Mode** to **standalone**.
 
 When it worked, **Mode** says "reel runs on this PC", and the window shows the library.
 

@@ -56,12 +56,12 @@ else in the bucket. A bucket of reel's own is still the tidy choice.
 
     | Row | What to put there |
     |---|---|
-    | [S3 endpoint](configuration.md#s3-endpoint) | the S3 endpoint from step 4 |
-    | [Region](configuration.md#region) | `auto` |
-    | [Bucket](configuration.md#bucket) | `reel-previews` |
-    | [Access key](configuration.md#access-key) | the Access Key ID |
-    | [Secret key](configuration.md#secret-key) | the Secret Access Key; reel never shows it again |
-    | [Public address](configuration.md#public-address) | `https://media.example.com` |
+    | [S3 endpoint](settings/sharing.md#external-endpoint) | the S3 endpoint from step 4 |
+    | [Region](settings/sharing.md#external-region) | `auto` |
+    | [Bucket](settings/sharing.md#external-bucket) | `reel-previews` |
+    | [Access key](settings/sharing.md#external-access-key) | the Access Key ID |
+    | [Secret key](settings/sharing.md#external-secret-key) | the Secret Access Key; reel never shows it again |
+    | [Public address](settings/sharing.md#external-public-url) | `https://media.example.com` |
 
 6. Press **Test**. reel writes a small file, reads it back over the
    public address and deletes it. When it worked, it says so; when it did
@@ -91,20 +91,20 @@ preview at 35 Mbit/s takes about nine seconds. A preview
 
 The previews from storage can be larger than your server's, so they look
 sharper: [Preview video size from
-storage](configuration.md#preview-video-size-from-storage) is 40 MB by
+storage](settings/sharing.md#external-embed-mb) is 40 MB by
 default, against the server's 20. A version under that size, in H.264
 with AAC, goes up as it is. Any other gets a copy at that size, made when
 the clip comes in.
 
 ## The limit and what stays
 
-[Limit](configuration.md#limit) (5 GB by default) is the most reel keeps
+[Limit](settings/sharing.md#external-limit-gb) (5 GB by default) is the most reel keeps
 in the storage. reel counts it from its own records and checks it every
 ten minutes against a listing of `reel/`. When something would pass the
 limit, previews make room in this order, the last first:
 
 1. previews of links made within the
-   [Protected window](configuration.md#protected-window) (14 days by
+   [Protected window](settings/sharing.md#external-protect-days) (14 days by
    default): never removed for room;
 2. previews of links that were posted or opened, the most recently active
    first;
@@ -124,10 +124,10 @@ the same line.
 
 ## Made ahead
 
-[Made ahead](configuration.md#made-ahead) puts previews in the storage
+[Made ahead](settings/sharing.md#external-ahead) puts previews in the storage
 before any link exists, so a link you make later is instant. Choose **for
 edited clips**, or **for edited and new clips** (new for
-[New for](configuration.md#new-for) days after they come in, 7 by
+[New for](settings/sharing.md#external-new-days) days after they come in, 7 by
 default). With the desktop app's **Keep the last** set, every clip it
 sends keeps only its last seconds, which counts as an edit, so **for
 edited clips** covers every replay you save. These previews are the first
@@ -142,7 +142,7 @@ where each link's preview comes from: "preview from storage", or "preview
 from your server" with the reason.
 
 With **Notifications** set up, the event [the external storage needs a
-look](configuration.md#events) (on by default) tells you at 80 % and at
+look](settings/notifications.md#notify-events) (on by default) tells you at 80 % and at
 100 % of the limit, and when an upload or a delete fails.
 
 ## Discord keeps its preview
@@ -155,9 +155,9 @@ keeps the embed it had. Post the link again for one from the storage.
 
 With one-key sharing, every replay you save gets a link, and most of them
 you never send anywhere. [Revoke links never
-shared](configuration.md#revoke-links-never-shared), off by default,
+shared](settings/sharing.md#share-cleanup), off by default,
 revokes a link that no chat app ever fetched and no one ever opened,
-[Revoke after](configuration.md#revoke-after) days after it was made (30
+[Revoke after](settings/sharing.md#share-cleanup-days) days after it was made (30
 by default), and its preview leaves the storage.
 
 A link that was posted or opened even once is never revoked, however long

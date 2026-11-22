@@ -58,7 +58,7 @@ the app need them:
 - **Revoke** a link on the Shares page or on the clip's page. From that
   moment its page and its files answer "gone".
 - A link made with an expiry (1 day, 7 days or 30 days; see
-  [Expire](configuration.md#expire)) ends by itself.
+  [Expire](settings/sharing.md#share-expiry-default)) ends by itself.
 - A clip in the trash, or deleted, takes every link to it down with it.
 - A collection's link ends with **Revoke** on the collection's page, or
   when you make a new link for it, which replaces the old one.
@@ -82,13 +82,13 @@ private to one user.
 ## Who can sign in
 
 You set the mode when the container starts (see
-[Mode](configuration.md#mode)):
+[Mode](settings/access.md#auth-mode)):
 
 - **local** (the default): reel's own accounts. The first admin needs the
   setup code from the server's log, and admins add everyone else.
 - **proxy**: a sign-in in front of reel (Authentik, Authelia,
   oauth2-proxy) names the user in a header. reel believes it only from
-  the addresses in [Trusted proxies](configuration.md#trusted-proxies),
+  the addresses in [Trusted proxies](settings/access.md#auth-trusted-proxies),
   and refuses to start in this mode without that list.
 - **oidc**: an identity provider signs people in over OpenID Connect. A
   user is bound to the provider's issuer and subject, never to a display
@@ -116,10 +116,10 @@ You set the mode when the container starts (see
   same domain can set it. Every sign-in gets a new session id. The
   database keeps only a hash of each session's id, so a copy of the
   database signs nobody in.
-- A session ends after [Idle timeout](configuration.md#idle-timeout)
+- A session ends after [Idle timeout](settings/access.md#auth-session-days)
   without use (30 days by default, 7 behind an identity provider) and,
   however active, after
-  [Session lifetime](configuration.md#session-lifetime) (90 days, 30
+  [Session lifetime](settings/access.md#auth-session-max-days) (90 days, 30
   behind an identity provider).
 - **Sign out everywhere** (Settings, **Access**, with reel's own
   accounts) ends every session of your account. A changed password does
@@ -264,17 +264,17 @@ it (`127.0.0.1` and OBS's own password by default).
 Only these, and only while they are set:
 
 - **GitHub's releases**, once a day, to see whether a newer reel is out
-  ([Check for updates](configuration.md#check-for-updates), on by
-  default; [Repository](configuration.md#repository) names where). The
+  ([Check for updates](settings/advanced.md#advanced-update-check), on by
+  default; [Repository](settings/advanced.md#advanced-update-repo) names where). The
   request carries reel's version in its user agent and nothing else.
 - **The desktop app's installers**, from the public release of the
   server's own version, while
-  [Offer app updates](configuration.md#offer-app-updates) is on (by
+  [Offer app updates](settings/devices.md#device-app-updates) is on (by
   default): at start and once a day while one is missing, with no token
   and nothing of yours in the request. A
-  [Release token](configuration.md#release-token) is sent only when you
+  [Release token](settings/devices.md#device-updates-token) is sent only when you
   set one, for a private fork's releases.
-- **Your notifications**, when [Send to](configuration.md#send-to) is an
+- **Your notifications**, when [Send to](settings/notifications.md#notify-kind) is an
   ntfy topic or a webhook: the event, the clip, the reason and a link.
   They go over https unless the address is on your own network.
 - **Your identity provider**, in oidc mode.
@@ -294,7 +294,7 @@ Only these, and only while they are set:
 reel speaks plain HTTP, and the reverse proxy in front adds HTTPS. reel
 reads the visitor's address from `X-Forwarded-For`, and in proxy mode the
 user's name from `X-authentik-username`, only when the request comes from
-an address in [Trusted proxies](configuration.md#trusted-proxies). Anyone
+an address in [Trusted proxies](settings/access.md#auth-trusted-proxies). Anyone
 else is taken at their own address, and in proxy mode gets a 401, whatever
 the headers say. List the proxy's exact address (as `10.0.0.2/32`), never
 a whole network.

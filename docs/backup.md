@@ -14,7 +14,7 @@ example compose file:
 | What | Where | Back it up? |
 |---|---|---|
 | The database: every clip, version, link, collection, user, paired device and setting | `./data/reel.db` | Yes, always. Copy it as [below](#copy-the-database-safely). |
-| The clips: a folder per clip with every version (the original, the cuts, the preview videos), its poster, hover loop and filmstrip; the trash in `.trash/`; the `.reel-library` file | `./data/library/` | Yes. With a [Library folder](configuration.md#library-folder) set, back up that folder instead. |
+| The clips: a folder per clip with every version (the original, the cuts, the preview videos), its poster, hover loop and filmstrip; the trash in `.trash/`; the `.reel-library` file | `./data/library/` | Yes. With a [Library folder](settings/storage.md#library-dir) set, back up that folder instead. |
 | Settings written in a file, if you made one | `./data/config.toml` | Yes, when it is there. Settings changed in reel's own Settings are in the database. |
 | The raw file of each clip reel had to encode again | `./originals` | If you want the raw recordings back. reel plays every clip without them. |
 | Your compose file, with the environment it sets | `docker-compose.yml` | Yes. |

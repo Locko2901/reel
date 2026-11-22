@@ -1209,4 +1209,111 @@ mod tests {
         }
     }
 
+    /// The ids of a docs page's headings, `### Name { #id }`.
+    fn heading_ids(page: &str) -> Vec<String> {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../docs/settings")
+            .join(format!("{page}.md"));
+        let text = std::fs::read_to_string(&path)
+            .unwrap_or_else(|_| panic!("{} is missing", path.display()));
+        text.lines()
+            .filter(|l| l.starts_with('#'))
+            .filter_map(|l| Some(&l[l.rfind('{')? + 1..l.rfind('}')?]))
+            .flat_map(|attrs| attrs.split_whitespace().filter_map(|a| a.strip_prefix('#')))
+            .map(str::to_string)
+            .collect()
+    }
+
+    /// The `page#anchor` values written out in a page's or a script's source: `data-docs="..."`,
+    /// `'data-docs': '...'`, and any quoted `'<an app page>#...'`.
+    fn literal_docs(source: &str) -> Vec<String> {
+        let after = |open: &str, close: char| -> Vec<String> {
+            source
+                .split(open)
+                .skip(1)
+                .filter_map(|rest| rest.split(close).next())
+                .filter(|v| !v.contains(['{', '$']))
+                .map(str::to_string)
+                .collect()
+        };
+        let mut out = after("data-docs=\"", '"');
+        out.extend(after("'data-docs': '", '\''));
+        for page in [
+            "essentials",
+            "clips",
+            "session",
+            "capture",
+            "hotkeys",
+            "games",
+        ] {
+            out.extend(
+                after(&format!("'{page}#"), '\'')
+                    .into_iter()
+                    .map(|a| format!("{page}#{a}")),
+            );
+        }
+        out
+    }
+
+    /// Every question mark's "More in the docs" lands on a heading of its own page.
+    #[test]
+    fn every_tip_lands_on_its_entry() {
+        let mut want: Vec<String> = Section::ALL.iter().map(|s| s.id().to_string()).collect();
+        want.extend(
+            catalog::DEFS
+                .iter()
+                .map(|d| format!("{}#{}", d.section.id(), catalog::anchor(d.key))),
+        );
+        for standalone in [false, true] {
+            let mut cfg = Config::default();
+            cfg.storage.standalone = standalone;
+            let mut actions = action_panels("disk".into(), "storage".into(), "trash".into(), &cfg);
+            tips(&mut [], &mut actions);
+            for a in &actions {
+                want.extend(Some(a.docs.clone()).filter(|d| !d.is_empty()));
+                want.extend(
+                    a.rows
+                        .iter()
+                        .map(|r| r.docs.clone())
+                        .filter(|d| !d.is_empty()),
+                );
+            }
+        }
+        for source in [
+            include_str!("../../../../web/templates/settings.html"),
+            include_str!("../../../../desktop/ui/index.html"),
+            include_str!("../../../../desktop/ui/games.js"),
+            include_str!("../../../../desktop/ui/sources.js"),
+        ] {
+            want.extend(literal_docs(source));
+        }
+        let mut missing = Vec::new();
+        for w in &want {
+            let (page, anchor) = w.split_once('#').unwrap_or((w, ""));
+            let ids = heading_ids(page);
+            if !anchor.is_empty() && !ids.iter().any(|i| i == anchor) {
+                missing.push(w.clone());
+            }
+        }
+        assert!(
+            missing.is_empty(),
+            "no heading in docs/settings for: {missing:?}"
+        );
+    }
+
+    #[test]
+    fn no_two_headings_share_an_id() {
+        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../docs/settings");
+        for e in std::fs::read_dir(&dir).expect("docs/settings").flatten() {
+            let name = e.file_name().to_string_lossy().into_owned();
+            let Some(page) = name.strip_suffix(".md") else {
+                continue;
+            };
+            let mut ids = heading_ids(page);
+            let all = ids.len();
+            ids.sort();
+            ids.dedup();
+            assert_eq!(ids.len(), all, "two headings of {name} share an id");
+        }
+    }
 }
