@@ -190,7 +190,7 @@ export function renderParts(status) {
   bar(status, { state: serverState, line: serverLine });
   renderVersions(status.versions, status.update_line);
   const hasPages = !!status.server_url || status.mode === 'standalone';
-  $$('header.top [data-page], #more-reel [data-page]').forEach(a => a.classList.toggle('disabled', !hasPages));
+  $$('header.top [data-page], #app-nav [data-page]').forEach(a => a.classList.toggle('disabled', !hasPages));
 }
 
 export function renderVersions(v, line) {

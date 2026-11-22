@@ -423,7 +423,7 @@ ok "Steam's 7 games came in as Games, the application and the program added to S
 sleep 2
 shot "8-games-cinder-road"
 # shellcheck disable=SC2086
-xdotool mousemove ${REEL_GAMES_NOT_A_GAME:-547 600} click 1
+xdotool mousemove ${REEL_GAMES_NOT_A_GAME:-654 600} click 1
 wait_programs 'e["steam-1957780"]["class"] == "not_a_game"' 10 "a click on Not a game did not sort Cinder Road"
 sleep 1
 shot "8-games-not-a-game"
@@ -432,7 +432,7 @@ xdotool mousemove 740 400 click --repeat 30 --delay 30 5
 sleep 1
 shot "8-games-remove"
 # shellcheck disable=SC2086
-xdotool mousemove ${REEL_GAMES_REMOVE:-327 730} click 1
+xdotool mousemove ${REEL_GAMES_REMOVE:-434 730} click 1
 wait_programs '"steam-1957780" not in e and [n["app"] for n in p["not_again"]] == [1957780]' 10 "Remove did not take Cinder Road out and keep it from Steam"
 waitlog "games and apps: removed from the list" 10 "the Log does not say Cinder Road was removed"
 sleep 2
@@ -440,7 +440,7 @@ shot "8-games-not-added-again"
 ok "a Steam game sorted as Not a game in one click, then taken out: Steam does not add it again (shots)"
 b=$(logged "Steam read in")
 # shellcheck disable=SC2086
-xdotool mousemove ${REEL_GAMES_ADD_BACK:-971 501} click 1
+xdotool mousemove ${REEL_GAMES_ADD_BACK:-1078 501} click 1
 waitlog "games and apps: Steam may add it again" 10 "Add back did nothing"
 waitmore "Steam read in" 20 "Add back did not read Steam again" "$b"
 wait_programs '"steam-1957780" in e and not p["not_again"] and e["steam-1957780"]["class"] == "game"' 10 "Cinder Road did not come back from Steam as a Game"
@@ -448,7 +448,7 @@ ok "Add back: Steam's next read adds it again, as a Game"
 "$APP" --section=games/steam-1957780 > /dev/null 2>&1 || true
 sleep 2
 # shellcheck disable=SC2086
-xdotool mousemove ${REEL_GAMES_NAME:-877 282} click 1 key ctrl+a type "Cinder Road Deluxe"
+xdotool mousemove ${REEL_GAMES_NAME:-984 282} click 1 key ctrl+a type "Cinder Road Deluxe"
 xdotool key Return
 wait_programs 'e["steam-1957780"]["name"] == "Cinder Road Deluxe" and e["steam-1957780"]["name_from"] == "hand"' 10 "the rename was not kept"
 waitlog "games and apps: renamed" 10 "the Log does not say the rename"
@@ -460,15 +460,15 @@ touch "$W/lib2/steamapps/appmanifest_2610450.acf"
 waitmore "Steam read in" 20 "a change in a Steam library was not read" "$b"
 programs 'e["steam-1957780"]["name"] == "Cinder Road Deluxe"' || fail "Steam's read took back the name given by hand"
 ok "a rename without older clips is kept, and Steam's read after a change in its library keeps it (shot)"
-# hotkeys, the id of the page Save a clip had before, opens Settings' first page, which has it now
+# Hotkeys, every key in one place
 "$APP" --section=hotkeys > /dev/null 2>&1 || true
-waitlog "app page section=first" 20 "Settings' first page did not open for the hotkeys"
+waitlog "app page section=hotkeys" 20 "Settings, Hotkeys did not open"
 sleep 2
 shot "9-save-a-clip"
 b=$(logged "hotkeys off while a field listens")
-# Save a clip's field, the last row of Clips on the first page, under its Linux line
+# Save a clip's field, the first row of Hotkeys
 # shellcheck disable=SC2086
-xdotool mousemove ${REEL_SAVE_FIELD:-895 576} click 1
+xdotool mousemove ${REEL_SAVE_FIELD:-1003 279} click 1
 for _ in $(seq 1 20); do [ "$(logged 'hotkeys off while a field listens')" -gt "$b" ] && break; sleep 0.5; done
 [ "$(logged 'hotkeys off while a field listens')" -gt "$b" ] || fail "Save a clip's field did not listen"
 xdotool key --clearmodifiers alt+F8
@@ -488,7 +488,7 @@ for _ in $(seq 1 20); do [ "$(logged 'save: OBS saves the replay')" -gt "$asked"
 [ "$(logged 'save: OBS saves the replay')" -gt "$asked" ] || fail "Alt+F8 did nothing: $(cat "$L"/reel-desktop.log* | grep -i 'hotkey' | tail -5)"
 for _ in $(seq 1 180); do [ "$(logged 'standalone: the clip is published')" -gt "$b" ] && break; sleep 0.5; done
 [ "$(logged 'standalone: the clip is published')" -gt "$b" ] || fail "Alt+F8 did not save a clip"
-ok "Save a clip's hotkey changed on Settings' first page, from the setup's Alt+F10 to Alt+F8: saved, and it saves a clip"
+ok "Save a clip's hotkey changed on Settings, Hotkeys, from the setup's Alt+F10 to Alt+F8: saved, and it saves a clip"
 # Too quiet to measure: a peak, and a loudness under the gate all through
 "$FFMPEG" -v error -f lavfi -i "testsrc2=duration=3:size=1280x720:rate=30" -f lavfi -i "anoisesrc=color=pink:amplitude=0.0008:r=48000:duration=3" \
   -c:v libx264 -pix_fmt yuv420p -c:a aac -b:a 160k -ac 2 -shortest "$W/quiet.mp4"
@@ -603,12 +603,12 @@ WIN=$(window)
 [ -n "$WIN" ] || fail "no window"
 xdotool windowmove "$WIN" 0 0 windowsize "$WIN" 1280 820 2>/dev/null || true
 sleep 1
-# Settings in the crumb over Status, back to the first page
+# Essentials, the first entry of the nav beside Status
 # shellcheck disable=SC2086
-xdotool mousemove ${REEL_CRUMB:-300 81} click 1
+xdotool mousemove ${REEL_ESSENTIALS:-200 133} click 1
 sleep 1
 shot "14-start-settings"
-waitlog "app page section=first chosen=true" 10 "Settings was not opened by the click on its crumb (shot 14)"
+waitlog "app page section=first chosen=true" 10 "Essentials was not opened by the click in the nav (shot 14)"
 mv "$W/drive-away" "$W/drive"
 waitmore "standalone: reel serves on the loopback" 60 "reel on this PC did not start once its library was back" "$up"
 waitlog "the library is ready; the window stays on the app's page it is on view=\"settings\"" 10 "reel on this PC coming up did not say the window stays"

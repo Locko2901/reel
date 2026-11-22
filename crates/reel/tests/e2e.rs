@@ -3339,10 +3339,12 @@ async fn the_standalone_library_offers_nothing_of_a_servers() {
     assert_eq!(
         settings_nav(&sharing),
         [
+            "app first Essentials",
             "head This PC",
             "app clips",
             "app session Session recording",
             "app capture",
+            "app hotkeys",
             "app games Games and apps",
             "app server Connection",
             "app startup App",
@@ -3359,7 +3361,7 @@ async fn the_standalone_library_offers_nothing_of_a_servers() {
             "section appearance",
             "section advanced",
         ],
-        "the nav by what a person does: this PC's pages, then reel's with the app's that belong among them"
+        "the nav by what a person does: Essentials, this PC's pages, then reel's with the app's that belong among them"
     );
     let (_, storage) = ask(&env, "GET", "/settings/storage", None).await;
     assert!(
@@ -11318,10 +11320,12 @@ async fn the_apps_parts_in_the_header_stay_hidden_in_a_browser() {
     assert_eq!(
         settings_nav(&html),
         [
+            "app first Essentials",
             "head This PC",
             "app clips",
             "app session Session recording",
             "app capture",
+            "app hotkeys",
             "app games Games and apps",
             "app upload Uploads",
             "app server Connection",

@@ -351,7 +351,7 @@ body.has-appbar .toast { bottom: calc(var(--appbar) + var(--s4) + env(safe-area-
 body.has-appbar .select-bar { bottom: calc(var(--appbar) + var(--s4) + env(safe-area-inset-bottom)); }
 body.has-appbar.selecting { padding-bottom: calc(96px + var(--appbar)); }
 body.has-appbar.selecting .toast { bottom: calc(var(--appbar) + var(--s4) + 64px + env(safe-area-inset-bottom)); }
-body.has-appbar .sections { max-height: calc(100vh - 76px - var(--appbar)); }
+body.has-appbar .sections { max-height: calc(100vh - 128px - var(--appbar)); }
 @media (max-width: 1279px) {
   .appbar .app-record .hint { display: none; }
 }
@@ -439,8 +439,11 @@ dialog > footer { padding: 10px 14px; border-top: 1px solid var(--line); display
 .uploads:empty { display: none; }
 body.over::after { content: "Drop to upload"; position: fixed; inset: 12px; z-index: 50; display: grid; place-items: center; border: 2px dashed var(--accent); border-radius: var(--radius); background: var(--overlay); color: var(--text); font-size: var(--fs-l); pointer-events: none; }
 
-.settings { display: grid; grid-template-columns: 190px minmax(0, 1fr); gap: 22px; align-items: start; }
-.sections { display: flex; flex-direction: column; gap: 1px; position: sticky; top: 66px; max-height: calc(100vh - 76px); overflow-y: auto; }
+.settings { display: grid; grid-template-columns: 190px minmax(0, 760px); gap: 24px; align-items: start; max-width: 974px; margin-left: auto; margin-right: auto; }
+.page-head:has(~ .settings) { max-width: 974px; margin-left: auto; margin-right: auto; }
+/* sticky, and short enough to show its last entry where it starts, under the head */
+.sections { display: flex; flex-direction: column; gap: 1px; position: sticky; top: 66px; max-height: calc(100vh - 128px); overflow-y: auto; }
+.sections > * { flex-shrink: 0; }
 .sections a { display: flex; align-items: center; justify-content: space-between; height: var(--ctl); padding: 0 10px; border-radius: var(--radius); color: var(--text-2); border-left: 2px solid transparent; }
 .sections a:hover { background: var(--raised); color: var(--text); text-decoration: none; }
 .sections a[aria-current="page"] { color: var(--text); border-left-color: var(--accent); border-radius: 0; }

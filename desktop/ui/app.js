@@ -1,6 +1,6 @@
 // The app's own Settings section: every row saves as it changes.
-import { $, $$, APP_SECTIONS, STANDALONE_ONLY, applyShape, invoke, listen, mount, renderParts, runSave, saveButtons, serverHref, toast } from './shell.js';
-import { NAV } from './nav.js';
+import { $, $$, APP_SECTIONS, STANDALONE_ONLY, applyShape, goServer, invoke, listen, mount, renderParts, runSave, saveButtons, serverHref, toast } from './shell.js';
+import { NAV, unsortedCount } from './nav.js';
 import { isOn, setOn } from './assets/js/switch.js';
 import { keycaps, recorder, recordersOffOnLeave } from './hotkeys.js';
 import { noiseHelp, noiseOptions, ownMicWords } from './noise.js';
@@ -107,7 +107,7 @@ async function save(row, force = false) {
     row.classList.remove('refused');
     err.hidden = true;
   }
-  fill(row);
+  $$(`.srow[data-key="${key}"]`).forEach(fill);
   if (held) {
     elevatedAsks--;
     syncElevated();
@@ -233,23 +233,22 @@ function entry() {
   }
   return k;
 }
-function keep(k, y, first) {
+function keep(k, y) {
   const all = places();
   delete all[k];
   all[k] = y;
-  if (first) all.first = y;
-  const keys = Object.keys(all).filter((x) => x !== 'first');
+  const keys = Object.keys(all);
   for (const x of keys.slice(0, Math.max(0, keys.length - 50))) delete all[x];
   try { sessionStorage.setItem(PLACES, JSON.stringify(all)); } catch { /* the place is not kept */ }
 }
 let pending = null;
 function watchPlace() {
-  const flush = () => { if (pending) keep(pending.k, pending.y, pending.first); pending = null; };
+  const flush = () => { if (pending) keep(pending.k, pending.y); pending = null; };
   addEventListener('scroll', () => {
     const k = entry();
     if (pending && pending.k !== k) flush();
     if (!pending) requestAnimationFrame(flush);
-    pending = { k, y: Math.round(scrollY), first: current === 'first' && !$('#settings-filter')?.value.trim() };
+    pending = { k, y: Math.round(scrollY) };
   }, { passive: true });
   addEventListener('pagehide', flush);
 }
@@ -284,10 +283,10 @@ function sections() {
     const h = document.createElement('h2');
     h.className = 'hit-page';
     h.hidden = true;
-    h.textContent = g.dataset.appSection === 'first' ? 'Settings' : PAGE[g.dataset.appSection];
+    h.textContent = PAGE[g.dataset.appSection];
     g.prepend(h);
   }
-  const known = (id) => id === 'first' || id in PAGE;
+  const known = (id) => id in PAGE;
   const open = (want, push, chosen = true, y = 0) => {
     // a program's page under Games and apps is games/<its id>; Status at its log is status/log
     let [id, sub] = String(want || 'first').split('/');
@@ -299,10 +298,10 @@ function sections() {
     if (id === 'library') capAsk();
     root.dataset.section = id;
     $$('.group', body).forEach(g => g.hidden = g.dataset.appSection !== id);
-    $$('.section-line, .panel, .srow, .q-h, .row-link, #summary, #more-reel', body).forEach(el => el.hidden = el.hasAttribute('data-off'));
+    $$('.section-line, .panel, .srow, .q-h, #summary', body).forEach(el => el.hidden = el.hasAttribute('data-off'));
     $$('.hit-page', body).forEach(h => h.hidden = true);
     $('#no-match').hidden = true;
-    heading(id);
+    markNav();
     if (push) history.pushState(null, '', `#${sub ? `${id}/${sub}` : id}`);
     placeAt(y);
     gamesOpened(id === 'games', id === 'games' ? sub : undefined);
@@ -320,11 +319,17 @@ function sections() {
     e.preventDefault();
     open(a.dataset.appSection, true);
   });
-  $('#crumb').addEventListener('click', (e) => { e.preventDefault(); open('first', true, true, places().first); });
   window.addEventListener('popstate', () => open(location.hash.replace('#', '') || 'first', false, true, placeOf()));
   open(location.hash.replace('#', '') || 'first', false, false, cameBack() ? placeOf() : 0);
   watchPlace();
+  // out of the back/forward cache, whose scroll the webview does not put back under 'manual'
+  addEventListener('pageshow', (e) => { if (e.persisted) placeAt(placeOf()); });
   window.openSection = (id) => open(id, true);
+  $('#app-select').addEventListener('change', (e) => {
+    const [kind, id] = e.target.value.split(':');
+    if (kind === 'app') open(id, true);
+    else { e.target.value = `app:${current}`; goServer(`/settings/${id}`); }
+  });
   const filter = $('#settings-filter');
   let searched = false;
   filter?.addEventListener('input', () => {
@@ -332,7 +337,6 @@ function sections() {
     if (q && !searched) { searched = true; invoke('page_section', { section: current, chosen: true }).catch(() => {}); }
     if (!q) { open(current, false); return; }
     let hits = 0;
-    heading(null);
     $$('.group', body).forEach(g => g.hidden = false);
     $$('.section-line, .q-h, #summary', body).forEach(l => l.hidden = true);
     $$('.panel', body).forEach(p => {
@@ -340,9 +344,6 @@ function sections() {
       $$('.srow', p).forEach(r => {
         const hit = `${$('.shelp', r)?.textContent || ''} ${$('b', r)?.textContent || ''} ${r.dataset.key || ''}`.toLowerCase().includes(q);
         r.hidden = !hit || r.hasAttribute('data-off'); any = any || !r.hidden;
-      });
-      $$('.row-link', p).forEach(r => {
-        r.hidden = !r.textContent.toLowerCase().includes(q) || r.hasAttribute('data-off'); any = any || !r.hidden;
       });
       p.hidden = !any || p.hasAttribute('data-off'); hits += p.hidden ? 0 : 1;
     });
@@ -355,116 +356,79 @@ function sections() {
   });
 }
 
-// The head: Settings on the first screen, a crumb back to it over a page one row further.
-function heading(id) {
-  const sub = id && id !== 'first';
-  $('#crumb').hidden = !sub;
-  $('#settings-head .crumb-sep').hidden = !sub;
-  $('#page-title').textContent = sub ? PAGE[id] : 'Settings';
-  $('#page-sub').hidden = sub;
-}
-
-const CHEV = '<svg class="icon chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3.5 10.5 8 6 12.5"/></svg>';
-function rowLink(attrs, name, state) {
-  const a = document.createElement('a');
-  a.className = 'row-link';
-  a.href = '#';
-  Object.assign(a.dataset, attrs);
-  const b = document.createElement('b');
-  b.append(...name);
-  a.append(b, state, document.createRange().createContextualFragment(CHEV));
-  return a;
-}
-
-// More: this PC's pages, each with what is set there.
-let moreKey = '';
-function renderMore() {
-  if (!status) return;
-  const here = status.mode === 'standalone';
-  const lines = (status.pages && status.pages.lines) || {};
-  const key = JSON.stringify([here, lines, status.unsorted, status.state_tone]);
-  if (key === moreKey) return;
-  moreKey = key;
-  const rows = NAV[0][1].map(pageOf).filter((p) => shows(p, here)).map((p) => {
-    const name = [PAGE[p.id]];
-    if (p.id === 'games' && status.unsorted) {
-      const n = document.createElement('span');
-      n.className = 'n to-sort';
-      n.textContent = `${status.unsorted} to sort`;
-      name.push(' ', n);
-    }
-    const state = document.createElement('span');
-    state.className = 'state';
-    if (p.id === 'status') {
-      const dot = document.createElement('i');
-      dot.className = `dot ${status.state_tone || ''}`;
-      state.append(dot);
-    }
-    state.append(lines[p.id] || '');
-    return rowLink({ appSection: p.id }, name, state);
-  });
-  $('#more').replaceChildren(...rows);
-  if ($('#settings-filter')?.value.trim()) $('#settings-filter').dispatchEvent(new Event('input'));
-}
-
-// The foot: reel's pages, the server's or the library's on this PC, with the app's pages that
-// belong among them; they open as reel draws them.
-function renderFoot() {
-  const box = $('#more-reel');
-  if (!box || !shape) return;
+// The nav, as the server's: Essentials, this PC's pages, then reel's groups, the server's pages
+// or the library's on this PC with the app's that belong among them; a select under 960 px.
+let navKey = '';
+function renderNav() {
   const here = !!(status ? status.mode === 'standalone' : document.body.hasAttribute('data-standalone'));
-  const sections = shape.sections || [];
-  const placed = [];
-  const rows = [];
-  const reels = (s) => {
-    const name = [s.label];
-    if (s.changed > 0) {
-      const n = document.createElement('span');
-      n.className = 'n';
-      n.textContent = s.changed;
-      name.push(' ', n);
-    }
-    const line = document.createElement('span');
-    line.className = 'line';
-    line.textContent = s.state || s.line || '';
-    const a = rowLink({ page: `/settings/${s.id}`, section: s.id }, name, line);
-    a.href = serverHref(`/settings/${s.id}`);
-    if (s.state) a.classList.add('stated');
-    return a;
-  };
-  for (const [, pages] of NAV.slice(1)) {
+  const secs = (shape && shape.sections) || [];
+  const key = JSON.stringify([here, secs.map((x) => [x.id, x.label, x.changed])]);
+  if (key === navKey) return;
+  navKey = key;
+  const links = [], choices = [], placed = new Set();
+  const option = (value, label) => { const o = document.createElement('option'); o.value = value; o.textContent = label; return o; };
+  for (const [words, pages] of NAV) {
+    const items = [], opts = [];
     for (const p of pages.map(pageOf).filter((x) => shows(x, here))) {
+      const a = document.createElement('a');
+      a.href = '#';
       if (p.app) {
-        const state = document.createElement('span');
-        state.className = 'state';
-        state.textContent = ((status && status.pages && status.pages.lines) || {})[p.id] || '';
-        rows.push(rowLink({ appSection: p.id }, [PAGE[p.id]], state));
+        a.dataset.appSection = p.id;
+        a.append(PAGE[p.id]);
+        if (p.id === 'games') a.append(' ', unsortedCount(status ? status.unsorted : 0));
+        opts.push(option(`app:${p.id}`, PAGE[p.id]));
       } else {
-        const s = sections.find((x) => x.id === p.id);
-        if (s) { rows.push(reels(s)); placed.push(s.id); }
+        const sec = secs.find((x) => x.id === p.id);
+        if (!sec) continue;
+        placed.add(sec.id);
+        a.dataset.page = `/settings/${sec.id}`;
+        a.href = serverHref(`/settings/${sec.id}`);
+        a.append(sec.label);
+        if (sec.changed > 0) { const n = document.createElement('span'); n.className = 'n'; n.textContent = sec.changed; a.append(' ', n); }
+        opts.push(option(`reel:${sec.id}`, sec.label));
       }
+      items.push(a);
     }
+    if (!items.length) continue;
+    if (words) {
+      const h = document.createElement('span');
+      h.className = 'sections-head';
+      h.textContent = words;
+      links.push(h);
+      const g = document.createElement('optgroup');
+      g.label = words;
+      g.append(...opts);
+      choices.push(g);
+    } else choices.push(...opts);
+    links.push(...items);
   }
-  rows.push(...sections.filter((s) => !placed.includes(s.id)).map(reels));
-  if (!sections.length) { box.replaceChildren(); return; }
-  const h = document.createElement('h2');
-  h.className = 'q-h';
-  const aside = document.createElement('span');
-  aside.className = 'q-aside';
-  let host = '';
-  try { host = status && status.server_url ? new URL(status.server_url).host : ''; } catch { host = ''; }
-  const name = status && status.server_name && status.server_name.trim() !== 'reel' ? status.server_name : host;
-  aside.textContent = here ? 'reel on this PC' : `${name ? `${name}, ` : ''}for every PC and browser`;
-  h.append(here ? 'Library' : 'Server', ' ', aside);
-  const nav = document.createElement('nav');
-  nav.className = 'panel rows';
-  nav.setAttribute('aria-label', here ? 'The library\'s pages' : 'The server\'s pages');
-  nav.append(...rows);
-  box.replaceChildren(h, nav);
+  // a section of a newer server's that the table does not know yet, at the end as the server has it
+  for (const sec of secs.filter((x) => !placed.has(x.id))) {
+    const a = document.createElement('a');
+    a.dataset.page = `/settings/${sec.id}`;
+    a.href = serverHref(`/settings/${sec.id}`);
+    a.textContent = sec.label;
+    links.push(a);
+    choices.push(option(`reel:${sec.id}`, sec.label));
+  }
+  $('#app-nav').replaceChildren(...links);
+  $('#app-select').replaceChildren(...choices);
   if (status) renderParts(status);
+  markNav();
 }
 
-// The first screen's sentence: what saves a clip, how much, when, at what, and where it goes.
+function markNav() {
+  const nav = $('#app-nav');
+  for (const a of $$('a[data-app-section]', nav)) {
+    if (a.dataset.appSection !== current) { a.removeAttribute('aria-current'); continue; }
+    a.setAttribute('aria-current', 'page');
+    // a nav taller than the window scrolls on its own: the page shown stays in sight there
+    if (a.offsetTop < nav.scrollTop || a.offsetTop + a.offsetHeight > nav.scrollTop + nav.clientHeight) nav.scrollTop = a.offsetTop - nav.clientHeight / 2;
+  }
+  $('#app-select').value = `app:${current}`;
+}
+
+// Essentials' sentence: what saves a clip, how much, when, at what, and where it goes.
 function renderSummary() {
   const el = $('#summary');
   const text = (status && status.pages && status.pages.summary) || '';
@@ -971,7 +935,7 @@ function renderStatus() {
   renderBufferNote();
   renderPresence(status);
   renderSummary();
-  renderMore();
+  renderNav();
   const here = status.mode === 'standalone';
   renderObs();
   renderLocal();
@@ -993,8 +957,7 @@ function renderStatus() {
   kv($('#obs-checks'), (status.obs_checks || []).map((c) => [c.name, c.line, c.ok ? 'st-ok' : 'st-warn']));
   // what reel needs from an OBS of one's own opens by itself while something is missing
   if ((status.obs_checks || []).some((c) => !c.ok)) $('#obs-more').open = true;
-  $('#hotkeys-how').textContent = status.hotkeys_how || '';
-  $('#hotkeys-how').hidden = !status.hotkeys_how;
+  for (const el of $$('.hotkeys-how')) { el.textContent = status.hotkeys_how || ''; el.hidden = !status.hotkeys_how; }
   const q = $('#queue tbody');
   q.innerHTML = '';
   $('#queue-empty').hidden = status.queue.length > 0;
@@ -1065,10 +1028,14 @@ function renderStatus() {
   $('#paired-as').textContent = status.paired ? `${status.device_name}, as ${status.user} on ${status.server_name || status.server_url}` : '';
   $('#obs-line').textContent = status.obs.line;
   $('#watch-line').textContent = status.watcher.line;
-  // under Save a clip, the keys' line says only what went wrong
-  $('#hotkey-line').textContent = status.hotkey_ok ? '' : status.hotkey_line;
-  $('#hotkey-line').classList.toggle('st-warn', !status.hotkey_ok);
-  $('#hotkey-line').hidden = status.hotkey_ok;
+  // the keys' line says only what went wrong
+  for (const el of $$('.hotkey-line')) {
+    el.textContent = status.hotkey_ok ? '' : status.hotkey_line;
+    el.classList.toggle('st-warn', !status.hotkey_ok);
+    el.hidden = status.hotkey_ok;
+  }
+  const how = $('#g-hotkeys .panel > .body:not(.flush)');
+  if (how) how.hidden = status.hotkey_ok && !status.hotkeys_how;
   kv($('#about'), [['Version', [status.version, status.versions?.kind].filter(Boolean).join(', ')], ...(status.bundled ? [['OBS', `OBS Studio ${status.obs_version}, included`]] : []), ['Settings', status.config_dir], ['Data', status.data_dir]]);
   $('#about-obs').hidden = !status.bundled;
   $('#uninstall').hidden = !status.uninstaller;
@@ -1245,15 +1212,6 @@ function bindButtons() {
   $('#log-folder').onclick = () => invoke('open_log_folder').catch(e => toast(String(e.message || e), 'err'));
 }
 
-// The foot's app rows (Library folder, Encoding) carry their lines too.
-function renderFootLines() {
-  const lines = (status.pages && status.pages.lines) || {};
-  for (const a of $$('#more-reel a[data-app-section]')) {
-    const st = $('.state', a);
-    if (st && st.textContent !== (lines[a.dataset.appSection] || '')) st.textContent = lines[a.dataset.appSection] || '';
-  }
-}
-
 async function reshape() {
   const key = status ? `${status.mode}|${status.server_url}|${status.paired}|${!!status.offline}` : '';
   if (key === shapeKey) return;
@@ -1262,7 +1220,7 @@ async function reshape() {
     const ps = await invoke('page_shape_get');
     applyShape(ps.shape, ps.base);
     shape = ps.shape;
-    renderFoot();
+    renderNav();
   } catch (e) { /* the shell is gone; the page stays as it is */ }
 }
 
@@ -1290,9 +1248,9 @@ async function main() {
     toast(`no shell: ${String(e.message || e)}`, 'err');
   }
   shape = await shaped;
-  renderFoot();
+  renderNav();
   delete document.documentElement.dataset.wait;
-  await listen('status', (ev) => { status = ev.payload; renderStatus(); reshape(); gamesRefresh(); if (Date.now() - capAt > 5000) capAsk(); if (shape) renderFootLines(); });
+  await listen('status', (ev) => { status = ev.payload; renderStatus(); reshape(); gamesRefresh(); if (Date.now() - capAt > 5000) capAsk(); });
   await listen('open-section', (ev) => { if (window.openSection) window.openSection(ev.payload); });
   await listen('settings', (ev) => takeSettings(ev.payload));
   await listen('obs-meters', (ev) => {

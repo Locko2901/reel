@@ -87,16 +87,18 @@ const fn app(id: &'static str) -> NavPage {
     (id, true, Shows::Always)
 }
 
-/// The nav by what a person does: the desktop app's own pages first, then the sections with the
-/// app's pages that belong among them. The app's Settings draws the same groups from
-/// desktop/ui/nav.js, which a test holds this to.
-const NAV: [(&str, &[NavPage]); 4] = [
+/// The nav by what a person does: the desktop app's own pages first, Essentials under no head,
+/// then the sections with the app's pages that belong among them. The app's Settings draws the
+/// same groups from desktop/ui/nav.js, which a test holds this to.
+const NAV: [(&str, &[NavPage]); 5] = [
+    ("", &[app("first")]),
     (
         "This PC",
         &[
             app("clips"),
             app("session"),
             app("capture"),
+            app("hotkeys"),
             app("games"),
             ("upload", true, Shows::WithServer),
             app("server"),
@@ -132,9 +134,11 @@ const NAV: [(&str, &[NavPage]); 4] = [
 
 fn app_label(id: &str) -> &'static str {
     match id {
+        "first" => "Essentials",
         "clips" => "Clips",
         "session" => "Session recording",
         "capture" => "Capture",
+        "hotkeys" => "Hotkeys",
         "games" => "Games and apps",
         "upload" => "Uploads",
         "server" => "Connection",
@@ -174,9 +178,11 @@ fn nav_of(mut sections: Vec<SectionView>, standalone: bool) -> (Vec<SectionView>
         if entries.is_empty() {
             continue;
         }
-        let mut h = NavEntry::head(head);
-        h.app = entries.iter().all(|e| e.app);
-        nav.push(h);
+        if !head.is_empty() {
+            let mut h = NavEntry::head(head);
+            h.app = entries.iter().all(|e| e.app);
+            nav.push(h);
+        }
         nav.extend(entries);
     }
     nav.extend(

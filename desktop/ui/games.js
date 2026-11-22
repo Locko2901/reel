@@ -41,7 +41,7 @@ function waits() {
 function behaviours() {
   const w = waits();
   const out = [
-    { key: 'buffer', row: 'Replay buffer', help: 'runs while it runs, or stops while it runs', page: 'Settings', page_id: 'first', on: 'replay buffer while it runs', off: 'no replay buffer' },
+    { key: 'buffer', row: 'Replay buffer', help: 'runs while it runs, or stops while it runs', page: 'Essentials', page_id: 'first', on: 'replay buffer while it runs', off: 'no replay buffer' },
     { key: 'record', row: 'Record by itself', help: 'a session recording starts when it starts', page: 'Session recording', page_id: 'session', on: 'records by itself', off: 'never records by itself' },
     { key: 'stop', row: 'Stop when it closes', help: 'the session recording stops when it closes', page: 'Session recording', page_id: 'session', on: 'stops the recording when it closes', off: 'recording goes on after it closes' },
   ];
@@ -138,7 +138,7 @@ function renderTop() {
   const w = waits(), line = $('#games-line');
   line.replaceChildren(
     'Which programs are games, the name each gives its clips, and what one program does apart from its class. What every game gets is set where it belongs: the replay buffer under ',
-    link('Settings', 'first'), ', recording by itself under ', link('Session recording', 'session'),
+    link('Essentials', 'first'), ', recording by itself under ', link('Session recording', 'session'),
     ...(page.linux
       ? ['. On Linux reel cannot tell which program is in front: the list fills from Steam and by hand, and a clip takes the name of the game that runs.']
       : [', the waits under ', link(w.page, w.page_id), '.']),
