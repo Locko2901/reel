@@ -206,8 +206,8 @@ as well.
 ## Afterwards
 
 - **Change the setup**: Settings has every choice of the setup: the clip length, the quality and
-  the microphone on its first page, the rest under **Capture**, the sources a clip hears among
-  them, with **Run the setup again**. Its values are OBS's own: reel reads them
+  the microphone on **Essentials**, its first page, the rest under **Capture**, the sources a clip
+  hears among them, with **Run the setup again**. Its values are OBS's own: reel reads them
   from OBS, so a change you make in OBS shows there too. A change made here goes into OBS, that
   setting alone. When it starts, reel writes nothing into OBS; it only makes sure the WebSocket and
   the replay buffer are on.

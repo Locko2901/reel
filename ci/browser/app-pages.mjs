@@ -84,14 +84,6 @@ const shell = (flavour) => {
       summary: standalone
         ? '**Alt+F10** saves the last **60 s** while a game runs, at **Smooth**. Each clip goes into the library on this PC.'
         : '**Alt+F10** saves the last **60 s** while a game runs, at **Smooth**. Each clip goes up to **clips.example.com**.',
-      lines: {
-        clips: standalone ? 'Keep the last off \u00b7 3 sounds' : 'Keep the last off \u00b7 2 more keys \u00b7 4 sounds \u00b7 kept 30 days',
-        session: 'Alt+F9 \u00b7 remind every 30 min', capture: 'NVIDIA NVENC H.264 \u00b7 the game in front \u00b7 desktop audio \u00b7 reel\'s OBS',
-        games: 'Steam on \u00b7 grace period 60 s', upload: 'no limit \u00b7 they never wait for a game',
-        server: standalone ? 'standalone \u00b7 no server' : 'clips.example.com \u00b7 paired as sam',
-        startup: ready ? '1.19.0, an update is ready \u00b7 tray icon in colour' : '1.19.0, the newest \u00b7 tray icon in colour',
-        status: 'ready \u00b7 the log', ...(standalone ? { library: 'D:\\reel \u00b7 no cap', encoder: 'NVIDIA NVENC \u00b7 never waits' } : {}),
-      },
     },
   };
   const sections = [
@@ -129,6 +121,7 @@ const shell = (flavour) => {
 const PICTURES = {
   'img/app-updates.png': { page: 'index.html#startup', flavour: 'update', size: [1280, 900], part: '#update-help' },
   'img/app-settings.png': { page: 'index.html', flavour: 'connected', size: [1280, 820] },
+  'img/app-hotkeys.png': { page: 'index.html#hotkeys', flavour: 'connected', size: [1280, 820] },
   'setup/img/app-setup-0-choice.png': { page: 'setup.html', flavour: 'standalone choice', size: [1280, 800] },
   'setup/img/app-setup-9-new-versions.png': { page: 'setup.html#look', flavour: 'standalone first', size: [1280, 800] },
   'setup/img/app-linux-choice.png': { page: 'setup.html', flavour: 'standalone choice linux', size: [1280, 800] },

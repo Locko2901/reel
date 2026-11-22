@@ -63,14 +63,14 @@ and the clips folder.
 
 === "The AppImage"
 
-    1. Turn off **Start at logon** (on Settings' first page), so nothing
+    1. Turn off **Start at logon** (on Settings, **Essentials**), so nothing
        tries to start reel at your next login.
     2. Quit reel from its tray icon.
     3. Delete the AppImage file.
 
 === "The .deb"
 
-    1. Turn off **Start at logon** (on Settings' first page).
+    1. Turn off **Start at logon** (on Settings, **Essentials**).
     2. Quit reel from its tray icon.
     3. Remove the package:
 

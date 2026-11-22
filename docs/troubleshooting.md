@@ -343,7 +343,7 @@ App, **Updates** tries again.
 so they may not work, or may need setting up in the desktop's own
 keyboard settings. There you can bind a key to `reel-desktop
 --save-and-share` (or `--save`, `--share-last`); Settings shows the exact
-command for the AppImage under **Save a clip**
+command for the AppImage under **Hotkeys**
 ([The desktop app](desktop-app.md#hotkeys)).
 
 **No tray icon.** GNOME shows no tray icons without the AppIndicator

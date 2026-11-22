@@ -59,9 +59,9 @@ what only a server needs: share links (the clip page's Share, a collection's lin
 clip's menu and in the Select bar, the Shares page), members and sign-in, the Devices page, the
 public address, notifications to ntfy or a webhook, external storage, the incoming folder, the
 first run and the restart. Their addresses answer "Not in standalone" with what to do instead.
-Settings is the same, with the pages a library on one PC has: its first page, **More** without
-**Uploads**, and at its foot **Library**, reel on this PC: **Library and storage**, **Library
-folder**, **Ingest**, **Encoding**, **Copies under a size**, **Imports**, **General**,
+Settings is the same, with the pages a library on one PC has: its nav lists **Essentials**, this
+PC's pages without **Uploads**, then the library's, reel on this PC: **Library and storage**,
+**Library folder**, **Ingest**, **Encoding**, **Copies under a size**, **Imports**, **General**,
 **Appearance** and **Advanced**.
 
 A server can be paired while the app stays standalone: **Upload to the server** on Settings,
@@ -139,9 +139,9 @@ does is in a bar along the window's foot:
   on this PC runs; its dot turns red only for a check of the PC's own (its room, ffmpeg, the
   database), and **Pause uploads** shows once a server is paired. Esc closes the menu, and the
   keyboard reaches all of it.
-- **Settings** opens on what is set and the few settings most people change, each with what it
-  costs; **More** lists the app's other pages, and the server's pages (in standalone, the
-  library's) follow at its foot. Ctrl+, opens Settings from anywhere in the window.
+- **Settings** opens on **Essentials**: what is set and the few settings most people change, each
+  with what it costs. Its nav lists every other page, this PC's and then the server's (in
+  standalone, the library's). Ctrl+, opens Settings from anywhere in the window.
 
 The window has no address bar. A clip's page has its own back button above the player, and the
 mouse's back and forward buttons, Alt+Left and Alt+Right walk back and forth through the pages,
@@ -203,7 +203,7 @@ plays the recording.
 
 ## The app's pages
 
-Settings opens on its first page: a sentence of what is set (the key that saves a clip, how long
+Settings opens on **Essentials**: a sentence of what is set (the key that saves a clip, how long
 a clip is, when the replay buffer runs, the quality, and where a clip goes), then the settings
 most people change, each with what it costs:
 
@@ -216,26 +216,30 @@ most people change, each with what it costs:
 - **Start with Windows** (**Start at logon** on Linux).
 
 With your own OBS, **Clip length** is OBS's replay length, and the picture and the microphone are
-OBS's own: the first page says so, and points to **Capture**.
+OBS's own: Essentials says so, and points to **Capture**.
 
-**More** lists the app's other pages, each with what is set there, and opens each as a page of its
-own, with **Settings** above it to go back. They are kept on this PC, each PC with its own. The
-server's pages follow at the foot of the first page, under **Server**, kept on the server, the
-same for every PC and browser; in standalone the library's follow under **Library**, with
-**Library folder** and **Encoding** among them.
+The nav on the left lists every page of Settings: **Essentials**, then **This PC**, the app's own
+pages, kept on this PC, each PC with its own; then the server's pages under **Library**,
+**Server** and **System**, kept on the server, the same for every PC and browser. In standalone
+the library's pages follow under **Library**, with **Library folder** and **Encoding** among them.
+A server's page opens in the window with the same nav and the same head, so going from one page
+to another changes the page and nothing around it. In a narrow window the nav is a list at the top
+of the page. Back and Forward come back to where you were on a page; a page opened from the nav
+starts at its top.
 
-![Settings, its first page](img/app-settings.png)
+![Settings, Essentials](img/app-settings.png)
 
 | Page | Where | What it holds |
 |---|---|---|
-| **Clips** | More | **Save a clip now**; with your own OBS **Start it in OBS**, which starts its replay buffer; **Keep the last**; connected, the keys **Save and share** and **Share the last clip**; the **Sounds** (clip captured, no clip, clip uploaded or in standalone clip in the library, and link copied), each on or off, with a volume, a WAV file of your own and **Preview**; and **On this PC**: the **Clips folder** and, connected, how long a clip stays on the PC after the server has it |
-| **Session recording** | More | **Record a session**, its key; **With a game**: every game records by itself, and the recording stops when its game closes; the reminders while a [session recording](#recording-a-whole-session) runs: **Remind every** and their sound, on or off, with a volume, a WAV file of your own and **Preview**; the sound also plays when a recording starts |
-| **Capture** | More | **Picture** (the encoder and the format; with your own OBS, the format and the bitrate), **What it captures** (the game in front, games that run as administrator), **Sound** (desktop audio, the game alone, Discord alone, the microphone's noise suppression and gate, a track for each source, the levels), and **The OBS behind it**: with reel's own OBS (the one that came with reel on Windows, the installed one run a second time on Linux) which OBS and how it runs, **Open OBS** on Windows and **Run the setup again**; with your own OBS the obs-websocket connection with **Run the setup**. Folded under it: **What reel needs from OBS**, **What OBS is set to** (its profile among it) and how reel finds a new clip (**Follow OBS**, the file endings, **Still for**) |
-| **Games and apps** | More | the programs reel has seen: which ones are games, and the name each gives its clips; Steam's installed games come in by themselves; **Show on Discord**; and **When a game closes**, its grace period. The count beside it is of those not sorted yet. See [Games and apps](games-and-apps.md) |
-| **Uploads** | More, connected | **Upload the last clip**, its key; on Windows **Uploads wait while a game has the screen**, off unless you turn it on (never for a Save and share, whose upload goes at once, ahead of the others); a bandwidth limit and the chunk size. See [The waits](games-and-apps.md#the-waits) |
-| **Connection** | More | **Mode** (connected or standalone), the **Server URL**, the **Device name** and the pairing; in standalone under **A server, later**, and with a server paired **Sending to it**, its bandwidth limit and chunk size |
-| **App** | More | the **Tray icon**, the app's **Updates**, its **Versions**, and **About** (the version, the folders the app keeps its settings and data in, and on Windows **Uninstall reel...**); in standalone **Look for new versions on GitHub** |
-| **Status** | More | the connections (the server, OBS, the clips folder, the hotkeys, on Linux the tray), the queue with **Upload now** and **Retry**, the last clips with **Copy link** and **Open**, and the **Log**: what the app did, newest at the bottom, the **Log level** and **Open the log folder**. In standalone: the library on this PC in place of the server, a **Standalone** panel (where the library lives, the encoder, ffmpeg), **Add now** and **Retry** to take a clip into the library, the last clips with **Open**, and **Upload to the server** once a server is paired |
+| **Clips** | This PC | **Save a clip now**; with your own OBS **Start it in OBS**, which starts its replay buffer; **Keep the last**; connected, the keys **Save and share** and **Share the last clip**; the **Sounds** (clip captured, no clip, clip uploaded or in standalone clip in the library, and link copied), each on or off, with a volume, a WAV file of your own and **Preview**; and **On this PC**: the **Clips folder** and, connected, how long a clip stays on the PC after the server has it |
+| **Session recording** | This PC | **Record a session**, its key; **With a game**: every game records by itself, and the recording stops when its game closes; the reminders while a [session recording](#recording-a-whole-session) runs: **Remind every** and their sound, on or off, with a volume, a WAV file of your own and **Preview**; the sound also plays when a recording starts |
+| **Capture** | This PC | **Picture** (the encoder and the format; with your own OBS, the format and the bitrate), **What it captures** (the game in front, games that run as administrator), **Sound** (desktop audio, the game alone, Discord alone, the microphone's noise suppression and gate, a track for each source, the levels), and **The OBS behind it**: with reel's own OBS (the one that came with reel on Windows, the installed one run a second time on Linux) which OBS and how it runs, **Open OBS** on Windows and **Run the setup again**; with your own OBS the obs-websocket connection with **Run the setup**. Folded under it: **What reel needs from OBS**, **What OBS is set to** (its profile among it) and how reel finds a new clip (**Follow OBS**, the file endings, **Still for**) |
+| **Hotkeys** | This PC | every hotkey of the app, each set there or with the settings it belongs to: **Save a clip** (also under Essentials), **Save and share** and **Share the last clip** (also under Clips), **Upload the last clip** (also under Uploads) and **Record a session** (also under Session recording); on Linux, how a hotkey reaches the app. See [Hotkeys](#hotkeys) |
+| **Games and apps** | This PC | the programs reel has seen: which ones are games, and the name each gives its clips; Steam's installed games come in by themselves; **Show on Discord**; and **When a game closes**, its grace period. The count beside it is of those not sorted yet. See [Games and apps](games-and-apps.md) |
+| **Uploads** | This PC, connected | **Upload the last clip**, its key; on Windows **Uploads wait while a game has the screen**, off unless you turn it on (never for a Save and share, whose upload goes at once, ahead of the others); a bandwidth limit and the chunk size. See [The waits](games-and-apps.md#the-waits) |
+| **Connection** | This PC | **Mode** (connected or standalone), the **Server URL**, the **Device name** and the pairing; in standalone under **A server, later**, and with a server paired **Sending to it**, its bandwidth limit and chunk size |
+| **App** | This PC | the **Tray icon**, the app's **Updates**, its **Versions**, and **About** (the version, the folders the app keeps its settings and data in, and on Windows **Uninstall reel...**); in standalone **Look for new versions on GitHub** |
+| **Status** | This PC | the connections (the server, OBS, the clips folder, the hotkeys, on Linux the tray), the queue with **Upload now** and **Retry**, the last clips with **Copy link** and **Open**, and the **Log**: what the app did, newest at the bottom, the **Log level** and **Open the log folder**. In standalone: the library on this PC in place of the server, a **Standalone** panel (where the library lives, the encoder, ffmpeg), **Add now** and **Retry** to take a clip into the library, the last clips with **Open**, and **Upload to the server** once a server is paired |
 | **Library folder** (standalone) | Library | where the library is on this PC, with **Move** and **Make a copy**, the **Library cap** and **The cap spares unsent clips** |
 | **Encoding** (standalone) | Library | the **GPU encoder** and the one in use, **Copies on the GPU**, and on Windows **Encoding waits while a game has the screen**, off unless you turn it on. See [The waits](games-and-apps.md#the-waits) |
 
@@ -247,9 +251,13 @@ user can read, in the app's settings folder.
 
 ## Hotkeys
 
-The five hotkeys: **Save a clip** on Settings' first page, **Save and share** and **Share the last
-clip** under Settings, **Clips**, **Upload the last clip** under **Uploads** and **Record a session**
-under **Session recording**:
+The five hotkeys are all on Settings, **Hotkeys**, and each also sits with the settings it belongs
+to: **Save a clip** under **Essentials**, **Save and share** and **Share the last clip** under
+**Clips**, **Upload the last clip** under **Uploads** and **Record a session** under **Session
+recording**. A key set in one place is the same key in the other.
+
+![Settings, Hotkeys](img/app-hotkeys.png)
+
 
 | Hotkey | Default | What it does |
 |---|---|---|
@@ -281,7 +289,7 @@ One exception: a game that runs as administrator does not pass its keys to the a
 **On Linux** global hotkeys depend on your desktop: they may not work, or may need to be set up in
 the desktop's own keyboard settings. There you can bind a key to `reel-desktop --save-and-share`
 (or `--save`, `--share-last`, `--pause-recording`, `--resume-recording`, `--record-session`). With the AppImage the command is the AppImage's path, which
-Settings shows under **Save a clip**.
+Settings shows under **Hotkeys** (and under **Save a clip** on **Essentials**).
 
 ## Updates
 

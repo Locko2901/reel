@@ -91,9 +91,9 @@ before an update opens as it did, without the setup.
 
 ## 3. OBS's settings, later
 
-Settings has what the setup set and more, and writes into OBS for you what it sets there. On its
-first page, **Clip length** is OBS's replay length. Under **Clips**, **Start it in OBS** starts
-OBS's replay buffer, and **On this PC** has OBS's **Recording folder**. Under **Capture**,
+Settings has what the setup set and more, and writes into OBS for you what it sets there. On
+**Essentials**, its first page, **Clip length** is OBS's replay length. Under **Clips**, **Start
+it in OBS** starts OBS's replay buffer, and **On this PC** has OBS's **Recording folder**. Under **Capture**,
 **Picture** has OBS's format and bitrate, and **The OBS behind it** the **obs-websocket**
 connection, with **What OBS is set to** folded under it.
 
@@ -118,12 +118,13 @@ safety net too, so a clip saved while OBS and the app were not talking is still 
     runs whenever you play. To keep Streamer Mode off: in Discord, **User Settings**, **Streamer
     Mode** (in newer versions under **Appearance**), turn off **Automatically Enable/Disable**.
 
-**Save a clip**, its key, is on Settings' first page later: click the field and press the keys. A
-combination another program holds is refused with a reason, and the field keeps what it had. With
-a server there are three more keys: **Save and share** and **Share the last clip** under **Clips**,
-and **Upload the last clip** under **Uploads** ([Hotkeys](../desktop-app.md#hotkeys)).
+**Save a clip**, its key, is on Settings, **Essentials** later: click the field and press the
+keys. A combination another program holds is refused with a reason, and the field keeps what it
+had. With a server there are three more keys: **Save and share** and **Share the last clip** under
+**Clips**, and **Upload the last clip** under **Uploads**; **Hotkeys** has all of them
+([Hotkeys](../desktop-app.md#hotkeys)).
 
-![Settings, its first page](img/app-settings.png)
+![Settings, Essentials](img/app-settings.png)
 
 ## 4. The first clip
 

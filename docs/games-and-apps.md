@@ -1,6 +1,6 @@
 # Games and apps
 
-Settings, **Games and apps**, under **More**, is the list of the programs reel
+Settings, **Games and apps**, under **This PC**, is the list of the programs reel
 has seen on this PC: which ones are games, the name each gives its clips, and what each does
 while it runs: whether the replay buffer runs, whether a session recording starts by itself and
 stops when it closes, and whether uploads and encoding wait. Steam's installed games come into it
@@ -123,7 +123,7 @@ says each start and close of a program of the list, for example `game: Ember Pas
 
 ### The replay buffer
 
-On Settings' first page, **The replay buffer**, its two cards:
+On Settings, **Essentials**, **The replay buffer**, its two cards:
 
 - **Always**, the default: as before, a clip can be saved at any time.
 - **While a game runs**: OBS's replay buffer starts with a game and stops once the last

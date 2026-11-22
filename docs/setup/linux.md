@@ -148,7 +148,10 @@ sandbox.
 Global hotkeys on Linux depend on your desktop: they may not work, or may need to be set up in the
 desktop's own keyboard settings. There you can bind a key to `reel-desktop --save` (Save a clip)
 or `--record-session` (Record a session), or with a server `--save-and-share` and `--share-last`. With the AppImage, the command is the
-AppImage's path, which Settings shows under **Save a clip**.
+AppImage's path, which Settings shows under **Hotkeys** and under **Save a clip** on
+**Essentials**.
+
+![Settings, Hotkeys on Linux, with how a hotkey reaches the app](img/app-hotkeys-linux.png)
 
 ## 6. The first clip
 
@@ -186,7 +189,7 @@ Then make your first link:
 
 ## Good to know
 
-- **Start at logon**: on Settings' first page. For the AppImage the entry points at the AppImage's
+- **Start at logon**: on Settings, **Essentials**. For the AppImage the entry points at the AppImage's
   own path, so after moving the file, turn it off and on again.
 - **NVIDIA**: with NVIDIA's driver, WebKitGTK's DMA-BUF renderer leaves windows blank, and on
   Wayland NVIDIA's explicit sync breaks them. reel turns both off for itself unless you set
