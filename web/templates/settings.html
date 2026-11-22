@@ -15,7 +15,7 @@
   </nav>
   <select class="sections-select" id="sections-select" aria-label="Section">{% for s in sections %}<option value="{{ s.id }}"{% if s.current %} selected{% endif %}>{{ s.label }}</option>{% endfor %}</select>
   <div id="sections-body">
-    {% for s in sections %}<p class="section-line" data-section="{{ s.id }}"{% if !s.current %} hidden{% endif %}>{{ s.line }}</p>
+    {% for s in sections %}<p class="section-line" data-section="{{ s.id }}" data-docs="{{ s.docs }}" data-name="{{ s.label }}"{% if !who.standalone %} data-scope="every PC and browser"{% endif %}{% if !s.current %} hidden{% endif %}>{{ s.line }}</p>
     {% endfor %}
     {% for p in panels %}
     <div class="panel" data-section="{{ p.section }}"{% if p.section != section %} hidden{% endif %}>
@@ -32,7 +32,7 @@
     {% endfor %}
     {% for a in actions %}
     <div class="panel" data-section="{{ a.section }}"{% if a.section != section %} hidden{% endif %}>
-      <header><h2>{{ a.name }}</h2>{% if !a.line.is_empty() %}<span class="desc">{{ a.line }}</span>{% endif %}</header>
+      <header><h2>{{ a.name }}</h2>{% if !a.line.is_empty() %}<span class="desc"{% if !a.docs.is_empty() %} data-docs="{{ a.docs }}"{% endif %}>{{ a.line }}</span>{% endif %}</header>
       <div class="body flush">
         {% for r in a.rows %}
         {% include "action-row.html" %}
@@ -43,20 +43,20 @@
     <div class="panel" data-section="appearance"{% if section != "appearance" %} hidden{% endif %}>
       <header><h2>This browser</h2><span class="desc">kept in this browser only, never on the server</span></header>
       <div class="body flush">
-        <div class="srow"><div class="slabel"><b>Hover previews on cards</b><span class="shelp">the muted loop under the pointer; off saves bandwidth on a laptop</span></div><div class="sctl"><button type="button" class="switch" role="switch" aria-checked="true" data-pref="hover" aria-label="Hover previews on cards"><i></i></button></div></div>
-        <div class="srow"><div class="slabel"><b>Card size</b><span class="shelp">the smallest column of the library grid</span></div><div class="sctl"><select data-pref="cards" aria-label="Card size"><option value="small">small</option><option value="medium">medium</option><option value="large">large</option></select></div></div>
-        <div class="srow"><div class="slabel"><b>Key hints</b><span class="shelp">the key lines under the pages; hidden on a phone regardless</span></div><div class="sctl"><button type="button" class="switch" role="switch" aria-checked="true" data-pref="kbd" aria-label="Key hints"><i></i></button></div></div>
-        <div class="srow"><div class="slabel"><b>Accent</b><span class="shelp">the one pink, by design; not a setting</span></div><div class="sctl"><span class="in-locked mono" title="#f282d8"><span>#f282d8</span>{% include "lock.html" %}</span></div></div>
+        <div class="srow"><div class="slabel"><b>Hover previews on cards</b><span class="shelp" data-docs="appearance#hover-previews">the muted loop under the pointer; off saves bandwidth on a laptop</span></div><div class="sctl"><button type="button" class="switch" role="switch" aria-checked="true" data-pref="hover" aria-label="Hover previews on cards"><i></i></button></div></div>
+        <div class="srow"><div class="slabel"><b>Card size</b><span class="shelp" data-docs="appearance#card-size">the smallest column of the library grid</span></div><div class="sctl"><select data-pref="cards" aria-label="Card size"><option value="small">small</option><option value="medium">medium</option><option value="large">large</option></select></div></div>
+        <div class="srow"><div class="slabel"><b>Key hints</b><span class="shelp" data-docs="appearance#key-hints">the key lines under the pages; hidden on a phone regardless</span></div><div class="sctl"><button type="button" class="switch" role="switch" aria-checked="true" data-pref="kbd" aria-label="Key hints"><i></i></button></div></div>
+        <div class="srow"><div class="slabel"><b>Accent</b><span class="shelp" data-docs="appearance#accent">the one pink, by design; not a setting</span></div><div class="sctl"><span class="in-locked mono" title="#f282d8"><span>#f282d8</span>{% include "lock.html" %}</span></div></div>
       </div>
     </div>
     {% if !who.standalone %}
     <div class="panel" data-section="advanced"{% if section != "advanced" %} hidden{% endif %}>
-      <header><h2>Logs</h2><span class="desc">the last 200 lines of this process, share tokens shortened</span><div class="actions"><a class="btn small" href="/api/logs/download">Download the last hour</a><button class="small quiet" id="logs-refresh" type="button">Refresh</button></div></header>
+      <header><h2>Logs</h2><span class="desc" data-docs="advanced#logs">the last 200 lines of this process, share tokens shortened</span><div class="actions"><a class="btn small" href="/api/logs/download">Download the last hour</a><button class="small quiet" id="logs-refresh" type="button">Refresh</button></div></header>
       <div class="body"><pre class="logbox" id="log-lines"></pre></div>
     </div>
     {% endif %}
     <div class="panel" data-section="advanced"{% if section != "advanced" %} hidden{% endif %}>
-      <header><h2>Settings history</h2><span class="desc">the last 500 changes; Revert puts the old value back</span></header>
+      <header><h2>Settings history</h2><span class="desc" data-docs="advanced#settings-history">the last 500 changes; Revert puts the old value back</span></header>
       <div class="body flush">
         <table class="cards" id="history"><thead><tr><th>Setting</th><th>Was</th><th>Now</th><th>Who</th><th>When</th><th></th></tr></thead><tbody></tbody></table>
         <p class="muted" id="history-empty" hidden>No change yet.</p>
@@ -64,7 +64,7 @@
     </div>
     {% if !who.standalone %}
     <div class="panel access-panels" data-section="access"{% if section != "access" %} hidden{% endif %}>
-      <header><h2>Users</h2><span class="desc">members see the whole library, upload, and edit and share what they uploaded; admins do everything</span><div class="actions">{% if access.local %}<button class="danger small" id="signout-all" type="button">Sign out everywhere</button>{% endif %}<button class="small" id="add-user" type="button">Add user</button></div></header>
+      <header><h2>Users</h2><span class="desc" data-docs="access#users">members see the whole library, upload, and edit and share what they uploaded; admins do everything</span><div class="actions">{% if access.local %}<button class="danger small" id="signout-all" type="button">Sign out everywhere</button>{% endif %}<button class="small" id="add-user" type="button">Add user</button></div></header>
       <div class="body flush">
         <table class="cards" id="users">
           <thead><tr><th>Name</th><th>Role</th><th class="num">Clips</th><th>Last seen</th><th>State</th><th></th></tr></thead>
@@ -85,7 +85,7 @@
     </div>
     {% if access.local %}
     <div class="panel access-panels" data-section="access"{% if section != "access" %} hidden{% endif %}>
-      <header><h2>Sign-in attempts</h2><span class="desc">failed ones in the last 7 days; an address gets five tries in two minutes, then one more every two minutes, and so does a name</span></header>
+      <header><h2>Sign-in attempts</h2><span class="desc" data-docs="access#sign-in-attempts">failed ones in the last 7 days; an address gets five tries in two minutes, then one more every two minutes, and so does a name</span></header>
       <div class="body{% if !access.attempts.is_empty() %} flush{% endif %}">
         {% if access.attempts.is_empty() %}<p class="muted">None.</p>{% else %}
         <table class="cards">
@@ -97,14 +97,14 @@
     </div>
     {% endif %}
 <div class="panel" data-section="devices"{% if section != "devices" %} hidden{% endif %}>
-      <header><h2>The app</h2><span class="desc">for the PC games are played on: it uploads what OBS saves, and Save and share copies a link with one key</span></header>
+      <header><h2>The app</h2><span class="desc" data-docs="devices#the-app">for the PC games are played on: it uploads what OBS saves, and Save and share copies a link with one key</span></header>
       <div class="body flush">
         {% for a in devices.apps %}<div class="srow"><div class="slabel"><b>{{ a.name }}</b><span class="shelp">{{ a.who }}</span></div><div class="sctl">{% if let Some(u) = a.url %}<a class="btn" href="{{ u }}" download>Download, {{ a.size }}</a>{% else %}<span class="muted small">not on this server yet: it fetches its version's installers from the release, at start and once a day</span>{% endif %}</div></div>
         {% endfor %}
       </div>
     </div>
     <div class="panel" data-section="devices"{% if section != "devices" %} hidden{% endif %}>
-      <header><h2>Paired devices</h2><span class="desc">the desktop app on each PC: it uploads what OBS saves and shares the device's own clips; a revoked device has to pair again</span><div class="actions"><button class="small" id="pair-device" type="button">Pair a device</button></div></header>
+      <header><h2>Paired devices</h2><span class="desc" data-docs="devices#paired-devices">the desktop app on each PC: it uploads what OBS saves and shares the device's own clips; a revoked device has to pair again</span><div class="actions"><button class="small" id="pair-device" type="button">Pair a device</button></div></header>
       <div class="body{% if !devices.devices.is_empty() %} flush{% endif %}">
         {% if devices.devices.is_empty() %}<p class="muted">No device yet. Pair a device shows a code the app asks for.</p>{% else %}
         <table class="cards" id="devices">

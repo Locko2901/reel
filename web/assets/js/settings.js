@@ -1,6 +1,7 @@
 import { $, $$, api, arm, toast } from './lib.js';
 import { applyPrefs, prefs } from './global.js';
 import { isOn, setOn } from './switch.js';
+import { bindTips, enhance, tipHit, tipHitsOff } from './tip.js';
 
 const CTL = 'input, select, button[role="switch"]';
 
@@ -182,6 +183,8 @@ export function settings() {
   const root = $('#settings');
   if (!root) return;
   const body = $('#sections-body');
+  enhance(body);
+  bindTips();
   const select = $('#sections-select');
   function open(id, push) {
     if (push) scrollTo(0, 0);
@@ -189,6 +192,7 @@ export function settings() {
     root.dataset.section = id;
     $$('[data-section]', body).forEach(el => el.hidden = el.dataset.section !== id);
     $$('.srow, .sgroup', body).forEach(r => r.hidden = false);
+    tipHitsOff(body);
     $('#no-match').hidden = true;
     $$('.sections a[data-section]', root).forEach(a => { if (a.dataset.section === id) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
     if (select) select.value = id;
@@ -204,16 +208,18 @@ export function settings() {
     if (!q) { open(root.dataset.section, false); if (atIndex()) root.dataset.index = ''; return; }
     delete root.dataset.index;
     let hits = 0;
-    $$('.section-line', body).forEach(l => l.hidden = true);
+    $$('.section-line, .page-top', body).forEach(l => l.hidden = true);
     $$('.panel', body).forEach(p => {
       let any = false;
       $$('.srow', p).filter(r => !r.closest('.sgroup')).forEach(r => {
         const hit = !('depOff' in r.dataset) && `${r.dataset.label || ''} ${r.dataset.key || ''} ${$('.shelp', r)?.textContent || ''} ${$('b', r)?.textContent || ''}`.toLowerCase().includes(q);
         r.hidden = !hit; any = any || hit;
+        tipHit(r, hit ? q : '');
       });
       $$('.sgroup', p).forEach(g => {
         const hit = !('depOff' in g.dataset) && `${g.dataset.label} ${g.dataset.key} ${g.textContent}`.toLowerCase().includes(q);
         g.hidden = !hit; any = any || hit;
+        $$('.srow', g).forEach(r => tipHit(r, hit ? q : ''));
       });
       p.hidden = !any; hits += any ? 1 : 0;
     });

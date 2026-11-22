@@ -2,7 +2,7 @@
 <div class="sgroup{% if r.locked.is_some() %} locked{% endif %}" data-key="{{ r.key }}" data-label="{{ r.label }}" data-kind="set"{% if !r.depends.is_empty() %} data-depends="{{ r.depends }}"{% endif %}{% if r.dep_off %} data-dep-off{% endif %} role="group" aria-label="{{ r.label }}">
   <div class="srow sgroup-head">
     <div class="slabel">
-      <b>{{ r.label }}</b><span class="shelp">{{ r.help }}</span>
+      <b>{{ r.label }}</b><span class="shelp"{% if !r.docs.is_empty() %} data-docs="{{ r.docs }}"{% endif %}>{{ r.help }}</span>
       <div class="notes">
         {% if let Some(l) = r.locked %}<span class="badge lock">{% include "lock.html" %}{{ l }}</span>{% endif %}
         {% if r.restart %}<span class="badge warn">after a restart</span>{% endif %}
@@ -16,7 +16,7 @@
   </div>
   {% for o in r.options %}
   <div class="srow sopt" data-opt="{{ o.value }}">
-    <div class="slabel"><b>{{ o.title }}</b>{% if !o.line.is_empty() %}<span class="shelp">{{ o.line }}</span>{% endif %}</div>
+    <div class="slabel"><b>{{ o.title }}</b>{% if !o.line.is_empty() %}<span class="shelp"{% if !r.docs.is_empty() %} data-docs="{{ r.docs }}"{% endif %}>{{ o.line }}</span>{% endif %}</div>
     <div class="sctl"><button type="button" class="switch" role="switch" aria-checked="{% if o.chosen %}true{% else %}false{% endif %}" aria-label="{{ r.label }}: {{ o.label }}"{% if r.locked.is_some() %} disabled{% endif %}><i></i></button></div>
   </div>
   {% endfor %}
@@ -24,7 +24,7 @@
 {% else %}
 <div class="srow{% if r.locked.is_some() %} locked{% endif %}" data-key="{{ r.key }}" data-label="{{ r.label }}" data-kind="{{ r.kind }}"{% if r.kind == "bool" %} data-on="{{ r.is_on }}"{% endif %}{% if !r.depends.is_empty() %} data-depends="{{ r.depends }}"{% endif %}{% if r.dep_off %} data-dep-off{% endif %}>
   <div class="slabel">
-    <b>{{ r.label }}</b><span class="shelp">{{ r.help }}</span>{% if !r.note.is_empty() %}<span class="snote {{ r.note_class }}">{{ r.note }}</span>{% endif %}
+    <b>{{ r.label }}</b><span class="shelp"{% if !r.docs.is_empty() %} data-docs="{{ r.docs }}"{% endif %}>{{ r.help }}</span>{% if !r.note.is_empty() %}<span class="snote {{ r.note_class }}">{{ r.note }}</span>{% endif %}
     <div class="notes">
       {% if let Some(l) = r.locked %}<span class="badge lock">{% include "lock.html" %}{{ l }}</span>{% endif %}
       {% if r.restart %}<span class="badge warn">after a restart</span>{% endif %}
