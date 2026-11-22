@@ -184,7 +184,7 @@ export function settings() {
   const body = $('#sections-body');
   const select = $('#sections-select');
   function open(id, push) {
-    if (push && 'index' in root.dataset) scrollTo(0, 0);
+    if (push) scrollTo(0, 0);
     delete root.dataset.index;
     root.dataset.section = id;
     $$('[data-section]', body).forEach(el => el.hidden = el.dataset.section !== id);

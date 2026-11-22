@@ -81,6 +81,15 @@ document.addEventListener('keydown', (e) => {
   toSettings(e);
 }, true);
 
+// A section opened from the nav of a released server's Settings starts at its top; Back puts the
+// one before where it was, as the webview keeps it.
+const sectionTop = (e) => {
+  const a = e.target.closest?.('#settings .sections a[data-section]');
+  if (a && e.button === 0 && !e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey) setTimeout(() => scrollTo(0, 0));
+};
+document.addEventListener('click', sectionTop);
+document.addEventListener('change', (e) => { if (e.target.id === 'sections-select') setTimeout(() => scrollTo(0, 0)); });
+
 // before the page's scripts run, which show and bind the app's pages in the nav they find
 document.addEventListener('readystatechange', () => { if (document.readyState === 'interactive') fill(); });
 addEventListener('DOMContentLoaded', count);
