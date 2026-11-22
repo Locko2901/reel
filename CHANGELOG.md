@@ -1,5 +1,21 @@
 # Changelog
 
+## [1.19.0](https://github.com/Locko2901/reel/compare/v1.18.0...v1.19.0) (2026-11-22)
+
+
+### Features
+
+* after a game closes, the bar counts down its grace period to what then stops, and the menu and the tray say it too ([231ed06](https://github.com/Locko2901/reel/commit/231ed06d3fbbcef8dbda56782319a50f209e6f45))
+* Discord can show your friends the game you clip or record (off unless you turn it on) ([e68186e](https://github.com/Locko2901/reel/commit/e68186e3585ff7aeeb7cf7b33455681545b7d963))
+* Discord shows the game's own picture, Clipping with reel or Recording with reel, and the clips you saved this session ([45c6345](https://github.com/Locko2901/reel/commit/45c63454f9f6342b4fc2a94d092c0c2ea683144b))
+* games start and stop the replay buffer and session recordings, and the bar names the game that runs ([9310124](https://github.com/Locko2901/reel/commit/9310124a98f7c1b116fab3feba0f39da0788ec33))
+
+
+### Bug Fixes
+
+* Record in reel's window no longer freezes the window for good on Windows ([8269533](https://github.com/Locko2901/reel/commit/8269533afed6a0f816b3d01f91769aef380e3040))
+* with the external storage on, the app no longer waits for good for the preview of a clip sent without a link ([9d578f6](https://github.com/Locko2901/reel/commit/9d578f6e503e41834f8699f096411691c3868354))
+
 ## [1.18.0](https://github.com/Locko2901/reel/compare/v1.17.0...v1.18.0) (2026-11-20)
 
 
