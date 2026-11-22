@@ -531,6 +531,29 @@ label.check.pick:has(input:checked) { background: var(--raised-2); border-color:
 .srow.refused { border-left: 2px solid var(--err); }
 .srow.refused .sctl input, .srow.refused .sctl select { border-color: var(--err); }
 .srow.locked .slabel b { color: var(--text-2); }
+.slabel > .shelp[data-docs], .panel > header > .desc[data-docs], .section-line[data-docs] { display: none; }
+.sname { display: flex; align-items: center; gap: 2px; min-width: 0; }
+.sname > b { min-width: 0; }
+.hname { display: flex; align-items: center; gap: 2px; min-width: 0; grid-column: 1; }
+.hname > h2 { overflow: hidden; text-overflow: ellipsis; }
+button.tip-btn { display: inline-grid; place-items: center; flex: none; width: 20px; height: 20px; min-width: 0; padding: 0; margin: 0; border: 0; border-radius: 50%; background: none; color: var(--text-3); line-height: normal; cursor: help; opacity: 0.6; }
+button.tip-btn .icon { width: 14px; height: 14px; stroke-width: 1.4; }
+.srow:hover button.tip-btn, .panel > header:hover button.tip-btn, .page-top:hover button.tip-btn { opacity: 0.85; }
+button.tip-btn:hover:not(:disabled), button.tip-btn[aria-expanded="true"] { background: none; border: 0; color: var(--text); opacity: 1; }
+button.tip-btn.pinned { color: var(--accent); }
+.tip { display: none; }
+.tip.open { display: block; position: fixed; z-index: 30; width: 320px; max-width: calc(100vw - 16px); padding: 10px 12px 9px; background: var(--raised); border: 1px solid var(--line-2); border-radius: var(--radius); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45); color: var(--text); font-size: var(--fs-s); font-weight: 400; line-height: 1.5; text-align: left; white-space: normal; letter-spacing: normal; }
+.tip .shelp, .tip .desc, .tip .section-line { display: block; margin: 0; max-width: none; color: var(--text); font-size: var(--fs-s); }
+.tip .tip-extra { display: block; margin-top: 6px; color: var(--text-2); overflow-wrap: anywhere; }
+.tip-more { display: inline-block; margin-top: 6px; color: var(--text-2); text-decoration: underline; text-decoration-color: var(--text-3); text-underline-offset: 3px; }
+.tip-more:hover { color: var(--text); text-decoration-color: var(--text-2); }
+.srow.tip-hit .tip { display: block; position: static; width: auto !important; padding: 0; border: 0; background: none; box-shadow: none; margin-top: 2px; }
+.srow.tip-hit .tip .shelp { color: var(--text-2); }
+.srow.tip-hit .tip-more { margin-top: 2px; font-size: var(--fs-xs); }
+.page-top { display: flex; align-items: center; gap: 2px; flex-wrap: wrap; margin: 0 0 var(--s3); }
+.page-top .page-name { font-size: var(--fs-l); font-weight: 500; margin-right: 2px; }
+.page-top .scope { display: none; margin-left: auto; align-items: center; height: 20px; padding: 0 8px; border: 1px solid var(--line-2); border-radius: 10px; color: var(--text-2); font-size: var(--fs-xs); white-space: nowrap; }
+[data-app="desktop"] .page-top .scope, .settings[data-paired] .page-top .scope { display: inline-flex; }
 .panel .action-body { display: block; }
 .panel .action-note { margin: 0; }
 .logbox { margin: 0; max-height: 360px; overflow: auto; font-family: var(--mono); font-size: var(--fs-xs); line-height: 1.5; color: var(--text-2); white-space: pre-wrap; overflow-wrap: anywhere; }

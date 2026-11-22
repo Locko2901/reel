@@ -358,6 +358,12 @@ pub fn option_word(key: &str, value: &str) -> String {
 
 /// The short line under an option of a set, which shows as a row of its own with a switch;
 /// empty where the words say it all.
+/// A setting's anchor on its page of the docs (`docs/settings/<section>.md`), made from its key
+/// so that it stays when the setting is renamed.
+pub fn anchor(key: &str) -> String {
+    key.replace(['.', '_'], "-")
+}
+
 pub fn option_line(key: &str, value: &str) -> &'static str {
     match (key, value) {
         ("notify.events", "job_failed") => "an ingest, a transcode or a cut stopped with an error",

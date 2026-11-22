@@ -17,6 +17,8 @@ pub struct SectionView {
     pub line: String,
     pub current: bool,
     pub changed: usize,
+    /// The page's place in the docs (`docs/settings/<docs>.md`).
+    pub docs: &'static str,
 }
 
 /// A line of the nav: a group's head, a section, or one of the desktop app's own pages (`app`),
@@ -227,6 +229,8 @@ pub struct RowView {
     /// A line under the help about the thing itself (a folder's disk), and its colour.
     pub note: String,
     pub note_class: &'static str,
+    /// `page#anchor` in the docs; set, the help goes behind the row's question mark.
+    pub docs: String,
 }
 
 pub struct PanelView {
@@ -262,6 +266,9 @@ pub struct ActionRow {
     pub buttons: Vec<ActionView>,
     pub depends: &'static str,
     pub dep_off: bool,
+    /// What the thing is now, always in sight; the help is how it works, behind the icon.
+    pub note: String,
+    pub docs: String,
 }
 
 pub struct ActionPanel {
@@ -269,6 +276,7 @@ pub struct ActionPanel {
     pub name: &'static str,
     pub line: String,
     pub rows: Vec<ActionRow>,
+    pub docs: String,
 }
 
 fn act(id: &'static str, label: &'static str, path: &'static str) -> ActionView {
@@ -311,6 +319,8 @@ fn action_row(title: &'static str, help: &str, buttons: Vec<ActionView>) -> Acti
         buttons,
         depends: "",
         dep_off: false,
+        note: String::new(),
+        docs: String::new(),
     }
 }
 
@@ -344,23 +354,25 @@ fn action_panels(
             name: "External storage",
             line: String::new(),
             rows: vec![
-                under_switch("external.on", cfg, action_row("In the storage", &storage_line, vec![act("external-check", "Check now", "/api/external/check")])),
+                under_switch("external.on", cfg, noted(action_row("In the storage", "", vec![act("external-check", "Check now", "/api/external/check")]), storage_line)),
                 under_switch("external.on", cfg, action_row("Test the storage", "writes a small file with the settings above, reads it back over the public address and deletes it; the answer shows here", vec![act("external-test", "Test", "/api/external/test")])),
             ],
+            docs: String::new(),
         },
         ActionPanel {
             section: "storage",
             name: "Now",
             line: "the trash is purged on its own after its days and the copies trimmed to their size; these do it at once".into(),
             rows: vec![
-                action_row("The trash", &trash_line, vec![link("open-trash", "Open", "/trash"), sure(act("purge-trash", "Purge now", "/api/storage/purge-trash"))]),
+                noted(action_row("The trash", "Open lists them, to restore or delete one now; Purge now deletes them all for good, nothing comes back", vec![link("open-trash", "Open", "/trash"), sure(act("purge-trash", "Purge now", "/api/storage/purge-trash"))]), trash_line),
                 action_row("Clear the copies under a size", "the copies made for downloads go; a copy is made again when it is asked for", vec![act("clear-discord", "Clear", "/api/storage/clear-discord")]),
                 action_row("Clear the web copies", "the sharper copies the links' pages play go; each page plays its preview video until its copy is made again, on its next view", vec![act("clear-web", "Clear", "/api/storage/clear-web")]),
                 action_row("Rebuild posters, loops and filmstrips", "one job per clip at the lowest priority, at the poster time each clip keeps", vec![act("rebuild-derived", "Rebuild", "/api/storage/rebuild-derived")]),
                 action_row("Remake the default posters", "every clip that keeps its default poster gets it again, skipping black frames; a poster you picked stays", vec![act("remake-posters", "Remake", "/api/storage/remake-posters")]),
                 action_row("Remake the preview videos", "the ones missing under the current size and the ones made for another size or rule, which keep serving until the new one is ready; nothing is remade on its own", vec![act("remake-embeds", "Remake", "/api/storage/remake-embeds")]),
-                action_row("Disk", &disk_line, vec![act("disk-refresh", "Refresh", "/api/storage/disk-refresh")]),
+                noted(action_row("Disk", "", vec![act("disk-refresh", "Refresh", "/api/storage/disk-refresh")]), disk_line),
             ],
+            docs: String::new(),
         },
         ActionPanel {
             section: "imports",
@@ -384,6 +396,8 @@ fn action_panels(
                 }),
                 depends: "",
                 dep_off: false,
+                note: String::new(),
+                docs: String::new(),
                 buttons: vec![
                     act("scan-folder", "Scan now", "/api/imports/scan"),
                     sure(with(
@@ -392,12 +406,14 @@ fn action_panels(
                     )),
                 ],
             }],
+            docs: String::new(),
         },
         ActionPanel {
             section: "notifications",
             name: "Try it",
             line: String::new(),
             rows: vec![action_row("Send a test note", "it goes where the rows above say, whatever the events; the answer shows here", vec![act("notify-test", "Send a test", "/api/notify/test")])],
+            docs: String::new(),
         },
         ActionPanel {
             section: "advanced",
@@ -407,6 +423,7 @@ fn action_panels(
                 action_row("The database", if cfg.standalone() { "a consistent copy taken while reel runs, the secrets blank; a copy of the clips' files with it is Library folder, Make a copy" } else { "a consistent copy taken while reel runs, the secrets blank" }, vec![link("export-database", "Download", "/api/export/database")]),
                 action_row("The settings as config.toml", "the settings in force, the secrets blank", vec![link("export-config", "Download", "/api/export/config")]),
             ],
+            docs: String::new(),
         },
         ActionPanel {
             section: "advanced",
@@ -417,18 +434,58 @@ fn action_panels(
                 action_row("Doctor", "what doctor sees is on the Status page, with a re-probe", vec![link("doctor", "Open Status", "/status")]),
                 action_row("Restart reel", "the process exits cleanly; the container's restart policy, or whatever runs reel, starts it again", vec![sure(act("restart", "Restart", "/api/restart"))]),
             ],
+            docs: String::new(),
         },
     ]
 }
 
 /// The trash's size on disk is the same figure as the Disk row's.
 fn trash_line(clips: usize, bytes: u64) -> String {
-    let held = match clips {
+    match clips {
         0 => "empty".to_string(),
         1 => format!("1 clip, {} on disk", reel_core::format::size(bytes)),
         n => format!("{n} clips, {} on disk", reel_core::format::size(bytes)),
-    };
-    format!("{held}; Open lists them, to restore or delete one now; Purge now deletes them all for good, nothing comes back")
+    }
+}
+
+fn noted(mut r: ActionRow, note: String) -> ActionRow {
+    r.note = note;
+    r
+}
+
+/// Every row, group line and page line of the rendered page gets its place in the docs, so its
+/// help goes behind the question mark; a row whose help is empty has only its note, in sight.
+fn tips(panels: &mut [PanelView], actions: &mut [ActionPanel]) {
+    for p in panels.iter_mut() {
+        for r in p.rows.iter_mut() {
+            r.docs = format!("{}#{}", p.section, catalog::anchor(r.key));
+        }
+        for a in p.actions.iter_mut() {
+            tip_action(p.section, a);
+        }
+    }
+    for a in actions.iter_mut() {
+        if !a.line.is_empty() {
+            a.docs = format!("{}#{}", a.section, slug(a.name));
+        }
+        for r in a.rows.iter_mut() {
+            tip_action(a.section, r);
+        }
+    }
+}
+
+fn tip_action(section: &str, r: &mut ActionRow) {
+    if let (false, Some(b)) = (r.help.is_empty(), r.buttons.first()) {
+        r.docs = format!("{section}#{}", b.id);
+    }
+}
+
+fn slug(name: &str) -> String {
+    name.to_lowercase()
+        .split(|c: char| !c.is_alphanumeric())
+        .filter(|w| !w.is_empty())
+        .collect::<Vec<_>>()
+        .join("-")
 }
 
 pub struct UserView {
@@ -653,6 +710,7 @@ pub fn row(d: &Def, eff: &Effective, under: &Config) -> RowView {
         dep_off: !catalog::shown(&eff.config, d.key),
         note: String::new(),
         note_class: "",
+        docs: String::new(),
     }
 }
 
@@ -783,6 +841,7 @@ async fn render(st: AppState, me: User, current: Section, index: bool) -> AppRes
             None => actions.push(a),
         }
     }
+    tips(&mut panels, &mut actions);
     let (sections, nav_entries) = nav_of(
         Section::ALL
             .iter()
@@ -796,6 +855,7 @@ async fn render(st: AppState, me: User, current: Section, index: bool) -> AppRes
                     .iter()
                     .filter(|d| d.section == *s && eff.source(d.key) == Source::Table)
                     .count(),
+                docs: s.id(),
             })
             .collect(),
         standalone,
@@ -1148,4 +1208,5 @@ mod tests {
             );
         }
     }
+
 }
