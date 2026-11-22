@@ -531,6 +531,7 @@ label.check.pick:has(input:checked) { background: var(--raised-2); border-color:
 .srow.refused { border-left: 2px solid var(--err); }
 .srow.refused .sctl input, .srow.refused .sctl select { border-color: var(--err); }
 .srow.locked .slabel b { color: var(--text-2); }
+/* tips: from here to "tips end", the app gives this block to a server page that has none */
 .slabel > .shelp[data-docs], .panel > header > .desc[data-docs], .section-line[data-docs] { display: none; }
 .sname { display: flex; align-items: center; gap: 2px; min-width: 0; }
 .sname > b { min-width: 0; }
@@ -554,6 +555,7 @@ button.tip-btn.pinned { color: var(--accent); }
 .page-top .page-name { font-size: var(--fs-l); font-weight: 500; margin-right: 2px; }
 .page-top .scope { display: none; margin-left: auto; align-items: center; height: 20px; padding: 0 8px; border: 1px solid var(--line-2); border-radius: 10px; color: var(--text-2); font-size: var(--fs-xs); white-space: nowrap; }
 [data-app="desktop"] .page-top .scope, .settings[data-paired] .page-top .scope { display: inline-flex; }
+/* tips end */
 .panel .action-body { display: block; }
 .panel .action-note { margin: 0; }
 .logbox { margin: 0; max-height: 360px; overflow: auto; font-family: var(--mono); font-size: var(--fs-xs); line-height: 1.5; color: var(--text-2); white-space: pre-wrap; overflow-wrap: anywhere; }

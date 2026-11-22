@@ -440,7 +440,7 @@ shot "8-games-not-added-again"
 ok "a Steam game sorted as Not a game in one click, then taken out: Steam does not add it again (shots)"
 b=$(logged "Steam read in")
 # shellcheck disable=SC2086
-xdotool mousemove ${REEL_GAMES_ADD_BACK:-1078 501} click 1
+xdotool mousemove ${REEL_GAMES_ADD_BACK:-1078 343} click 1
 waitlog "games and apps: Steam may add it again" 10 "Add back did nothing"
 waitmore "Steam read in" 20 "Add back did not read Steam again" "$b"
 wait_programs '"steam-1957780" in e and not p["not_again"] and e["steam-1957780"]["class"] == "game"' 10 "Cinder Road did not come back from Steam as a Game"
@@ -448,7 +448,7 @@ ok "Add back: Steam's next read adds it again, as a Game"
 "$APP" --section=games/steam-1957780 > /dev/null 2>&1 || true
 sleep 2
 # shellcheck disable=SC2086
-xdotool mousemove ${REEL_GAMES_NAME:-984 282} click 1 key ctrl+a type "Cinder Road Deluxe"
+xdotool mousemove ${REEL_GAMES_NAME:-984 266} click 1 key ctrl+a type "Cinder Road Deluxe"
 xdotool key Return
 wait_programs 'e["steam-1957780"]["name"] == "Cinder Road Deluxe" and e["steam-1957780"]["name_from"] == "hand"' 10 "the rename was not kept"
 waitlog "games and apps: renamed" 10 "the Log does not say the rename"
@@ -468,7 +468,7 @@ shot "9-save-a-clip"
 b=$(logged "hotkeys off while a field listens")
 # Save a clip's field, the first row of Hotkeys
 # shellcheck disable=SC2086
-xdotool mousemove ${REEL_SAVE_FIELD:-1003 279} click 1
+xdotool mousemove ${REEL_SAVE_FIELD:-1003 218} click 1
 for _ in $(seq 1 20); do [ "$(logged 'hotkeys off while a field listens')" -gt "$b" ] && break; sleep 0.5; done
 [ "$(logged 'hotkeys off while a field listens')" -gt "$b" ] || fail "Save a clip's field did not listen"
 xdotool key --clearmodifiers alt+F8

@@ -2,6 +2,7 @@
 import { $, $$, APP_SECTIONS, STANDALONE_ONLY, applyShape, goServer, invoke, listen, mount, renderParts, runSave, saveButtons, serverHref, toast } from './shell.js';
 import { NAV, unsortedCount } from './nav.js';
 import { isOn, setOn } from './assets/js/switch.js';
+import { bindTips, enhance, tipHit, tipHitsOff } from './assets/js/tip.js';
 import { keycaps, recorder, recordersOffOnLeave } from './hotkeys.js';
 import { noiseHelp, noiseOptions, ownMicWords } from './noise.js';
 import { ensureOption, takenWords } from './inobs.js';
@@ -286,6 +287,17 @@ function sections() {
     h.textContent = PAGE[g.dataset.appSection];
     g.prepend(h);
   }
+  enhance(body);
+  // on Linux, Essentials' Save a clip keeps the note's warning in sight and its how in the tip
+  const saveTip = $('#g-first .srow[data-key="hotkeys.save"] .tip');
+  if (saveTip) {
+    const how = document.createElement('span');
+    how.className = 'tip-extra';
+    how.id = 'hotkeys-how-tip';
+    how.hidden = true;
+    saveTip.insertBefore(how, $('.tip-more', saveTip));
+  }
+  bindTips();
   const known = (id) => id in PAGE;
   const open = (want, push, chosen = true, y = 0) => {
     // a program's page under Games and apps is games/<its id>; Status at its log is status/log
@@ -298,8 +310,9 @@ function sections() {
     if (id === 'library') capAsk();
     root.dataset.section = id;
     $$('.group', body).forEach(g => g.hidden = g.dataset.appSection !== id);
-    $$('.section-line, .panel, .srow, .q-h, #summary', body).forEach(el => el.hidden = el.hasAttribute('data-off'));
+    $$('.section-line, .page-top, .panel, .srow, .q-h, #summary', body).forEach(el => el.hidden = el.hasAttribute('data-off'));
     $$('.hit-page', body).forEach(h => h.hidden = true);
+    tipHitsOff(body);
     $('#no-match').hidden = true;
     markNav();
     if (push) history.pushState(null, '', `#${sub ? `${id}/${sub}` : id}`);
@@ -338,12 +351,13 @@ function sections() {
     if (!q) { open(current, false); return; }
     let hits = 0;
     $$('.group', body).forEach(g => g.hidden = false);
-    $$('.section-line, .q-h, #summary', body).forEach(l => l.hidden = true);
+    $$('.section-line, .page-top, .q-h, #summary', body).forEach(l => l.hidden = true);
     $$('.panel', body).forEach(p => {
       let any = false;
       $$('.srow', p).forEach(r => {
         const hit = `${$('.shelp', r)?.textContent || ''} ${$('b', r)?.textContent || ''} ${r.dataset.key || ''}`.toLowerCase().includes(q);
         r.hidden = !hit || r.hasAttribute('data-off'); any = any || !r.hidden;
+        tipHit(r, hit ? q : '');
       });
       p.hidden = !any || p.hasAttribute('data-off'); hits += p.hidden ? 0 : 1;
     });
@@ -666,8 +680,6 @@ function renderLocal() {
 // one in use stays as it is.
 function renderEncoderChoices(s) {
   const row = $('.srow[data-key="obs.setup.encoder"]');
-  const help = $('.shelp', row);
-  if (help.dataset.base == null) help.dataset.base = help.textContent;
   const known = new Map((status.obs_encoders || []).map((v) => [v.id, v]));
   const not = [];
   for (const o of $('select', row).options) {
@@ -678,7 +690,8 @@ function renderEncoderChoices(s) {
     o.textContent = ok ? o.dataset.word : `${o.dataset.word} (${v ? 'not here' : 'not tested'})`;
     if (!ok) not.push(`${o.dataset.word}: ${v ? v.why : 'not tested on this PC yet'}`);
   }
-  help.textContent = not.length ? `${help.dataset.base}. Not offered: ${not.join('; ')}` : help.dataset.base;
+  $('#encoder-note').textContent = not.length ? `Not offered: ${not.join('; ')}` : '';
+  $('#encoder-note').hidden = !not.length;
 }
 
 let ownMicApp = null;
@@ -793,8 +806,10 @@ async function renderCosts() {
   const custom = s.quality === 'custom';
   const cv = custom && s.custom_video;
   $('#quality-help').textContent = custom
-    ? `as set in OBS${cv ? `: ${cv.output[0]} \u00d7 ${cv.output[1]}, ${Math.round(cv.fps[0] / (cv.fps[1] || 1))} frames a second` : ''}; a card sets one of reel's instead`
+    ? 'the picture every clip and session recording gets, and what it costs; a card sets one of reel\'s instead of OBS\'s'
     : 'the picture every clip and session recording gets, and what it costs';
+  $('#quality-note').textContent = custom ? `as set in OBS${cv ? `: ${cv.output[0]} \u00d7 ${cv.output[1]}, ${Math.round(cv.fps[0] / (cv.fps[1] || 1))} frames a second` : ''}` : '';
+  $('#quality-note').hidden = !custom;
   for (const q of ['light', 'smooth', 'sharp', 'native']) {
     const m = await ask(q, 60);
     if (!m) continue;
@@ -872,9 +887,9 @@ function renderBundled() {
     $('#bundled-title').textContent = 'reel\'s own OBS';
     $('#bundled-use-label').textContent = 'Run a second OBS of reel\'s';
     $('#bundled-use-help').textContent = `${status.obs_which.replace(/^t/, 'T')}, run a second time with settings of its own: started with the app, in its own tray icon, set up by reel; your own OBS and its settings stay as they are. Off, the app connects to your own OBS as below`;
-    $('#game-app-help').textContent = status.obs_game_capture === false
-      ? 'needs obs-vkcapture, which this OBS does not have; the screen holds the game meanwhile'
-      : 'obs-vkcapture\'s capture of a Vulkan or OpenGL game started with obs-gamecapture, over the screen';
+    $('#game-app-help').textContent = 'obs-vkcapture\'s capture of a Vulkan or OpenGL game started with obs-gamecapture, over the screen';
+    $('#game-app-note').textContent = 'needs obs-vkcapture, which this OBS does not have; the screen holds the game meanwhile';
+    $('#game-app-note').hidden = status.obs_game_capture !== false;
     $('#elevated-app-row').hidden = true;
   }
   $('#bundled-again').hidden = !inUse || box.state !== 'gave_up';
@@ -940,8 +955,10 @@ function renderStatus() {
   renderObs();
   renderLocal();
   $('#clips-dir-help').textContent = status.watcher.from_obs
-    ? `OBS says ${status.watcher.dir}; this folder is watched when OBS is not connected or Follow OBS is off`
+    ? 'this folder is watched when OBS is not connected or Follow OBS is off'
     : 'watched while OBS is not connected or Follow OBS is off; a file counts once its size holds still and it can be opened';
+  $('#clips-dir-note').textContent = status.watcher.from_obs ? `OBS says ${status.watcher.dir}` : '';
+  $('#clips-dir-note').hidden = !status.watcher.from_obs;
   const lib = status.local;
   kv($('#conn'), [
     ...(here ? [['Library', lib ? `on this PC, reel runs; in ${lib.library_dir}` : (status.local_line || 'reel on this PC is not running'), lib ? 'st-ok' : /did not start/.test(status.local_line || '') ? 'st-err' : 'st-active']] : []),
@@ -957,7 +974,14 @@ function renderStatus() {
   kv($('#obs-checks'), (status.obs_checks || []).map((c) => [c.name, c.line, c.ok ? 'st-ok' : 'st-warn']));
   // what reel needs from an OBS of one's own opens by itself while something is missing
   if ((status.obs_checks || []).some((c) => !c.ok)) $('#obs-more').open = true;
-  for (const el of $$('.hotkeys-how')) { el.textContent = status.hotkeys_how || ''; el.hidden = !status.hotkeys_how; }
+  const [linuxWarn, ...linuxHow] = (status.hotkeys_how || '').split(/(?<=\.) (?=There )/);
+  for (const el of $$('.hotkeys-how')) {
+    const short = !!el.closest('#g-first');
+    el.textContent = short ? linuxWarn : status.hotkeys_how || '';
+    el.hidden = !status.hotkeys_how;
+  }
+  const howTip = $('#hotkeys-how-tip');
+  if (howTip) { howTip.textContent = linuxHow.join(' '); howTip.hidden = !linuxHow.length; }
   const q = $('#queue tbody');
   q.innerHTML = '';
   $('#queue-empty').hidden = status.queue.length > 0;

@@ -172,6 +172,7 @@ pub fn run() {
             commands::app_session_set,
             commands::app_obs_again,
             commands::app_open_settings,
+            commands::app_open_docs,
             commands::app_download_open,
             files::app_library_open,
             commands::view_show,

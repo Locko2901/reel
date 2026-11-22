@@ -1,8 +1,10 @@
 // Settings, Games and apps: the list, a program's own page, Steam, adding one and renaming one.
 import { $, invoke, toast } from './shell.js';
+import { enhance } from './assets/js/tip.js';
 
 const CLASS = { game: 'Game', not_a_game: 'Not a game', not_sorted: 'Not sorted yet', ignored: 'Ignored' };
 const CLASSES = ['game', 'not_a_game', 'not_sorted', 'ignored'];
+const OWN_DOCS = { buffer: 'games#replay-buffer', record: 'games#record-by-itself', stop: 'games#stop-when-it-closes', wait: 'games#uploads-wait' };
 const NUM = ['no', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine'];
 
 let page = null;
@@ -253,9 +255,9 @@ function trace(e, b) {
   return h('span', { class: 'trace' }, steps);
 }
 
-function row(label, help, ctl, extra) {
+function row(label, help, ctl, extra, docs) {
   return h('div', { class: 'srow' },
-    h('div', { class: 'slabel' }, h('b', null, label), help ? h('span', { class: 'shelp' }, help) : null, extra || null),
+    h('div', { class: 'slabel' }, h('b', null, label), help ? h('span', { class: 'shelp', 'data-docs': docs }, help) : null, extra || null),
     h('div', { class: 'sctl' }, ctl));
 }
 
@@ -265,11 +267,11 @@ function panel(title, desc, actions, ...body) {
     ...body);
 }
 
-function nameHelp(e) {
-  const base = 'clips and session recordings saved in front of it take this name';
-  if (e.name_from === 'steam') return `${base}; its name in Steam`;
-  if (e.name_from === 'guess') return `${base}; guessed from its file: ${e.guess}`;
-  return e.guess && e.guess !== e.name ? `${base}; its file would give it ${e.guess}` : base;
+// Where the name came from stays in sight; what the name does is in the row's tip.
+function nameNote(e) {
+  if (e.name_from === 'steam') return 'its name in Steam';
+  if (e.name_from === 'guess') return `guessed from its file: ${e.guess}`;
+  return e.guess && e.guess !== e.name ? `its file would give it ${e.guess}` : '';
 }
 
 function cameWords(e) {
@@ -305,14 +307,14 @@ function renderProgram() {
   naming.value = e.naming;
   naming.addEventListener('change', () => set(e, { naming: naming.value }));
   const programRows = [
-    row('Name', nameHelp(e), name),
+    row('Name', 'clips and session recordings saved in front of it take this name', name, nameNote(e) ? h('span', { class: 'snote' }, nameNote(e)) : null, 'games#name'),
     e.folder
       ? row('Folder', `in a Steam library, app ${e.steam_app}: every program in it counts as this game, but one listed on its own${e.uninstalled ? '; not installed in Steam now, it stays with its name' : ''}`, path)
       : row('File', e.came === 'steam_shortcut' ? 'added to Steam by hand, outside its store' : '', path),
     row('In the library', 'clips and session recordings of this PC named after it', [h('span', { class: 'muted small' }, clips || 'none yet'),
-      clips ? h('button', { class: 'small', type: 'button', onclick: () => invoke('open_page', { path: `/?q=${encodeURIComponent(e.name)}` }).catch(fail) }, 'Show them') : null]),
+      clips ? h('button', { class: 'small', type: 'button', onclick: () => invoke('open_page', { path: `/?q=${encodeURIComponent(e.name)}` }).catch(fail) }, 'Show them') : null], null, 'games#in-the-library'),
   ];
-  if (!page.linux) programRows.push(row('Clips are named', 'after this name, or after its window\'s title, for an emulator or a launcher that shows the game it runs', naming));
+  if (!page.linux) programRows.push(row('Clips are named', 'after this name, or after its window\'s title, for an emulator or a launcher that shows the game it runs', naming, null, 'games#clips-are-named'));
   const cards = h('div', { class: 'classes', role: 'radiogroup', 'aria-label': 'Class' }, CLASSES.map((c) =>
     h('button', { type: 'button', role: 'radio', class: `opt${c === e.class ? ' on' : ''}`, 'aria-checked': String(c === e.class), onclick: () => { if (c !== e.class) set(e, { class: c }); } },
       h('b', null, h('i'), CLASS[c]), h('span', null, cardWords(c)))));
@@ -328,13 +330,14 @@ function renderProgram() {
     const tri = h('div', { class: 'seg tri', role: 'group', 'aria-label': b.row }, [['as_class', 'As its class'], ['on', 'On'], ['off', 'Off']].map(([v, words]) =>
       h('button', { type: 'button', 'aria-pressed': String(own === v), disabled: e.class === 'ignored', onclick: () => { if (v !== own) set(e, { [b.key]: v }); } }, words)));
     const label = h('b', null, b.row, own !== 'as_class' ? h('span', { class: 'badge own' }, 'own setting') : null);
-    return h('div', { class: 'srow', 'data-own': b.key }, h('div', { class: 'slabel' }, label, h('span', { class: 'shelp' }, b.help), trace(e, b)), h('div', { class: 'sctl' }, tri));
+    return h('div', { class: 'srow', 'data-own': b.key }, h('div', { class: 'slabel' }, label, h('span', { class: 'shelp', 'data-docs': OWN_DOCS[b.key] }, b.help), trace(e, b)), h('div', { class: 'sctl' }, tri));
   });
   parts.push(panel('This program', 'each as its class, or on or off for this program alone', null, h('div', { class: 'body flush' }, ownRows)));
   parts.push(h('div', { class: 'row remove-row' },
     h('button', { class: 'small quiet', type: 'button', onclick: () => remove(e) }, 'Remove from the list'),
     h('span', { class: 'muted small' }, removeWords(e))));
   box.replaceChildren(...parts);
+  enhance(box);
 }
 
 async function set(e, change) {
