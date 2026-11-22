@@ -98,6 +98,7 @@ sleep 2
 page img/app-log.png status/log
 page img/app-status.png status
 page setup/img/app-settings.png first
+page setup/img/app-hotkeys-linux.png hotkeys
 page setup/img/app-settings-capture.png capture
 page setup/img/app-settings-connection.png server
 echo done
