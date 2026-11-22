@@ -129,16 +129,17 @@ function hide() {
 // A short wait, so the pointer can cross from the icon to the tip's link.
 function later() { clearTimeout(shut); shut = setTimeout(() => { if (open && !open.pinned) hide(); }, 180); }
 
-// The app opens the docs in the browser: its own pages have the opener, a server page in its
-// window asks the app, which opens nothing but the docs.
+// The app opens the docs in the browser: its own pages through its opener; a server page in its
+// window asks the app, which opens nothing but the docs (an app without that command: the opener).
 function openDocs(e, more) {
   const tauri = window.__TAURI__;
   if (!tauri) return;
   e.preventDefault();
-  const opener = tauri.opener && tauri.opener.openUrl;
+  const opener = () => (tauri.opener && tauri.opener.openUrl ? tauri.opener.openUrl(more.href) : Promise.reject());
+  const own = location.protocol === 'tauri:' || location.hostname === 'tauri.localhost';
   Promise.resolve()
-    .then(() => (opener ? opener(more.href) : Promise.reject()))
-    .catch(() => tauri.core.invoke('app_open_docs', { path: more.dataset.docs }))
+    .then(() => (own ? opener() : tauri.core.invoke('app_open_docs', { path: more.dataset.docs })))
+    .catch(() => (own ? undefined : opener()))
     .catch(() => {});
 }
 

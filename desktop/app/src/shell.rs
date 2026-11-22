@@ -26,7 +26,7 @@ pub const SETUP_PAGE: &str = "setup.html";
 const BACKGROUND: tauri::window::Color = tauri::window::Color(0x0d, 0x0b, 0x10, 0xff);
 
 /// The only commands a reel page inside the app may call.
-const REMOTE_PERMISSIONS: [&str; 11] = [
+const REMOTE_PERMISSIONS: [&str; 12] = [
     "allow-app-status",
     "allow-app-page-error",
     "allow-app-share-last",
@@ -38,6 +38,7 @@ const REMOTE_PERMISSIONS: [&str; 11] = [
     "allow-app-obs-again",
     "allow-app-open-settings",
     "allow-app-download-open",
+    "allow-app-open-docs",
 ];
 
 /// What the library the app shows may ask besides, on this PC or on the server it is paired
@@ -71,15 +72,27 @@ pub fn library_page_of(label: &str, url: Option<&str>, base: &str) -> bool {
 /// The app's pages in the nav of the server's Settings pages, whatever the server's version, and
 /// Games and apps' count beside it: desktop/ui/nav.js without its exports, then server_nav.js.
 fn server_nav() -> String {
-    let nav: Vec<&str> = include_str!("../../ui/nav.js")
-        .lines()
-        .map(|l| l.strip_prefix("export ").unwrap_or(l))
-        .collect();
+    let module = |text: &str| {
+        text.lines()
+            .map(|l| l.strip_prefix("export ").unwrap_or(l))
+            .collect::<Vec<_>>()
+            .join("\n")
+    };
     format!(
-        "(() => {{\n{}\n{}}})();",
-        nav.join("\n"),
+        "(() => {{\n{}\nconst TIP = (() => {{\n{}\nreturn {{ enhance, bindTips, tipHit, tipHitsOff }};\n}})();\nconst TIP_CSS = {};\n{}}})();",
+        module(include_str!("../../ui/nav.js")),
+        module(include_str!("../../../web/assets/js/tip.js")),
+        serde_json::to_string(tip_css()).unwrap_or_else(|_| "''".into()),
         include_str!("server_nav.js")
     )
+}
+
+/// The styles of the tips, for a server page that has none of its own.
+fn tip_css() -> &'static str {
+    let css = include_str!("../../../web/assets/reel.css");
+    let from = css.find("/* tips:").unwrap_or(css.len());
+    let to = css.find("/* tips end */").unwrap_or(from).max(from);
+    &css[from..to]
 }
 
 /// Every page's uncaught errors, unhandled rejections and scripts that did not load go to the
@@ -732,6 +745,22 @@ mod tests {
             assert!(js.contains(part), "{part}");
         }
         assert_eq!(code.filter(|l| l.starts_with("const NAV = [")).count(), 1);
+    }
+
+    #[test]
+    fn a_server_without_tips_gets_the_apps() {
+        let css = tip_css();
+        assert!(
+            css.starts_with("/* tips:")
+                && css.contains(".tip.open")
+                && !css.contains("/* tips end */")
+        );
+        let script = server_nav();
+        assert!(
+            !script.contains("\nexport "),
+            "a module's export left in the script"
+        );
+        assert!(script.contains("const TIP = (() => {") && script.contains("function enhance("));
     }
 
     #[test]

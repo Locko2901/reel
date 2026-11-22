@@ -39,7 +39,7 @@ details.advanced[open] > summary { margin-bottom: var(--s2); }
 #library-job .notice .bar { flex-basis: 100%; width: 100%; }
 #library-job .notice .grow { flex: 1 1 320px; overflow-wrap: anywhere; }
 #library-line .mono { overflow-wrap: anywhere; }
-.settings[data-paired] .group > .section-line::after { content: " Kept on this PC: each PC has its own."; }
+.settings[data-paired] .tip > .section-line::after { content: " Kept on this PC: each PC has its own."; }
 #encoders details.ffmpeg > summary { cursor: pointer; color: var(--text-3); font-size: var(--fs-xs); width: max-content; margin-top: 2px; }
 #encoders details.ffmpeg > pre { margin: 6px 0 0; padding: 8px 10px; background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius); font-family: var(--mono); font-size: var(--fs-xs); line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--text-2); max-height: 200px; overflow: auto; }
 .order-line { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin: -6px 0 var(--gap-panels); font-size: var(--fs-s); color: var(--text-2); }

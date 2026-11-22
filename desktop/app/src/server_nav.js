@@ -136,8 +136,71 @@ const sectionTop = (e) => {
 document.addEventListener('click', sectionTop);
 document.addEventListener('change', (e) => { if (e.target.id === 'sections-select') setTimeout(() => scrollTo(0, 0)); });
 
+// A released server whose rows carry no question marks: they get the app's, by their keys, as a
+// server with them draws them. Its own filter still finds a row by the words in a tip.
+const LINKS = { '/trash': 'open-trash', '/api/export/database': 'export-database', '/api/export/config': 'export-config', '/setup': 'setup-again', '/status': 'doctor' };
+const GROUPS = ['Now', 'Scan a folder', 'Logs', 'Settings history', 'Users', 'Sign-in attempts', 'The app', 'Paired devices'];
+const BROWSER = { 'Hover previews on cards': 'hover-previews', 'Card size': 'card-size', 'Key hints': 'key-hints', Accent: 'accent' };
+const tips = () => {
+  const body = document.getElementById('sections-body');
+  if (!body || document.querySelector('[data-docs]')) return;
+  const slug = (words) => words.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean).join('-');
+  const sectionOf = (el) => el.closest('[data-section]')?.dataset.section;
+  for (const row of body.querySelectorAll('.sgroup[data-key], .srow[data-key]')) {
+    const where = `${sectionOf(row)}#${row.dataset.key.replace(/[._]/g, '-')}`;
+    row.querySelectorAll('.slabel > .shelp').forEach((w) => { w.dataset.docs = where; });
+  }
+  for (const row of body.querySelectorAll('.srow.action')) {
+    const first = row.querySelector('.sctl a, .sctl button');
+    const id = first && (first.id || LINKS[first.getAttribute('href')]);
+    const words = row.querySelector('.slabel > .shelp');
+    // the disk's and the external storage's lines say what is there now: they stay in sight
+    if (!id || !words || id === 'disk-refresh' || id === 'external-check') continue;
+    if (id === 'open-trash') {
+      const [held, ...how] = words.textContent.split('; ');
+      const note = document.createElement('span');
+      note.className = 'snote';
+      note.textContent = held;
+      words.after(note);
+      words.textContent = how.join('; ');
+    }
+    words.dataset.docs = `${sectionOf(row)}#${id}`;
+  }
+  for (const desc of body.querySelectorAll('.panel > header > .desc')) {
+    const name = desc.parentElement.querySelector('h2')?.textContent || '';
+    if (GROUPS.includes(name)) desc.dataset.docs = `${sectionOf(desc)}#${slug(name)}`;
+  }
+  for (const row of body.querySelectorAll('.panel[data-section="appearance"] .srow:not([data-key])')) {
+    const at = BROWSER[row.querySelector('b')?.textContent];
+    const words = row.querySelector('.slabel > .shelp');
+    if (at && words) words.dataset.docs = `appearance#${at}`;
+  }
+  const standalone = document.body.hasAttribute('data-standalone');
+  for (const line of body.querySelectorAll('.section-line[data-section]')) {
+    const id = line.dataset.section;
+    line.dataset.docs = id;
+    line.dataset.name = document.querySelector(`#sections-select option[value="${id}"]`)?.textContent || id;
+    if (!standalone) line.dataset.scope = 'every PC and browser';
+  }
+  const style = document.createElement('style');
+  style.textContent = TIP_CSS;
+  document.head.append(style);
+  TIP.enhance(body);
+  TIP.bindTips();
+  const root = document.getElementById('settings');
+  const filter = document.getElementById('settings-filter');
+  filter?.addEventListener('input', () => {
+    const q = filter.value.trim().toLowerCase();
+    body.querySelectorAll('.page-top').forEach((t) => { t.hidden = !!q || t.dataset.section !== root.dataset.section; });
+    if (!q) { TIP.tipHitsOff(body); return; }
+    body.querySelectorAll('.srow').forEach((r) => TIP.tipHit(r, r.closest('[hidden]') ? '' : q));
+  });
+};
+
 // before the page's scripts run, which show and bind the app's pages in the nav they find
 document.addEventListener('readystatechange', () => { if (document.readyState === 'interactive') { frame(); fill(); choices(); } });
 addEventListener('DOMContentLoaded', count);
+// after them: a server that draws its own question marks has marked its words by then
+addEventListener('DOMContentLoaded', tips);
 addEventListener('pageshow', (e) => { if (e.persisted) count(); });
 document.addEventListener('visibilitychange', () => { if (!document.hidden) count(); });

@@ -814,3 +814,115 @@ pub async fn program_rename(
 ) -> R<Value> {
     rt.rename(&id, &name, older, server.unwrap_or(false)).await
 }
+
+/// The pages of reel's settings docs a tip may open, one per page of Settings.
+const DOCS_PAGES: [&str; 22] = [
+    "essentials",
+    "clips",
+    "session",
+    "capture",
+    "hotkeys",
+    "games",
+    "uploads",
+    "connection",
+    "app",
+    "status",
+    "library-folder",
+    "encoding",
+    "storage",
+    "ingest",
+    "imports",
+    "sharing",
+    "devices",
+    "access",
+    "notifications",
+    "general",
+    "appearance",
+    "advanced",
+];
+const DOCS: &str = "https://locko2901.github.io/reel/settings/";
+
+/// A tip's "More in the docs", `<page>/` or `<page>/#<anchor>`: only a page of the table and an
+/// anchor of lowercase letters, digits and hyphens, so a server's page opens nothing else.
+pub fn docs_url(path: &str) -> Option<String> {
+    let (page, anchor) = match path.split_once("/#") {
+        Some((page, anchor)) => (page, Some(anchor)),
+        None => (path.strip_suffix('/')?, None),
+    };
+    if !DOCS_PAGES.contains(&page) {
+        return None;
+    }
+    if let Some(a) = anchor {
+        let fine = |b: u8| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-';
+        if a.is_empty() || a.len() > 64 || !a.bytes().all(fine) {
+            return None;
+        }
+    }
+    Some(format!("{DOCS}{path}"))
+}
+
+/// A setting's place in the docs, in the default browser.
+#[tauri::command]
+pub fn app_open_docs(app: AppHandle, path: String) -> R<()> {
+    let url = docs_url(&path).ok_or_else(|| "not a page of reel's settings docs".to_string())?;
+    tracing::info!(%url, "docs opened");
+    app.opener()
+        .open_url(url, None::<&str>)
+        .map_err(|e| e.to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_docs_open_only_on_a_settings_page() {
+        assert_eq!(
+            docs_url("storage/#data-dir").as_deref(),
+            Some("https://locko2901.github.io/reel/settings/storage/#data-dir")
+        );
+        assert_eq!(
+            docs_url("clips/").as_deref(),
+            Some("https://locko2901.github.io/reel/settings/clips/")
+        );
+        for refused in [
+            "",
+            "storage",
+            "/storage/",
+            "storage/#",
+            "storage//#data-dir",
+            "storage/#Data-Dir",
+            "storage/#data dir",
+            "storage/#data-dir/../x",
+            "storage/?q=1",
+            "storage/x/",
+            "nowhere/",
+            "../configuration/",
+            "https://example.com/",
+            "//example.com/storage/",
+            "storage/#data-dir\n",
+            "storage/#data-dir#x",
+        ] {
+            assert_eq!(docs_url(refused), None, "{refused:?}");
+        }
+        assert_eq!(docs_url(&format!("storage/#{}", "a".repeat(65))), None);
+    }
+
+    #[test]
+    fn every_page_of_the_table_is_in_the_docs() {
+        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../docs/settings");
+        let mut pages: Vec<String> = std::fs::read_dir(&dir)
+            .expect("docs/settings")
+            .flatten()
+            .filter_map(|e| {
+                let name = e.file_name().to_string_lossy().into_owned();
+                name.strip_suffix(".md").map(str::to_string)
+            })
+            .filter(|p| p != "index")
+            .collect();
+        pages.sort();
+        let mut table: Vec<String> = DOCS_PAGES.iter().map(|p| p.to_string()).collect();
+        table.sort();
+        assert_eq!(table, pages);
+    }
+}

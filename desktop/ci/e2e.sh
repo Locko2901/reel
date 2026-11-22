@@ -165,7 +165,7 @@ xdotool windowactivate --sync "$WIN" 2>/dev/null || true
 sleep 1
 import -display "$DISPLAY" -window "$WIN" "$SHOTS/hotkeys.png"
 # Share the last clip's field, the third row of Hotkeys
-SHARE_FIELD="${REEL_E2E_SHARE_FIELD:-1003 471}"
+SHARE_FIELD="${REEL_E2E_SHARE_FIELD:-1003 340}"
 n=$(log_n "hotkeys off while a field listens")
 xdotool mousemove $SHARE_FIELD click 1
 wait_more 10 "the app's hotkeys to go off while the field listens" "hotkeys off while a field listens" "$n"

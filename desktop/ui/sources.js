@@ -1,5 +1,6 @@
 // What a clip hears: the chosen audio sources and a level row for each.
 import { $$, invoke } from './shell.js';
+import { enhance } from './assets/js/tip.js';
 
 export async function audioPlan(setup) {
   const none = { sources: [], words: [], apart: false };
@@ -10,7 +11,7 @@ function levelRow(name, onLevel) {
   const row = document.createElement('div');
   row.className = 'srow';
   row.dataset.vol = name;
-  row.innerHTML = '<div class="slabel"><b></b><span class="shelp">its volume in OBS; the meter shows it after the volume</span><span class="meter" aria-hidden="true"><i></i></span></div>'
+  row.innerHTML = '<div class="slabel"><b></b><span class="shelp" data-docs="capture#obs-setup-volumes">its volume in OBS; the meter shows it after the volume</span><span class="meter" aria-hidden="true"><i></i></span></div>'
     + '<div class="sctl"><span class="vol"><input type="range" min="-30" max="10" step="1" value="0"><span class="ctl-group"><input type="number" class="in-num" min="-30" max="10" step="1" value="0"><span class="unit">dB</span></span></span></div>';
   row.querySelector('b').textContent = `${name} level`;
   const [range, num] = row.querySelectorAll('input');
@@ -26,6 +27,7 @@ export function renderLevelRows(box, sources, volumes, onLevel) {
   const had = new Map($$('.srow[data-vol]', box).map((r) => [r.dataset.vol, r]));
   const rows = sources.map((s) => had.get(s.name) || levelRow(s.name, onLevel));
   box.replaceChildren(...rows);
+  enhance(box);
   for (const row of rows) {
     if (row.contains(document.activeElement)) continue;
     for (const i of $$('input', row)) i.value = (volumes || {})[row.dataset.vol] || 0;
