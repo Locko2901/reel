@@ -4,7 +4,7 @@
     <div class="slabel">
       <b>{{ r.label }}</b><span class="shelp">{{ r.help }}</span>
       <div class="notes">
-        {% if let Some(l) = r.locked %}<span class="badge lock">{{ l }}</span>{% endif %}
+        {% if let Some(l) = r.locked %}<span class="badge lock">{% include "lock.html" %}{{ l }}</span>{% endif %}
         {% if r.restart %}<span class="badge warn">after a restart</span>{% endif %}
         <span class="badge accent changed"{% if !r.changed %} hidden{% endif %}>changed from the defaults</span>
       </div>
@@ -26,7 +26,7 @@
   <div class="slabel">
     <b>{{ r.label }}</b><span class="shelp">{{ r.help }}</span>{% if !r.note.is_empty() %}<span class="snote {{ r.note_class }}">{{ r.note }}</span>{% endif %}
     <div class="notes">
-      {% if let Some(l) = r.locked %}<span class="badge lock">{{ l }}</span>{% endif %}
+      {% if let Some(l) = r.locked %}<span class="badge lock">{% include "lock.html" %}{{ l }}</span>{% endif %}
       {% if r.restart %}<span class="badge warn">after a restart</span>{% endif %}
       <span class="badge accent changed"{% if !r.changed %} hidden{% endif %}>changed, was {{ r.default_text }}</span>
     </div>
@@ -34,7 +34,7 @@
   <div class="sctl">
     {% if r.locked.is_none() %}<button class="quiet reset" type="button"{% if !r.changed %} hidden{% endif %}>Reset</button>{% endif %}
     {% if r.locked.is_some() %}
-    <span class="in-locked{% if r.kind == "path" || r.kind == "url" %} mono{% endif %}" title="{{ r.value }}"><span>{% if r.kind == "secret" %}{% if r.secret_set %}set{% else %}not set{% endif %}{% else if r.value.is_empty() %}empty{% else %}{{ r.value }}{% endif %}</span></span>
+    <span class="in-locked{% if r.kind == "path" || r.kind == "url" %} mono{% endif %}" title="{{ r.value }}"><span>{% if r.kind == "secret" %}{% if r.secret_set %}set{% else %}not set{% endif %}{% else if r.value.is_empty() %}empty{% else %}{{ r.value }}{% endif %}</span>{% include "lock.html" %}</span>
     {% else if r.kind == "int" %}
     <span class="ctl-group"><input type="number" class="in-num" value="{{ r.value }}" min="{{ r.min }}" max="{{ r.max }}" aria-label="{{ r.label }}">{% if !r.unit.is_empty() %}<span class="unit">{{ r.unit }}</span>{% endif %}</span>
     {% else if r.kind == "bool" %}

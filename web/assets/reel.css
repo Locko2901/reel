@@ -138,7 +138,7 @@ html[data-wait] body { background: none; animation: shown 0s 1s forwards; }
 .badge.warn { color: var(--warn); }
 .badge.err { color: var(--err); }
 .badge.accent { color: var(--accent); }
-.badge.lock::before { content: ""; width: 7px; height: 9px; border: 1.5px solid currentColor; border-radius: 2px; box-sizing: border-box; opacity: 0.8; }
+.badge .icon.lock { width: 11px; height: 11px; stroke-width: 1.7; flex: none; opacity: 0.85; }
 .pulse { animation: pulse 1.6s ease-in-out infinite; }
 @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
 
@@ -206,7 +206,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
 .in-locked { display: inline-flex; align-items: center; justify-content: space-between; gap: var(--s2); height: var(--ctl); padding: 0 9px; border: 1px dashed var(--line-2); border-radius: var(--radius); color: var(--text-2); font-size: var(--fs-s); max-width: 100%; min-width: 0; }
 .in-locked span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .in-locked.mono span { font-family: var(--mono); }
-.in-locked::after { content: ""; width: 8px; height: 10px; border: 1.5px solid var(--text-3); border-radius: 2px; flex: none; }
+.in-locked .icon.lock { width: 13px; height: 13px; stroke-width: 1.6; color: var(--text-3); flex: none; }
 label.check { display: inline-flex; align-items: center; gap: 7px; cursor: pointer; }
 input[type="checkbox"] { accent-color: var(--accent); width: 14px; height: 14px; margin: 0; }
 input[type="range"] { accent-color: var(--accent); }
