@@ -521,7 +521,8 @@ function draw() {
   if (shown) renderProgram();
 }
 
-// Shows the list, or a program's page; with `push` the window's Back comes back.
+// Shows the list, or a program's page; with `push` (a click) at its top, and the window's Back
+// comes back. Opened by the address, the section puts it where it was.
 export function show(id, push = false) {
   const was = shown;
   shown = id || null;
@@ -531,7 +532,7 @@ export function show(id, push = false) {
   prog.hidden = !shown;
   if (push) history.pushState(null, '', shown ? `#games/${shown}` : '#games');
   if (shown) renderProgram();
-  if (shown || was) window.scrollTo(0, 0);
+  if (push && (shown || was)) window.scrollTo(0, 0);
 }
 
 export async function refresh(force = false) {

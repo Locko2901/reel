@@ -220,6 +220,56 @@ function bindHotkeys() {
 
 let current = 'first';
 const PAGE = Object.fromEntries(APP_SECTIONS);
+
+// Where each entry of the history was left, by an id in its state, in the session's storage that
+// outlives this page while the window shows a server page: Back and Forward come back there.
+const PLACES = 'reel-places';
+const places = () => { try { return JSON.parse(sessionStorage.getItem(PLACES)) || {}; } catch { return {}; } };
+function entry() {
+  let k = history.state && history.state.place;
+  if (!k) {
+    k = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+    history.replaceState({ ...(history.state || {}), place: k }, '');
+  }
+  return k;
+}
+function keep(k, y, first) {
+  const all = places();
+  delete all[k];
+  all[k] = y;
+  if (first) all.first = y;
+  const keys = Object.keys(all).filter((x) => x !== 'first');
+  for (const x of keys.slice(0, Math.max(0, keys.length - 50))) delete all[x];
+  try { sessionStorage.setItem(PLACES, JSON.stringify(all)); } catch { /* the place is not kept */ }
+}
+let pending = null;
+function watchPlace() {
+  const flush = () => { if (pending) keep(pending.k, pending.y, pending.first); pending = null; };
+  addEventListener('scroll', () => {
+    const k = entry();
+    if (pending && pending.k !== k) flush();
+    if (!pending) requestAnimationFrame(flush);
+    pending = { k, y: Math.round(scrollY), first: current === 'first' && !$('#settings-filter')?.value.trim() };
+  }, { passive: true });
+  addEventListener('pagehide', flush);
+}
+// The page may still be filling in (Games and apps' list, the log): try until it is long enough,
+// for two seconds at most, or until the wheel, a key or a touch takes over.
+let wantY = null, wantUntil = 0;
+function placeAt(y) {
+  wantY = y || 0;
+  wantUntil = Date.now() + 2000;
+  const step = () => {
+    if (wantY === null) return;
+    window.scrollTo(0, wantY);
+    if (Math.abs(scrollY - wantY) < 2 || Date.now() > wantUntil) { wantY = null; return; }
+    requestAnimationFrame(step);
+  };
+  step();
+}
+for (const ev of ['wheel', 'keydown', 'pointerdown', 'touchstart']) addEventListener(ev, () => { wantY = null; }, { passive: true, capture: true });
+const placeOf = () => places()[entry()] || 0;
+const cameBack = () => ['back_forward', 'reload'].includes(performance.getEntriesByType('navigation')[0]?.type) && !!(history.state && history.state.place);
 // A page of the nav table: its kind (reel's or the app's) and when it shows.
 const pageOf = (page) => {
   const [kind, id] = page.split(' ');
@@ -238,7 +288,7 @@ function sections() {
     g.prepend(h);
   }
   const known = (id) => id === 'first' || id in PAGE;
-  const open = (want, push, chosen = true) => {
+  const open = (want, push, chosen = true, y = 0) => {
     // a program's page under Games and apps is games/<its id>; Status at its log is status/log
     let [id, sub] = String(want || 'first').split('/');
     if (!known(id)) { id = 'first'; sub = undefined; }
@@ -254,12 +304,12 @@ function sections() {
     $('#no-match').hidden = true;
     heading(id);
     if (push) history.pushState(null, '', `#${sub ? `${id}/${sub}` : id}`);
-    window.scrollTo(0, 0);
+    placeAt(y);
     gamesOpened(id === 'games', id === 'games' ? sub : undefined);
     if (id === 'session') renderRecordNow();
     if (id === 'first') { renderBufferNote(); renderCosts(); }
     // Status at its log: once the lines are in, so the page is long enough to get there
-    if (id === 'status') loadLog().then(() => { if (sub === 'log' && current === 'status') $('#log-panel')?.scrollIntoView(); });
+    if (id === 'status') loadLog(true).then(() => { if (sub === 'log' && !y && current === 'status') $('#log-panel')?.scrollIntoView(); });
     invoke('obs_meters', { on: id === 'capture' }).catch(() => {});
     if (id === 'capture' && settings && settings.obs.bundled) invoke('obs_read').then((r) => doneInObs(r, false, true)).catch(() => {});
     invoke('page_section', { section: id, chosen }).catch(() => {});
@@ -270,9 +320,10 @@ function sections() {
     e.preventDefault();
     open(a.dataset.appSection, true);
   });
-  $('#crumb').addEventListener('click', (e) => { e.preventDefault(); open('first', true); });
-  window.addEventListener('popstate', () => open(location.hash.replace('#', '') || 'first', false));
-  open(location.hash.replace('#', '') || 'first', false, false);
+  $('#crumb').addEventListener('click', (e) => { e.preventDefault(); open('first', true, true, places().first); });
+  window.addEventListener('popstate', () => open(location.hash.replace('#', '') || 'first', false, true, placeOf()));
+  open(location.hash.replace('#', '') || 'first', false, false, cameBack() ? placeOf() : 0);
+  watchPlace();
   window.openSection = (id) => open(id, true);
   const filter = $('#settings-filter');
   let searched = false;
@@ -1065,12 +1116,14 @@ function renderSave() {
     : `OBS's replay buffer runs and keeps the last ${st && st.replay_seconds ? `${st.replay_seconds} s` : 'seconds'}.${b.ok || status.mode === 'standalone' ? '' : ` Save and share not now: ${b.why}.`}`;
 }
 
-async function loadLog() {
+// The log opens at its end and follows new lines there; scrolled up to read, it stays put.
+async function loadLog(opened = false) {
   try {
     const lines = await invoke('log_tail', { lines: 300 });
     const box = $('#log-lines');
+    const end = opened || box.scrollHeight - box.scrollTop - box.clientHeight < 24;
     box.textContent = lines.length ? lines.join('\n') : 'nothing yet';
-    box.scrollTop = box.scrollHeight;
+    if (end) box.scrollTop = box.scrollHeight;
   } catch (e) { $('#log-lines').textContent = String(e.message || e); }
 }
 
@@ -1188,7 +1241,7 @@ function bindButtons() {
   };
   $('#update-install').onclick = () => invoke('update_install').catch(e => toast(String(e.message || e), 'err'));
   $('#update-releases').onclick = () => invoke('open_releases').catch(e => toast(String(e.message || e), 'err'));
-  $('#log-refresh').onclick = loadLog;
+  $('#log-refresh').onclick = () => loadLog(true);
   $('#log-folder').onclick = () => invoke('open_log_folder').catch(e => toast(String(e.message || e), 'err'));
 }
 
