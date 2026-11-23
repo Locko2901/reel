@@ -1,8 +1,9 @@
 #!/bin/sh
-#   XVFB_SCREEN=1280x900 desktop/ci/xvfb.sh run sh desktop/ci/docs-shots.sh
+#   XVFB_SCREEN=1920x1080 desktop/ci/xvfb.sh run sh desktop/ci/docs-shots.sh
 # The docs' pictures of the app's own pages, from the real Linux app paired with the server at
 # REEL_E2E_SERVER (best a fresh one, its clips none but the one sent here), in the app's first
-# window, 1280x820: the stand-in OBS connected, one clip sent with Save and share. Each picture
+# window, 1280x820, and one of Settings beside the library at 1920x1000: the stand-in OBS
+# connected, one clip sent with Save and share. Each picture
 # lands at its place under docs/ in 256 colours, as the docs keep them. The pictures in Windows'
 # words come from ci/browser/app-pages.mjs.
 set -eu
@@ -35,7 +36,7 @@ window() { xdotool search --onlyvisible --name '^reel$' 2>/dev/null | head -1; }
 shot() { # shot <path under docs>
   win=$(window)
   [ -n "$win" ] || fail "no window for $1"
-  xdotool mousemove 1279 899
+  xdotool mousemove 1919 1079
   sleep 0.3
   import -display "$DISPLAY" -window "$win" "$W/shot.png"
   mkdir -p "$(dirname "$DOCS/$1")"
@@ -101,4 +102,15 @@ page setup/img/app-settings.png first
 page setup/img/app-hotkeys-linux.png hotkeys
 page setup/img/app-settings-capture.png capture
 page setup/img/app-settings-connection.png server
+# Settings beside the library, on a window wide enough for it
+b=$(logged "library loaded at=$HOST/$")
+"$APP" --page=/ > /dev/null 2>&1 || true
+waitlog "library loaded at=$HOST/$" 20 "the library before Settings beside it" "$b"
+xdotool windowsize "$(window)" 1920 1000 2>/dev/null || true
+sleep 1.5
+b=$(logged "settings panel opens")
+"$APP" --section=first > /dev/null 2>&1 || true
+waitlog "settings panel opens" 20 "Settings beside the library" "$b"
+sleep 2
+shot img/app-settings-beside.png
 echo done
