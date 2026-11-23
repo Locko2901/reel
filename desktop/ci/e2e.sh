@@ -320,6 +320,36 @@ done
 xdotool mousemove 640 760
 echo "the nav opens each of this PC's pages, Back walks them, and the ids of the pages before open the pages that hold them now"
 
+say "a wide window: Settings beside the library, a server's page in it, the page beside clicked, Esc"
+WIN=$(xdotool search --name '^reel$' | head -1 || true)
+[ -n "$WIN" ] || fail "no window for Settings beside the page"
+LIBRARY_PAGE="library loaded at=$HOST/\$"
+n=$(log_n "$LIBRARY_PAGE")
+"$APP" --page=/ >/dev/null 2>&1 &
+wait_more 20 "the library" "$LIBRARY_PAGE" "$n"
+xdotool windowmove "$WIN" 0 0 windowsize "$WIN" 1920 1000
+sleep 2
+n=$(log_n 'settings panel opens')
+"$APP" --section=clips >/dev/null 2>&1 &
+wait_more 20 "Settings beside the library" 'settings panel opens' "$n"
+PANEL_STORAGE="settings panel loaded at=$HOST/settings/storage"
+n=$(log_n "$PANEL_STORAGE")
+beside=$(log_n "$STORAGE_PAGE")
+"$APP" --page=/settings/storage >/dev/null 2>&1 &
+wait_more 15 "Library and storage in the panel" "$PANEL_STORAGE" "$n"
+[ "$(log_n "$STORAGE_PAGE")" = "$beside" ] || fail "Library and storage opened in the library, not beside it"
+sleep 2
+import -display "$DISPLAY" -window "$WIN" "$SHOTS/settings-beside.png"
+# the header of the page beside, between its links and the search: nothing there navigates
+n=$(log_n 'settings panel closes')
+xdotool mousemove 1100 24 click 1
+sleep 1
+xdotool key Escape
+wait_more 10 "Esc on the page beside closing Settings" 'settings panel closes' "$n"
+xdotool windowsize "$WIN" 1280 820
+sleep 1
+echo "on a wide window Settings opens beside the page, keeps the server's pages, and Esc closes it"
+
 say "cues played, from the log"
 cat "$LOG"/reel-desktop.log* | grep -o 'cue [a-z_]* played ([^)]*)' | sort | uniq -c
 

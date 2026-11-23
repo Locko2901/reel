@@ -238,7 +238,7 @@ desktop-linux: desktop-sidecars-linux ## A Linux debug build of the app, for the
 	$(DESKTOP_RUN) -w /work/desktop $(DESKTOP_IMAGE) sh -c 'cargo build -p reel-desktop && cargo build -p reel-desktop-core --example fake_obs --example mic_filters'
 
 desktop-e2e: desktop-appimage desktop-linux ## The AppImage under Xvfb against the demo on :8746 (REEL_E2E_PASSWORD)
-	$(DESKTOP_RUN) -w /work -e REEL_E2E_SERVER=$(REEL_E2E_SERVER) -e REEL_E2E_USER=$(REEL_E2E_USER) \
+	$(DESKTOP_RUN) -w /work -e XVFB_SCREEN=1920x1080 -e REEL_E2E_SERVER=$(REEL_E2E_SERVER) -e REEL_E2E_USER=$(REEL_E2E_USER) \
 	  -e REEL_E2E_PASSWORD="$(REEL_E2E_PASSWORD)" -e REEL_E2E_APP=/out/reel_$(APP_VERSION)_amd64.AppImage \
 	  $(DESKTOP_IMAGE) /work/desktop/ci/xvfb.sh run /work/desktop/ci/e2e.sh
 
