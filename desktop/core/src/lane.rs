@@ -1,6 +1,7 @@
 //! One step in Program Files at a time (reel-elevate.exe as administrator): every request goes
 //! through one worker in order, and saves that wait together are taken as one.
 use crate::elevated::Step;
+use crate::history::Source;
 use crate::settings::Settings;
 use serde::Serialize;
 use serde_json::{Map, Value};
@@ -133,15 +134,20 @@ pub fn left(on: bool, copy_there: bool, task: bool) -> bool {
 }
 
 /// The settings' leaves a request changed, so a request that waited applies over what the
-/// steps before it left.
+/// steps before it left, and where the request came from.
 #[derive(Debug, Clone, Default, PartialEq)]
-pub struct Changes(Vec<(Vec<String>, Option<Value>)>);
+pub struct Changes(Vec<(Vec<String>, Option<Value>)>, Source);
 
 impl Changes {
     pub fn between(base: &Settings, new: &Settings) -> Changes {
         let mut out = Vec::new();
         diff(&mut Vec::new(), &json(base), &json(new), &mut out);
-        Changes(out)
+        Changes(out, Source::Settings)
+    }
+
+    pub fn from(mut self, from: Source) -> Changes {
+        self.1 = from;
+        self
     }
 
     pub fn is_empty(&self) -> bool {
@@ -161,6 +167,27 @@ impl Changes {
             put(&mut v, path, value.clone());
         }
         serde_json::from_value(v).map_err(|e| format!("the settings as changed: {e}"))
+    }
+}
+
+/// Where each leaf a turn of the lane changed was asked from; the last request of a leaf wins,
+/// and a leaf no request names was the app's own.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct Askers(Vec<(Vec<String>, Source)>);
+
+impl Askers {
+    pub fn of(&self, key: &str) -> Source {
+        let key: Vec<&str> = key.split('.').collect();
+        self.0
+            .iter()
+            .rev()
+            .find(|(path, _)| path.iter().zip(&key).all(|(a, b)| a == b))
+            .map(|(_, f)| *f)
+            .unwrap_or(Source::Reel)
+    }
+
+    fn add(&mut self, c: &Changes) {
+        self.0.extend(c.0.iter().map(|(p, _)| (p.clone(), c.1)));
     }
 }
 
@@ -262,8 +289,9 @@ pub trait Program: Send + Sync + 'static {
         new: &Settings,
         answered: &dyn Fn(),
     ) -> Result<(), String>;
-    /// The settings kept, and what follows from them in the rest of the app.
-    fn save(&self, old: &Settings, new: Settings) -> Answer;
+    /// The settings kept, and what follows from them in the rest of the app; `by` says where
+    /// each change was asked.
+    fn save(&self, old: &Settings, new: Settings, by: &Askers) -> Answer;
     /// The line under the switch after a step: why it did not go through, or nothing.
     fn said(&self, problem: Option<String>);
     /// Nothing waits: the copy read again and set against the saved setting.
@@ -466,7 +494,7 @@ impl Lane {
     fn save<P: Program>(&self, p: &P, mut members: Vec<Member>, held: &mut Option<P::Hold>) {
         self.absorb(&mut members);
         let old = p.saved();
-        let mut target = merged(&old, &mut members);
+        let (mut target, mut by) = merged(&old, &mut members);
         let mut step = plan_with(p, &old, &target);
         if step.is_some() {
             if held.is_none() {
@@ -474,7 +502,7 @@ impl Lane {
             }
             // The saves that came while OBS stopped: Windows has not asked yet.
             if self.absorb(&mut members) > 0 {
-                target = merged(&old, &mut members);
+                (target, by) = merged(&old, &mut members);
                 step = plan_with(p, &old, &target);
             }
         }
@@ -487,7 +515,7 @@ impl Lane {
                 fin
             }
         };
-        let saved = p.save(&old, fin);
+        let saved = p.save(&old, fin, &by);
         for (_, r) in members {
             answer(r, saved.clone());
         }
@@ -555,11 +583,13 @@ fn plan_with<P: Program>(p: &P, old: &Settings, new: &Settings) -> Option<Step> 
 }
 
 /// One that does not apply is answered at once and left out.
-fn merged(old: &Settings, members: &mut Vec<Member>) -> Settings {
+fn merged(old: &Settings, members: &mut Vec<Member>) -> (Settings, Askers) {
     let mut s = old.clone();
+    let mut by = Askers::default();
     members.retain(|(c, r)| match c.onto(&s) {
         Ok(n) => {
             s = n;
+            by.add(c);
             true
         }
         Err(e) => {
@@ -569,7 +599,7 @@ fn merged(old: &Settings, members: &mut Vec<Member>) -> Settings {
             false
         }
     });
-    s
+    (s, by)
 }
 
 #[cfg(test)]
@@ -587,6 +617,49 @@ mod tests {
 
     fn switched(base: bool, want: bool) -> Changes {
         Changes::between(&with(base), &with(want))
+    }
+
+    #[test]
+    fn saves_taken_together_keep_where_each_change_came_from() {
+        let old = Settings::default();
+        let mut page = old.clone();
+        page.obs.replay_buffer = crate::settings::ReplayBuffer::Games;
+        page.upload.keep_last = 30;
+        let mut back = old.clone();
+        back.upload.keep_last = 15;
+        back.hotkeys.save = "Alt+F10".into();
+        let mut members: Vec<Member> = vec![
+            (Changes::between(&old, &page), None),
+            (Changes::between(&old, &back).from(Source::Revert), None),
+        ];
+        let (s, by) = merged(&old, &mut members);
+        assert_eq!(s.obs.replay_buffer, crate::settings::ReplayBuffer::Games);
+        assert_eq!(
+            (s.upload.keep_last, s.hotkeys.save.as_str()),
+            (15, "Alt+F10")
+        );
+        assert_eq!(by.of("obs.replay_buffer"), Source::Settings);
+        assert_eq!(
+            by.of("upload.keep_last"),
+            Source::Revert,
+            "the last ask wins"
+        );
+        assert_eq!(by.of("hotkeys.save"), Source::Revert);
+        assert_eq!(
+            by.of("obs.setup.encoder"),
+            Source::Reel,
+            "asked by no request"
+        );
+        let mut setup = old.clone();
+        setup.obs.setup.screen.name = "DISPLAY2".into();
+        let mut members: Vec<Member> =
+            vec![(Changes::between(&old, &setup).from(Source::Setup), None)];
+        let (_, by) = merged(&old, &mut members);
+        assert_eq!(
+            by.of("obs.setup.screen"),
+            Source::Setup,
+            "a row above its leaves"
+        );
     }
 
     #[derive(Clone, Copy, Debug, PartialEq)]
@@ -759,7 +832,7 @@ mod tests {
             }
         }
 
-        fn save(&self, _old: &Settings, new: Settings) -> Answer {
+        fn save(&self, _old: &Settings, new: Settings, _by: &Askers) -> Answer {
             self.lock().saved = new.clone();
             self.changed();
             self.tell(Ev::Settings(new.obs.setup.elevated));
@@ -897,10 +970,10 @@ mod tests {
                 let done = world.step(Job::Save, step, &old, &new, &|| {});
                 world.settle();
                 new = after(step, &old, new, done, world.copy_there()).0;
-                let _ = world.save(&old, new);
+                let _ = world.save(&old, new, &Askers::default());
             }
             None => {
-                let _ = world.save(&old, new);
+                let _ = world.save(&old, new, &Askers::default());
             }
         }
         drop(held);

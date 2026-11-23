@@ -531,6 +531,10 @@ impl Paths {
     pub fn settings_file(&self) -> PathBuf {
         self.config_dir.join("settings.json")
     }
+    /// This PC's settings history, kept and gone with the settings.
+    pub fn history_file(&self) -> PathBuf {
+        self.config_dir.join("settings-history.jsonl")
+    }
     pub fn ledger_file(&self) -> PathBuf {
         self.data_dir.join("ledger.json")
     }

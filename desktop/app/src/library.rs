@@ -979,7 +979,11 @@ impl Runtime {
 
     /// Writes the settings naming `to` as the library folder; the settings in force change only
     /// once the file has them.
-    fn write_library_dir(&self, to: &Path) -> Result<(), String> {
+    fn write_library_dir(
+        &self,
+        to: &Path,
+        from: reel_desktop_core::history::Source,
+    ) -> Result<(), String> {
         let mut g = self.lock();
         let mut s = g.settings.clone();
         s.standalone.library_dir = if to == g.paths.library_dir() {
@@ -989,7 +993,9 @@ impl Runtime {
         };
         s.save(&g.paths.settings_file())
             .map_err(|e| format!("the settings: {e}"))?;
+        let moved = reel_desktop_core::history::changes(&g.settings, &s, &|_| from);
         g.settings = s;
+        g.keep_history(moved);
         Ok(())
     }
 
@@ -1000,7 +1006,8 @@ impl Runtime {
         let to = to.to_path_buf();
         let lane = self.lane();
         let _ = lane.ask(reel_desktop_core::lane::Ask::Run(Box::new(move || {
-            let _ = tx.send(rt.write_library_dir(&to));
+            let _ =
+                tx.send(rt.write_library_dir(&to, reel_desktop_core::history::Source::Settings));
         })));
         rx.recv()
             .map_err(|_| "the settings were not written".to_string())??;
@@ -1259,7 +1266,7 @@ impl Runtime {
             &mut j,
             &file,
             names,
-            &mut |to| self.write_library_dir(to),
+            &mut |to| self.write_library_dir(to, reel_desktop_core::history::Source::Reel),
             &holds,
         );
         tracing::info!(settled = ?settled, "library: the move is settled at this start");

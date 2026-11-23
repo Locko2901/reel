@@ -117,6 +117,8 @@ const COMMANDS: &[&str] = &[
     "app_download_open",
     "app_library_open",
     "app_update_answer",
+    "app_settings_history",
+    "app_settings_revert",
     "offline_retry",
     "page_shape_get",
     "page_section",

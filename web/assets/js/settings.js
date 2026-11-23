@@ -137,6 +137,7 @@ async function settingsHistory() {
       tr.children[2].textContent = show(h.new, h.new_words);
       tr.children[3].textContent = h.user || '';
       tr.children[4].textContent = h.when;
+      tr.dataset.at = h.at;
       $('button', tr).onclick = async (e) => {
         if (!arm(e.currentTarget, 'Sure?', 'Revert')) return;
         try { await api('PATCH', '/api/settings', { [h.key]: h.old === undefined ? null : h.old }); toast(`${h.label || h.key} is back to ${show(h.old, h.old_words)}.`, 'ok'); setTimeout(() => location.reload(), 600); }
@@ -145,6 +146,8 @@ async function settingsHistory() {
       body.append(tr);
     }
   } catch (err) { $('#history-empty').textContent = err.message; $('#history-empty').hidden = false; }
+  // in the app's window, its script puts this PC's changes among these
+  document.dispatchEvent(new Event('reel:history'));
 }
 
 function capLine() {
