@@ -408,6 +408,52 @@ ok "a file moved away outside reel: refused with words, in the page's toast (sho
 sleep 2
 shot "7-this-app-status"
 ok "the window: the library on this PC, the bar, a clip's page, Settings, Status (shots)"
+# Settings history: The replay buffer changed on Essentials shows on Advanced as this PC's change,
+# among the library's, and its Revert puts it back
+b=$(logged "app page section=first")
+"$APP" --section=first > /dev/null 2>&1 || true
+waitmore "app page section=first" 20 "Essentials did not open" "$b"
+sleep 2
+# shellcheck disable=SC2086
+xdotool mousemove ${REEL_BUFFER_GAMES:-930 320} click 1
+for _ in $(seq 1 20); do grep -q '"replay_buffer": "games"' "$D/config/settings.json" && break; sleep 0.5; done
+grep -q '"replay_buffer": "games"' "$D/config/settings.json" || fail "a click on While a game runs did not save it"
+grep -q '"key":"obs.replay_buffer","old":"always","new":"games","from":"settings"' "$D/config/settings-history.jsonl" \
+  || fail "the change is not in this PC's settings history: $(cat "$D/config/settings-history.jsonl" 2>/dev/null)"
+# the page turns Start it in OBS on with it, for an OBS of one's own: the newest row
+for _ in $(seq 1 20); do grep -q '"key":"obs.start_replay"' "$D/config/settings-history.jsonl" && break; sleep 0.5; done
+tail -1 "$D/config/settings-history.jsonl" | grep -q '"key":"obs.start_replay","old":false,"new":true,"from":"settings"' \
+  || fail "Start it in OBS, turned on with it, is not the newest change: $(tail -1 "$D/config/settings-history.jsonl")"
+shot "18-history-essentials"
+b=$(logged "library loaded at=127.0.0.1/settings/advanced")
+"$APP" --page=/settings/advanced > /dev/null 2>&1 || true
+waitmore "library loaded at=127.0.0.1/settings/advanced" 20 "Advanced did not open" "$b"
+sleep 3
+# to the table once the page has filled: WebKit keeps no place while a part above it grows
+"$APP" "--page=/settings/advanced#history" > /dev/null 2>&1 || true
+sleep 1.5
+xdotool mousemove 1279 819
+import -display "$DISPLAY" -window "$(window)" "$W/history.png"
+at=$(python3 /work/desktop/ci/this-pc-row.py "$W/history.png" 2)
+shot "18-history-advanced"
+[ -n "$at" ] || fail "Advanced's Settings history does not show this PC's two rows (shot 18-history-advanced)"
+# shellcheck disable=SC2086
+xdotool mousemove $at click 1
+sleep 0.6
+# shellcheck disable=SC2086
+xdotool mousemove $at click 1
+waitlog "settings history: a change reverted.*key=obs.replay_buffer back=true" 10 "Revert did not put The replay buffer back"
+grep -q '"replay_buffer": "always"' "$D/config/settings.json" || fail "Revert did not save The replay buffer as Always"
+tail -1 "$D/config/settings-history.jsonl" | grep -q '"key":"obs.replay_buffer","old":"games","new":"always","from":"revert"' \
+  || fail "the revert is not a change of its own: $(tail -1 "$D/config/settings-history.jsonl")"
+sleep 1
+shot "18-history-reverted"
+b=$(logged "app page section=first")
+"$APP" --section=first > /dev/null 2>&1 || true
+waitmore "app page section=first" 20 "Essentials did not open again" "$b"
+sleep 2
+shot "18-history-back-on-essentials"
+ok "The replay buffer changed on Essentials: on Advanced as this PC's change, and its Revert put it back (shots)"
 # Settings, Games and apps: Steam's games came in at the start; one sorted, taken out, added
 # back by Steam, and renamed
 waitlog "$STEAM_READ" 30 "the made up Steam was not read as it is"

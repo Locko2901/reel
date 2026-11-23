@@ -1,6 +1,7 @@
 use crate::runtime::Runtime;
 use crate::status::Status;
 use reel_desktop_core::cues::Cue;
+use reel_desktop_core::history::Source;
 use reel_desktop_core::session::By;
 use reel_desktop_core::settings::Settings;
 use serde_json::{json, Value};
@@ -66,13 +67,14 @@ pub fn library_stop(rt: State<'_, Runtime>) {
 }
 
 /// Saves the settings; a changed server URL is refused when nothing answers there, unless
-/// `force` (the page's "Save anyway").
+/// `force` (the page's "Save anyway"). `from` is "setup" for the setup's pages.
 #[tauri::command]
 pub async fn settings_save(
     rt: State<'_, Runtime>,
     settings: Settings,
     base: Option<Settings>,
     force: Option<bool>,
+    from: Option<String>,
 ) -> R<Settings> {
     let old = rt.settings().server_url;
     let changed = settings.server_url.trim() != old && !settings.server_url.trim().is_empty();
@@ -84,7 +86,7 @@ pub async fn settings_save(
             ));
         }
     }
-    rt.save_settings(settings, base)
+    rt.save_settings(settings, base, Source::of_page(from.as_deref()))
 }
 
 #[tauri::command]
@@ -279,6 +281,50 @@ fn library_page(webview: &tauri::Webview, rt: &Runtime) -> bool {
         url.as_ref().map(|u| u.as_str()),
         &rt.library_base(),
     )
+}
+
+/// Whether a server page is on the library the app shows now: a server the app was paired with
+/// before keeps its grant, never this PC's settings.
+fn on_the_library(webview: &tauri::Webview, rt: &Runtime) -> bool {
+    let url = webview.url().ok();
+    same_origin(url.as_ref().map(|u| u.as_str()), &rt.library_base())
+}
+
+fn same_origin(page: Option<&str>, base: &str) -> bool {
+    let here = crate::shell::origin_of(base);
+    here.is_some() && page.and_then(crate::shell::origin_of) == here
+}
+
+/// This PC's settings history for Advanced's table on the library's own server, in the window.
+#[tauri::command]
+pub fn app_settings_history(webview: tauri::Webview, rt: State<'_, Runtime>) -> R<Value> {
+    if !on_the_library(&webview, &rt) {
+        tracing::warn!("this PC's settings history asked from another server's page: refused");
+        return Err("only the library's own server shows this PC's settings history".into());
+    }
+    let page = rt.settings_history();
+    tracing::debug!(
+        rows = page["rows"].as_array().map_or(0, Vec::len),
+        "settings history: this PC's changes for the library's page"
+    );
+    Ok(page)
+}
+
+/// Revert on a row of this PC's settings history: the id alone, the old value from the
+/// history's file, through the same save as a page's.
+#[tauri::command]
+pub async fn app_settings_revert(
+    webview: tauri::Webview,
+    rt: State<'_, Runtime>,
+    id: String,
+) -> R<Value> {
+    if !on_the_library(&webview, &rt) {
+        tracing::warn!("a revert of this PC's settings asked from another server's page: refused");
+        return Err("only the library's own server reverts this PC's settings".into());
+    }
+    rt.settings_revert(&id).inspect_err(|e| {
+        tracing::info!(id = %id.chars().take(24).collect::<String>(), why = %e, "settings history: a revert refused");
+    })
 }
 
 /// An uncaught error, an unhandled rejection or a script that did not load on a server page.
@@ -787,7 +833,7 @@ pub async fn steam_get(rt: State<'_, Runtime>) -> R<Value> {
 
 #[tauri::command]
 pub fn program_set(rt: State<'_, Runtime>, id: String, change: crate::games::Change) -> R<Value> {
-    rt.program_set(&id, change)
+    rt.program_set(&id, change, Source::Settings)
 }
 
 #[tauri::command]
@@ -911,6 +957,33 @@ pub fn app_open_docs(app: AppHandle, path: String) -> R<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn this_pcs_settings_history_goes_to_the_librarys_own_server_alone() {
+        let base = "https://clips.example.com";
+        assert!(same_origin(
+            Some("https://clips.example.com/settings/advanced"),
+            base
+        ));
+        assert!(same_origin(
+            Some("http://127.0.0.1:41234/settings/advanced"),
+            "http://127.0.0.1:41234"
+        ));
+        for page in [
+            "https://old.example.com/settings/advanced",
+            "http://clips.example.com/settings/advanced",
+            "https://clips.example.com:8443/settings/advanced",
+            "http://127.0.0.1:41235/settings/advanced",
+            "tauri://localhost/index.html",
+        ] {
+            assert!(!same_origin(Some(page), base), "{page}");
+        }
+        assert!(!same_origin(None, base));
+        assert!(
+            !same_origin(Some("https://clips.example.com/"), ""),
+            "no library"
+        );
+    }
 
     #[test]
     fn the_docs_open_only_on_a_settings_page() {

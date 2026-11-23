@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-app-settings-history"
+description = "Enables the app_settings_history command without any pre-configured scope."
+commands.allow = ["app_settings_history"]
+
+[[permission]]
+identifier = "deny-app-settings-history"
+description = "Denies the app_settings_history command without any pre-configured scope."
+commands.deny = ["app_settings_history"]

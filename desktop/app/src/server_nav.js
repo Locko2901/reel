@@ -197,10 +197,139 @@ const tips = () => {
   });
 };
 
+// Advanced's Settings history in the window: this PC's changes, which the app keeps, among the
+// server's by time, newest first. A server of this version says when its rows are in; a released
+// one is watched for them, and its rows' times come from its own list, in the same order.
+const settingsHistory = () => {
+  const table = document.getElementById('history');
+  const empty = document.getElementById('history-empty');
+  const body = table?.querySelector('tbody');
+  const call = window.__TAURI__?.core?.invoke;
+  if (!body || !empty || !call || !window.__REEL_DESKTOP__) return;
+  const NONE = empty.textContent;
+  let mine = null, theirs = false, times = null;
+  // WebKit reads a time to the millisecond alone; the server's and the app's go to the nanosecond
+  const time = (at) => new Date(String(at).replace(/(\.\d{3})\d+/, '$1'));
+  // as the server words its own rows' times
+  const ago = (at) => {
+    const t = time(at), secs = Math.max(0, (Date.now() - t) / 1000);
+    if (Number.isNaN(secs)) return at;
+    if (secs < 60) return 'just now';
+    if (secs < 3600) return `${Math.floor(secs / 60)} min ago`;
+    if (secs < 86400) return `${Math.floor(secs / 3600)} h ago`;
+    const two = (n) => String(n).padStart(2, '0');
+    const year = t.getFullYear() === new Date().getFullYear() ? '' : `${t.getFullYear()} `;
+    return `${t.toLocaleString('en-US', { month: 'short' })} ${t.getDate()}, ${year}${two(t.getHours())}:${two(t.getMinutes())}`;
+  };
+  const say = (text, kind) => {
+    const host = document.getElementById('toasts');
+    if (!host) return;
+    const el = document.createElement('div');
+    el.className = `toast ${kind}`;
+    el.setAttribute('role', 'status');
+    const words = document.createElement('span');
+    words.className = 'toast-words';
+    words.textContent = text;
+    const acts = document.createElement('span');
+    acts.className = 'toast-acts';
+    const x = document.createElement('button');
+    x.className = 'quiet small';
+    x.textContent = 'Dismiss';
+    x.onclick = () => el.remove();
+    acts.append(x);
+    el.append(words, ' ', acts);
+    host.replaceChildren(el);
+    setTimeout(() => el.remove(), 4000);
+  };
+  const load = async () => { try { mine = await call('app_settings_history'); } catch { mine = { rows: [] }; } };
+  const rowOf = (h) => {
+    const tr = document.createElement('tr');
+    tr.dataset.app = h.id;
+    tr.dataset.at = h.at;
+    tr.innerHTML = '<td class="clip"></td><td class="sub"></td><td class="sub"></td><td class="sub"><span class="badge">this PC</span> <span></span></td><td class="sub"></td><td class="right acts"></td>';
+    const c = tr.children;
+    c[0].textContent = h.name;
+    c[1].textContent = h.was;
+    c[2].textContent = h.now;
+    c[3].firstChild.title = mine.device || '';
+    c[3].lastChild.textContent = h.from;
+    c[4].textContent = ago(h.at);
+    c[4].title = time(h.at).toLocaleString();
+    if (h.revert) {
+      const b = document.createElement('button');
+      b.className = 'quiet small';
+      b.type = 'button';
+      b.textContent = 'Revert';
+      b.onclick = async () => {
+        if (b.dataset.armed !== '1') {
+          b.dataset.armed = '1';
+          b.textContent = 'Sure?';
+          b.classList.add('danger');
+          setTimeout(() => { b.dataset.armed = ''; b.textContent = 'Revert'; b.classList.remove('danger'); }, 3000);
+          return;
+        }
+        b.disabled = true;
+        try {
+          const d = await call('app_settings_revert', { id: h.id });
+          say(d.back ? `${d.name} is back to ${d.now}.` : `${d.name} did not go back to ${d.now}; Settings says why.`, d.back ? 'ok' : 'err');
+          await load();
+          merge();
+        } catch (err) { say(String(err?.message || err), 'err'); b.disabled = false; }
+      };
+      c[5].append(b);
+    } else {
+      // where it changes instead, kept narrow: the cell is the table's last
+      const note = document.createElement('span');
+      note.className = 'faint small';
+      note.style.cssText = 'display: inline-block; width: 9.5em; white-space: normal; text-align: right; line-height: 1.35';
+      note.textContent = h.note || '';
+      c[5].append(note);
+    }
+    return tr;
+  };
+  const serverTimes = async () => {
+    if (times) return times;
+    try {
+      const r = await fetch('/api/settings/history', { headers: { accept: 'application/json' }, credentials: 'same-origin' });
+      times = r.ok ? ((await r.json()).history || []) : [];
+    } catch { times = []; }
+    return times;
+  };
+  const merge = async () => {
+    if (!mine || !theirs) return;
+    if (!mine.rows.length && !body.querySelector('tr[data-app]')) return;
+    const server = [...body.children].filter((tr) => !tr.dataset.app);
+    if (server.some((tr) => !tr.dataset.at)) {
+      const list = await serverTimes();
+      let last = new Date().toISOString();
+      server.forEach((tr, i) => {
+        const h = list[i];
+        if (h && (h.label || h.key) === tr.children[0]?.textContent) last = h.at;
+        tr.dataset.at ||= last;
+      });
+    }
+    const all = [...server, ...mine.rows.map(rowOf)];
+    all.sort((a, b) => time(b.dataset.at) - time(a.dataset.at));
+    watch.disconnect();
+    body.replaceChildren(...all);
+    if (empty.textContent === NONE) empty.hidden = all.length > 0;
+  };
+  // the server's rows are in once it says so, a row is there, or its empty line shows
+  const watch = new MutationObserver(() => {
+    if (!theirs && (body.children.length || !empty.hidden)) { theirs = true; merge(); }
+  });
+  watch.observe(body, { childList: true });
+  watch.observe(empty, { attributes: true, attributeFilter: ['hidden'] });
+  document.addEventListener('reel:history', () => { theirs = true; merge(); });
+  theirs = body.children.length > 0 || !empty.hidden;
+  load().then(merge);
+};
+
 // before the page's scripts run, which show and bind the app's pages in the nav they find
 document.addEventListener('readystatechange', () => { if (document.readyState === 'interactive') { frame(); fill(); choices(); } });
 addEventListener('DOMContentLoaded', count);
 // after them: a server that draws its own question marks has marked its words by then
 addEventListener('DOMContentLoaded', tips);
+addEventListener('DOMContentLoaded', settingsHistory);
 addEventListener('pageshow', (e) => { if (e.persisted) count(); });
 document.addEventListener('visibilitychange', () => { if (!document.hidden) count(); });

@@ -8,6 +8,8 @@ use crate::{hotkey, notify, shell, startup, tray};
 use reel_desktop_core::api::{Api, ShareAnswer, WhoAmI};
 use reel_desktop_core::cues::{Cue, Player};
 use reel_desktop_core::gaming::{self, Foreground};
+use reel_desktop_core::history::{self, History, Source};
+use reel_desktop_core::lane::Askers;
 use reel_desktop_core::ledger::{ClipState, Ledger};
 use reel_desktop_core::links::Link;
 use reel_desktop_core::obs::{ObsChange, ObsCommand, ObsConfig, ObsError, ObsEvent, ObsState};
@@ -111,6 +113,8 @@ pub struct Inner {
     pub obs_game_exe: Option<String>,
     /// Settings, Games and apps' list.
     pub programs: reel_desktop_core::programs::Programs,
+    /// This PC's settings history.
+    pub history: History,
     pub steam: crate::games::SteamSeen,
     /// Wakes the reader of Steam's files.
     pub steam_wake: Option<mpsc::UnboundedSender<()>>,
@@ -421,6 +425,30 @@ fn standalone_update_line(g: &Inner, current: &str) -> String {
     )
 }
 
+impl Inner {
+    /// What names the history's rows as the pages do now.
+    fn history_ctx(&self) -> history::Ctx {
+        history::Ctx {
+            standalone: self.settings.mode == Mode::Standalone,
+            paired: self.api.is_some(),
+            windows: cfg!(windows),
+            programs: self
+                .programs
+                .entries
+                .iter()
+                .map(|e| (e.id.clone(), e.name.clone()))
+                .collect(),
+        }
+    }
+
+    /// Keeps changes in this PC's settings history; one that could not be written is in the log.
+    pub(crate) fn keep_history(&mut self, changes: Vec<history::Change>) {
+        if let Err(e) = self.history.add(changes) {
+            tracing::warn!(error = %e, "the settings history was not written");
+        }
+    }
+}
+
 impl Runtime {
     pub fn start(app: AppHandle) -> anyhow::Result<Runtime> {
         let paths = settings::paths();
@@ -444,6 +472,7 @@ impl Runtime {
         }
         let ledger = Ledger::load(&paths.ledger_file())?;
         let programs = crate::games::load(&paths.programs_file());
+        let history = History::open(&paths.history_file());
         let tokens = TokenStore::new(&paths.config_dir);
         let token = tokens.get().unwrap_or_else(|e| {
             tracing::warn!(error = %e, "the token store did not answer");
@@ -514,6 +543,7 @@ impl Runtime {
             obs_game: None,
             obs_game_exe: None,
             programs,
+            history,
             steam: crate::games::SteamSeen::default(),
             steam_wake: None,
             runs: reel_desktop_core::programs::Runs::default(),
@@ -1260,7 +1290,12 @@ impl Runtime {
         });
     }
 
-    pub fn save_settings(&self, new: Settings, base: Option<Settings>) -> Result<Settings, String> {
+    pub fn save_settings(
+        &self,
+        new: Settings,
+        base: Option<Settings>,
+        from: Source,
+    ) -> Result<Settings, String> {
         if !new.server_url.trim().is_empty() {
             settings::check_server_url(&new.server_url)?;
         }
@@ -1296,19 +1331,61 @@ impl Runtime {
             }
             self.lock().encoder_back = None;
         }
-        let changes = reel_desktop_core::lane::Changes::between(&base, &new);
+        let changes = reel_desktop_core::lane::Changes::between(&base, &new).from(from);
         let lane = self.lane.clone();
         tokio::task::block_in_place(|| lane.ask(reel_desktop_core::lane::Ask::Save(changes)))
     }
 
-    /// Keeps the settings a turn of the lane ends with, and applies them to the rest of the app.
-    fn store(&self, old: &Settings, new: Settings) -> Result<Settings, String> {
+    /// This PC's settings history for Advanced's table: what its rows show, nothing more.
+    pub fn settings_history(&self) -> serde_json::Value {
+        let g = self.lock();
+        serde_json::json!({
+            "device": g.settings.device_name,
+            "rows": g.history.page(&g.history_ctx()),
+        })
+    }
+
+    /// Puts back the old value of one change of this PC's settings history, by its id alone:
+    /// the value comes from the history's file, through the same save as a page's.
+    pub fn settings_revert(&self, id: &str) -> Result<serde_json::Value, String> {
+        let (r, key, value) = self.lock().history.revert_of(id)?;
+        let name = history::name(&r, &self.lock().history_ctx());
+        let now = if let Some((program, field)) = history::program_key(&key) {
+            let change: crate::games::Change =
+                serde_json::from_value(serde_json::json!({ field: value }))
+                    .map_err(|e| format!("the old value does not fit any more: {e}"))?;
+            let v = self.program_set(program, change, Source::Revert)?;
+            let at = if matches!(field, "class" | "naming") {
+                &v[field]
+            } else {
+                &v["own"][field]
+            };
+            at.clone()
+        } else {
+            let base = self.settings();
+            let new = history::put(&base, &key, &value)?;
+            let saved = self.save_settings(new, Some(base), Source::Revert)?;
+            history::value_of(&saved, &key)
+        };
+        let back = now == value;
+        tracing::info!(id, key = %key, back, "settings history: a change reverted");
+        Ok(serde_json::json!({
+            "name": name,
+            "now": history::value_words(&key, &value),
+            "back": back,
+        }))
+    }
+
+    /// Keeps the settings a turn of the lane ends with, and applies them to the rest of the app;
+    /// each setting a page shows that changed goes into this PC's settings history.
+    fn store(&self, old: &Settings, new: Settings, by: &Askers) -> Result<Settings, String> {
         let old = old.clone();
         {
             let mut g = self.lock();
             let file = g.paths.settings_file();
             new.save(&file).map_err(|e| e.to_string())?;
             g.settings = new.clone();
+            g.keep_history(history::changes(&old, &new, &|k| by.of(k)));
             if new.server_url != old.server_url {
                 g.api = match (new.server_url.is_empty(), g.tokens.get().ok().flatten()) {
                     (false, Some(t)) => Api::new(&new.server_url, Some(t)).ok(),
@@ -2409,7 +2486,7 @@ impl Runtime {
             new.obs.setup.encoder = id;
             if now {
                 rt.keep_setup(&new);
-            } else if let Err(e) = rt.store(&old, new) {
+            } else if let Err(e) = rt.store(&old, new, &Askers::default()) {
                 tracing::warn!(error = %e, "the encoder was not saved");
             }
         };
@@ -4800,7 +4877,7 @@ impl Runtime {
         }
         if changed {
             let rt = self.clone();
-            let save = move || match rt.save_settings(s, Some(base)) {
+            let save = move || match rt.save_settings(s, Some(base), Source::CommandLine) {
                 Ok(_) => tracing::info!("settings changed from the command line"),
                 Err(e) => tracing::warn!(error = %e, "settings from the command line refused"),
             };
@@ -4894,8 +4971,8 @@ impl reel_desktop_core::lane::Program for Steps {
         done
     }
 
-    fn save(&self, old: &Settings, new: Settings) -> Result<Settings, String> {
-        self.0.store(old, new)
+    fn save(&self, old: &Settings, new: Settings, by: &Askers) -> Result<Settings, String> {
+        self.0.store(old, new, by)
     }
 
     fn said(&self, problem: Option<String>) {

@@ -10,6 +10,7 @@ pub mod elevated;
 pub mod encoders;
 pub mod gaming;
 pub mod hash;
+pub mod history;
 pub mod install;
 pub mod lane;
 pub mod ledger;
