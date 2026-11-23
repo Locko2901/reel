@@ -23,10 +23,10 @@ pub const SETUP_PAGE: &str = "setup.html";
 
 /// reel's page background under every page, shown before a page has drawn; WebView2 would show
 /// white there, between two pages too.
-const BACKGROUND: tauri::window::Color = tauri::window::Color(0x0d, 0x0b, 0x10, 0xff);
+pub(crate) const BACKGROUND: tauri::window::Color = tauri::window::Color(0x0d, 0x0b, 0x10, 0xff);
 
 /// The only commands a reel page inside the app may call.
-const REMOTE_PERMISSIONS: [&str; 12] = [
+const REMOTE_PERMISSIONS: [&str; 13] = [
     "allow-app-status",
     "allow-app-page-error",
     "allow-app-share-last",
@@ -39,6 +39,7 @@ const REMOTE_PERMISSIONS: [&str; 12] = [
     "allow-app-open-settings",
     "allow-app-download-open",
     "allow-app-open-docs",
+    "allow-app-close-settings",
 ];
 
 /// What the library the app shows may ask besides, on this PC or on the server it is paired
@@ -71,7 +72,7 @@ pub fn library_page_of(label: &str, url: Option<&str>, base: &str) -> bool {
 
 /// The app's pages in the nav of the server's Settings pages, whatever the server's version, and
 /// Games and apps' count beside it: desktop/ui/nav.js without its exports, then server_nav.js.
-fn server_nav() -> String {
+pub(crate) fn server_nav() -> String {
     let module = |text: &str| {
         text.lines()
             .map(|l| l.strip_prefix("export ").unwrap_or(l))
@@ -152,7 +153,7 @@ impl View {
     }
 }
 
-fn where_to(url: &Url) -> String {
+pub(crate) fn where_to(url: &Url) -> String {
     format!("{}{}", url.host_str().unwrap_or(""), url.path())
 }
 
@@ -182,7 +183,7 @@ pub fn shows_app_page(url: Option<&Url>) -> bool {
     url.is_none_or(|u| is_local(u) || !matches!(u.scheme(), "http" | "https"))
 }
 
-fn page_of(url: &Url) -> Option<View> {
+pub(crate) fn page_of(url: &Url) -> Option<View> {
     if !is_local(url) {
         return None;
     }
@@ -260,6 +261,7 @@ pub fn allow_origin(app: &AppHandle, base_url: &str) {
     let mut cap = CapabilityBuilder::new(format!("reel-pages-{n}"))
         .local(false)
         .webview(LIBRARY)
+        .webview(crate::panel::PANEL)
         .remote(format!("{origin}/*"));
     let (standalone, base) = app
         .try_state::<Runtime>()
@@ -337,13 +339,14 @@ fn library(app: &AppHandle, first: Url) -> WebviewBuilder<tauri::Wry> {
     let first_page = first.to_string();
     WebviewBuilder::new(LIBRARY, WebviewUrl::External(first))
         .background_color(BACKGROUND)
-        .initialization_script(format!(
-            "window.__REEL_DESKTOP__ = {{ version: \"{}\" }};\n{PAGE_ERRORS}",
-            reel_desktop_core::version_line()
-        ))
+        .initialization_script(first_script())
         .initialization_script(server_nav())
+        .initialization_script(crate::panel::script(false))
         .on_navigation(move |url| {
             tracing::info!(to = %where_to(url), "library goes to");
+            if !crate::panel::library_goes(&handle, url) {
+                return false;
+            }
             // WebView2 starts the first page after the library may have been asked for: it
             // overtakes nothing, so it ends no watch
             let own_first = opening.swap(false, std::sync::atomic::Ordering::SeqCst)
@@ -355,13 +358,22 @@ fn library(app: &AppHandle, first: Url) -> WebviewBuilder<tauri::Wry> {
             }
             true
         })
-        .on_page_load(|_, payload| {
+        .on_page_load(|webview, payload| {
             if let PageLoadEvent::Finished = payload.event() {
                 tracing::info!(at = %where_to(payload.url()), "library loaded");
+                crate::panel::library_loaded(&webview);
             }
         })
         // with a hook set, wry picks where a download goes and WebView2 shows no bar of its own
         .on_download(|_, _| true)
+}
+
+/// What every page of the window runs first: the app's version, and its errors sent to the Log.
+pub(crate) fn first_script() -> String {
+    format!(
+        "window.__REEL_DESKTOP__ = {{ version: \"{}\" }};\n{PAGE_ERRORS}",
+        reel_desktop_core::version_line()
+    )
 }
 
 /// Small on purpose: on Linux this size becomes a minimum; `layout` sets the real one.
@@ -373,7 +385,20 @@ fn add(window: &Window, library: WebviewBuilder<tauri::Wry>) -> tauri::Result<We
     )
 }
 
-fn logical_size(window: &Window) -> (f64, f64) {
+/// A second webview in the window, in the library's WebView2 browser process on Windows.
+pub(crate) fn add_beside(
+    app: &AppHandle,
+    window: &Window,
+    webview: WebviewBuilder<tauri::Wry>,
+) -> tauri::Result<Webview> {
+    #[cfg(windows)]
+    let webview = audio::joined(app, webview);
+    #[cfg(not(windows))]
+    let _ = app;
+    add(window, webview)
+}
+
+pub(crate) fn logical_size(window: &Window) -> (f64, f64) {
     let scale = window.scale_factor().unwrap_or(1.0);
     match window.inner_size() {
         Ok(s) => (s.width as f64 / scale, s.height as f64 / scale),
@@ -381,7 +406,7 @@ fn logical_size(window: &Window) -> (f64, f64) {
     }
 }
 
-/// After a resize: the webview takes the whole client area.
+/// After a resize: the library takes the whole client area, the settings panel its left edge.
 pub fn layout(window: &Window) {
     let (w, h) = logical_size(window);
     for wv in window.webviews() {
@@ -389,6 +414,16 @@ pub fn layout(window: &Window) {
             let _ = wv.set_position(LogicalPosition::new(0.0, 0.0));
             let _ = wv.set_size(LogicalSize::new(w, h));
         }
+    }
+    crate::panel::layout(window, w, h);
+}
+
+/// What the window shows: Settings while the panel is open.
+pub fn showing(app: &AppHandle) -> View {
+    if crate::panel::is_open() {
+        View::Settings
+    } else {
+        current(app)
     }
 }
 
@@ -421,7 +456,15 @@ pub fn on_local_page(app: &AppHandle) -> bool {
 /// An event for the app's own page, when one is on; never into a server page.
 pub fn emit_local<S: serde::Serialize + Clone>(app: &AppHandle, event: &str, payload: S) {
     if on_local_page(app) {
-        let _ = app.emit_to(EventTarget::labeled(LIBRARY), event, payload);
+        let _ = app.emit_to(EventTarget::labeled(LIBRARY), event, payload.clone());
+    }
+    let panel = crate::panel::PANEL;
+    if app
+        .get_webview(panel)
+        .and_then(|w| w.url().ok())
+        .is_some_and(|u| is_local(&u))
+    {
+        let _ = app.emit_to(EventTarget::labeled(panel), event, payload);
     }
 }
 
@@ -510,6 +553,21 @@ pub fn show(app: &AppHandle, view: View, section: Option<&str>) {
     let Some(window) = ensure(app) else {
         return;
     };
+    if view == View::Settings && crate::panel::docks(app) {
+        let _ = window.show();
+        let _ = window.unminimize();
+        let _ = window.set_focus();
+        let standalone = app
+            .try_state::<Runtime>()
+            .is_some_and(|rt| rt.is_standalone());
+        let section = section
+            .map(|s| alias(s, standalone))
+            .filter(|s| section_ok(s))
+            .map(str::to_string);
+        crate::panel::open(app, crate::panel::To::App(section));
+        tracing::info!(view = view.name(), "window shows, settings beside the page");
+        return;
+    }
     if matches!(view, View::Settings | View::Setup) {
         if let Some(rt) = app.try_state::<Runtime>() {
             rt.library_let_go();
@@ -545,6 +603,7 @@ pub fn place(app: &AppHandle) -> Option<reel_desktop_core::update_steps::Place> 
                 .filter(|s| view == View::Settings && section_ok(s))
                 .map(str::to_string),
             path: None,
+            panel: None,
         },
         None => reel_desktop_core::update_steps::Place {
             view: View::Library.name().to_string(),
@@ -553,6 +612,7 @@ pub fn place(app: &AppHandle) -> Option<reel_desktop_core::update_steps::Place> 
                 Some(q) => format!("{}?{q}", url.path()),
                 None => url.path().to_string(),
             }),
+            panel: crate::panel::place(app),
         },
     })
 }
@@ -572,6 +632,9 @@ pub fn reopen(rt: &Runtime, place: &reel_desktop_core::update_steps::Place) {
                     rt.go_library(p);
                 }
                 None => show(&rt.app, View::Library, None),
+            }
+            if let Some(at) = &place.panel {
+                crate::panel::reopen(&rt.app, at);
             }
         }
     }
@@ -638,6 +701,15 @@ pub mod audio {
         match folder.zip(app.path().app_local_data_dir().ok()) {
             Some((f, local)) => library.data_directory(local.join(f)),
             None => library,
+        }
+    }
+
+    /// Another webview of the window, with the library's arguments and folder: WebView2 runs
+    /// one browser process per folder, with the arguments of its first webview.
+    pub fn joined(app: &AppHandle, webview: WebviewBuilder<Wry>) -> WebviewBuilder<Wry> {
+        match RUN.get() {
+            Some(plan) => with(app, webview, *plan),
+            None => webview,
         }
     }
 

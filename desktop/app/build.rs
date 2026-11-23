@@ -113,6 +113,7 @@ const COMMANDS: &[&str] = &[
     "app_obs_again",
     "app_open_settings",
     "app_open_docs",
+    "app_close_settings",
     "app_download_open",
     "app_library_open",
     "app_update_answer",
