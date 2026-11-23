@@ -141,7 +141,8 @@ does is in a bar along the window's foot:
   keyboard reaches all of it.
 - **Settings** opens on **Essentials**: what is set and the few settings most people change, each
   with what it costs. Its nav lists every other page, this PC's and then the server's (in
-  standalone, the library's). Ctrl+, opens Settings from anywhere in the window.
+  standalone, the library's). Ctrl+, opens Settings from anywhere in the window; on a window
+  1600 px wide or more it opens beside the page you were on ([The app's pages](#the-apps-pages)).
 
 The window has no address bar. A clip's page has its own back button above the player, and the
 mouse's back and forward buttons, Alt+Left and Alt+Right walk back and forth through the pages,
@@ -226,6 +227,17 @@ A server's page opens in the window with the same nav and the same head, so goin
 to another changes the page and nothing around it. In a narrow window the nav is a list at the top
 of the page. Back and Forward come back to where you were on a page; a page opened from the nav
 starts at its top.
+
+On a window 1600 px wide or more, Settings opens beside the page you were on, along the window's
+left edge under the header, and that page stays as it was: scroll it, open a clip, go to Jobs,
+with Settings open beside it. From 2200 px wide Settings there has its nav and its page as on its
+own; narrower, the nav is the list at its top. Its **×**, Esc (in Settings or on the page beside)
+and Settings in the header close it. Back and Forward walk Settings' pages in Settings, and the
+other pages on the page beside. Under 1600 px Settings is the window's page, as above: a window
+made narrower with Settings beside a page shows Settings in full, and wider again puts it back
+beside that page.
+
+![Settings beside the library, on a window 1920 px wide](img/app-settings-beside.png)
 
 A setting shows its name and its control; the small question mark beside the name says what it
 does (hover it, or click it to keep it open), and its **More in the docs** link lands on the

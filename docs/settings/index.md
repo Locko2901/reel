@@ -8,13 +8,17 @@ setting's entry here.
 ## Where Settings is
 
 - **In the desktop app:** Settings in the window's top bar, or Ctrl+, anywhere in the window. It
-  opens on **Essentials**.
+  opens on **Essentials**. On a window 1600 pixels wide or more it opens beside the page you were
+  on, along the window's left edge, and that page stays usable; its **×** or Esc closes it.
 - **In a browser:** Settings in the server's top bar, for an admin. A browser shows the server's
   pages only.
 
 ## The pages
 
-The nav on the left lists every page; under 960 pixels wide a list at the top takes its place.
+The nav on the left lists every page; under 960 pixels wide a list at the top takes its place, as
+it does in the app's Settings beside a page on a window under 2200 pixels wide. In a browser
+window 1600 pixels wide or more the nav sits at its left edge and a page's groups flow side by
+side.
 
 - **Essentials** and the pages under **This PC** are the desktop app's own. They are kept on this
   PC: each PC with the app has its own.
