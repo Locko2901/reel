@@ -4,6 +4,7 @@ use crate::detect::game_running_alone;
 use crate::runtime::{Inner, Runtime};
 use jiff::Timestamp;
 use reel_desktop_core::gaming::{self, ProcessInfo};
+use reel_desktop_core::history::{self, Source};
 use reel_desktop_core::programs::{
     self, Came, Class, Entry, Every, Front, NameFrom, Naming, Own, Programs, Runs,
 };
@@ -475,13 +476,14 @@ impl Runtime {
         Ok(g.view(e, &g.named()))
     }
 
-    pub fn program_set(&self, id: &str, c: Change) -> R<Value> {
+    pub fn program_set(&self, id: &str, c: Change, from: Source) -> R<Value> {
         {
             let mut g = self.lock();
             let e = g
                 .programs
                 .get_mut(id)
                 .ok_or("that program is no longer in the list")?;
+            let was = e.clone();
             if let Some(class) = c.class {
                 e.class = class;
             }
@@ -501,7 +503,9 @@ impl Runtime {
                 e.own.wait = w;
             }
             tracing::info!(name = %e.name, class = ?e.class, naming = ?e.naming, own = ?e.own, "games and apps: a program changed");
+            let changed = history::program_changes(&was, e, from);
             g.programs.save().map_err(|e| e.to_string())?;
+            g.keep_history(changed);
         }
         self.push_status();
         self.entry_view(id)
@@ -657,9 +661,12 @@ impl Runtime {
                 .programs
                 .get_mut(id)
                 .ok_or("that program is no longer in the list")?;
+            let was = e.clone();
             let old = std::mem::replace(&mut e.name, name.clone());
             e.name_from = NameFrom::Hand;
+            let changed = history::program_changes(&was, e, Source::Settings);
             g.programs.save().map_err(|e| e.to_string())?;
+            g.keep_history(changed);
             let moved = if older && old != name {
                 let m = g.ledger.rename_game(&old, &name);
                 if let Err(e) = g.ledger.save() {

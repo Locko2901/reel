@@ -320,6 +320,45 @@ done
 xdotool mousemove 640 760
 echo "the nav opens each of this PC's pages, Back walks them, and the ids of the pages before open the pages that hold them now"
 
+say "Settings history: The replay buffer changed on Essentials, on Advanced as this PC's change, its Revert puts it back"
+n=$(log_n 'app page section=first')
+"$APP" --section=first >/dev/null 2>&1 &
+wait_more 20 "Essentials" 'app page section=first' "$n"
+sleep 2
+xdotool mousemove ${REEL_E2E_BUFFER_GAMES:-930 320} click 1
+wait_for 10 "The replay buffer saved as While a game runs" grep -q '"replay_buffer": "games"' "$ROOT/config/settings.json"
+grep -q '"key":"obs.replay_buffer","old":"always","new":"games","from":"settings"' "$ROOT/config/settings-history.jsonl" \
+  || fail "the change is not in this PC's settings history: $(cat "$ROOT/config/settings-history.jsonl" 2>/dev/null)"
+ADVANCED_PAGE="library loaded at=$HOST/settings/advanced"
+n=$(log_n "$ADVANCED_PAGE")
+"$APP" --page=/settings/advanced >/dev/null 2>&1 &
+wait_more 20 "Advanced" "$ADVANCED_PAGE" "$n"
+sleep 3
+# to the table once the page has filled: WebKit keeps no place while a part above it grows
+"$APP" "--page=/settings/advanced#history" >/dev/null 2>&1 &
+sleep 1.5
+xdotool mousemove 640 760
+import -display "$DISPLAY" -window "$WIN" "$SHOTS/history-advanced.png"
+AT=$(python3 /work/desktop/ci/this-pc-row.py "$SHOTS/history-advanced.png")
+[ -n "$AT" ] || fail "Advanced's Settings history shows no row of this PC (history-advanced.png)"
+n=$(log_n "settings history: a change reverted")
+xdotool mousemove $AT click 1
+sleep 0.6
+xdotool mousemove $AT click 1
+wait_more 10 "Revert on this PC's row" "settings history: a change reverted" "$n"
+log_has "a change reverted.*key=obs.replay_buffer back=true" || fail "Revert did not put The replay buffer back"
+wait_for 10 "The replay buffer back to Always" grep -q '"replay_buffer": "always"' "$ROOT/config/settings.json"
+tail -1 "$ROOT/config/settings-history.jsonl" | grep -q '"from":"revert"' || fail "the revert is not a change of its own"
+sleep 1
+import -display "$DISPLAY" -window "$WIN" "$SHOTS/history-reverted.png"
+n=$(log_n 'app page section=first')
+"$APP" --section=first >/dev/null 2>&1 &
+wait_more 20 "Essentials again" 'app page section=first' "$n"
+sleep 2
+import -display "$DISPLAY" -window "$WIN" "$SHOTS/history-back-on-essentials.png"
+xdotool mousemove 640 760
+echo "The replay buffer: changed on Essentials, this PC's row on Advanced, reverted there, back on Essentials"
+
 say "cues played, from the log"
 cat "$LOG"/reel-desktop.log* | grep -o 'cue [a-z_]* played ([^)]*)' | sort | uniq -c
 

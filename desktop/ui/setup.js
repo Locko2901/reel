@@ -169,7 +169,7 @@ async function saveNow(change) {
   try {
     const now = await invoke('settings_get');
     change(now);
-    await invoke('settings_save', { settings: now, force: false });
+    await invoke('settings_save', { settings: now, force: false, from: 'setup' });
     status = await invoke('status_get');
   } catch (e) { toast(String(e.message || e), 'err'); }
 }
@@ -627,7 +627,7 @@ async function later() {
   try {
     const now = await invoke('settings_get');
     now.obs.setup_later = true;
-    settings = await invoke('settings_save', { settings: now, force: false });
+    settings = await invoke('settings_save', { settings: now, force: false, from: 'setup' });
   } catch (e) { toast(String(e.message || e), 'err'); return; }
   invoke('obs_meters', { on: false }).catch(() => {});
   invoke('view_show', { view: 'settings', section: 'first' }).catch(() => {});
@@ -793,7 +793,7 @@ function go(id) {
 }
 
 async function save(force = false) {
-  settings = await invoke('settings_save', { settings, force });
+  settings = await invoke('settings_save', { settings, force, from: 'setup' });
 }
 
 let finishedTo = null;

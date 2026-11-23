@@ -216,6 +216,8 @@ pub fn run() {
             commands::update_answer,
             commands::update_check_set,
             commands::app_update_answer,
+            commands::app_settings_history,
+            commands::app_settings_revert,
             commands::open_releases,
             commands::programs_get,
             commands::steam_get,

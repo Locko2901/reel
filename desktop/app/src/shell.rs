@@ -42,8 +42,12 @@ const REMOTE_PERMISSIONS: [&str; 12] = [
 ];
 
 /// What the library the app shows may ask besides, on this PC or on the server it is paired
-/// with: the answer to the update's question.
-const LIBRARY_PERMISSIONS: [&str; 1] = ["allow-app-update-answer"];
+/// with: the answer to the update's question, and this PC's settings history and its Revert.
+const LIBRARY_PERMISSIONS: [&str; 3] = [
+    "allow-app-update-answer",
+    "allow-app-settings-history",
+    "allow-app-settings-revert",
+];
 
 /// What the library on this PC may ask besides: its files open where they are.
 const STANDALONE_PERMISSIONS: [&str; 1] = ["allow-app-library-open"];
@@ -852,12 +856,22 @@ mod tests {
     ) {
         let answer = "allow-app-update-answer";
         let open = "allow-app-library-open";
+        let history = ["allow-app-settings-history", "allow-app-settings-revert"];
         let server = "https://clips.example.com";
         let paired = grants(server, false, "https://clips.example.com/");
         assert!(
             paired.contains(&answer) && !paired.contains(&open),
             "{paired:?}"
         );
+        assert!(history.iter().all(|h| paired.contains(h)), "{paired:?}");
+        assert!(
+            !grants("https://other.example.com", false, server)
+                .iter()
+                .any(|p| history.contains(p)),
+            "this PC's settings go to the paired server's pages alone"
+        );
+        let local = grants("http://127.0.0.1:41234", true, "http://127.0.0.1:41234");
+        assert!(history.iter().all(|h| local.contains(h)), "{local:?}");
         assert!(REMOTE_PERMISSIONS.iter().all(|p| paired.contains(p)));
         let other = grants("https://other.example.com", false, server);
         assert_eq!(
