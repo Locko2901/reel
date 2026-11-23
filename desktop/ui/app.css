@@ -159,6 +159,13 @@ dialog.games-dialog .add-body { display: flex; flex-direction: column; gap: var(
 /* the server's frame, also under a released server's stylesheet, which the page takes when paired */
 .page > .notice, .settings, .page-head:has(~ .settings) { max-width: 974px; margin-left: auto; margin-right: auto; }
 @media (min-width: 960px) { .settings { grid-template-columns: 190px minmax(0, 760px); gap: 24px; } }
+@media (min-width: 1600px) {
+  .page > .notice, .settings, .page-head:has(~ .settings) { max-width: none; margin-left: 0; margin-right: 0; }
+  .settings { grid-template-columns: 210px minmax(0, 1fr); gap: 32px; }
+  .settings .group:not([hidden]) { column-width: 600px; column-gap: 24px; }
+  .settings .group > * { break-inside: avoid; }
+  .settings .group > .page-top { column-span: all; }
+}
 .sections, body.has-appbar .sections { max-height: calc(100vh - 128px - var(--appbar)); }
 .sections > * { flex-shrink: 0; }
 .sections a.disabled { opacity: 0.5; pointer-events: none; }

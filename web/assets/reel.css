@@ -454,6 +454,14 @@ body.over::after { content: "Drop to upload"; position: fixed; inset: 12px; z-in
 .section-line { color: var(--text-2); margin-bottom: var(--gap-panels); max-width: 90ch; }
 .settings .panel { margin-bottom: var(--gap-panels); }
 .page-head .tools #settings-filter { width: 220px; }
+/* a wide window: the nav at its left edge, a page's groups in columns of at least 600 px */
+@media (min-width: 1600px) {
+  .settings, .page-head:has(~ .settings) { max-width: none; margin-left: 0; margin-right: 0; }
+  .settings { grid-template-columns: 210px minmax(0, 1fr); gap: 32px; }
+  .settings .group:not([hidden]), #sections-body:not(:has(> .group)) { column-width: 600px; column-gap: 24px; }
+  .settings .group > *, #sections-body:not(:has(> .group)) > * { break-inside: avoid; }
+  .settings .group > .page-top, #sections-body > .page-top { column-span: all; }
+}
 .srow { display: grid; grid-template-columns: minmax(0, 1fr) var(--ctl-col); gap: 6px 18px; align-items: center; padding: 10px var(--s3); border-bottom: 1px solid var(--line); }
 .srow:last-child { border-bottom: 0; }
 .srow[data-dep-off], .sgroup[data-dep-off] { display: none; }
