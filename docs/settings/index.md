@@ -62,7 +62,7 @@ There is no Save button: a setting is saved the moment it changes, and Settings 
 value is refused. On the server's pages a setting that differs from its default shows
 **changed, was** with the old value and a **Reset** button, and a page's name in the nav counts
 its changed settings. [Settings history](advanced.md#settings-history) lists the last changes
-with **Revert**.
+with **Revert**; in the app's window it lists this PC's own changes too, tagged **this PC**.
 
 A server setting given in `config.toml` or the environment shows read only, with a padlock and
 a badge that says where it came from; it changes there, not under Settings

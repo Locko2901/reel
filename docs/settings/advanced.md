@@ -148,3 +148,22 @@ environment since that change cannot be reverted here, and reverting a secret's 
 holds for it. A setting marked **after a restart** waits for the next start, as usual.
 
 In the app's standalone mode it is the history of the library's settings on this PC.
+
+### This PC's changes {#this-pcs-changes}
+
+In the app's window the table lists the changes of the app's own settings too, among the
+server's by time: every setting of the pages under This PC, Library folder and Encoding, and
+of the setup. Who says **this PC** (its device name on the pointer), then where the change came
+from: **Settings**, **the setup**, **Revert**, **the command line**, or **reel** when the app
+changed one itself, as when it went back from an encoder that did not record. A program's own
+settings under Games and apps show with its name, such as **Dust Runner, Class**. A password says
+**changed**, never its values. The app keeps its last 500 changes in `settings-history.jsonl`
+beside its settings, kept by an update and gone with the settings.
+
+**Revert** on a line of this PC, after **Sure?**, puts the old value back through the same save as
+its page, with the same checks, and adds a line from **Revert**. Some lines do not go back from
+here and say where to change the setting instead: **Mode** and **Server URL** (Connection),
+**Library folder** (a move), the **Screen** and the **Encoder** (Capture), the obs-websocket
+**Password**, and a program's **Name** (its page under Games and apps).
+
+A browser shows the server's lines alone: this PC's changes stay on this PC.
