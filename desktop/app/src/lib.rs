@@ -15,6 +15,7 @@ mod notify;
 mod obsbox;
 mod page_errors;
 mod pages;
+mod panel;
 #[cfg(target_os = "linux")]
 mod portal;
 mod presence;
@@ -173,6 +174,7 @@ pub fn run() {
             commands::app_obs_again,
             commands::app_open_settings,
             commands::app_open_docs,
+            commands::app_close_settings,
             commands::app_download_open,
             files::app_library_open,
             commands::view_show,
@@ -376,10 +378,13 @@ pub fn run() {
             Ok(())
         })
         .on_window_event(|window, event| match event {
-            WindowEvent::Destroyed if window.label() == shell::MAIN && !updates::leaving() => {
-                tracing::info!(
-                    "the window is closed and its webview gone; the app goes on in the tray"
-                );
+            WindowEvent::Destroyed if window.label() == shell::MAIN => {
+                panel::gone();
+                if !updates::leaving() {
+                    tracing::info!(
+                        "the window is closed and its webview gone; the app goes on in the tray"
+                    );
+                }
             }
             WindowEvent::Resized(_) | WindowEvent::ScaleFactorChanged { .. } => {
                 shell::layout(window);

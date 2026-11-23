@@ -194,6 +194,8 @@ export function bindTips() {
   const again = () => { if (open) place(open.btn, open.tip); };
   addEventListener('scroll', again, { passive: true });
   addEventListener('resize', again);
+  // a click outside the page closes it too: another window, or the page beside the app's Settings
+  addEventListener('blur', () => { if (open) hide(); });
 }
 
 // While the filter is on, a row found only by its tip's words shows them under its name.

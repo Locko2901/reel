@@ -41,6 +41,9 @@ pub struct Place {
     /// A page of the server or of reel on this PC: its path and query.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub path: Option<String>,
+    /// Settings open beside that page: `app:<section>`, or a path of the server's Settings.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub panel: Option<String>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -232,6 +235,20 @@ pub fn news_line(notes: &str) -> Option<String> {
 mod tests {
     use super::*;
 
+    #[test]
+    fn a_place_from_before_settings_beside_the_page_reads_without_it() {
+        let before: Place = serde_json::from_str(r#"{"view":"library","path":"/jobs"}"#).unwrap();
+        assert_eq!(before.panel, None);
+        let now = Place {
+            view: "library".into(),
+            section: None,
+            path: Some("/jobs".into()),
+            panel: Some("app:clips".into()),
+        };
+        let read: Place = serde_json::from_str(&serde_json::to_string(&now).unwrap()).unwrap();
+        assert_eq!(read, now);
+    }
+
     const WIN: Kind = Kind::Windows { with_obs: false };
     const WITH_OBS: Kind = Kind::Windows { with_obs: true };
 
@@ -371,6 +388,7 @@ mod tests {
                 view: "settings".into(),
                 section: Some("startup".into()),
                 path: None,
+                panel: None,
             }),
             news: None,
             at: 1_000,

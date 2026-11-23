@@ -239,18 +239,37 @@ pub async fn obs_apply(
 }
 
 #[tauri::command]
-pub async fn open_page(rt: State<'_, Runtime>, path: String) -> R<()> {
+pub async fn open_page(webview: tauri::Webview, rt: State<'_, Runtime>, path: String) -> R<()> {
     let path = if path.starts_with('/') {
         path
     } else {
         format!("/{path}")
     };
+    // a page of the server's Settings asked for from the settings panel opens in it
+    if webview.label() == crate::panel::PANEL {
+        if let Ok(url) = rt.library_page(&path).parse::<tauri::Url>() {
+            if crate::panel::is_settings(&url) {
+                let _ = webview.navigate(url);
+                return Ok(());
+            }
+        }
+    }
     rt.open_library(&path)
+}
+
+/// The settings panel's close button, and Esc in it or in the page beside it.
+#[tauri::command]
+pub fn app_close_settings(app: AppHandle, webview: tauri::Webview) -> R<()> {
+    crate::panel::close(&app, webview.label());
+    Ok(())
 }
 
 #[tauri::command]
 pub fn app_status(webview: tauri::Webview, rt: State<'_, Runtime>) -> R<Value> {
-    Ok(rt.app_status(library_page(&webview, &rt)))
+    Ok(rt.app_status(
+        library_page(&webview, &rt),
+        webview.label() == crate::shell::LIBRARY,
+    ))
 }
 
 fn library_page(webview: &tauri::Webview, rt: &Runtime) -> bool {
@@ -298,7 +317,10 @@ pub fn app_save_and_share(rt: State<'_, Runtime>) -> R<()> {
 #[tauri::command]
 pub fn app_pause_set(webview: tauri::Webview, rt: State<'_, Runtime>, paused: bool) -> R<Value> {
     rt.set_paused(paused);
-    Ok(rt.app_status(library_page(&webview, &rt)))
+    Ok(rt.app_status(
+        library_page(&webview, &rt),
+        webview.label() == crate::shell::LIBRARY,
+    ))
 }
 
 #[tauri::command]
@@ -308,7 +330,10 @@ pub fn app_recording_pause_set(
     paused: bool,
 ) -> R<Value> {
     rt.set_recording_paused(paused);
-    Ok(rt.app_status(library_page(&webview, &rt)))
+    Ok(rt.app_status(
+        library_page(&webview, &rt),
+        webview.label() == crate::shell::LIBRARY,
+    ))
 }
 
 /// Record from a reel page's header: starts a session recording or stops it, once OBS answered.
@@ -319,7 +344,10 @@ pub async fn app_session_set(
     on: bool,
 ) -> R<Value> {
     rt.record_now(session_ask(on), By::Window).await?;
-    Ok(rt.app_status(library_page(&webview, &rt)))
+    Ok(rt.app_status(
+        library_page(&webview, &rt),
+        webview.label() == crate::shell::LIBRARY,
+    ))
 }
 
 /// Start OBS in the bar of a reel page: the OBS that came with the app, after the app stopped
@@ -327,7 +355,10 @@ pub async fn app_session_set(
 #[tauri::command]
 pub fn app_obs_again(webview: tauri::Webview, rt: State<'_, Runtime>) -> R<Value> {
     rt.start_obs_again();
-    Ok(rt.app_status(library_page(&webview, &rt)))
+    Ok(rt.app_status(
+        library_page(&webview, &rt),
+        webview.label() == crate::shell::LIBRARY,
+    ))
 }
 
 /// Show in folder and Open on a download's toast: only a file this run downloaded, and Open
@@ -354,12 +385,18 @@ pub fn app_download_open(app: AppHandle, id: u64, reveal: bool) -> R<()> {
 #[tauri::command]
 pub fn app_open_settings(
     app: AppHandle,
+    webview: tauri::Webview,
     rt: State<'_, Runtime>,
     section: Option<String>,
     shape: Option<Value>,
 ) -> R<()> {
     if let Some(s) = shape.and_then(reel_desktop_core::shape::Shape::checked) {
         rt.take_shape(s);
+    }
+    // Settings in the header of the page beside the open panel closes it
+    if section.is_none() && webview.label() == crate::shell::LIBRARY && crate::panel::is_open() {
+        crate::panel::close(&app, "the header's Settings");
+        return Ok(());
     }
     crate::shell::show(&app, crate::shell::View::Settings, section.as_deref());
     Ok(())
@@ -406,7 +443,7 @@ pub async fn offline_retry(rt: State<'_, Runtime>) -> R<()> {
 
 #[tauri::command]
 pub fn view_get(app: AppHandle) -> R<String> {
-    Ok(crate::shell::current(&app).name().to_string())
+    Ok(crate::shell::showing(&app).name().to_string())
 }
 
 #[tauri::command]

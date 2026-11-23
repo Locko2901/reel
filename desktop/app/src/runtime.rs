@@ -1098,10 +1098,14 @@ impl Runtime {
     /// What a reel page inside the app may know: no URL, no path, no setting value but the
     /// hotkeys its bar names. `own`: the library's own page, which alone may answer the update's
     /// question.
-    pub fn app_status(&self, own: bool) -> serde_json::Value {
+    /// `library`: the call comes from the library's webview, whose page the app watches; the
+    /// settings panel's pages call too.
+    pub fn app_status(&self, own: bool, library: bool) -> serde_json::Value {
         static FIRST: std::sync::Once = std::sync::Once::new();
         FIRST.call_once(|| tracing::info!("the server's page reached the app"));
-        self.page_alive();
+        if library {
+            self.page_alive();
+        }
         let st = self.status();
         let can_share =
             st.mode != "standalone" && st.paired && self.lock().ledger.last_confirmed().is_some();
