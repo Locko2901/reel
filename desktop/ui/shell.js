@@ -75,7 +75,8 @@ export function applyShape(shape, baseUrl) {
 }
 
 // The server's stylesheet replaces the app's copy once loaded; the copy's fonts stay, as the
-// server sends its fonts to its own pages alone.
+// server sends its fonts to its own pages alone, and so does assets/tips.css, the copy's tips
+// block on its own, as a server older than the tips has none.
 function followServer() {
   const own = document.querySelector('link[rel="stylesheet"][href="assets/reel.css"]');
   let link = document.querySelector('link[data-server-css]');
