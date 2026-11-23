@@ -183,7 +183,7 @@ mod old {
 mod hammer {
     use reel_desktop_core::bundled::Bundled;
     use reel_desktop_core::elevated::{self, Step};
-    use reel_desktop_core::lane::{left, on, Answer, Ask, Changes, Job, Lane, Program};
+    use reel_desktop_core::lane::{left, on, Answer, Ask, Askers, Changes, Job, Lane, Program};
     use reel_desktop_core::obsproc;
     use reel_desktop_core::settings::Settings;
     use std::path::{Path, PathBuf};
@@ -270,7 +270,7 @@ mod hammer {
             done
         }
 
-        fn save(&self, _old: &Settings, new: Settings) -> Answer {
+        fn save(&self, _old: &Settings, new: Settings, _by: &Askers) -> Answer {
             self.0.counts[1].fetch_add(1, Ordering::SeqCst);
             *self.0.saved.lock().unwrap() = new.clone();
             Ok(new)
