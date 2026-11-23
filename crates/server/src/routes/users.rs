@@ -19,6 +19,7 @@ use reel_store::models::User as UserRow;
 use serde::Deserialize;
 use serde_json::{json, Value};
 use std::net::SocketAddr;
+use tower_sessions::Session;
 
 #[derive(Template)]
 #[template(path = "signin.html")]
@@ -122,13 +123,13 @@ pub async fn signin_page(
 /// admin's setup code.
 async fn claimer(st: &AppState, auth: &AuthSession<Backend>) -> AppResult<Option<String>> {
     let cfg = st.ctx.config();
-    let Some(me) = auth.user.as_ref() else {
+    let Some(me) = auth.user().await else {
         return Ok(None);
     };
     let waits = cfg.auth.mode == AuthMode::Oidc
         && !me.admin
         && accounts::wants_setup_code(&st.ctx.store, &cfg).await?;
-    Ok(waits.then(|| me.name.clone()))
+    Ok(waits.then_some(me.name))
 }
 
 #[derive(Deserialize)]
@@ -158,27 +159,28 @@ async fn wait_page(st: &AppState, next: &str, secs: u64) -> Response {
 /// Signs the session in: the id rotates, the sign-in time is kept for the absolute lifetime,
 /// and the expiry is set outright (a pending sign-in had a short one).
 async fn finish_login(
-    auth: &mut AuthSession<Backend>,
+    auth: &AuthSession<Backend>,
+    session: &Session,
     user: &SessionUser,
     remember: bool,
     session_days: u64,
 ) -> AppResult<()> {
-    let signed_in_before = auth.user.is_some();
+    let signed_in_before = auth.user().await.is_some();
     auth.login(user)
         .await
         .map_err(|e| AppError::Internal(anyhow::anyhow!("login: {e}")))?;
     // the login rotates the id only for a session nobody was signed in to
     if signed_in_before {
-        auth.session
+        session
             .cycle_id()
             .await
             .map_err(|e| AppError::Internal(anyhow::anyhow!("session: {e}")))?;
     }
-    auth.session
+    session
         .insert(SIGNED_IN_AT, jiff::Timestamp::now().as_second())
         .await
         .map_err(|e| AppError::Internal(anyhow::anyhow!("session: {e}")))?;
-    auth.session.set_expiry(Some(if remember {
+    session.set_expiry(Some(if remember {
         tower_sessions::Expiry::OnInactivity(time::Duration::days(session_days.max(1) as i64))
     } else {
         tower_sessions::Expiry::OnSessionEnd
@@ -188,7 +190,8 @@ async fn finish_login(
 
 pub async fn signin(
     State(st): State<AppState>,
-    mut auth: AuthSession<Backend>,
+    auth: AuthSession<Backend>,
+    session: Session,
     ConnectInfo(peer): ConnectInfo<SocketAddr>,
     headers: HeaderMap,
     Form(f): Form<SigninForm>,
@@ -224,7 +227,8 @@ pub async fn signin(
         return Ok(html_status(StatusCode::UNAUTHORIZED, page));
     };
     finish_login(
-        &mut auth,
+        &auth,
+        &session,
         &user,
         f.remember.is_some(),
         cfg.auth.session_days,
@@ -245,7 +249,8 @@ pub struct FirstForm {
 /// The first admin, when built-in accounts have nobody yet: behind the setup code, made once.
 pub async fn first_admin(
     State(st): State<AppState>,
-    mut auth: AuthSession<Backend>,
+    auth: AuthSession<Backend>,
+    session: Session,
     ConnectInfo(peer): ConnectInfo<SocketAddr>,
     headers: HeaderMap,
     Form(f): Form<FirstForm>,
@@ -310,7 +315,8 @@ pub async fn first_admin(
     }
     tracing::info!(user = %user.name, ip, "first admin made");
     finish_login(
-        &mut auth,
+        &auth,
+        &session,
         &SessionUser::from(&user),
         true,
         cfg.auth.session_days,
@@ -344,7 +350,7 @@ pub async fn claim_admin(
         return Err(AppError::Forbidden("that came from another site".into()));
     }
     let Some(me) = claimer(&st, &auth).await? else {
-        return if auth.user.is_some() {
+        return if auth.user().await.is_some() {
             Err(AppError::Conflict("this reel has an admin already".into()))
         } else {
             Ok(Redirect::to("/signin").into_response())
@@ -371,7 +377,7 @@ pub async fn claim_admin(
         page.claim = Some(me);
         return Ok(html_status(StatusCode::FORBIDDEN, page));
     }
-    let id = auth.user.as_ref().map(|u| u.id.clone()).unwrap_or_default();
+    let id = auth.user().await.map(|u| u.id).unwrap_or_default();
     if !st.ctx.store.claim_first_admin(&id, SETUP_CODE_KEY).await? {
         return Err(AppError::Conflict("this reel has an admin already".into()));
     }
@@ -379,7 +385,7 @@ pub async fn claim_admin(
     Ok(Redirect::to("/").into_response())
 }
 
-pub async fn signout(mut auth: AuthSession<Backend>) -> AppResult<Response> {
+pub async fn signout(auth: AuthSession<Backend>) -> AppResult<Response> {
     auth.logout()
         .await
         .map_err(|e| AppError::Internal(anyhow::anyhow!("logout: {e}")))?;
@@ -391,7 +397,7 @@ pub async fn signout(mut auth: AuthSession<Backend>) -> AppResult<Response> {
 pub async fn signout_everywhere(
     State(st): State<AppState>,
     Extension(me): Extension<User>,
-    mut auth: AuthSession<Backend>,
+    auth: AuthSession<Backend>,
 ) -> AppResult<Json<Value>> {
     st.ctx.store.bump_session_version(&me.id).await?;
     let _ = auth.logout().await;
@@ -401,13 +407,15 @@ pub async fn signout_everywhere(
 pub async fn oidc_start(
     State(st): State<AppState>,
     auth: AuthSession<Backend>,
+    session: Session,
 ) -> AppResult<Response> {
-    to_provider(&st, &auth, None).await
+    to_provider(&st, &auth, &session, None).await
 }
 
 async fn to_provider(
     st: &AppState,
     auth: &AuthSession<Backend>,
+    session: &Session,
     link: Option<String>,
 ) -> AppResult<Response> {
     let oidc = match &st.provider {
@@ -423,15 +431,14 @@ async fn to_provider(
     };
     let (url, mut pending) = oidc.start();
     pending.link = link;
-    auth.session
+    session
         .insert(OIDC_PENDING, pending)
         .await
         .map_err(|e| AppError::Internal(anyhow::anyhow!("session: {e}")))?;
-    if auth.user.is_none() {
-        auth.session
-            .set_expiry(Some(tower_sessions::Expiry::AtDateTime(
-                time::OffsetDateTime::now_utc() + time::Duration::minutes(OIDC_PENDING_MINUTES),
-            )));
+    if auth.user().await.is_none() {
+        session.set_expiry(Some(tower_sessions::Expiry::AtDateTime(
+            time::OffsetDateTime::now_utc() + time::Duration::minutes(OIDC_PENDING_MINUTES),
+        )));
     }
     Ok(Redirect::to(&url).into_response())
 }
@@ -446,7 +453,8 @@ pub struct OidcCallback {
 
 pub async fn oidc_callback(
     State(st): State<AppState>,
-    mut auth: AuthSession<Backend>,
+    auth: AuthSession<Backend>,
+    session: Session,
     Query(q): Query<OidcCallback>,
 ) -> AppResult<Response> {
     let Some((provider, oidc)) = st.provider.as_ref().and_then(|p| Some((p, p.current()?))) else {
@@ -454,8 +462,7 @@ pub async fn oidc_callback(
             "the identity provider is not reachable".into(),
         ));
     };
-    let pending: Option<OidcPending> = auth
-        .session
+    let pending: Option<OidcPending> = session
         .get(OIDC_PENDING)
         .await
         .map_err(|e| AppError::Internal(anyhow::anyhow!("session: {e}")))?;
@@ -473,7 +480,7 @@ pub async fn oidc_callback(
             "the state does not match this browser's sign-in".into(),
         ));
     }
-    auth.session
+    session
         .remove::<OidcPending>(OIDC_PENDING)
         .await
         .map_err(|e| AppError::Internal(anyhow::anyhow!("session: {e}")))?;
@@ -525,7 +532,14 @@ pub async fn oidc_callback(
     let Some(user) = user else {
         return Err(AppError::Forbidden("this account is disabled".into()));
     };
-    finish_login(&mut auth, &user, true, st.ctx.config().auth.session_days).await?;
+    finish_login(
+        &auth,
+        &session,
+        &user,
+        true,
+        st.ctx.config().auth.session_days,
+    )
+    .await?;
     tracing::info!(user = %user.name, "signed in through the identity provider");
     if !user.admin && accounts::wants_setup_code(&st.ctx.store, &cfg).await? {
         return Ok(Redirect::to("/signin").into_response());
@@ -537,6 +551,7 @@ pub async fn oidc_callback(
 pub async fn oidc_link(
     State(st): State<AppState>,
     auth: AuthSession<Backend>,
+    session: Session,
     Path(token): Path<String>,
 ) -> AppResult<Response> {
     if st.ctx.config().auth.mode != AuthMode::Oidc {
@@ -550,7 +565,7 @@ pub async fn oidc_link(
         None => LinkRefused::Gone,
         Some(u) if u.linked_to(&st.ctx.config().auth.oidc_issuer) => LinkRefused::Linked(u.name),
         Some(u) if u.disabled_at.is_some() => LinkRefused::Disabled(u.name),
-        Some(_) => return to_provider(&st, &auth, Some(token)).await,
+        Some(_) => return to_provider(&st, &auth, &session, Some(token)).await,
     };
     Ok(error_page(
         StatusCode::GONE,
