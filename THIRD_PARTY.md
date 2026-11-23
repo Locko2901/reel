@@ -16,12 +16,12 @@ comes from others under their own licences, listed here with where each one's so
 
 ## OBS Studio
 
-In **reel** for Windows: OBS Studio 33.0.1, the official build, unmodified, under the
+In **reel** for Windows: OBS Studio 33.0.3, the official build, unmodified, under the
 GNU General Public License version 2 or later. Its licence text is in the install folder
 beside it. Its complete source is the release's own archive,
-`OBS-Studio-33.0.1-Sources.tar.gz`, which every reel release that ships OBS carries as an
+`OBS-Studio-33.0.3-Sources.tar.gz`, which every reel release that ships OBS carries as an
 asset, and the upstream tag
-[obsproject/obs-studio 33.0.1](https://github.com/obsproject/obs-studio/tree/33.0.1). The
+[obsproject/obs-studio 33.0.3](https://github.com/obsproject/obs-studio/tree/33.0.3). The
 version reel pins is in [`desktop/obs/pinned.json`](desktop/obs/pinned.json). On Linux, reel uses
 the OBS your distribution installed and ships none.
 
