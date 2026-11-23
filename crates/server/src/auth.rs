@@ -10,6 +10,7 @@ use axum_login::AuthSession;
 use reel_core::config::AuthMode;
 use reel_store::models::User as UserRow;
 use std::net::{IpAddr, SocketAddr};
+use tower_sessions::Session;
 
 pub const SETUP_CODE_KEY: &str = "setup_code";
 
@@ -285,14 +286,17 @@ pub async fn require_user(State(st): State<AppState>, mut req: Request, next: Ne
             }
         }
         AuthMode::Local | AuthMode::Oidc => {
-            let Some(mut auth) = req.extensions().get::<AuthSession<Backend>>().cloned() else {
+            let (Some(auth), Some(session)) = (
+                req.extensions().get::<AuthSession<Backend>>().cloned(),
+                req.extensions().get::<Session>().cloned(),
+            ) else {
                 return table_down(&req, "no auth layer", "session");
             };
-            let Some(session_user) = auth.user.clone() else {
+            let Some(session_user) = auth.user().await else {
                 return to_signin(&req);
             };
             let now = jiff::Timestamp::now().as_second();
-            let signed_in_at: Option<i64> = auth.session.get(SIGNED_IN_AT).await.ok().flatten();
+            let signed_in_at: Option<i64> = session.get(SIGNED_IN_AT).await.ok().flatten();
             if let Some(at) = signed_in_at {
                 if lifetime_over(at, now, cfg.auth.session_max_days) {
                     tracing::info!(user = %session_user.name, "session past its lifetime");
@@ -301,9 +305,9 @@ pub async fn require_user(State(st): State<AppState>, mut req: Request, next: Ne
                 }
             }
             // a session's idle expiry moves only when it is written: once an hour is enough
-            let seen_at: Option<i64> = auth.session.get(SEEN_AT).await.ok().flatten();
+            let seen_at: Option<i64> = session.get(SEEN_AT).await.ok().flatten();
             if seen_at.is_none_or(|t| now - t >= 3600) {
-                let _ = auth.session.insert(SEEN_AT, now).await;
+                let _ = session.insert(SEEN_AT, now).await;
             }
             match st.ctx.store.user(&session_user.id).await {
                 Ok(Some(row)) if row.disabled_at.is_none() => {

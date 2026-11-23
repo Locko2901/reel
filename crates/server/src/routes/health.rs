@@ -57,7 +57,7 @@ struct Asker {
     /// A loopback peer that no proxy forwarded, as a proxy on the same machine would; for the
     /// app's standalone library, which every program of the PC reaches so, the app with its key.
     this_machine: bool,
-    session_user: Option<String>,
+    session: Option<AuthSession<Backend>>,
 }
 
 impl Asker {
@@ -74,10 +74,7 @@ impl Asker {
                     .app_key
                     .as_ref()
                     .is_none_or(|k| k.shown_by(req.headers())),
-            session_user: req
-                .extensions()
-                .get::<AuthSession<Backend>>()
-                .and_then(|a| a.user.as_ref().map(|u| u.id.clone())),
+            session: req.extensions().get::<AuthSession<Backend>>().cloned(),
         }
     }
 
@@ -89,10 +86,13 @@ impl Asker {
         if self.this_machine {
             return true;
         }
-        let Some(id) = &self.session_user else {
+        let Some(auth) = &self.session else {
             return false;
         };
-        matches!(st.ctx.store.user(id).await, Ok(Some(u)) if u.is_admin() && u.disabled_at.is_none())
+        let Some(me) = auth.user().await else {
+            return false;
+        };
+        matches!(st.ctx.store.user(&me.id).await, Ok(Some(u)) if u.is_admin() && u.disabled_at.is_none())
     }
 }
 
