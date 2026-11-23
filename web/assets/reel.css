@@ -531,7 +531,7 @@ label.check.pick:has(input:checked) { background: var(--raised-2); border-color:
 .srow.refused { border-left: 2px solid var(--err); }
 .srow.refused .sctl input, .srow.refused .sctl select { border-color: var(--err); }
 .srow.locked .slabel b { color: var(--text-2); }
-/* tips: from here to "tips end", the app gives this block to a server page that has none */
+/* tips: from here to "tips end", the app keeps this block on its own pages and gives it to a server page that has none */
 .slabel > .shelp[data-docs], .panel > header > .desc[data-docs], .section-line[data-docs] { display: none; }
 .sname { display: flex; align-items: center; gap: 2px; min-width: 0; }
 .sname > b { min-width: 0; }

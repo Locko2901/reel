@@ -764,6 +764,24 @@ mod tests {
     }
 
     #[test]
+    fn the_apps_page_keeps_its_tips_under_an_older_servers_stylesheet() {
+        let built = std::fs::read_to_string(
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../ui/assets/tips.css"),
+        )
+        .expect("build.rs writes the tips' block");
+        assert_eq!(built, tip_css());
+        let page = include_str!("../../ui/index.html");
+        let at = |href: &str| {
+            page.find(&format!(r#"<link rel="stylesheet" href="{href}">"#))
+                .expect(href)
+        };
+        assert!(
+            at("assets/reel.css") < at("assets/tips.css") && at("assets/tips.css") < at("app.css"),
+            "the server's stylesheet goes in right after reel.css: tips.css must follow it"
+        );
+    }
+
+    #[test]
     fn an_older_id_opens_the_page_that_holds_it_now() {
         for (old, standalone, now) in [
             ("obs", false, "capture"),

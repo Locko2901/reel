@@ -1,12 +1,23 @@
 //! Copies reel's stylesheet, fonts and shared scripts from web/assets into the app's pages.
 use std::path::Path;
 
+/// The tips' block of reel.css on its own, for the app's page under a server's stylesheet that
+/// has none; shell.rs gives the same block to such a server's pages.
+fn tips(css: &str) -> std::io::Result<&str> {
+    match (css.find("/* tips:"), css.find("/* tips end */")) {
+        (Some(from), Some(to)) if from < to => Ok(&css[from..to]),
+        _ => Err(std::io::Error::other("reel.css has no tips block")),
+    }
+}
+
 fn copy_assets() -> std::io::Result<()> {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
     let web = root.join("../../web/assets");
     let out = root.join("../ui/assets");
     std::fs::create_dir_all(out.join("fonts"))?;
     std::fs::copy(web.join("reel.css"), out.join("reel.css"))?;
+    let css = std::fs::read_to_string(web.join("reel.css"))?;
+    std::fs::write(out.join("tips.css"), tips(&css)?)?;
     std::fs::create_dir_all(out.join("js"))?;
     for js in ["switch.js", "walk.js", "record.js", "appbar.js", "tip.js"] {
         std::fs::copy(web.join("js").join(js), out.join("js").join(js))?;

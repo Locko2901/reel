@@ -138,7 +138,14 @@ const ui = join(root, 'desktop/ui'), assets = join(root, 'web/assets');
 const types = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.woff2': 'font/woff2', '.svg': 'image/svg+xml', '.png': 'image/png' };
 const server = createServer((req, res) => {
   const want = decodeURIComponent(req.url.split('?')[0]);
-  const file = want.startsWith('/assets/') ? resolve(assets, `.${want.slice('/assets'.length)}`) : resolve(ui, `.${want}`);
+  if (want === '/assets/tips.css') {
+    // what build.rs writes into the app's assets: reel.css's tips block
+    const css = readFileSync(join(assets, 'reel.css'), 'utf8');
+    res.writeHead(200, { 'content-type': 'text/css' });
+    res.end(css.slice(css.indexOf('/* tips:'), css.indexOf('/* tips end */')));
+    return;
+  }
+  const file =want.startsWith('/assets/') ? resolve(assets, `.${want.slice('/assets'.length)}`) : resolve(ui, `.${want}`);
   if (!(file.startsWith(ui) || file.startsWith(assets)) || !existsSync(file)) { res.writeHead(404); res.end(); return; }
   res.writeHead(200, { 'content-type': types[extname(file)] || 'application/octet-stream' });
   res.end(readFileSync(file));
