@@ -1,5 +1,28 @@
 # Changelog
 
+## [1.20.0](https://github.com/Locko2901/reel/compare/v1.19.0...v1.20.0) (2026-11-24)
+
+
+### Features
+
+* Settings has one nav on every page, the app's and the server's, opening on Essentials, and a Hotkeys page with every key ([dea980d](https://github.com/Locko2901/reel/commit/dea980debb0895207a3d3e6c31679b0e32b3dc8a))
+* Settings history in the app's window lists this PC's own changes too, and Revert puts one back ([c0dc2a8](https://github.com/Locko2901/reel/commit/c0dc2a83b6b057752cafd1374d323d87eed24ae0))
+* Settings in a wide browser window puts its nav at the edge and its groups side by side ([4d74966](https://github.com/Locko2901/reel/commit/4d74966bc1cd14e5fcc4ca57a8895845c6ae9e31))
+* Settings in the app shows each setting's name and control too, with its explanation behind a question mark and a link to the docs ([7383e8b](https://github.com/Locko2901/reel/commit/7383e8b2940a648e4ee0cd17f8c832737bfcdb67))
+* Settings on the server shows each setting's name and control, its explanation behind a question mark with a link to the docs ([b2a3389](https://github.com/Locko2901/reel/commit/b2a3389651e5b7b91eefb343e2e27ada5162034a))
+* Settings opens beside the page you were on, docked on the left of a wide window ([354e4d5](https://github.com/Locko2901/reel/commit/354e4d538ab4067acb1c5186ff539485f6d47c8f))
+* Settings opens on what is set and the few things most people change, each with what it costs, and every other page is one row further ([0b1eac6](https://github.com/Locko2901/reel/commit/0b1eac62deab6cd5521f72adf766c03bfb281565))
+
+
+### Bug Fixes
+
+* a value set outside Settings shows a padlock, not an empty box ([7d4ff2b](https://github.com/Locko2901/reel/commit/7d4ff2bdde06bc70e92c2c7f07d8819d8814c064))
+* **desktop:** bundle OBS 33.0.3 ([121ffe4](https://github.com/Locko2901/reel/commit/121ffe4b762f2666369debc76a11292fad9a4f7b))
+* Settings keeps your place: Back, Forward and the crumb come back where you were, a page opened from its link starts at its top, and the log stays where you read it ([cb12fb2](https://github.com/Locko2901/reel/commit/cb12fb2285e4b8fd19aed9f3bc1dbe7185388fa3))
+* Settings opened on a narrow window moves beside the page once the window is wide ([9c26b73](https://github.com/Locko2901/reel/commit/9c26b734b7239a8675b3931d1bac3ed79a263742))
+* the app's own Settings pages keep their tips' look when the server they are paired with has none ([c2ebc62](https://github.com/Locko2901/reel/commit/c2ebc62849f16483a5801057e2448bde6ed5406c))
+* the Windows example's lane program takes where a save came from too ([4bdabc8](https://github.com/Locko2901/reel/commit/4bdabc8994e96cc0ff4b07de75a6fa542d775a9b))
+
 ## [1.19.0](https://github.com/Locko2901/reel/compare/v1.18.0...v1.19.0) (2026-11-22)
 
 
