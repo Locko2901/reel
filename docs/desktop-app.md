@@ -233,9 +233,9 @@ left edge under the header, and that page stays as it was: scroll it, open a cli
 with Settings open beside it. From 2200 px wide Settings there has its nav and its page as on its
 own; narrower, the nav is the list at its top. Its **×**, Esc (in Settings or on the page beside)
 and Settings in the header close it. Back and Forward walk Settings' pages in Settings, and the
-other pages on the page beside. Under 1600 px Settings is the window's page, as above: a window
-made narrower with Settings beside a page shows Settings in full, and wider again puts it back
-beside that page.
+other pages on the page beside. Under 1600 px Settings is the window's page, as above. Settings
+follows the window's width: opened on a narrow window, it moves beside the page you opened it from
+once the window is 1600 px wide or more, and a window made narrower again shows it in full.
 
 ![Settings beside the library, on a window 1920 px wide](img/app-settings-beside.png)
 

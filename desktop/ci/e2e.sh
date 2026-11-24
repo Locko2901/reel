@@ -320,6 +320,43 @@ done
 xdotool mousemove 640 760
 echo "the nav opens each of this PC's pages, Back walks them, and the ids of the pages before open the pages that hold them now"
 
+say "Settings opened on a narrow window, then the window made wide: Settings beside the page it was opened from, and back"
+WIN=$(xdotool search --name '^reel$' | head -1 || true)
+[ -n "$WIN" ] || fail "no window for Settings made wide"
+xdotool windowmove "$WIN" 0 0 windowsize "$WIN" 1280 820
+sleep 1
+LIBRARY_PAGE="library loaded at=$HOST/\$"
+n=$(log_n "$LIBRARY_PAGE")
+"$APP" --page=/ >/dev/null 2>&1 &
+wait_more 20 "the library" "$LIBRARY_PAGE" "$n"
+opens=$(log_n 'settings panel opens')
+n=$(log_n "$APP_PAGE")
+"$APP" --section=clips >/dev/null 2>&1 &
+wait_more 20 "Settings as the full page of a 1280 px window" "$APP_PAGE" "$n"
+sleep 1
+[ "$(log_n 'settings panel opens')" = "$opens" ] || fail "Settings opened beside the page on a 1280 px window"
+n=$(log_n "$LIBRARY_PAGE")
+xdotool windowsize "$WIN" 1920 1000
+wait_more 20 "Settings beside the page once the window is wide" 'settings panel opens' "$opens"
+wait_more 20 "the library back beside Settings" "$LIBRARY_PAGE" "$n"
+sleep 2
+import -display "$DISPLAY" -window "$WIN" "$SHOTS/settings-widened.png"
+n=$(log_n "$APP_PAGE")
+xdotool windowsize "$WIN" 1280 820
+wait_more 10 "Settings as the full page again on a narrow window" "$APP_PAGE" "$n"
+opens=$(log_n 'settings panel opens')
+n=$(log_n "$LIBRARY_PAGE")
+xdotool windowsize "$WIN" 1920 1000
+wait_more 20 "Settings beside the page again" 'settings panel opens' "$opens"
+wait_more 20 "the library beside Settings again" "$LIBRARY_PAGE" "$n"
+sleep 1
+n=$(log_n 'settings panel closes')
+xdotool key Escape
+wait_more 10 "Esc closing Settings" 'settings panel closes' "$n"
+xdotool windowsize "$WIN" 1280 820
+sleep 1
+echo "Settings opened on a narrow window goes beside the page it came from once the window is wide, and back"
+
 say "a wide window: Settings beside the library, a server's page in it, the page beside clicked, Esc"
 WIN=$(xdotool search --name '^reel$' | head -1 || true)
 [ -n "$WIN" ] || fail "no window for Settings beside the page"
