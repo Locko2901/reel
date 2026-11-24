@@ -361,7 +361,7 @@ fn library(app: &AppHandle, first: Url) -> WebviewBuilder<tauri::Wry> {
         .on_page_load(|webview, payload| {
             if let PageLoadEvent::Finished = payload.event() {
                 tracing::info!(at = %where_to(payload.url()), "library loaded");
-                crate::panel::library_loaded(&webview);
+                crate::panel::library_loaded(&webview, payload.url());
             }
         })
         // with a hook set, wry picks where a download goes and WebView2 shows no bar of its own
@@ -487,6 +487,7 @@ pub fn go(app: &AppHandle, view: View, section: Option<&str>) {
                     let _ = wv.emit_to(EventTarget::labeled(LIBRARY), "open-section", s);
                 }
             } else {
+                crate::panel::library_leaves(&wv);
                 let page = match section {
                     Some(s) => format!("{SETTINGS_PAGE}#{s}"),
                     None => SETTINGS_PAGE.to_string(),

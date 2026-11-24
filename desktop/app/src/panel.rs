@@ -28,9 +28,9 @@ static MAKING: AtomicBool = AtomicBool::new(false);
 static SHOWN: AtomicU32 = AtomicU32::new(0);
 /// What the panel was asked to show while it was being made.
 static WANTED: Mutex<Option<To>> = Mutex::new(None);
-/// The page beside, kept while a narrowed window shows the panel's page as the full page, for
-/// the panel to come back beside it when the window is wide again.
-static MOVED: Mutex<Option<Url>> = Mutex::new(None);
+/// The page the library showed last other than Settings: Settings shown as the full page goes
+/// beside it once the window is wide enough for the panel.
+static UNDER: Mutex<Option<Url>> = Mutex::new(None);
 #[cfg(target_os = "linux")]
 static PX: std::sync::atomic::AtomicI32 = std::sync::atomic::AtomicI32::new(FULL as i32);
 
@@ -108,18 +108,76 @@ pub fn library_goes(app: &AppHandle, url: &Url) -> bool {
         return false;
     }
     LIBRARY_ON_SERVER.store(server, Ordering::SeqCst);
-    let settings =
-        is_settings(url) || (shell::is_local(url) && shell::page_of(url) == Some(View::Settings));
-    if !settings {
-        *lock(&MOVED) = None;
-    }
     true
 }
 
-/// A page of the library loaded: it moves right of the open panel, if one is.
-pub fn library_loaded(webview: &Webview) {
+/// A page of the library loaded: it moves right of the open panel, if one is. Settings loaded
+/// as the full page of a wide window goes into the panel: the window was made wide on it, or
+/// WebView2 named the page after the resize had passed.
+pub fn library_loaded(webview: &Webview, url: &Url) {
+    keep_under(url);
     let w = SHOWN.load(Ordering::SeqCst);
     let _ = webview.eval(format!("window.__reelPanel && window.__reelPanel({w})"));
+    if FITS.load(Ordering::SeqCst) && !is_open() && moves(url).is_some() {
+        let app = webview.app_handle().clone();
+        tauri::async_runtime::spawn(async move {
+            if let Some(l) = app.get_webview(shell::LIBRARY) {
+                widened(&app, &l);
+            }
+        });
+    }
+}
+
+/// The library is about to show Settings as the full page: the page it leaves is the one
+/// Settings goes beside on a wider window.
+pub fn library_leaves(library: &Webview) {
+    if let Ok(url) = library.url() {
+        keep_under(&url);
+    }
+}
+
+fn keep_under(url: &Url) {
+    if is_under(url) {
+        *lock(&UNDER) = Some(url.clone());
+    }
+}
+
+/// Whether Settings can go beside a page of the library: not one of Settings' own, and not a
+/// way in, whose ticket is used once.
+fn is_under(url: &Url) -> bool {
+    if shell::is_local(url) {
+        return shell::page_of(url) != Some(View::Settings);
+    }
+    matches!(url.scheme(), "http" | "https") && !is_settings(url) && url.path() != "/app/open"
+}
+
+/// What the panel takes over from the library when the library shows Settings as the full page.
+fn moves(page: &Url) -> Option<To> {
+    if shell::page_of(page) == Some(View::Settings) {
+        let section = page.fragment().filter(|s| shell::section_ok(s));
+        return Some(To::App(Some(section.unwrap_or("first").to_string())));
+    }
+    (is_settings(page) && page.path() != "/app/open").then(|| To::Page(page.clone()))
+}
+
+/// Where the library goes when Settings, the full page, moves into the panel.
+#[derive(Debug, PartialEq)]
+enum Beside {
+    Page(Url),
+    Home,
+    /// Under one of the app's own pages (offline, setup) or with no server, Settings stays the
+    /// full page, as it opens there on a wide window.
+    Stays,
+}
+
+fn beside(under: Option<&Url>, base: &str) -> Beside {
+    let origin = Url::parse(base).ok().map(|b| b.origin());
+    match under {
+        _ if origin.is_none() => Beside::Stays,
+        Some(u) if shell::is_local(u) => Beside::Stays,
+        Some(u) if Some(u.origin()) == origin => Beside::Page(u.clone()),
+        _ => Beside::Home,
+    }
 }
 
 fn lock<T>(m: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
@@ -175,7 +233,7 @@ pub fn close(app: &AppHandle, from: &str) {
 /// The window was closed: a new one starts without a panel.
 pub fn gone() {
     OPEN.store(false, Ordering::SeqCst);
-    *lock(&MOVED) = None;
+    *lock(&UNDER) = None;
 }
 
 fn go(p: &Webview, to: To) {
@@ -252,15 +310,15 @@ pub fn layout(window: &tauri::Window, w: f64, h: f64) {
     let width = width_for(w);
     FITS.store(width.is_some(), Ordering::SeqCst);
     let app = window.app_handle();
-    let panel = app.get_webview(PANEL);
     let library = app.get_webview(shell::LIBRARY);
-    if let (Some(p), Some(l)) = (&panel, &library) {
-        if is_open() && width.is_none() {
-            narrowed(p, l);
-        } else if !is_open() && width.is_some() {
-            widened(p, l);
+    if let Some(l) = &library {
+        match app.get_webview(PANEL) {
+            Some(p) if is_open() && width.is_none() => narrowed(&p, l),
+            _ if !is_open() && width.is_some() => widened(app, l),
+            _ => {}
         }
     }
+    let panel = app.get_webview(PANEL);
     let shown = if is_open() { width.unwrap_or(0.0) } else { 0.0 };
     SHOWN.store(shown as u32, Ordering::SeqCst);
     if let Some(p) = &panel {
@@ -282,32 +340,42 @@ pub fn layout(window: &tauri::Window, w: f64, h: f64) {
 fn narrowed(p: &Webview, l: &Webview) {
     OPEN.store(false, Ordering::SeqCst);
     put(p, false);
-    if let (Ok(page), Ok(before)) = (p.url(), l.url()) {
+    if let Ok(page) = p.url() {
         if matches!(page.scheme(), "http" | "https") || shell::is_local(&page) {
-            *lock(&MOVED) = Some(before);
+            library_leaves(l);
             let _ = l.navigate(page);
         }
     }
     tracing::info!("settings panel closes: the window is too narrow, its page is the full page");
 }
 
-fn widened(p: &Webview, l: &Webview) {
-    let Some(before) = lock(&MOVED).take() else {
-        return;
-    };
-    let Ok(page) = l.url() else {
-        return;
-    };
-    let settings = is_settings(&page) || shell::page_of(&page) == Some(View::Settings);
-    if !settings {
+/// The window is wide enough for the panel: Settings shown as the full page moves into it, and
+/// the library goes back to the page Settings was opened from, as if it had opened on this
+/// window.
+fn widened(app: &AppHandle, l: &Webview) {
+    if MAKING.load(Ordering::SeqCst) || is_open() {
         return;
     }
-    let _ = p.navigate(page);
-    let _ = l.navigate(before);
-    OPEN.store(true, Ordering::SeqCst);
-    put(p, true);
-    focus(p);
-    tracing::info!("settings panel opens: the window is wide again, its page goes back into it");
+    let Some(to) = l.url().ok().as_ref().and_then(moves) else {
+        return;
+    };
+    let Some(rt) = app.try_state::<crate::runtime::Runtime>() else {
+        return;
+    };
+    let to_page = match beside(lock(&UNDER).as_ref(), &rt.library_base()) {
+        Beside::Stays => return,
+        Beside::Page(url) => {
+            let at = shell::where_to(&url);
+            let _ = l.navigate(url);
+            at
+        }
+        Beside::Home => {
+            rt.go_library("/");
+            "the library".to_string()
+        }
+    };
+    tracing::info!(beside = %to_page, "settings goes into the panel: the window is wide");
+    open(app, to);
 }
 
 /// Where the open panel is, for the window after an update: the app's section, or the server's
@@ -489,6 +557,71 @@ mod tests {
             "about:blank",
         ] {
             assert!(!is_settings(&url(s)), "{s}");
+        }
+    }
+
+    #[test]
+    fn settings_as_the_full_page_moves_into_the_panel_beside_the_page_it_was_opened_from() {
+        for (page, to) in [
+            (
+                "tauri://localhost/index.html#capture",
+                To::App(Some("capture".into())),
+            ),
+            (
+                "http://tauri.localhost/index.html#games/steam-570",
+                To::App(Some("games/steam-570".into())),
+            ),
+            (
+                "tauri://localhost/index.html",
+                To::App(Some("first".into())),
+            ),
+            (
+                "http://nas:8746/settings/storage",
+                To::Page(url("http://nas:8746/settings/storage")),
+            ),
+        ] {
+            assert_eq!(moves(&url(page)), Some(to), "{page}");
+        }
+        for page in [
+            "http://nas:8746/",
+            "http://nas:8746/clips/01H",
+            "tauri://localhost/offline.html",
+            "tauri://localhost/setup.html",
+            "about:blank",
+        ] {
+            assert_eq!(moves(&url(page)), None, "{page}");
+        }
+
+        let base = "http://nas:8746";
+        let clip = url("http://nas:8746/clips/01H?t=3");
+        assert_eq!(beside(Some(&clip), base), Beside::Page(clip.clone()));
+        assert_eq!(beside(None, base), Beside::Home);
+        // a page of the server the app was paired with before
+        assert_eq!(beside(Some(&url("http://old:8746/")), base), Beside::Home);
+        let offline = url("tauri://localhost/offline.html");
+        assert_eq!(beside(Some(&offline), base), Beside::Stays);
+        assert_eq!(beside(Some(&clip), ""), Beside::Stays);
+        assert_eq!(beside(None, ""), Beside::Stays);
+    }
+
+    #[test]
+    fn the_page_settings_goes_beside_is_neither_settings_nor_a_way_in() {
+        for s in [
+            "http://nas:8746/",
+            "http://nas:8746/clips/01H?t=3",
+            "http://127.0.0.1:34567/jobs",
+            "tauri://localhost/offline.html",
+        ] {
+            assert!(is_under(&url(s)), "{s}");
+        }
+        for s in [
+            "http://nas:8746/settings/storage",
+            "http://127.0.0.1:34567/app/open?ticket=t&to=/",
+            "tauri://localhost/index.html#clips",
+            "http://tauri.localhost/index.html",
+            "about:blank",
+        ] {
+            assert!(!is_under(&url(s)), "{s}");
         }
     }
 
