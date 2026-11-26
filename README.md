@@ -129,4 +129,5 @@ to build and test (`make check` needs only Docker). Please report security probl
 ([SECURITY.md](SECURITY.md)).
 
 reel is under the [MIT licence](LICENSE), copyright Lockoo. It ships others' work under their
-own licences, OBS Studio and ffmpeg among them: [THIRD_PARTY.md](THIRD_PARTY.md).
+own licences, OBS Studio and ffmpeg among them: [THIRD_PARTY.md](THIRD_PARTY.md). Every crate's
+licence text is on each server at `/licences`, and beside the app as `licences.html`.

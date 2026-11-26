@@ -33,8 +33,11 @@ Each opens in the browser; in the app's window too, which stays on reel.
 ## Credits {#credits}
 
 The work of others that reel's downloads carry, each under its own licence, with where its source
-or its terms are. **Every one** opens `THIRD_PARTY.md` of this version, which lists them all with
-their versions and where each one's source is.
+or its terms are. **Every one** opens the server's licence page, `/licences`: the licence text of
+every crate the server and the app are built from, each text once with the crates under it, and a
+link to `THIRD_PARTY.md` of this version, which names the rest with where each one's source is.
+Anyone who reaches the server can open that page, signed in or not; in the app's window it opens
+in the browser. The app carries the same page in its install folder, `licences.html`.
 
 - **OBS Studio**, in reel for Windows (the installer with OBS), as its makers publish it,
   unmodified: GNU GPL 2.0 or later. Its licence text is in the install folder, and **Source**
@@ -51,4 +54,5 @@ their versions and where each one's source is.
   system.
 - **Geist and Geist Mono**, the pages' type: SIL Open Font License 1.1.
 - **Rust crates**, the libraries the server and the app are built from, each under its own
-  licence: **The list** names every one with its licence.
+  licence: **The list** opens the licence page too, which names every one with its licence's
+  text.

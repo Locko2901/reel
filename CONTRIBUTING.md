@@ -39,6 +39,13 @@ builds and the app's checks under Xvfb and Wine.
 `docs/configuration.md` is made from the settings catalogue in `crates/core/src/settings.rs`:
 after changing a setting, run `make docs-config`, or `make check` fails.
 
+A new or bumped crate needs a licence text of its own: `make check` first makes the licence page
+the server serves at `/licences` (`ci/licence-page.sh`, with cargo-about and its settings in
+`about.toml`) and fails, naming the crate, when one under MIT, BSD, ISC or Zlib has none that
+cargo-about can find. Give it a `clarify` entry in `about.toml`: its licence file in the crate,
+or in its repository at the commit the crate was published from. `make third-party` writes the
+crate list of `THIRD_PARTY.md` again from the same crates.
+
 Migrations under `crates/store/migrations` are never edited once released (sqlx checks their
 checksums): a change to the schema is a new numbered file.
 
