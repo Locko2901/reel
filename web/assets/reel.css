@@ -652,8 +652,9 @@ td.clip > a:not(.row) { display: block; overflow: hidden; text-overflow: ellipsi
 @media (max-width: 1199px) { .shares-table td.sub, .shares-table td.link { white-space: normal; } }
 /* Settings history takes its form from the room its panel has, not the window's: the app's dock
    and a wide window's columns are narrower than the window. A table from 750 px, the rows of
-   .cards below it. A long value wraps inside its own column; this PC's chip and where a change
-   came from (the app's rows) and the time stay whole. */
+   .cards below it, the old and new value named there as the table's heads name them. A long value
+   wraps inside its own column; this PC's chip and where a change came from (the app's rows) and
+   the time stay whole. */
 .panel > .body:has(> .history-table) { container-type: inline-size; }
 .history-table td.clip { max-width: none; }
 .history-table td:is(:nth-child(2), :nth-child(3)) { overflow-wrap: anywhere; }
@@ -670,6 +671,7 @@ td.clip > a:not(.row) { display: block; overflow: hidden; text-overflow: ellipsi
   .history-table td { display: block; width: auto; min-width: 0; padding: 0; border: 0; line-height: 1.45; overflow-wrap: anywhere; }
   .history-table td.clip { flex: 1 1 100%; }
   .history-table td.sub { font-size: var(--fs-s); color: var(--text-2); }
+  .history-table td.sub[data-l]::before { content: attr(data-l) "\a0"; color: var(--text-3); }
   .history-table td.acts { margin-left: auto; }
 }
 
