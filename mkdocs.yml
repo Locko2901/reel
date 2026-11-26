@@ -96,6 +96,7 @@ nav:
           - General: settings/general.md
           - Appearance: settings/appearance.md
           - Advanced: settings/advanced.md
+          - About: settings/about.md
   - Looking after reel:
       - Updating: updating.md
       - Switching the sign-in method: switching-sign-in.md

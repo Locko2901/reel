@@ -62,7 +62,7 @@ first run and the restart. Their addresses answer "Not in standalone" with what 
 Settings is the same, with the pages a library on one PC has: its nav lists **Essentials**, this
 PC's pages without **Uploads**, then the library's, reel on this PC: **Library and storage**,
 **Library folder**, **Ingest**, **Encoding**, **Copies under a size**, **Imports**, **General**,
-**Appearance** and **Advanced**.
+**Appearance**, **Advanced** and **About**.
 
 A server can be paired while the app stays standalone: **Upload to the server** on Settings,
 **Status** then sends a clip to it. [Standalone](setup/standalone.md) has the whole picture, and
