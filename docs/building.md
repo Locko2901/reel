@@ -38,6 +38,12 @@ as errors, and every test, the end to end tests among them, which run a
 real server against synthetic clips. `make desktop-check` does the same
 for the desktop app.
 
+Each build makes the licence page too: every licence text of the crates
+the server and the app are built from, which the server serves at
+`/licences` and the app carries in its install folder as
+`licences.html`. `make check` fails when a crate has no licence text of
+its own.
+
 ## A demo server
 
 ```

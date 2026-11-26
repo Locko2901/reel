@@ -247,6 +247,13 @@ into the cargo volume, refuses it when its SHA-256 does not match, and puts ffmp
 and ffmpeg's licence under `desktop/app/binaries/` (ignored by git) with the target triple in
 the name, which is where `bundle.externalBin` in `tauri.conf.json` looks.
 
+Beside them goes `licences.html`, the licence page of the server's crates and the app's
+(`ci/licence-page.sh`, as the server serves it at `/licences`), a resource in
+`tauri.conf.json`: the installers put it in the install folder, the .deb and the AppImage in
+`/usr/lib/reel/`. The installers' builds make it again each time and build it into reel on this
+PC; the sidecar steps of the other targets make it once when it is not there, as Tauri builds
+nothing while a resource is missing.
+
 | Pin | Build |
 |---|---|
 | `desktop/ffmpeg/pinned.json` | Windows: gyan.dev's essentials build of an ffmpeg release, static, GPL v3, with libx264, NVENC, AMF and QSV; the checksum is the one gyan.dev publishes |

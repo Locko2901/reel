@@ -39,11 +39,13 @@ was posted somewhere). Both show on the Shares page. reel tells the two
 apart by the request's browser name alone, and keeps no list of who
 opened a link and no visitor addresses for it.
 
-Three more paths answer without a sign-in, because the share pages and
-the app need them:
+Four more paths answer without a sign-in, because the share pages and
+the app need them, or because anyone given reel may read them:
 
 - `/assets/`: reel's own stylesheet, fonts, icons and scripts, the same on
   every server, nothing of yours.
+- `/licences`: the licence texts of the crates reel is built from, the
+  same on every server of a version, nothing of yours.
 - `/healthz`: the health check. To anyone on the internet it answers
   whether reel is ok, and 503 while the library is away. The details
   (reel's version, how long it has run, whether the database and ffmpeg
