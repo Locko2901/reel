@@ -1,3 +1,4 @@
+pub mod about;
 pub mod advanced;
 pub mod anims;
 pub mod api;

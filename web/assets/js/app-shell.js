@@ -36,6 +36,15 @@ export function renderVersions(v, line) {
   setPart('part-versions', v.standing === 'update' || v.standing === 'out' ? 'active' : v.standing === 'ahead' ? 'warn' : '', v.words, line || '');
   const row = $('#status-app');
   if (row) row.textContent = `${v.app}, ${v.kind}${v.obs ? ` (OBS ${v.obs})` : ''}; its updater: ${line || 'not asked yet'}`;
+  // Settings, About: the app's own version, and whether an update waits
+  const about = $('#about-app');
+  if (!about) return;
+  $('#about-app-version').textContent = v.app;
+  $('#about-app-kind').textContent = `${v.kind}${v.obs ? `, with OBS Studio ${v.obs}` : ''}`;
+  const note = $('#about-app-line');
+  note.textContent = `its updater: ${line || 'not asked yet'}`;
+  note.classList.toggle('st-active', v.standing === 'update');
+  about.dataset.filled = '';
 }
 
 // The update's question, which the app sends only to the library's own page: Install now, Later.
@@ -54,7 +63,7 @@ export function appShell() {
   document.documentElement.dataset.app = 'desktop';
   appDownloads();
   $$('.app-part, .sections .app-link').forEach(el => el.hidden = false);
-  if (!document.body.hasAttribute('data-standalone')) $$('#sections-body .section-line').forEach(l => l.append(' Kept on the server: the same for every PC and browser.'));
+  if (!document.body.hasAttribute('data-standalone')) $$('#sections-body .section-line:not([data-section="about"])').forEach(l => l.append(' Kept on the server: the same for every PC and browser.'));
   // The page's own read of the server's health, or of the library on this PC.
   const chipDot = $('#chip-dot');
   const server = () => document.documentElement.dataset.session === 'out'
@@ -110,6 +119,14 @@ export function appShell() {
     e.preventDefault();
     call('app_open_settings', { section: 'startup', shape: shape() }).catch(() => {});
   });
+  $('#about-updates')?.addEventListener('click', () => call('app_open_settings', { section: 'startup', shape: shape() }).catch(() => {}));
+  // About's links open in the browser, as the docs do, and the window stays on reel; an app
+  // without the command, or one that does not know the place, follows the link itself
+  $$('.about-panel a[href^="https://"]').forEach(a => a.addEventListener('click', (e) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    call('app_open_link', { url: a.href }).catch(() => { location.href = a.href; });
+  }));
   $$('.sections a[data-app-section]').forEach(a => a.addEventListener('click', (e) => {
     e.preventDefault();
     call('app_open_settings', { section: a.dataset.appSection, shape: shape() }).catch(() => {});

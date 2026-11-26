@@ -16,7 +16,7 @@ export const NAV = [
   ['This PC', ['a clips', 'a session', 'a capture', 'a hotkeys', 'a games', 'ap upload', 'a server', 'a startup', 'a status']],
   ['Library', ['r storage', 'as library', 'r ingest', 'as encoder', 'rs sharing', 'r imports']],
   ['Server', ['rp sharing', 'r devices', 'r access', 'r notifications']],
-  ['System', ['r general', 'r appearance', 'r advanced']],
+  ['System', ['r general', 'r appearance', 'r advanced', 'r about']],
 ];
 
 // Games and apps' count of programs not sorted yet, beside its name.

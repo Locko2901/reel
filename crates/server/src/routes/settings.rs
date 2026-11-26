@@ -130,7 +130,12 @@ const NAV: [(&str, &[NavPage]); 5] = [
     ),
     (
         "System",
-        &[reel("general"), reel("appearance"), reel("advanced")],
+        &[
+            reel("general"),
+            reel("appearance"),
+            reel("advanced"),
+            reel("about"),
+        ],
     ),
 ];
 
@@ -577,6 +582,7 @@ pub struct SettingsPage {
     pub actions: Vec<ActionPanel>,
     pub access: AccessView,
     pub devices: DevicesView,
+    pub about: crate::routes::about::AboutView,
 }
 
 async fn access_view(st: &AppState, me: &User) -> AppResult<AccessView> {
@@ -784,6 +790,59 @@ pub async fn page(
     render(st, me, current, false).await
 }
 
+/// About, for anyone signed in: an admin sees it among the other sections, a member alone.
+pub async fn about(
+    State(st): State<AppState>,
+    Extension(me): Extension<User>,
+) -> AppResult<Response> {
+    if me.admin {
+        return render(st, me, Section::About, false).await;
+    }
+    let standalone = st.ctx.config().standalone();
+    let (sections, nav_entries) = nav_of(
+        vec![SectionView {
+            id: Section::About.id(),
+            label: Section::About.label(),
+            line: Section::About.line().into(),
+            current: true,
+            changed: 0,
+            docs: Section::About.id(),
+        }],
+        standalone,
+    );
+    Ok(html(SettingsPage {
+        who: Who::at(&st, &me).await,
+        nav: "settings",
+        q: String::new(),
+        settings_json: crate::settings::client_json(&st).await?,
+        section: Section::About.id().into(),
+        index: false,
+        sections,
+        nav_entries,
+        panels: Vec::new(),
+        actions: Vec::new(),
+        access: AccessView {
+            local: false,
+            oidc: false,
+            by_name: false,
+            users: Vec::new(),
+            attempts: Vec::new(),
+        },
+        devices: DevicesView {
+            devices: Vec::new(),
+            apps: Vec::new(),
+            server_url: String::new(),
+            pair_minutes: 0,
+        },
+        about: about_view(&st).await,
+    }))
+}
+
+async fn about_view(st: &AppState) -> crate::routes::about::AboutView {
+    let ffmpeg = st.ctx.hw.read().await.ffmpeg_version.clone();
+    crate::routes::about::view(st.ctx.config().standalone(), ffmpeg.as_deref())
+}
+
 async fn render(st: AppState, me: User, current: Section, index: bool) -> AppResult<Response> {
     let standalone = st.ctx.config().standalone();
     if standalone && !current.in_standalone() {
@@ -873,6 +932,7 @@ async fn render(st: AppState, me: User, current: Section, index: bool) -> AppRes
         actions,
         access: access_view(&st, &me).await?,
         devices: devices_view(&st).await?,
+        about: about_view(&st).await,
     }))
 }
 

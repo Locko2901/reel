@@ -3360,6 +3360,7 @@ async fn the_standalone_library_offers_nothing_of_a_servers() {
             "section general",
             "section appearance",
             "section advanced",
+            "section about",
         ],
         "the nav by what a person does: Essentials, this PC's pages, then reel's with the app's that belong among them"
     );
@@ -5292,6 +5293,106 @@ async fn the_header_dot_says_how_reel_is_and_opens_status() {
     );
 }
 
+/// The About section's panels of a Settings page, each cut at the next panel or the page's end.
+fn about_panels(html: &str) -> Vec<&str> {
+    html.split(r#"<div class="panel"#)
+        .filter(|chunk| chunk.starts_with(r#" about-panel""#))
+        .map(|chunk| {
+            let end = chunk
+                .find(r#"<p class="faint small no-match""#)
+                .unwrap_or(chunk.len());
+            &chunk[..end]
+        })
+        .collect()
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn settings_about_names_this_version_and_links_out_by_https_alone() {
+    let Some(env) = start(AuthMode::Single, vec![]).await else {
+        return;
+    };
+    let (status, page) = ask(&env, "GET", "/settings/about", None).await;
+    assert_eq!(status, 200);
+    assert!(
+        page.contains(
+            r#"<a href="/settings/about" data-section="about" aria-current="page">About"#
+        ),
+        "About is a section of Settings, the one open"
+    );
+    assert!(
+        page.contains(
+            r#"<p class="section-line" data-section="about" data-docs="about" data-name="About">"#
+        ),
+        "About's line has its tip and no tag of where it is kept: nothing on it is kept anywhere"
+    );
+    let panels = about_panels(&page);
+    assert_eq!(panels.len(), 3, "reel, Links and Credits");
+    assert!(panels
+        .iter()
+        .all(|p| !p.contains(" hidden>") || p.contains(r#"id="about-app""#)));
+    let about = panels.concat();
+    assert!(
+        about.contains(&format!(
+            r#"<span class="about-value">{}</span>"#,
+            reel_core::VERSION
+        )),
+        "the server's version"
+    );
+    if reel_core::GIT_SHA.chars().all(|c| c.is_ascii_hexdigit()) {
+        assert!(about.contains(&format!(
+            r#"<span class="about-value">{} from <a class="mono" href="https://github.com/Locko2901/reel/commit/{sha}""#,
+            reel_core::BUILD_DATE,
+            sha = reel_core::GIT_SHA
+        )));
+    }
+    let links: Vec<&str> = about
+        .split(r#"href=""#)
+        .skip(1)
+        .map(|rest| &rest[..rest.find('"').unwrap()])
+        .collect();
+    assert!(links.len() > 10, "{links:?}");
+    for l in &links {
+        let rest = l
+            .strip_prefix("https://")
+            .unwrap_or_else(|| panic!("{l} is absolute and https"));
+        let host = rest.split(['/', '#', '?']).next().unwrap();
+        assert!(
+            host.contains('.') && !host.contains(['@', ':']),
+            "{l} names its host"
+        );
+    }
+    for want in [
+        "https://locko2901.github.io/reel/".to_string(),
+        "https://github.com/Locko2901/reel".to_string(),
+        "https://github.com/Locko2901/reel/issues".to_string(),
+        format!(
+            "https://github.com/Locko2901/reel/releases/tag/v{}",
+            reel_core::VERSION
+        ),
+        format!(
+            "https://github.com/Locko2901/reel/blob/v{}/LICENSE",
+            reel_core::VERSION
+        ),
+    ] {
+        assert!(links.contains(&want.as_str()), "{want}");
+    }
+    let pin: serde_json::Value =
+        serde_json::from_str(include_str!("../../../desktop/obs/pinned.json")).unwrap();
+    let obs = pin["version"].as_str().unwrap();
+    assert!(about.contains(&format!("<b>OBS Studio {obs}</b>")));
+    assert!(
+        links.contains(&format!("https://github.com/obsproject/obs-studio/tree/{obs}").as_str())
+    );
+    assert!(
+        about.contains(r#"class="srow about-row app-part" id="about-app" hidden"#),
+        "the app's own row waits for the app"
+    );
+    assert!(
+        page.contains(r#"id="settings-filter""#),
+        "an admin's Settings keeps its filter"
+    );
+}
+
 #[tokio::test(flavor = "multi_thread")]
 async fn status_page_shows_the_build_the_doctor_and_an_update() {
     let Some(env) = start(AuthMode::Single, vec![]).await else {
@@ -6392,6 +6493,41 @@ async fn built_in_accounts_sign_in_and_members_edit_their_own_clips() {
         get("/settings/general", &mira).await.unwrap().status(),
         403,
         "settings are the admins'"
+    );
+    let about = get("/settings/about", &mira).await.unwrap();
+    assert_eq!(about.status(), 200, "About is anyone's who is signed in");
+    let about = about.text().await.unwrap();
+    assert!(
+        about.contains(&format!(
+            r#"<span class="about-value">{}</span>"#,
+            reel_core::VERSION
+        )),
+        "a member's About names the server's version"
+    );
+    assert_eq!(
+        settings_nav(&about)
+            .into_iter()
+            .filter(|e| !e.starts_with("app ") && e != "head This PC")
+            .collect::<Vec<_>>(),
+        ["head System", "section about"],
+        "a member's nav holds About alone, beside the app's own pages in its window"
+    );
+    for admins in [
+        r#"id="settings-filter""#,
+        r#"data-section="general""#,
+        r#"id="users""#,
+        r#"id="pair-dialog""#,
+        r#"id="history""#,
+        "a change saves as you make it",
+    ] {
+        assert!(
+            !about.contains(admins),
+            "a member's About holds nothing of the admins': {admins}"
+        );
+    }
+    assert!(
+        about.contains(r#"<a href="/settings/about" role="menuitem">About</a>"#),
+        "a member's menu leads to About"
     );
     let lib = get("/", &mira).await.unwrap().text().await.unwrap();
     assert!(
@@ -11227,7 +11363,8 @@ async fn the_device_api_hands_over_the_shape_of_the_settings_pages() {
             "access",
             "devices",
             "appearance",
-            "advanced"
+            "advanced",
+            "about"
         ],
         "reel's sections in reel's order"
     );
@@ -11344,6 +11481,7 @@ async fn the_apps_parts_in_the_header_stay_hidden_in_a_browser() {
             "section general",
             "section appearance",
             "section advanced",
+            "section about",
         ],
         "a server's nav in the same groups, what only a server has under Server"
     );

@@ -175,7 +175,7 @@ fn render() -> String {
         "`config.toml` lives where `REEL_CONFIG` says, `/data/config.toml` in the image:\n\n",
     );
     p.push_str("```toml\npublic_url = \"https://clips.example.com\"\n\n[ingest]\npoll_seconds = 5\nextensions = [\"mkv\", \"mp4\"]\n```\n\n");
-    for section in Section::ALL {
+    for section in Section::ALL.into_iter().filter(Section::has_settings) {
         let defs: Vec<&Def> = DEFS.iter().filter(|d| d.section == section).collect();
         let _ = writeln!(p, "## {}\n\n{}\n", section.label(), section.line());
         for d in defs {

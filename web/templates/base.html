@@ -44,7 +44,7 @@
       <a href="/jobs" role="menuitem">Jobs</a>
     </div>
     <a href="/upload" role="menuitem">Upload a file <kbd>u</kbd></a>
-    {% if who.admin %}<a href="/settings" role="menuitem">Settings <kbd>,</kbd></a>{% endif %}
+    {% if who.admin %}<a href="/settings" role="menuitem">Settings <kbd>,</kbd></a>{% else %}<a href="/settings/about" role="menuitem">About</a>{% endif %}
     <a href="/status" role="menuitem">Status <kbd>g t</kbd></a>
     {% if who.local %}<form method="post" action="/signout"><button class="item danger" type="submit">Sign out</button></form>{% endif %}
   </div>
