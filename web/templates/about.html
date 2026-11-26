@@ -1,0 +1,21 @@
+    <div class="panel about-panel" data-section="about"{% if section != "about" %} hidden{% endif %}>
+      <header><h2 class="about-name"><svg class="mark" viewBox="8.6 3 16.2 26" aria-hidden="true"><path d="M8.6 3L16 10.4V29H8.6Z"/><path class="arm" d="M8.6 3H24.8V10.4H16Z"/></svg>reel</h2></header>
+      <div class="body flush">
+        {% for r in about.reel %}{% include "about-row.html" %}
+        {% endfor %}<div class="srow about-row app-part" id="about-app" hidden><div class="slabel"><b>This app</b><span class="shelp" id="about-app-kind">the app on this PC</span><span class="snote" id="about-app-line" aria-live="polite"></span></div><div class="sctl"><span class="about-value" id="about-app-version"></span><button class="small" type="button" id="about-updates">Updates</button></div></div>
+      </div>
+    </div>
+    <div class="panel about-panel" data-section="about"{% if section != "about" %} hidden{% endif %}>
+      <header><h2>Links</h2></header>
+      <div class="body flush">
+        {% for r in about.links %}{% include "about-row.html" %}
+        {% endfor %}
+      </div>
+    </div>
+    <div class="panel about-panel" data-section="about"{% if section != "about" %} hidden{% endif %}>
+      <header><h2>Credits</h2><span class="desc">the work of others reel ships with, each under its own licence</span><div class="actions"><a class="btn small" href="{{ about.third_party }}" rel="noopener" aria-label="Every one, with where its source is">Every one</a></div></header>
+      <div class="body flush">
+        {% for r in about.credits %}{% include "about-row.html" %}
+        {% endfor %}
+      </div>
+    </div>

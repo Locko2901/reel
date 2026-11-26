@@ -454,6 +454,13 @@ body.over::after { content: "Drop to upload"; position: fixed; inset: 12px; z-in
 .section-line { color: var(--text-2); margin-bottom: var(--gap-panels); max-width: 90ch; }
 .settings .panel { margin-bottom: var(--gap-panels); }
 .page-head .tools #settings-filter { width: 220px; }
+/* About: reel's name as the top bar sets it, and values where a setting's control would be; the
+   app's own row only once the app has filled it */
+.about-name { display: inline-flex; align-items: baseline; font-weight: 600; letter-spacing: -0.02em; font-size: var(--fs-l); }
+.about-name .mark { flex: none; width: 0.47em; height: 0.75em; margin-right: 0.37em; position: relative; top: 0.074em; fill: var(--text); }
+.about-name .mark .arm { fill: var(--accent); }
+.srow .sctl .about-value { font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+#about-app:not([data-filled]) { display: none; }
 /* a wide browser window: the nav at its left edge, a page's groups in columns of at least 600 px;
    the app docks Settings beside the page instead */
 @media (min-width: 1600px) {
@@ -473,6 +480,7 @@ body.over::after { content: "Drop to upload"; position: fixed; inset: 12px; z-in
 .srow .snote { display: block; margin-top: 3px; color: var(--text-3); font-size: var(--fs-s); font-variant-numeric: tabular-nums; }
 .srow .snote.st-warn { color: var(--warn); }
 .srow .snote.st-err { color: var(--err); }
+.srow .snote.st-active { color: var(--accent); }
 .srow .notes { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 5px; }
 .srow .sctl { display: flex; align-items: center; justify-content: flex-end; gap: var(--s2); min-width: 0; flex-wrap: wrap; }
 .srow .sctl .unit { color: var(--text-2); font-size: var(--fs-s); }

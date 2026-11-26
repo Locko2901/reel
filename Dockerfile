@@ -8,8 +8,11 @@ ENV REEL_GIT_SHA=$REEL_GIT_SHA REEL_BUILD_DATE=$REEL_BUILD_DATE
 COPY Cargo.toml Cargo.lock CHANGELOG.md ./
 COPY crates ./crates
 COPY web ./web
-# Status names the installer's OBS and the app's Windows downloads.
+# Status names the installer's OBS and the app's Windows downloads; Settings, About credits OBS,
+# the app's FFmpeg and the crates.
+COPY THIRD_PARTY.md ./
 COPY desktop/obs/pinned.json ./desktop/obs/pinned.json
+COPY desktop/ffmpeg/pinned.json desktop/ffmpeg/pinned-linux.json ./desktop/ffmpeg/
 COPY desktop/packages.json ./desktop/packages.json
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,target=/app/target \

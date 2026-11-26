@@ -3,8 +3,8 @@
 {% block content %}
 <div class="page-head">
   <h1>Settings</h1>
-  <span class="sub">a change saves as you make it</span>
-  <div class="tools"><input type="search" id="settings-filter" placeholder="Filter settings" aria-label="Filter settings" autocomplete="off"></div>
+  {% if who.admin %}<span class="sub">a change saves as you make it</span>{% endif %}
+  <div class="tools">{% if who.admin %}<input type="search" id="settings-filter" placeholder="Filter settings" aria-label="Filter settings" autocomplete="off">{% endif %}</div>
 </div>
 <div class="settings" id="settings" data-section="{{ section }}"{% if index %} data-index{% endif %}>
   <nav class="sections" aria-label="Sections">
@@ -15,8 +15,10 @@
   </nav>
   <select class="sections-select" id="sections-select" aria-label="Section">{% for s in sections %}<option value="{{ s.id }}"{% if s.current %} selected{% endif %}>{{ s.label }}</option>{% endfor %}</select>
   <div id="sections-body">
-    {% for s in sections %}<p class="section-line" data-section="{{ s.id }}" data-docs="{{ s.docs }}" data-name="{{ s.label }}"{% if !who.standalone %} data-scope="every PC and browser"{% endif %}{% if !s.current %} hidden{% endif %}>{{ s.line }}</p>
+    {% for s in sections %}<p class="section-line" data-section="{{ s.id }}" data-docs="{{ s.docs }}" data-name="{{ s.label }}"{% if !who.standalone && s.id != "about" %} data-scope="every PC and browser"{% endif %}{% if !s.current %} hidden{% endif %}>{{ s.line }}</p>
     {% endfor %}
+    {% include "about.html" %}
+    {% if who.admin %}
     {% for p in panels %}
     <div class="panel" data-section="{{ p.section }}"{% if p.section != section %} hidden{% endif %}>
       <header><h2>{{ p.name }}</h2></header>
@@ -127,10 +129,11 @@
       </div>
     </div>
     {% endif %}
+    {% endif %}
     <p class="faint small no-match" id="no-match" hidden>No setting matches.</p>
   </div>
 </div>
-{% if !who.standalone %}
+{% if who.admin && !who.standalone %}
 <dialog id="pair-dialog">
   <header>Pair a device</header>
   <div class="body stack">

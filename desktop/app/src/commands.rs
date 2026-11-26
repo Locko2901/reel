@@ -899,7 +899,7 @@ pub async fn program_rename(
 }
 
 /// The pages of reel's settings docs a tip may open, one per page of Settings.
-const DOCS_PAGES: [&str; 22] = [
+const DOCS_PAGES: [&str; 23] = [
     "essentials",
     "clips",
     "session",
@@ -922,6 +922,7 @@ const DOCS_PAGES: [&str; 22] = [
     "general",
     "appearance",
     "advanced",
+    "about",
 ];
 const DOCS: &str = "https://locko2901.github.io/reel/settings/";
 
@@ -949,6 +950,50 @@ pub fn docs_url(path: &str) -> Option<String> {
 pub fn app_open_docs(app: AppHandle, path: String) -> R<()> {
     let url = docs_url(&path).ok_or_else(|| "not a page of reel's settings docs".to_string())?;
     tracing::info!(%url, "docs opened");
+    app.opener()
+        .open_url(url, None::<&str>)
+        .map_err(|e| e.to_string())
+}
+
+/// Where Settings, About links to: reel's repository and docs, and the source or the terms of
+/// what reel ships with. A server's page opens nothing else in the browser.
+const ABOUT_PLACES: [&str; 7] = [
+    "https://github.com/Locko2901/reel",
+    "https://locko2901.github.io/reel/",
+    "https://github.com/obsproject/obs-studio/",
+    "https://github.com/FFmpeg/FFmpeg/",
+    "https://github.com/jellyfin/jellyfin-ffmpeg",
+    "https://snapshot.debian.org/",
+    "https://developer.microsoft.com/microsoft-edge/webview2/",
+];
+
+/// A link of Settings, About, as the browser should get it: https, no name, password or port,
+/// and under one of the places, a whole path segment of it.
+pub fn about_url(link: &str) -> Option<String> {
+    let url = tauri::Url::parse(link).ok()?;
+    if url.scheme() != "https"
+        || !url.username().is_empty()
+        || url.password().is_some()
+        || url.port().is_some()
+    {
+        return None;
+    }
+    let url = url.to_string();
+    ABOUT_PLACES
+        .iter()
+        .any(|place| {
+            url.strip_prefix(place).is_some_and(|rest| {
+                place.ends_with('/') || rest.is_empty() || rest.starts_with(['/', '#', '?'])
+            })
+        })
+        .then_some(url)
+}
+
+/// A link of Settings, About, in the default browser, so the window stays on reel.
+#[tauri::command]
+pub fn app_open_link(app: AppHandle, url: String) -> R<()> {
+    let url = about_url(&url).ok_or_else(|| "not one of the places About links to".to_string())?;
+    tracing::info!(%url, "a link of About opened");
     app.opener()
         .open_url(url, None::<&str>)
         .map_err(|e| e.to_string())
@@ -1016,6 +1061,64 @@ mod tests {
             assert_eq!(docs_url(refused), None, "{refused:?}");
         }
         assert_eq!(docs_url(&format!("storage/#{}", "a".repeat(65))), None);
+    }
+
+    #[test]
+    fn about_opens_its_own_places_alone() {
+        for fine in [
+            "https://locko2901.github.io/reel/",
+            "https://github.com/Locko2901/reel",
+            "https://github.com/Locko2901/reel/issues",
+            "https://github.com/Locko2901/reel/releases/tag/v1.20.0",
+            "https://github.com/Locko2901/reel/blob/v1.20.0/THIRD_PARTY.md#rust-crates",
+            "https://github.com/obsproject/obs-studio/tree/33.0.3",
+            "https://github.com/FFmpeg/FFmpeg/tree/n9.0.2",
+            "https://github.com/jellyfin/jellyfin-ffmpeg",
+            "https://snapshot.debian.org/",
+            "https://developer.microsoft.com/microsoft-edge/webview2/",
+        ] {
+            assert_eq!(about_url(fine).as_deref(), Some(fine), "{fine}");
+        }
+        for refused in [
+            "",
+            "http://github.com/Locko2901/reel",
+            "https://github.com/Locko2901/reeler",
+            "https://github.com/Locko2901/reel.evil.example/",
+            "https://github.com/other/reel",
+            "https://github.com:8443/Locko2901/reel",
+            "https://someone@github.com/Locko2901/reel",
+            "https://github.com.evil.example/Locko2901/reel",
+            "https://evil.example/https://github.com/Locko2901/reel",
+            "file:///etc/passwd",
+            "javascript:alert(1)",
+            "reel-desktop://install/1",
+            "/settings/about",
+        ] {
+            assert_eq!(about_url(refused), None, "{refused:?}");
+        }
+    }
+
+    #[test]
+    fn about_links_only_where_the_app_opens() {
+        use reel_server::routes::about::view;
+        for standalone in [false, true] {
+            for ffmpeg in [None, Some("ffmpeg version 7.1.2-Jellyfin Copyright")] {
+                let v = view(standalone, ffmpeg);
+                let urls: Vec<String> = v
+                    .reel
+                    .iter()
+                    .chain(&v.links)
+                    .chain(&v.credits)
+                    .flat_map(|r| r.links.iter().chain(r.value_link.as_ref()))
+                    .map(|l| l.url.clone())
+                    .chain([v.third_party.clone()])
+                    .collect();
+                assert!(urls.len() > 8);
+                for u in urls {
+                    assert_eq!(about_url(&u).as_deref(), Some(u.as_str()), "{u}");
+                }
+            }
+        }
     }
 
     #[test]

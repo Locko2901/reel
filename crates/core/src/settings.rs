@@ -16,10 +16,12 @@ pub enum Section {
     Devices,
     Appearance,
     Advanced,
+    /// What this reel is and what it ships with: no setting, readable by anyone signed in.
+    About,
 }
 
 impl Section {
-    pub const ALL: [Section; 10] = [
+    pub const ALL: [Section; 11] = [
         Section::General,
         Section::Storage,
         Section::Ingest,
@@ -30,6 +32,7 @@ impl Section {
         Section::Devices,
         Section::Appearance,
         Section::Advanced,
+        Section::About,
     ];
 
     pub fn id(&self) -> &'static str {
@@ -44,6 +47,7 @@ impl Section {
             Section::Devices => "devices",
             Section::Appearance => "appearance",
             Section::Advanced => "advanced",
+            Section::About => "about",
         }
     }
 
@@ -63,7 +67,13 @@ impl Section {
             Section::Devices => "Devices",
             Section::Appearance => "Appearance",
             Section::Advanced => "Advanced",
+            Section::About => "About",
         }
+    }
+
+    /// Whether the section holds settings of the catalogue: About holds none.
+    pub fn has_settings(&self) -> bool {
+        !matches!(self, Section::About)
     }
 
     /// Whether the app's standalone library has this section: notifications, access and devices
@@ -96,6 +106,7 @@ impl Section {
             Section::Imports => "A folder of clips on this PC to take into the library, and how big an upload may be.".into(),
             Section::Appearance => "The look of the pages, and what this window remembers.".into(),
             Section::Advanced => "The history of every change, and a copy of the database.".into(),
+            Section::About => "What reel on this PC is, where its code and docs are, and the work of others it ships with.".into(),
             _ => self.line().into(),
         }
     }
@@ -112,6 +123,7 @@ impl Section {
             Section::Devices => "The paired apps: a code to pair one, their tokens, what they upload, and the chunks they send.",
             Section::Appearance => "The look of the pages, and what this browser remembers.",
             Section::Advanced => "Logs, the update check, the history of every change, exports and the restart.",
+            Section::About => "What this reel is, where its code and docs are, and the work of others it ships with.",
         }
     }
 }
@@ -1317,7 +1329,7 @@ dev_user = 1979-05-27
         }
         assert!(Section::ALL
             .iter()
-            .filter(|s| s.in_standalone())
+            .filter(|s| s.in_standalone() && s.has_settings())
             .all(|s| DEFS.iter().any(|d| d.section == *s && in_standalone(d.key))));
     }
 
@@ -1361,9 +1373,10 @@ dev_user = 1979-05-27
             assert!(d.env.starts_with("REEL_"), "{}", d.env);
         }
         for s in Section::ALL {
-            assert!(
+            assert_eq!(
                 DEFS.iter().any(|d| d.section == s),
-                "{} is empty",
+                s.has_settings(),
+                "{}",
                 s.label()
             );
         }

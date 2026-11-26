@@ -74,8 +74,8 @@ pub async fn pair(State(st): State<AppState>, Json(body): Json<PairBody>) -> App
         .into_response())
 }
 
-/// The shape of the Settings pages for the app's own section: no setting value, and no section
-/// at all for a device whose user is not an admin.
+/// The shape of the Settings pages for the app's own section: no setting value, and for a device
+/// whose user is not an admin About alone, the one section anyone signed in may read.
 pub async fn sections(
     State(st): State<AppState>,
     Extension(me): Extension<DeviceAuth>,
@@ -87,20 +87,17 @@ pub async fn sections(
     };
     let who = crate::views::Who::at(&st, &user).await;
     let eff = st.ctx.effective();
-    let sections: Vec<Value> = if who.admin {
-        Section::ALL
-            .iter()
-            .map(|s| {
-                let changed = catalog::DEFS
-                    .iter()
-                    .filter(|d| d.section == *s && eff.source(d.key) == Source::Table)
-                    .count();
-                json!({ "id": s.id(), "label": s.label(), "line": s.line(), "changed": changed })
-            })
-            .collect()
-    } else {
-        Vec::new()
-    };
+    let sections: Vec<Value> = Section::ALL
+        .iter()
+        .filter(|s| who.admin || **s == Section::About)
+        .map(|s| {
+            let changed = catalog::DEFS
+                .iter()
+                .filter(|d| d.section == *s && eff.source(d.key) == Source::Table)
+                .count();
+            json!({ "id": s.id(), "label": s.label(), "line": s.line(), "changed": changed })
+        })
+        .collect();
     let (queued, running, failed) = st.ctx.store.job_counts_full().await?;
     Ok(Json(json!({
         "sections": sections,

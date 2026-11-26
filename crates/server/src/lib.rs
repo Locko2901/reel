@@ -305,6 +305,7 @@ pub fn router(state: AppState, bound: SocketAddr) -> Router {
         )
         .route("/jobs", get(routes::jobs::page))
         .route("/status", get(routes::status::page))
+        .route("/settings/about", get(routes::settings::about))
         .route("/api/status/doctor", post(routes::status::doctor))
         .route("/api/jobs", get(routes::jobs::list))
         .route("/api/jobs/counts", get(routes::jobs::counts))
