@@ -47,9 +47,10 @@
       "binaries/ffmpeg",
       "binaries/ffprobe"
     ],
-    "resources": [
-      "binaries/ffmpeg-LICENSE.txt"
-    ],
+    "resources": {
+      "binaries/ffmpeg-LICENSE.txt": "binaries/ffmpeg-LICENSE.txt",
+      "binaries/licences.html": "licences.html"
+    },
     "linux": {
       "appimage": {
         "bundleMediaFramework": true

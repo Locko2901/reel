@@ -10,6 +10,7 @@ pub mod events;
 pub mod health;
 pub mod imports;
 pub mod jobs;
+pub mod licences;
 pub mod media;
 pub mod montage;
 pub mod pages;

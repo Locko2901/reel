@@ -27,11 +27,16 @@ check-image: ## Build the check container (Rust, clippy, rustfmt, ffmpeg)
 check-text: ## Plain text only: no dashes, special spaces, typographic quotes or pictographs
 	sh ci/check-text.sh
 
-check-host: ## The same checks with a local toolchain (needs ffmpeg for the end-to-end tests)
+# The licence page the builds and the tests of check-host carry (ci/licence-page.sh).
+LICENCE_PAGE ?= $(or $(CARGO_TARGET_DIR),$(CURDIR)/target)/licences.html
+
+check-host: export REEL_LICENCES = $(LICENCE_PAGE)
+check-host: ## The same checks with a local toolchain (needs ffmpeg for the end-to-end tests, curl and python3 for the licence page)
 	sh ci/check-text.sh
 	sh ci/check-demo-port.sh
 	sh ci/check-obs-version.sh
 	sh desktop/ci/check-commands.sh
+	sh ci/licence-page.sh "$(LICENCE_PAGE)"
 	cargo fmt --all -- --check
 	cargo clippy --all-targets -- -D warnings
 	cargo clippy --all-targets --features reel/style-page -- -D warnings
@@ -45,8 +50,13 @@ licences: check-image ## Every crate's licence is one deny.toml allows (cargo de
 	  -w /work \
 	  $(CHECK_IMAGE) sh ci/licences.sh
 
-third-party: ## Write the crate list of THIRD_PARTY.md again (needs cargo and cargo-deny on the host)
-	python3 ci/third-party-crates.py
+third-party: check-image ## Write THIRD_PARTY.md's crate list and target/licences.html again (cargo-about, in the check container)
+	docker run --rm \
+	  -v reel-cargo-registry:/usr/local/cargo/registry \
+	  -v reel-cargo-git:/usr/local/cargo/git \
+	  -v "$(CURDIR)":/work \
+	  -w /work \
+	  $(CHECK_IMAGE) sh -c 'sh ci/licence-page.sh --third-party target/licences.html && chown $(shell id -u):$(shell id -g) THIRD_PARTY.md target target/licences.html'
 
 external-proof: ## Link previews in an external storage against the demo and a MinIO of its own
 	REEL_DEMO_PASSWORD="$(REEL_E2E_PASSWORD)" REEL_FFMPEG="$(HOME)/.local/ffmpeg/ffmpeg" ci/external-proof.sh http://127.0.0.1:8746
@@ -129,11 +139,16 @@ desktop-cap: desktop-image
 	mkdir -p "$(DESKTOP_OUT)"
 	ci/cap-volume.sh reel-desktop-target $(DESKTOP_TARGET_CAP_MB) $(DESKTOP_IMAGE)
 
+# Tauri builds nothing while a resource is missing; the installers' builds make the page again.
+DESKTOP_LICENCES = test -f desktop/app/binaries/licences.html || $(DESKTOP_RUN) -w /work $(DESKTOP_IMAGE) sh ci/licence-page.sh desktop/app/binaries/licences.html
+
 desktop-sidecars-linux: desktop-cap
 	$(DESKTOP_RUN) -w /work -e FFMPEG_CACHE=/cargo-home/ffmpeg-cache $(DESKTOP_IMAGE) desktop/ci/fetch-ffmpeg.sh linux
+	$(DESKTOP_LICENCES)
 
 desktop-sidecars-windows: desktop-cap
 	$(DESKTOP_RUN) -w /work -e FFMPEG_CACHE=/cargo-home/ffmpeg-cache $(DESKTOP_IMAGE) desktop/ci/fetch-ffmpeg.sh windows
+	$(DESKTOP_LICENCES)
 
 desktop-check-windows: desktop-sidecars-windows ## Clippy of the desktop workspace for Windows, cross compiled
 	$(DESKTOP_RUN) -w /work/desktop $(DESKTOP_IMAGE) sh -c 'cargo xwin clippy --target x86_64-pc-windows-msvc --all-targets -- -D warnings'

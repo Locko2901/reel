@@ -1,6 +1,7 @@
 //! Settings, About: what this reel is, where its code and docs are, its licence, and the work of
-//! others it ships with. Every link on it is absolute and https: the page is the same in a browser,
-//! in the app's window and in reel on this PC.
+//! others it ships with. Every link on it is absolute and https but the licence page, this
+//! server's own: the page is the same in a browser, in the app's window and in reel on this PC.
+use super::licences;
 use serde_json::Value;
 
 /// reel's repository and its docs site.
@@ -29,8 +30,8 @@ pub struct AboutView {
     pub reel: Vec<AboutRow>,
     pub links: Vec<AboutRow>,
     pub credits: Vec<AboutRow>,
-    /// THIRD_PARTY.md of this version: every one, with where its source is.
-    pub third_party: String,
+    /// The licence page: every crate's licence text, on this server.
+    pub licences: &'static str,
 }
 
 fn link(label: impl Into<String>, aria: impl Into<String>, url: impl Into<String>) -> AboutLink {
@@ -87,22 +88,12 @@ pub fn ffmpeg_words(line: &str) -> String {
         .to_string()
 }
 
-/// The crate count THIRD_PARTY.md's generated list starts with (`make third-party`).
-fn crate_count(third_party: &str) -> Option<usize> {
-    let at = third_party.find("<!-- crates:begin -->")?;
-    third_party[at..]
-        .lines()
-        .find_map(|l| l.strip_suffix(" crates, by the licence each declares:"))
-        .and_then(|n| n.trim().parse().ok())
-}
-
 /// The page's content. `ffmpeg`: the first line of `ffmpeg -version` here, as Status shows it.
 pub fn view(standalone: bool, ffmpeg: Option<&str>) -> AboutView {
     let version = reel_core::VERSION;
     let obs = pin(include_str!("../../../../desktop/obs/pinned.json"));
     let ff_win = pin(include_str!("../../../../desktop/ffmpeg/pinned.json"));
     let ff_linux = pin(include_str!("../../../../desktop/ffmpeg/pinned-linux.json"));
-    let third_party = include_str!("../../../../THIRD_PARTY.md");
     let here = ffmpeg.map(ffmpeg_words).filter(|v| !v.is_empty());
 
     let mut version_row = row(
@@ -287,15 +278,15 @@ pub fn view(standalone: bool, ffmpeg: Option<&str>) -> AboutView {
             "the pages' type, copyright 2024 The Geist Project Authors; SIL Open Font License 1.1",
         )
     });
-    let crates = match crate_count(third_party) {
+    let crates = match licences::crate_count() {
         Some(n) => format!("{n} crates the server and the app are built from: MIT or Apache 2.0 for most, a few MPL 2.0, all unmodified"),
         None => "the crates the server and the app are built from, each under its own licence".into(),
     };
     credits.push(AboutRow {
         links: vec![link(
             "The list",
-            "The list of every crate with its licence",
-            format!("{}#rust-crates", at_tag("THIRD_PARTY.md")),
+            "The list of every crate, with its licence text",
+            licences::PATH,
         )],
         ..row("Rust crates", crates)
     });
@@ -305,7 +296,7 @@ pub fn view(standalone: bool, ffmpeg: Option<&str>) -> AboutView {
         reel: vec![version_row, built, licence],
         links,
         credits,
-        third_party: at_tag("THIRD_PARTY.md"),
+        licences: licences::PATH,
     }
 }
 
@@ -320,12 +311,12 @@ mod tests {
             .chain(&v.credits)
             .flat_map(|r| r.links.iter().chain(r.value_link.as_ref()))
             .map(|l| l.url.clone())
-            .chain([v.third_party.clone()])
+            .chain([v.licences.to_string()])
             .collect()
     }
 
     #[test]
-    fn every_link_is_absolute_and_https() {
+    fn every_link_is_absolute_and_https_but_the_licence_page() {
         for standalone in [false, true] {
             for ffmpeg in [
                 None,
@@ -335,7 +326,12 @@ mod tests {
                 let v = view(standalone, ffmpeg);
                 let urls = every_url(&v);
                 assert!(urls.len() > 8);
-                for u in urls {
+                assert_eq!(
+                    urls.iter().filter(|u| *u == licences::PATH).count(),
+                    2,
+                    "Every one and The list"
+                );
+                for u in urls.into_iter().filter(|u| u != licences::PATH) {
                     let rest = u.strip_prefix("https://").unwrap_or_else(|| panic!("{u}"));
                     assert!(
                         rest.split('/').next().is_some_and(|h| h.contains('.')),
@@ -391,13 +387,18 @@ mod tests {
     }
 
     #[test]
-    fn the_crate_count_is_third_partys() {
-        let n = crate_count(include_str!("../../../../THIRD_PARTY.md")).expect("a count");
-        assert!(n > 100);
-        assert!(view(true, None)
+    fn the_crate_count_is_the_licence_pages() {
+        let v = view(true, None);
+        let crates = v
             .credits
             .iter()
-            .any(|r| r.help.starts_with(&format!("{n} crates"))));
+            .find(|r| r.title == "Rust crates")
+            .expect("the crates are credited");
+        match licences::crate_count() {
+            Some(n) => assert!(crates.help.starts_with(&format!("{n} crates"))),
+            None => assert!(crates.help.starts_with("the crates")),
+        }
+        assert_eq!(crates.links[0].url, licences::PATH);
         assert_eq!(
             ffmpeg_words("ffmpeg version n9.0.2-17-g2a571b6068 Copyright (c) 2000-2026"),
             "n9.0.2-17-g2a571b6068"

@@ -53,6 +53,7 @@ const ELSEWHERE: &[(&str, &str)] = &[(
 const NOT_FOR_USERS: &[&str] = &[
     "REEL_GIT_SHA",
     "REEL_BUILD_DATE",
+    "REEL_LICENCES",
     "REEL_RUSTC",
     "REEL_ASSET_MARK",
     "REEL_DESKTOP_BUILD",

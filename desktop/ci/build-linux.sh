@@ -29,6 +29,9 @@ case "$VERSION" in
   *-dev.*) export CARGO_PROFILE_RELEASE_DEBUG=line-tables-only CARGO_PROFILE_RELEASE_STRIP=none NO_STRIP=1 ;;
 esac
 
+# The licence page goes in the install folder and into reel on this PC.
+sh ../../ci/licence-page.sh binaries/licences.html
+export REEL_LICENCES="$PWD/binaries/licences.html"
 cargo tauri build --bundles appimage,deb --config "{\"version\":\"$VERSION\"}"
 B="${CARGO_TARGET_DIR:-../target}/release/bundle"
 cp "$B/appimage/reel_${VERSION}_amd64.AppImage" "$B/deb/reel_${VERSION}_amd64.deb" /out/

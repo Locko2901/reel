@@ -11,22 +11,23 @@ for f in "$IMG" "$DEB"; do [ -f "$f" ] || fail "$(basename "$f") is not there"; 
 FFV=$(sed -n 's/.*"version": *"\([^"]*\)".*/\1/p' /work/desktop/ffmpeg/pinned-linux.json | head -1)
 
 dpkg-deb -c "$DEB" > "$W/deb.txt"
-for p in usr/bin/reel-desktop usr/bin/ffmpeg usr/bin/ffprobe usr/share/applications/reel.desktop; do
+for p in usr/bin/reel-desktop usr/bin/ffmpeg usr/bin/ffprobe usr/share/applications/reel.desktop usr/lib/reel/licences.html; do
   grep -Eq " (\./)?$p\$" "$W/deb.txt" || fail "the .deb lacks /$p"
 done
 DEPS=$(dpkg-deb -f "$DEB" Depends)
 case "$DEPS" in *libwebkit2gtk-4.1*) ;; *) fail "the .deb does not depend on WebKitGTK: $DEPS" ;; esac
 case "$DEPS" in *gstreamer1.0-plugins-good*gstreamer1.0-libav*|*gstreamer1.0-libav*gstreamer1.0-plugins-good*) ;; *) fail "the .deb does not depend on GStreamer's plugins for the clips' video: $DEPS" ;; esac
-ok "the .deb: reel-desktop, ffmpeg, ffprobe, the menu entry; depends on $DEPS"
+ok "the .deb: reel-desktop, ffmpeg, ffprobe, the menu entry, the licence page; depends on $DEPS"
 
 (cd "$W" && "$IMG" --appimage-extract >/dev/null)
 R="$W/squashfs-root"
 for p in AppRun usr/bin/reel-desktop usr/bin/ffmpeg usr/bin/ffprobe reel.desktop; do
   [ -e "$R/$p" ] || fail "the AppImage lacks $p"
 done
+grep -q '<meta name="reel-crates" content="[0-9]' "$R/usr/lib/reel/licences.html" || fail "the AppImage lacks the licence page usr/lib/reel/licences.html"
 "$R/usr/bin/ffmpeg" -hide_banner -version | head -1 | grep -q "$FFV" || fail "the AppImage's ffmpeg is not $FFV"
 ! ldd "$R/usr/bin/ffmpeg" 2>/dev/null | grep -q libav || fail "the AppImage's ffmpeg wants libav* of the system"
-ok "the AppImage: AppRun, reel-desktop, the menu entry, ffmpeg $FFV built in (no libav* of the system)"
+ok "the AppImage: AppRun, reel-desktop, the menu entry, the licence page, ffmpeg $FFV built in (no libav* of the system)"
 G="$R/usr/lib/gstreamer-1.0"
 for p in libgstcoreelements.so libgstplayback.so libgstautodetect.so libgstpulseaudio.so libgstalsa.so libgstisomp4.so libgstlibav.so; do
   [ -f "$G/$p" ] || fail "the AppImage lacks GStreamer's $p"

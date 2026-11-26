@@ -35,9 +35,14 @@ both=("$WITH")
 [ -n "$PLAIN" ] && both+=("$PLAIN") && check "$(echo "$plain" | grep -c '^obs/' || true)" "$PLAIN_NAME has no OBS in it"
 has() { grep -qx${2:-} -- "$1" <<<"$with" && { [ -z "$PLAIN" ] || grep -qx${2:-} -- "$1" <<<"$plain"; }; }
 words=$([ -n "$PLAIN" ] && echo both || echo "$WITH_OBS_NAME")
-for name in reel-desktop.exe ffmpeg.exe ffprobe.exe binaries/ffmpeg-LICENSE.txt; do
+for name in reel-desktop.exe ffmpeg.exe ffprobe.exe binaries/ffmpeg-LICENSE.txt licences.html; do
   has "$name"
   check $? "$words: $name"
+done
+for f in "${both[@]}"; do
+  page=$(7z l -slt "$f" | sed -n 's/^Path = //p' | grep -E '(^|[\\/])licences\.html$' | head -1) || true
+  7z e -so "$f" "$page" 2>/dev/null | grep -q '<meta name="reel-crates" content="[0-9]'
+  check $? "$(basename "$f"): licences.html is the licence page of this build's crates"
 done
 stop='$PLUGINSDIR/reel-stop.exe'
 has "$stop" F
