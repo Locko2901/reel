@@ -8,7 +8,7 @@ W=$(mktemp -d)
 fail() { printf 'FAIL %s\n' "$*"; cat "$W"/*/data/logs/reel-desktop.log* 2>/dev/null | tail -25; exit 1; }
 ok() { printf 'ok   %s\n' "$*"; }
 for f in "$IMG" "$DEB"; do [ -f "$f" ] || fail "$(basename "$f") is not there"; done
-FFV=$(sed -n 's/.*"version": *"\([^"]*\)".*/\1/p' /work/desktop/ffmpeg/pinned-linux.json | head -1)
+FFV=$(sed -n 's/.*"version": *"\([^"]*\)".*/\1/p' /work/desktop/ffmpeg/pinned-linux.json | sed -n 1p)
 
 dpkg-deb -c "$DEB" > "$W/deb.txt"
 for p in usr/bin/reel-desktop usr/bin/ffmpeg usr/bin/ffprobe usr/share/applications/reel.desktop usr/lib/reel/licences.html; do
@@ -25,8 +25,12 @@ for p in AppRun usr/bin/reel-desktop usr/bin/ffmpeg usr/bin/ffprobe reel.desktop
   [ -e "$R/$p" ] || fail "the AppImage lacks $p"
 done
 grep -q '<meta name="reel-crates" content="[0-9]' "$R/usr/lib/reel/licences.html" || fail "the AppImage lacks the licence page usr/lib/reel/licences.html"
-"$R/usr/bin/ffmpeg" -hide_banner -version | head -1 | grep -q "$FFV" || fail "the AppImage's ffmpeg is not $FFV"
-! ldd "$R/usr/bin/ffmpeg" 2>/dev/null | grep -q libav || fail "the AppImage's ffmpeg wants libav* of the system"
+# Read whole into a variable, not into grep -q: under pipefail the writer of a pipe whose reader
+# stops early gets SIGPIPE, which can turn the first into a false FAIL and the second into a false ok.
+ffv=$("$R/usr/bin/ffmpeg" -hide_banner -version | sed -n 1p) || true
+case "$ffv" in *"$FFV"*) ;; *) fail "the AppImage's ffmpeg is not $FFV: $ffv" ;; esac
+libs=$(ldd "$R/usr/bin/ffmpeg" 2>/dev/null) || true
+case "$libs" in *libav*) fail "the AppImage's ffmpeg wants libav* of the system" ;; esac
 ok "the AppImage: AppRun, reel-desktop, the menu entry, the licence page, ffmpeg $FFV built in (no libav* of the system)"
 G="$R/usr/lib/gstreamer-1.0"
 for p in libgstcoreelements.so libgstplayback.so libgstautodetect.so libgstpulseaudio.so libgstalsa.so libgstisomp4.so libgstlibav.so; do
