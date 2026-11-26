@@ -2510,7 +2510,7 @@ dependencies = [
 
 [[package]]
 name = "reel"
-version = "1.20.0"
+version = "1.21.0"
 dependencies = [
  "anyhow",
  "axum",
@@ -2541,7 +2541,7 @@ dependencies = [
 
 [[package]]
 name = "reel-core"
-version = "1.20.0"
+version = "1.21.0"
 dependencies = [
  "base64 0.22.1",
  "getrandom 0.3.4",
@@ -2558,7 +2558,7 @@ dependencies = [
 
 [[package]]
 name = "reel-media"
-version = "1.20.0"
+version = "1.21.0"
 dependencies = [
  "reel-core",
  "serde_json",
@@ -2570,7 +2570,7 @@ dependencies = [
 
 [[package]]
 name = "reel-pipeline"
-version = "1.20.0"
+version = "1.21.0"
 dependencies = [
  "anyhow",
  "arc-swap",
@@ -2595,7 +2595,7 @@ dependencies = [
 
 [[package]]
 name = "reel-server"
-version = "1.20.0"
+version = "1.21.0"
 dependencies = [
  "anyhow",
  "askama",
@@ -2640,7 +2640,7 @@ dependencies = [
 
 [[package]]
 name = "reel-store"
-version = "1.20.0"
+version = "1.21.0"
 dependencies = [
  "jiff",
  "reel-core",
