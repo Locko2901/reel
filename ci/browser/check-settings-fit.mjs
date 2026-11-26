@@ -1,10 +1,11 @@
 // Usage: node ci/browser/check-settings-fit.mjs <server URL> [--shots dir]
 // Settings, Advanced against a running server (the demo), signed in as session.mjs does. Its
 // Settings history, twelve rows answered here in the server's shape (two long URLs, a secret, a
-// long name, select words), never makes the page or its panel scroll sideways, and every Revert
-// is on the screen where it scrolls to: at a phone's width, the app's dock's two, the page's own
-// column and a wide window, as a browser and as the app's window with three of this PC's rows
-// (a stand-in shell around the app's own scripts). And on a wide window, side by side panels of
+// long name, select words), never makes the page or its panel scroll sideways, its rows name the
+// old and new value "was" and "now" (the table by its heads), and every Revert is on the screen
+// where it scrolls to: at a phone's width, the app's dock's two, the page's own column and a wide
+// window, as a browser and as the app's window with three of this PC's rows (a stand-in shell
+// around the app's own scripts). And on a wide window, side by side panels of
 // every Settings page start on one line with their names on one baseline. Nothing on the server
 // changes: the history comes from here, and no Revert is pressed.
 import { launch } from './browsers.mjs';
@@ -105,15 +106,31 @@ for (const [kind, width] of CASES) {
       ? [...table.tBodies[0].rows].flatMap((tr) => [...tr.cells].slice(0, 3).map((td) => td.getBoundingClientRect().width)).filter((w) => w < 120).length
       : 0;
     const secret = [...table.tBodies[0].rows].filter((tr) => tr.cells[0].textContent === 'Secret key').map((tr) => [tr.cells[1].textContent, tr.cells[2].textContent]);
+    // a value's label, by what shows: its word, and how far the value's text starts past the cell's
+    // padding (a label before it pushes it on)
+    const labels = [...table.tBodies[0].rows].map((tr) => [1, 2].map((i) => {
+      const td = tr.cells[i], range = document.createRange();
+      range.selectNodeContents(td);
+      const text = [...range.getClientRects()].find((x) => x.width > 0);
+      const shift = text ? text.left - td.getBoundingClientRect().left - parseFloat(getComputedStyle(td).paddingLeft) : 0;
+      return { word: td.dataset.l || '', shift };
+    }));
     return {
       page: [d.scrollWidth, d.clientWidth], panel: [panel.scrollWidth, panel.clientWidth], body: [body.scrollWidth, body.clientWidth],
-      inside: t.left >= p.left - 0.5 && t.right <= p.right + 0.5, form, narrow, secret, buttons: table.querySelectorAll('tbody button').length,
+      inside: t.left >= p.left - 0.5 && t.right <= p.right + 0.5, form, narrow, secret, labels, buttons: table.querySelectorAll('tbody button').length,
     };
   });
   check(m.page[0] <= m.page[1], `${what} the page does not scroll sideways (${m.page[0]} of ${m.page[1]} px)`);
   check(m.panel[0] <= m.panel[1] && m.body[0] <= m.body[1] && m.inside, `${what} the history stays inside its panel, as ${m.form === 'table' ? 'a table' : 'rows'} (${m.body[0]} of ${m.body[1]} px)`);
   check(m.narrow === 0, `${what} no Setting, Was or Now column under 120 px${m.narrow ? ` (${m.narrow} cells)` : ''}`);
   check(m.secret.length === 1 && m.secret[0].every((v) => v === SECRET), `${what} the secret's row says "${SECRET}" twice`);
+  if (m.form === 'rows') {
+    const named = m.labels.filter(([was, now]) => was.word === 'was' && now.word === 'now' && was.shift > 8 && now.shift > 8).length;
+    check(named === m.labels.length, `${what} every row's old and new value have "was" and "now" before them (${named} of ${m.labels.length} rows${kind === 'browser' ? '' : ', this PC\'s too'})`);
+  } else {
+    const shown = m.labels.flat().filter((v) => v.shift > 2).length;
+    check(shown === 0, `${what} the table's values show no labels, its heads name them${shown ? ` (${shown} labelled)` : ''}`);
+  }
   let reached = 0;
   for (let i = 0; i < m.buttons; i++) {
     const b = page.locator('#history tbody button').nth(i);
