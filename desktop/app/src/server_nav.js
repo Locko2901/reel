@@ -246,7 +246,7 @@ const settingsHistory = () => {
     const tr = document.createElement('tr');
     tr.dataset.app = h.id;
     tr.dataset.at = h.at;
-    tr.innerHTML = '<td class="clip"></td><td class="sub"></td><td class="sub"></td><td class="sub"><span class="badge">this PC</span> <span></span></td><td class="sub"></td><td class="right acts"></td>';
+    tr.innerHTML = '<td class="clip"></td><td class="sub" data-l="was"></td><td class="sub" data-l="now"></td><td class="sub"><span class="badge">this PC</span> <span></span></td><td class="sub"></td><td class="right acts"></td>';
     const c = tr.children;
     c[0].textContent = h.name;
     c[1].textContent = h.was;

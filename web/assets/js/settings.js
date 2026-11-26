@@ -131,7 +131,7 @@ async function settingsHistory() {
     for (const h of rows) {
       const tr = document.createElement('tr');
       const show = (v, words) => v === null || v === undefined ? 'the value under the table' : (v === '' ? 'empty' : (words || v));
-      tr.innerHTML = `<td class="clip"></td><td class="sub"></td><td class="sub"></td><td class="sub"></td><td class="sub"></td><td class="right acts"><button class="quiet small">Revert</button></td>`;
+      tr.innerHTML = `<td class="clip"></td><td class="sub" data-l="was"></td><td class="sub" data-l="now"></td><td class="sub"></td><td class="sub"></td><td class="right acts"><button class="quiet small">Revert</button></td>`;
       tr.children[0].textContent = h.label || h.key;
       tr.children[1].textContent = show(h.old, h.old_words);
       tr.children[2].textContent = show(h.new, h.new_words);

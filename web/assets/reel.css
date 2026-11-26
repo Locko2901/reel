@@ -466,8 +466,13 @@ body.over::after { content: "Drop to upload"; position: fixed; inset: 12px; z-in
 @media (min-width: 1600px) {
   html:not([data-app="desktop"]) :is(.settings, .page-head:has(~ .settings)) { max-width: none; margin-left: 0; margin-right: 0; }
   html:not([data-app="desktop"]) .settings { grid-template-columns: 210px minmax(0, 1fr); gap: 32px; }
-  html:not([data-app="desktop"]) :is(.settings .group:not([hidden]), #sections-body:not(:has(> .group))) { column-width: 600px; column-gap: 24px; }
-  html:not([data-app="desktop"]) :is(.settings .group > *, #sections-body:not(:has(> .group)) > *) { break-inside: avoid; }
+  html:not([data-app="desktop"]) :is(.settings .group:not([hidden]), #sections-body:not(:has(> .group))) { column-width: 600px; column-gap: 24px; orphans: 1; widows: 1; }
+  /* every column starts on one line: the first column kept its first panel's top margin, and a
+     margin at a column break goes in Chromium but stays in WebKit. So here a panel is a line of
+     its own, with no top margin and its bottom margin inside the line, and any panel may start a
+     column. */
+  html:not([data-app="desktop"]) :is(.settings .group > *, #sections-body:not(:has(> .group)) > *) { break-inside: avoid; margin-top: 0; }
+  html:not([data-app="desktop"]) :is(.settings .group > :not(.page-top), #sections-body:not(:has(> .group)) > :not(.page-top)) { display: inline-block; width: 100%; vertical-align: top; }
   html:not([data-app="desktop"]) :is(.settings .group > .page-top, #sections-body > .page-top) { column-span: all; }
 }
 .srow { display: grid; grid-template-columns: minmax(0, 1fr) var(--ctl-col); gap: 6px 18px; align-items: center; padding: 10px var(--s3); border-bottom: 1px solid var(--line); }
@@ -554,6 +559,8 @@ label.check.pick:has(input:checked) { background: var(--raised-2); border-color:
 .sname > b { min-width: 0; }
 .hname { display: flex; align-items: center; gap: 2px; min-width: 0; grid-column: 1; }
 .hname > h2 { overflow: hidden; text-overflow: ellipsis; }
+/* the icon takes no more height than the name's line, so a header with it is as tall as one without */
+.hname > button.tip-btn { margin-block: -1px; }
 button.tip-btn { display: inline-grid; place-items: center; flex: none; width: 20px; height: 20px; min-width: 0; padding: 0; margin: 0; border: 0; border-radius: 50%; background: none; color: var(--text-3); line-height: normal; cursor: help; opacity: 0.6; }
 button.tip-btn .icon { width: 14px; height: 14px; stroke-width: 1.4; }
 .srow:hover button.tip-btn, .panel > header:hover button.tip-btn, .page-top:hover button.tip-btn { opacity: 0.85; }
@@ -651,6 +658,30 @@ td.clip > a:not(.row) { display: block; overflow: hidden; text-overflow: ellipsi
 .shares-table .long { display: none; }
 .shares-table .mark { font-size: var(--fs-xs); color: var(--text-3); }
 @media (max-width: 1199px) { .shares-table td.sub, .shares-table td.link { white-space: normal; } }
+/* Settings history takes its form from the room its panel has, not the window's: the app's dock
+   and a wide window's columns are narrower than the window. A table from 750 px, the rows of
+   .cards below it, the old and new value named there as the table's heads name them. A long value
+   wraps inside its own column; this PC's chip and where a change came from (the app's rows) and
+   the time stay whole. */
+.panel > .body:has(> .history-table) { container-type: inline-size; }
+.history-table td.clip { max-width: none; }
+.history-table td:is(:nth-child(2), :nth-child(3)) { overflow-wrap: anywhere; }
+@container (min-width: 750px) {
+  .history-table td.clip { width: 21%; }
+  .history-table td:is(:nth-child(2), :nth-child(3)) { width: 22%; }
+  .history-table td:nth-child(4) > *, .history-table td:nth-child(5) { white-space: nowrap; }
+}
+@container (max-width: 749px) {
+  .history-table, .history-table tbody { display: block; }
+  .history-table thead { display: none; }
+  .history-table tr { display: flex; flex-wrap: wrap; align-items: center; gap: 4px var(--s3); padding: 10px var(--s3); border-bottom: 1px solid var(--line); }
+  .history-table tr:last-child { border-bottom: 0; }
+  .history-table td { display: block; width: auto; min-width: 0; padding: 0; border: 0; line-height: 1.45; overflow-wrap: anywhere; }
+  .history-table td.clip { flex: 1 1 100%; }
+  .history-table td.sub { font-size: var(--fs-s); color: var(--text-2); }
+  .history-table td.sub[data-l]::before { content: attr(data-l) "\a0"; color: var(--text-3); }
+  .history-table td.acts { margin-left: auto; }
+}
 
 .grid {
   display: grid;
