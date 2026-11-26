@@ -11,7 +11,8 @@ setting's entry here.
   opens on **Essentials**. On a window 1600 pixels wide or more it opens beside the page you were
   on, along the window's left edge, and that page stays usable; its **×** or Esc closes it.
 - **In a browser:** Settings in the server's top bar, for an admin. A browser shows the server's
-  pages only.
+  pages only. A member has no Settings, but reads [About](about.md) from the menu behind their
+  initial.
 
 ## The pages
 
@@ -55,6 +56,7 @@ In the app's window, a small tag beside a page's name says where it is kept: **t
 | System | [General](general.md) | the site's name and address, its clock, the editor's quick trims |
 | | [Appearance](appearance.md) | the pages' theme, and this browser's own choices |
 | | [Advanced](advanced.md) | logs, exports, the settings' history, the first run, a restart |
+| | [About](about.md) | the version and its build, the links, reel's licence, and the credits of what it ships |
 
 ## A change saves as you make it
 
