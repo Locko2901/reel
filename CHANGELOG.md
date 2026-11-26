@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.21.0](https://github.com/Locko2901/reel/compare/v1.20.0...v1.21.0) (2026-11-26)
+
+
+### Features
+
+* Settings ends with About, for anyone signed in: the version and its build, the links, reel's licence and the credits of what it ships ([45f9c89](https://github.com/Locko2901/reel/commit/45f9c89e49f31060d43658ae9f14e597b601ccb2))
+* the licence text of every crate reel is built from, at /licences on the server and beside the app, and About links to it ([a99997e](https://github.com/Locko2901/reel/commit/a99997edd1b0530bbaeeb022d60e79c02e016155))
+
+
+### Bug Fixes
+
+* Settings history fits its panel, and side by side panels start on one line ([b1bcd27](https://github.com/Locko2901/reel/commit/b1bcd2717cb4e2b5f052018b84659066c65fe79e))
+* Settings history names was and now in its stacked rows ([900da54](https://github.com/Locko2901/reel/commit/900da5483648d694672cd99577d8892d502f8160))
+* the installer checks read the licence page whole, so 7z no longer ends them with SIGPIPE ([8ce16bb](https://github.com/Locko2901/reel/commit/8ce16bbde28069ba696959170a832e5a27f23b5d))
+
 ## [1.20.0](https://github.com/Locko2901/reel/compare/v1.19.0...v1.20.0) (2026-11-24)
 
 
