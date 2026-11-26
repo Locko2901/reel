@@ -3,7 +3,7 @@ set -euo pipefail
 OUT="${1:?the folder with the installers}"
 HERE=$(cd "$(dirname "$0")/.." && pwd)
 VERSION="${2:-}"
-[ -n "$VERSION" ] || VERSION=$(sed -n 's/^ *"version": *"\([^"]*\)".*/\1/p' "$HERE/app/tauri.conf.json" | head -1)
+[ -n "$VERSION" ] || VERSION=$(sed -n 's/^ *"version": *"\([^"]*\)".*/\1/p' "$HERE/app/tauri.conf.json" | sed -n 1p)
 PACKAGES_JSON="$HERE/packages.json" . "$HERE/ci/packages.sh"
 PLAIN="$OUT/${PLAIN_FILE}_${VERSION}_x64-setup.exe"
 WITH="$OUT/${WITH_OBS_FILE}_${VERSION}_x64-setup.exe"
@@ -20,11 +20,13 @@ else
 fi
 with=$(list "$WITH")
 want=$(unzip -Z1 "$ZIP" | grep -v '/$' | sed 's|^bin/64bit/obs64\.exe$|bin/64bit/reel-capture.exe|; s|^|obs/|' | sort)
-missing=$(comm -23 <(echo "$want") <(echo "$with") | head -5)
+# Under pipefail nothing at the end of a pipe may stop reading early (grep -q, head): the command
+# still writing gets SIGPIPE and ends the check with exit 141. sed -n reads to the end.
+missing=$(comm -23 <(echo "$want") <(echo "$with") | sed -n 1,5p)
 check "$([ -z "$missing" ] && echo 0 || echo 1)" "$WITH_OBS_NAME has every one of the zip's $(echo "$want" | wc -l) files under obs/${missing:+; missing: $missing}"
 extra=$(comm -13 <(echo "$want") <(echo "$with" | grep '^obs/') | tr '\n' ' ')
 check "$([ "$extra" = "obs/portable_mode.txt " ] && echo 0 || echo 1)" "and adds portable_mode.txt to them, nothing else (${extra:-nothing})"
-path=$(7z l -slt "$WITH" | sed -n 's/^Path = //p' | grep -E 'obs.bin.64bit.reel-capture\.exe$' | head -1)
+path=$(7z l -slt "$WITH" | sed -n 's/^Path = //p' | grep -E 'obs.bin.64bit.reel-capture\.exe$' | sed -n 1p)
 a=$(7z e -so "$WITH" "$path" 2>/dev/null | sha256sum | cut -d' ' -f1)
 b=$(unzip -p "$ZIP" bin/64bit/obs64.exe | sha256sum | cut -d' ' -f1)
 check "$([ "$a" = "$b" ] && echo 0 || echo 1)" "its reel-capture.exe is the official obs64.exe, byte for byte ($a), and no obs64.exe is in it"
@@ -40,9 +42,9 @@ for name in reel-desktop.exe ffmpeg.exe ffprobe.exe binaries/ffmpeg-LICENSE.txt 
   check $? "$words: $name"
 done
 for f in "${both[@]}"; do
-  page=$(7z l -slt "$f" | sed -n 's/^Path = //p' | grep -E '(^|[\\/])licences\.html$' | head -1) || true
-  7z e -so "$f" "$page" 2>/dev/null | grep -q '<meta name="reel-crates" content="[0-9]'
-  check $? "$(basename "$f"): licences.html is the licence page of this build's crates"
+  page=$(7z l -slt "$f" | sed -n 's/^Path = //p' | grep -E '(^|[\\/])licences\.html$' | sed -n 1p) || true
+  crates=$(7z e -so "$f" "$page" 2>/dev/null | sed -n 's/.*<meta name="reel-crates" content="\([0-9][0-9]*\)".*/\1/p') || true
+  check "$([ -n "$crates" ] && echo 0 || echo 1)" "$(basename "$f"): licences.html is the licence page of this build's crates (${crates:-none named in it})"
 done
 stop='$PLUGINSDIR/reel-stop.exe'
 has "$stop" F
