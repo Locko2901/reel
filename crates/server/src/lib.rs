@@ -180,6 +180,7 @@ pub fn router(state: AppState, bound: SocketAddr) -> Router {
     let public = Router::new()
         .route("/healthz", get(routes::health::healthz))
         .route("/signin", get(routes::users::signin_page))
+        .route(routes::licences::PATH, get(routes::licences::page))
         .route("/assets/{*path}", get(routes::assets::asset))
         .route("/app/open", get(single::open))
         .merge(shared)

@@ -1,4 +1,20 @@
 # syntax=docker/dockerfile:1.7
+# The licence page of the server's crates and the app's (ci/licence-page.sh), which the server serves
+# at /licences. cargo-about reads the app's workspace by its manifests, so empty files stand in for
+# its code.
+FROM rust:1-bookworm AS licences
+WORKDIR /app
+COPY Cargo.toml Cargo.lock about.toml LICENSE ./
+COPY crates ./crates
+COPY desktop/Cargo.toml desktop/Cargo.lock ./desktop/
+COPY desktop/app/Cargo.toml ./desktop/app/
+COPY desktop/core/Cargo.toml ./desktop/core/
+COPY ci/licence-page.sh ci/licence-page.py ./ci/
+RUN mkdir -p desktop/app/src desktop/core/src \
+    && touch desktop/app/build.rs desktop/app/src/lib.rs desktop/app/src/main.rs desktop/core/src/lib.rs
+RUN --mount=type=cache,target=/usr/local/cargo/registry \
+    sh ci/licence-page.sh /licences.html
+
 FROM rust:1-bookworm AS build
 WORKDIR /app
 ARG CARGO_BUILD_JOBS=default
@@ -8,12 +24,13 @@ ENV REEL_GIT_SHA=$REEL_GIT_SHA REEL_BUILD_DATE=$REEL_BUILD_DATE
 COPY Cargo.toml Cargo.lock CHANGELOG.md ./
 COPY crates ./crates
 COPY web ./web
-# Status names the installer's OBS and the app's Windows downloads; Settings, About credits OBS,
-# the app's FFmpeg and the crates.
-COPY THIRD_PARTY.md ./
+# Status names the installer's OBS and the app's Windows downloads; Settings, About credits OBS and
+# the app's FFmpeg.
 COPY desktop/obs/pinned.json ./desktop/obs/pinned.json
 COPY desktop/ffmpeg/pinned.json desktop/ffmpeg/pinned-linux.json ./desktop/ffmpeg/
 COPY desktop/packages.json ./desktop/packages.json
+COPY --from=licences /licences.html /licences.html
+ENV REEL_LICENCES=/licences.html
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,target=/app/target \
     cargo build --release --locked -p reel \

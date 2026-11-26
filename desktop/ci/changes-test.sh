@@ -27,6 +27,8 @@ PIN=$(put desktop/obs/pinned.json '{ "version": "33.1.0" }')
 PINDOC=$(put docs/a.md "c")
 git checkout -qb names "$M"
 NAMES=$(put desktop/packages.json "{}")
+git checkout -qb page "$M"
+PAGE=$(put ci/licence-page.py "# the page")
 git checkout -q main
 OTHER=$(put desktop/app/src/x.rs "fn z() {}")
 git checkout -q pr
@@ -60,6 +62,7 @@ case_ "the hooks without OBS changed" "true true true" AFTER="$PLAIN" GREEN="$WI
 case_ "the Makefile builds the installers" "true true true" AFTER="$MAKE" GREEN="$PLAIN"
 case_ "docs/configuration.md is checked by make check: not documentation alone" "true true true" AFTER="$CONF" GREEN="$MAKE"
 case_ "the packages' names alone: both installers" "true true true" AFTER="$NAMES"
+case_ "the licence page both installers carry" "true true true" AFTER="$PAGE"
 case_ "labelled installers, with code" "true true true" ACTION=opened AFTER="$CODE" LABELS=installers
 case_ "labelled installers, documentation after a passed run" "false false false" AFTER="$DOC" GREEN="$CODE" LABELS="bug,installers"
 case_ "the label installers added to a passed head" "false true true" ACTION=labeled NEW_LABEL=installers AFTER="$DOC" GREEN="$DOC" LABELS=installers

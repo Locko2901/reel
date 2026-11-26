@@ -989,10 +989,28 @@ pub fn about_url(link: &str) -> Option<String> {
         .then_some(url)
 }
 
+/// The licence page of the server whose page asks, at the address that page has: http or
+/// https, as that server is reached.
+pub fn licences_url(page: Option<&str>, link: &str) -> Option<String> {
+    let url = tauri::Url::parse(link).ok()?;
+    let here = crate::shell::origin_of(page?)?;
+    let fine = matches!(url.scheme(), "http" | "https")
+        && crate::shell::origin_of(link)? == here
+        && url.path() == reel_server::routes::licences::PATH
+        && url.query().is_none()
+        && url.fragment().is_none()
+        && url.username().is_empty()
+        && url.password().is_none();
+    fine.then(|| url.to_string())
+}
+
 /// A link of Settings, About, in the default browser, so the window stays on reel.
 #[tauri::command]
-pub fn app_open_link(app: AppHandle, url: String) -> R<()> {
-    let url = about_url(&url).ok_or_else(|| "not one of the places About links to".to_string())?;
+pub fn app_open_link(app: AppHandle, webview: tauri::Webview, url: String) -> R<()> {
+    let page = webview.url().ok();
+    let url = about_url(&url)
+        .or_else(|| licences_url(page.as_ref().map(|u| u.as_str()), &url))
+        .ok_or_else(|| "not one of the places About links to".to_string())?;
     tracing::info!(%url, "a link of About opened");
     app.opener()
         .open_url(url, None::<&str>)
@@ -1093,14 +1111,63 @@ mod tests {
             "javascript:alert(1)",
             "reel-desktop://install/1",
             "/settings/about",
+            "/licences",
         ] {
             assert_eq!(about_url(refused), None, "{refused:?}");
         }
     }
 
     #[test]
+    fn the_licence_page_opens_from_its_own_server_alone() {
+        for (page, link) in [
+            (
+                "http://192.0.2.7:8080/settings/about",
+                "http://192.0.2.7:8080/licences",
+            ),
+            (
+                "https://clips.example.com/settings/about",
+                "https://clips.example.com/licences",
+            ),
+            (
+                "http://127.0.0.1:41234/settings/about",
+                "http://127.0.0.1:41234/licences",
+            ),
+        ] {
+            assert_eq!(licences_url(Some(page), link).as_deref(), Some(link));
+        }
+        let page = Some("https://clips.example.com/settings/about");
+        for refused in [
+            "https://other.example.com/licences",
+            "http://clips.example.com/licences",
+            "https://clips.example.com:8443/licences",
+            "https://someone@clips.example.com/licences",
+            "https://clips.example.com/licences/x",
+            "https://clips.example.com/licencesx",
+            "https://clips.example.com/licences?x=1",
+            "https://clips.example.com/licences#mit",
+            "https://clips.example.com/settings/about",
+            "/licences",
+            "javascript:alert(1)",
+        ] {
+            assert_eq!(licences_url(page, refused), None, "{refused:?}");
+        }
+        assert_eq!(
+            licences_url(None, "https://clips.example.com/licences"),
+            None
+        );
+        assert_eq!(
+            licences_url(
+                Some("tauri://localhost/index.html"),
+                "tauri://localhost/licences"
+            ),
+            None
+        );
+    }
+
+    #[test]
     fn about_links_only_where_the_app_opens() {
         use reel_server::routes::about::view;
+        let page = "http://192.0.2.7:8080/settings/about";
         for standalone in [false, true] {
             for ffmpeg in [None, Some("ffmpeg version 7.1.2-Jellyfin Copyright")] {
                 let v = view(standalone, ffmpeg);
@@ -1111,10 +1178,15 @@ mod tests {
                     .chain(&v.credits)
                     .flat_map(|r| r.links.iter().chain(r.value_link.as_ref()))
                     .map(|l| l.url.clone())
-                    .chain([v.third_party.clone()])
+                    .chain([v.licences.to_string()])
                     .collect();
                 assert!(urls.len() > 8);
                 for u in urls {
+                    if u == reel_server::routes::licences::PATH {
+                        let whole = format!("http://192.0.2.7:8080{u}");
+                        assert_eq!(licences_url(Some(page), &whole), Some(whole));
+                        continue;
+                    }
                     assert_eq!(about_url(&u).as_deref(), Some(u.as_str()), "{u}");
                 }
             }

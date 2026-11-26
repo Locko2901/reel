@@ -5351,7 +5351,18 @@ async fn settings_about_names_this_version_and_links_out_by_https_alone() {
         .map(|rest| &rest[..rest.find('"').unwrap()])
         .collect();
     assert!(links.len() > 10, "{links:?}");
-    for l in &links {
+    assert_eq!(
+        links
+            .iter()
+            .filter(|l| **l == reel_server::routes::licences::PATH)
+            .count(),
+        2,
+        "Every one and The list open this server's licence page"
+    );
+    for l in links
+        .iter()
+        .filter(|l| **l != reel_server::routes::licences::PATH)
+    {
         let rest = l
             .strip_prefix("https://")
             .unwrap_or_else(|| panic!("{l} is absolute and https"));
@@ -5391,6 +5402,68 @@ async fn settings_about_names_this_version_and_links_out_by_https_alone() {
         page.contains(r#"id="settings-filter""#),
         "an admin's Settings keeps its filter"
     );
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn the_licence_page_answers_without_a_session_and_names_every_crate_of_both_lock_files() {
+    use reel_server::routes::licences::{built_in, PATH};
+    let Some(env) = start(AuthMode::Local, vec![]).await else {
+        return;
+    };
+    let stranger = reqwest::Client::builder()
+        .redirect(reqwest::redirect::Policy::none())
+        .build()
+        .unwrap();
+    let library = stranger.get(format!("{}/", env.base)).send().await.unwrap();
+    assert_ne!(library.status(), 200, "the library asks for a sign-in");
+    let r = stranger
+        .get(format!("{}{PATH}", env.base))
+        .send()
+        .await
+        .unwrap();
+    // make check builds with the page (REEL_LICENCES); a plain cargo test may not
+    if option_env!("REEL_LICENCES").is_none() && !built_in() {
+        assert_eq!(r.status(), 404);
+        assert!(r
+            .text()
+            .await
+            .unwrap()
+            .contains("This build has no licence page."));
+        eprintln!("skipping the crates: built without REEL_LICENCES");
+        return;
+    }
+    assert!(
+        built_in(),
+        "REEL_LICENCES was given, so the page is built in"
+    );
+    assert_eq!(r.status(), 200);
+    assert_eq!(r.headers()["content-type"], "text/html; charset=utf-8");
+    let page = r.text().await.unwrap();
+    let licence =
+        std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/../../LICENSE")).unwrap();
+    let holder = licence
+        .lines()
+        .find(|l| l.starts_with("Copyright (c) "))
+        .unwrap();
+    assert!(page.contains(holder), "reel's own licence");
+    assert!(page.contains("Apache License") && page.contains("MIT License"));
+    let mut crates = 0;
+    for lock in ["Cargo.lock", "desktop/Cargo.lock"] {
+        let path = format!("{}/../../{lock}", env!("CARGO_MANIFEST_DIR"));
+        let lock: toml::Value = toml::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
+        for p in lock["package"].as_array().unwrap() {
+            if p.get("source").is_none() {
+                continue;
+            }
+            let (name, version) = (p["name"].as_str().unwrap(), p["version"].as_str().unwrap());
+            assert!(
+                page.contains(&format!(">{name} {version}<")),
+                "{name} {version} of {path} is on the page"
+            );
+            crates += 1;
+        }
+    }
+    assert!(crates > 600, "{crates}");
 }
 
 #[tokio::test(flavor = "multi_thread")]

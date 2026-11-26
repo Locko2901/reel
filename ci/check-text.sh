@@ -9,7 +9,8 @@ if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
   git ls-files -z
 else
   find . -path ./.git -prune -o -path ./target -prune -o -path ./site -prune \
-    -o -path ./dev -prune -o -path '*/node_modules' -prune -o -type f -print0 | sed -z 's|^\./||'
+    -o -path ./dev -prune -o -path '*/node_modules' -prune -o -path ./desktop/app/binaries -prune \
+    -o -type f -print0 | sed -z 's|^\./||'
 fi | grep -zv '^dev/' | xargs -0 grep -InP "$BAD" -- >"${TMPDIR:-/tmp}/reel-check-text.$$" || true
 
 if [ -s "${TMPDIR:-/tmp}/reel-check-text.$$" ]; then

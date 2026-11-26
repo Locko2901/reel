@@ -16,6 +16,9 @@ build() {
 put() {
   for f in "$NSIS"/reel_*-setup.exe*; do cp "$f" "/out/$(basename "$f" | sed "s/^reel_/${1}_/")"; done
 }
+# The licence page goes in the install folder and into reel on this PC.
+sh ../../ci/licence-page.sh binaries/licences.html
+export REEL_LICENCES="$PWD/binaries/licences.html"
 cargo xwin build --release --target x86_64-pc-windows-msvc -p reel-desktop-core --bin reel-stop --bin reel-elevate
 cp /target/x86_64-pc-windows-msvc/release/reel-stop.exe nsis/reel-stop.exe
 cp /target/x86_64-pc-windows-msvc/release/reel-elevate.exe nsis/reel-elevate.exe

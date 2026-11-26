@@ -6,9 +6,9 @@ out() { printf '%s=%s\n' "$1" "$2" >> "${GITHUB_OUTPUT:-/dev/stdout}"; }
 # Not docs/configuration.md: make check proves it is made from the settings.
 DOCS='^(docs/.*|[^/]*\.md)$'
 CHECKED='^docs/configuration\.md$'
-INSTALLERS='^(desktop/app/nsis/.*|desktop/app/tauri[^/]*\.json|desktop/packages\.json|desktop/obs/.*|desktop/ffmpeg/.*|desktop/ci/(build-windows\.sh|packages\.sh|fetch-obs\.sh|fetch-ffmpeg\.sh|fetch-previous\.sh|check-installers\.sh|check-nsis\.sh|check-obs-start\.sh|icuuc-stub\.c|desktop\.Dockerfile|changes\.sh)|Makefile|\.github/workflows/desktop\.yml)$'
+INSTALLERS='^(desktop/app/nsis/.*|desktop/app/tauri[^/]*\.json|desktop/packages\.json|desktop/obs/.*|desktop/ffmpeg/.*|desktop/ci/(build-windows\.sh|packages\.sh|fetch-obs\.sh|fetch-ffmpeg\.sh|fetch-previous\.sh|check-installers\.sh|check-nsis\.sh|check-obs-start\.sh|icuuc-stub\.c|desktop\.Dockerfile|changes\.sh)|about\.toml|ci/licence-page\.(sh|py)|Makefile|\.github/workflows/desktop\.yml)$'
 # The files that rebuild the installer without OBS too, not the one with OBS alone.
-PLAIN='^(desktop/app/nsis/(plain|common|English)\.nsh|desktop/app/nsis/installer\.nsi|desktop/app/tauri\.conf\.json|desktop/packages\.json|desktop/ci/(build-windows|check-installers|check-nsis|packages)\.sh)$'
+PLAIN='^(desktop/app/nsis/(plain|common|English)\.nsh|desktop/app/nsis/installer\.nsi|desktop/app/tauri\.conf\.json|desktop/packages\.json|desktop/ci/(build-windows|check-installers|check-nsis|packages)\.sh|about\.toml|ci/licence-page\.(sh|py))$'
 labelled() { printf '%s\n' "${LABELS:-}" | tr ',' '\n' | grep -qx installers; }
 
 if [ "${EVENT:-}" != pull_request ]; then

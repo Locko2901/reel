@@ -13,7 +13,7 @@
       </div>
     </div>
     <div class="panel about-panel" data-section="about"{% if section != "about" %} hidden{% endif %}>
-      <header><h2>Credits</h2><span class="desc">the work of others reel ships with, each under its own licence</span><div class="actions"><a class="btn small" href="{{ about.third_party }}" rel="noopener" aria-label="Every one, with where its source is">Every one</a></div></header>
+      <header><h2>Credits</h2><span class="desc">the work of others reel ships with, each under its own licence</span><div class="actions"><a class="btn small" href="{{ about.licences }}" aria-label="Every one, with its licence text">Every one</a></div></header>
       <div class="body flush">
         {% for r in about.credits %}{% include "about-row.html" %}
         {% endfor %}

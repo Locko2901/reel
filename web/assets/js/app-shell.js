@@ -122,7 +122,7 @@ export function appShell() {
   $('#about-updates')?.addEventListener('click', () => call('app_open_settings', { section: 'startup', shape: shape() }).catch(() => {}));
   // About's links open in the browser, as the docs do, and the window stays on reel; an app
   // without the command, or one that does not know the place, follows the link itself
-  $$('.about-panel a[href^="https://"]').forEach(a => a.addEventListener('click', (e) => {
+  $$('.about-panel a[href^="https://"], .about-panel a[href="/licences"]').forEach(a => a.addEventListener('click', (e) => {
     if (e.button !== 0) return;
     e.preventDefault();
     call('app_open_link', { url: a.href }).catch(() => { location.href = a.href; });

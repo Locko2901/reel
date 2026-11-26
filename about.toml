@@ -1,0 +1,163 @@
+# cargo-about's settings for the licence page (ci/licence-page.sh), for both workspaces.
+# A crate under a choice of licences is listed under the first of these it offers. Those whose text
+# names no holder come first: their SPDX text is the whole licence when a crate ships none.
+accepted = [
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "Unlicense",
+    "CC0-1.0",
+    "BSL-1.0",
+    "MPL-2.0",
+    "CDLA-Permissive-2.0",
+    "MIT",
+    "MIT-0",
+    "BSD-3-Clause",
+    "BSD-2-Clause",
+    "BSD-1-Clause",
+    "ISC",
+    "Zlib",
+    "Unicode-3.0",
+]
+# The same graph as deny.toml's, without what only the tests use.
+targets = ["x86_64-unknown-linux-gnu", "x86_64-pc-windows-msvc"]
+ignore-dev-dependencies = true
+private = { ignore = true }
+workarounds = ["chrono"]
+
+# Licence files cargo-about cannot read alone, each with more than one notice in it: the whole file
+# is the text.
+[brotli-decompressor.clarify]
+license = "BSD-3-Clause"
+[[brotli-decompressor.clarify.files]]
+path = "LICENSE"
+checksum = "c0c56f26d9c051cac4d200c34c84e7ae9aaa853e01a982a1df08b09931e518ae"
+
+[curve25519-dalek.clarify]
+license = "BSD-3-Clause"
+[[curve25519-dalek.clarify.files]]
+path = "LICENSE"
+checksum = "cca0bd3c4fcdba74145ef9d49c62337e2c9fbf9368288f11d0547f1b0273219f"
+
+[dpi.clarify]
+license = "Apache-2.0 AND MIT"
+[[dpi.clarify.files]]
+path = "LICENSE"
+license = "Apache-2.0"
+checksum = "6dc0e068dcf3a5bc8e054205b85b7720e1d49265bbc64bf515d2cf79197df69a"
+[[dpi.clarify.files]]
+path = "LICENSE-LIBM-MIT"
+license = "MIT"
+checksum = "9eff396a99bafd208e7126602420d6864f6066c08b84485a5b032320a9c01997"
+
+[libm.clarify]
+license = "MIT"
+[[libm.clarify.files]]
+path = "LICENSE.txt"
+checksum = "3823dda7cf046602f4b4e77ec8e227863dc4736037cc85bb33d9f19febe16bb7"
+
+[minisign-verify.clarify]
+license = "MIT"
+[[minisign-verify.clarify.files]]
+path = "LICENSE"
+checksum = "42c8695fbc468866d9756be99af0ba4e37d733f8daa3c8827c8d80b8bec1b2f9"
+
+# Crates whose source files cargo-about takes for licence texts, code and all: their licence files,
+# and of a copied file the notice alone.
+[encoding_rs.clarify]
+license = "(Apache-2.0 OR MIT) AND BSD-3-Clause"
+[[encoding_rs.clarify.files]]
+path = "LICENSE-APACHE"
+license = "Apache-2.0"
+checksum = "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+[[encoding_rs.clarify.files]]
+path = "LICENSE-MIT"
+license = "MIT"
+checksum = "3fa4ca83dcc9237839b1bdeb2e6d16bdfb5ec0c5ce42b24694d8bbf0dcbef72c"
+[[encoding_rs.clarify.files]]
+path = "LICENSE-WHATWG"
+license = "BSD-3-Clause"
+checksum = "838118388fe5c2e7f1dbbaeed13e1c7f3ebf88be91319c7c1d77c18e987d1a50"
+
+[ring.clarify]
+license = "Apache-2.0 AND ISC"
+[[ring.clarify.files]]
+path = "LICENSE-BoringSSL"
+license = "Apache-2.0"
+checksum = "005fc765ddc5115da796cca915baa9557abae13ff35e0a47c47affc56f6c414d"
+[[ring.clarify.files]]
+path = "LICENSE-other-bits"
+license = "ISC"
+checksum = "f025ccfb7dfb6bdfedc75ca0f67acc69e6fb4998143d834f7c2f38a29989680f"
+
+[schemars_derive.clarify]
+license = "MIT"
+[[schemars_derive.clarify.files]]
+path = "LICENSE"
+checksum = "1954992a2b32e8a2af24a4c11b726902e344c1934b947a77f04d404908f8db30"
+[[schemars_derive.clarify.files]]
+path = "src/regex_syntax.rs"
+start = "// Copyright (c) 2014 The Rust Project Developers"
+end = "// DEALINGS IN THE SOFTWARE."
+checksum = "271f2624842bf6b1d1b3a78e7b82693ad2cd2741480da32117a5169e58843392"
+
+# Crates published without their licence file: its text from their repository, at the commit the
+# crate was published from.
+[alloc-stdlib.clarify]
+license = "BSD-3-Clause"
+[[alloc-stdlib.clarify.git]]
+path = "LICENSE"
+checksum = "c0c56f26d9c051cac4d200c34c84e7ae9aaa853e01a982a1df08b09931e518ae"
+
+[axum-login.clarify]
+license = "MIT"
+[[axum-login.clarify.git]]
+path = "LICENSE"
+checksum = "f15bf5474582f725b331ee8a5e19121ac3f6cd5c4fe508b5c7172017241e5129"
+
+[dlopen2.clarify]
+license = "MIT"
+[[dlopen2.clarify.git]]
+path = "LICENSE"
+checksum = "39fa265207450e77c62e90c5594a06c085b655d8374c7ced4bf7894b6bd95dd2"
+
+[dlopen2_derive.clarify]
+license = "MIT"
+[[dlopen2_derive.clarify.git]]
+path = "LICENSE"
+checksum = "39fa265207450e77c62e90c5594a06c085b655d8374c7ced4bf7894b6bd95dd2"
+
+[tower-sessions-core.clarify]
+license = "MIT"
+[[tower-sessions-core.clarify.git]]
+path = "LICENSE"
+checksum = "81e729db46699dc38143ab423791259022f35ef8b331702d4540a0f3dbe3d7bf"
+
+[tower-sessions-memory-store.clarify]
+license = "MIT"
+[[tower-sessions-memory-store.clarify.git]]
+path = "LICENSE"
+checksum = "81e729db46699dc38143ab423791259022f35ef8b331702d4540a0f3dbe3d7bf"
+
+[tower-sessions-sqlx-store.clarify]
+license = "MIT"
+[[tower-sessions-sqlx-store.clarify.git]]
+path = "LICENSE"
+checksum = "ab56abc794a2b89a1b893461d0b7e9cee906ee2601eb0100def33499a32c9f34"
+
+[webview2-com.clarify]
+license = "MIT"
+[[webview2-com.clarify.git]]
+path = "LICENSE"
+checksum = "0dcf41516e608bbcb6cdc5229feb7b86fe4a643b85e7df251133c93408fdac73"
+
+[webview2-com-macros.clarify]
+license = "MIT"
+[[webview2-com-macros.clarify.git]]
+path = "LICENSE"
+checksum = "0dcf41516e608bbcb6cdc5229feb7b86fe4a643b85e7df251133c93408fdac73"
+
+[webview2-com-sys.clarify]
+license = "MIT"
+[[webview2-com-sys.clarify.git]]
+path = "LICENSE"
+checksum = "0dcf41516e608bbcb6cdc5229feb7b86fe4a643b85e7df251133c93408fdac73"

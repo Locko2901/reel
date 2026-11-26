@@ -2,6 +2,7 @@
   "bundle": {
     "resources": {
       "binaries/ffmpeg-LICENSE.txt": "binaries/ffmpeg-LICENSE.txt",
+      "binaries/licences.html": "licences.html",
       "obs/": "obs/"
     },
     "windows": {

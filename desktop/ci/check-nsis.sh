@@ -73,7 +73,10 @@ scheme() {
   cmd=$(wine reg query "$SCHEME\\shell\\open\\command" /ve 2>/dev/null | tr -d '\r' | sed -n 's/.*REG_SZ *//p')
   [ "$cmd" = "\"$WI\\reel-desktop.exe\" \"%1\"" ]
 }
-app_files() { for f in reel-desktop.exe ffmpeg.exe ffprobe.exe binaries/ffmpeg-LICENSE.txt reel-elevate.exe uninstall.exe; do [ -f "$I/$f" ] || return 1; done; }
+app_files() {
+  for f in reel-desktop.exe ffmpeg.exe ffprobe.exe binaries/ffmpeg-LICENSE.txt licences.html reel-elevate.exe uninstall.exe; do [ -f "$I/$f" ] || return 1; done
+  grep -q '<meta name="reel-crates" content="[0-9]' "$I/licences.html"
+}
 # update <installer> <window title> <what> <flags...>
 update() {
   exe=$1 title=$2 what=$3
@@ -100,7 +103,7 @@ inst "$PLAIN"
 key "$UNINST\\reel" && app_files && [ -f "$MENU" ] && [ ! -e "$I/obs" ] && [ "$(entries)" = 1 ] || fail "$P is not all there: $(ls "$I")"
 ! running 'reel-desktop.exe' || fail "a silent install started reel"
 scheme || fail "$P did not register its links: $(wine reg query "$SCHEME" /s 2>/dev/null | tr -d '\r' | head -8)"
-ok "$P: the app, ffmpeg and ffprobe with ffmpeg's licence, reel-elevate.exe, the uninstaller, the Start menu's shortcut reel, one reel in Apps, its links (reel-desktop://) to its reel-desktop.exe; no OBS; reel not started"
+ok "$P: the app, ffmpeg and ffprobe with ffmpeg's licence, the licence page, reel-elevate.exe, the uninstaller, the Start menu's shortcut reel, one reel in Apps, its links (reel-desktop://) to its reel-desktop.exe; no OBS; reel not started"
 
 # Wine's HKCR leaves out the user's own classes: the registered command is run as Windows would.
 WD="$W/app-dir"
